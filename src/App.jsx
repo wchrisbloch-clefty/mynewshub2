@@ -17,7 +17,9 @@ const DEFAULT_FEEDS={
     {name:'Fox News',url:'https://moxie.foxnews.com/google-publisher/latest.xml',on:true},
     {name:'NY Post',url:'https://nypost.com/feed/',on:true},
     {name:'CNBC',url:'https://www.cnbc.com/id/100003114/device/rss/rss.html',on:true},
-    {name:'Houston Chronicle',url:'https://www.houstonchronicle.com/rss/feed/Top-News-238.php',on:true},
+    {name:'Houston Chronicle',url:'https://www.chron.com/rss/feed/Top-News-201.php',on:true},
+    {name:'Politico',url:'https://www.politico.com/rss/politicopicks.xml',on:true},
+    {name:'Reuters',url:'https://feeds.reuters.com/reuters/topNews',on:true},
   ],
   sports:[
     {name:'ESPN NFL',url:'https://www.espn.com/espn/rss/nfl/news',on:true},
@@ -25,72 +27,118 @@ const DEFAULT_FEEDS={
     {name:'ESPN CFB',url:'https://www.espn.com/espn/rss/ncf/news',on:true},
     {name:'ESPN CBB',url:'https://www.espn.com/espn/rss/ncb/news',on:true},
     {name:'CBS Sports NFL',url:'https://www.cbssports.com/rss/headlines/nfl',on:true},
+    {name:'CBS Sports MLB',url:'https://www.cbssports.com/rss/headlines/mlb',on:true},
     {name:'Pro Football Talk',url:'https://profootballtalk.nbcsports.com/feed/',on:true},
     {name:'247Sports',url:'https://247sports.com/feeds/articles/rss/',on:true},
     {name:'Kentucky Sports Radio',url:'https://kentuckysportsradio.com/feed/',on:true},
+    {name:'Bleacher Report',url:'https://bleacherreport.com/articles/feed',on:true},
   ],
   business:[
-    {name:'Oil & Gas Journal',url:'https://www.ogj.com/rss',on:true},
+    {name:'Reuters Business',url:'https://feeds.reuters.com/reuters/businessNews',on:true},
+    {name:'CNBC Energy',url:'https://www.cnbc.com/id/10000664/device/rss/rss.html',on:true},
+    {name:'Oilprice.com',url:'https://oilprice.com/rss/main',on:true},
     {name:'Utility Dive',url:'https://www.utilitydive.com/feeds/news/',on:true},
     {name:'Data Center Dynamics',url:'https://www.datacenterdynamics.com/en/rss/',on:true},
-    {name:'AI News',url:'https://artificialintelligence-news.com/feed/',on:true},
-    {name:'MIT Tech Review',url:'https://www.technologyreview.com/feed/',on:true},
-    {name:'Rigzone',url:'https://www.rigzone.com/news/rss/rigzone_latest.aspx',on:true},
-    {name:'E&E News',url:'https://www.eenews.net/rss/1',on:true},
     {name:'Power Magazine',url:'https://www.powermag.com/feed/',on:true},
+    {name:'Rigzone',url:'https://www.rigzone.com/news/rss/rigzone_latest.aspx',on:true},
+    {name:'MIT Tech Review',url:'https://www.technologyreview.com/feed/',on:true},
+    {name:'AI News',url:'https://artificialintelligence-news.com/feed/',on:true},
+    {name:'Canary Media',url:'https://www.canarymedia.com/rss',on:true},
   ],
   finance:[
     {name:'MarketWatch',url:'https://feeds.marketwatch.com/marketwatch/topstories/',on:true},
+    {name:'Yahoo Finance',url:'https://finance.yahoo.com/news/rssindex',on:true},
     {name:'Kiplinger',url:'https://www.kiplinger.com/rss/all',on:true},
     {name:'Motley Fool',url:'https://www.fool.com/feeds/index.aspx',on:true},
-    {name:'Yahoo Finance',url:'https://finance.yahoo.com/news/rssindex',on:true},
-    {name:'BiggerPockets',url:'https://www.biggerpockets.com/blog/feed',on:true},
     {name:'Seeking Alpha',url:'https://seekingalpha.com/feed.xml',on:true},
+    {name:'BiggerPockets',url:'https://www.biggerpockets.com/blog/feed',on:true},
+    {name:'Investopedia',url:'https://www.investopedia.com/feedbuilder/feed/getfeed/?feedName=rss_headline',on:true},
   ],
   bloom:[
-    {name:'BusinessWire - Bloom Energy',url:'https://www.businesswire.com/rss/home/?rss=G7&source=Bloom+Energy',on:true},
+    {name:'Yahoo Finance - BE',url:'https://finance.yahoo.com/rss/headline?s=BE',on:true},
+    {name:'Seeking Alpha - BE',url:'https://seekingalpha.com/symbol/BE/feed.xml',on:true},
+    {name:'Oilprice.com',url:'https://oilprice.com/rss/main',on:true},
     {name:'Utility Dive',url:'https://www.utilitydive.com/feeds/news/',on:true},
     {name:'Data Center Dynamics',url:'https://www.datacenterdynamics.com/en/rss/',on:true},
     {name:'Power Magazine',url:'https://www.powermag.com/feed/',on:true},
-    {name:'E&E News',url:'https://www.eenews.net/rss/1',on:true},
-    {name:'Natural Gas Intelligence',url:'https://www.naturalgasintel.com/feed/',on:true},
-    {name:'Oil & Gas Journal',url:'https://www.ogj.com/rss',on:true},
-    {name:'Rigzone',url:'https://www.rigzone.com/news/rss/rigzone_latest.aspx',on:true},
     {name:'Reuters Business',url:'https://feeds.reuters.com/reuters/businessNews',on:true},
-    {name:'Bloomberg Markets',url:'https://feeds.bloomberg.com/markets/news.rss',on:true},
+    {name:'CNBC Energy',url:'https://www.cnbc.com/id/10000664/device/rss/rss.html',on:true},
     {name:'MIT Tech Review',url:'https://www.technologyreview.com/feed/',on:true},
+    {name:'Canary Media',url:'https://www.canarymedia.com/rss',on:true},
+    {name:'Rigzone',url:'https://www.rigzone.com/news/rss/rigzone_latest.aspx',on:true},
     {name:'AI News',url:'https://artificialintelligence-news.com/feed/',on:true},
   ]
 };
 
-const SK='v6b_';
+const SK='v7_';
 function load(k,def){try{const v=localStorage.getItem(SK+k);return v?JSON.parse(v):def;}catch{return def;}}
 function save(k,v){try{localStorage.setItem(SK+k,JSON.stringify(v));}catch{}}
 
 async function fetchRSS(url){
   try{
-    const r=await fetch(`https://api.rss2json.com/v1/api.json?rss_url=${encodeURIComponent(url)}&count=12`);
+    const r=await fetch(`https://api.rss2json.com/v1/api.json?rss_url=${encodeURIComponent(url)}&count=15`);
     const d=await r.json();
-    if(d.items&&d.items.length)return d.items.map(i=>({title:i.title,link:i.link,desc:(i.description||i.content||'').replace(/<[^>]*>/g,'').slice(0,160),pubDate:i.pubDate,img:i.thumbnail||''}));
+    if(d.items&&d.items.length>0)return d.items.map(i=>({
+      title:(i.title||'').trim(),
+      link:i.link,
+      desc:(i.description||i.content||'').replace(/<[^>]*>/g,'').replace(/&amp;/g,'&').replace(/&nbsp;/g,' ').trim().slice(0,200),
+      pubDate:i.pubDate,
+      img:i.thumbnail||''
+    }));
   }catch{}
   try{
     const r=await fetch(`https://api.allorigins.win/get?url=${encodeURIComponent(url)}`);
     const d=await r.json();
     if(d.contents){
       const p=new DOMParser(),x=p.parseFromString(d.contents,'text/xml');
-      return Array.from(x.querySelectorAll('item')).slice(0,12).map(i=>({title:i.querySelector('title')?.textContent||'',link:i.querySelector('link')?.textContent||'',desc:(i.querySelector('description')?.textContent||'').replace(/<[^>]*>/g,'').slice(0,160),pubDate:i.querySelector('pubDate')?.textContent||'',img:i.querySelector('enclosure')?.getAttribute('url')||''}));
+      const items=Array.from(x.querySelectorAll('item')).slice(0,15);
+      if(items.length>0)return items.map(i=>({
+        title:(i.querySelector('title')?.textContent||'').trim(),
+        link:i.querySelector('link')?.textContent||'',
+        desc:(i.querySelector('description')?.textContent||'').replace(/<[^>]*>/g,'').replace(/&amp;/g,'&').replace(/&nbsp;/g,' ').trim().slice(0,200),
+        pubDate:i.querySelector('pubDate')?.textContent||'',
+        img:i.querySelector('enclosure')?.getAttribute('url')||''
+      }));
     }
+  }catch{}
+  try{
+    const r=await fetch(`https://corsproxy.io/?${encodeURIComponent(url)}`);
+    const txt=await r.text();
+    const p=new DOMParser(),x=p.parseFromString(txt,'text/xml');
+    const items=Array.from(x.querySelectorAll('item')).slice(0,15);
+    if(items.length>0)return items.map(i=>({
+      title:(i.querySelector('title')?.textContent||'').trim(),
+      link:i.querySelector('link')?.textContent||'',
+      desc:(i.querySelector('description')?.textContent||'').replace(/<[^>]*>/g,'').replace(/&amp;/g,'&').replace(/&nbsp;/g,' ').trim().slice(0,200),
+      pubDate:i.querySelector('pubDate')?.textContent||'',
+      img:i.querySelector('enclosure')?.getAttribute('url')||''
+    }));
   }catch{}
   return[];
 }
 
-function ago(d){
+function fmtDate(d){
   if(!d)return'';
-  const diff=Math.floor((Date.now()-new Date(d))/1000);
-  if(isNaN(diff)||diff<0)return'';
-  if(diff<3600)return Math.floor(diff/60)+'m';
-  if(diff<86400)return Math.floor(diff/3600)+'h';
-  return Math.floor(diff/86400)+'d';
+  try{
+    const dt=new Date(d);
+    if(isNaN(dt.getTime()))return'';
+    const now=new Date();
+    const diff=Math.floor((now-dt)/1000);
+    const days=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+    const months=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+    const dayName=days[dt.getDay()];
+    const mon=months[dt.getMonth()];
+    const date=dt.getDate();
+    let h=dt.getHours(),m=dt.getMinutes(),ampm=h>=12?'PM':'AM';
+    h=h%12||12;
+    const mm=m<10?'0'+m:m;
+    const timeStr=`${h}:${mm} ${ampm}`;
+    if(diff<60)return'Just now';
+    if(diff<3600)return`${Math.floor(diff/60)}m ago · ${timeStr}`;
+    if(diff<86400)return`${dayName} ${timeStr}`;
+    if(diff<604800)return`${dayName} ${timeStr} · ${mon} ${date}`;
+    return`${mon} ${date} · ${timeStr}`;
+  }catch{return'';}
 }
 
 const css=`
@@ -145,19 +193,21 @@ body{background:var(--bg);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI
 .hero-body{flex:1;min-width:0;}
 .hero-title{font-size:12px;font-weight:600;color:var(--text);line-height:1.35;margin-bottom:3px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;}
 .hero-meta{font-size:10px;color:var(--text3);display:flex;align-items:center;gap:5px;flex-wrap:wrap;}
+.hero-date{font-size:10px;color:var(--text3);margin-top:2px;}
 .kw-tag{font-size:9px;border-radius:8px;padding:1px 5px;font-weight:500;}
-.mini-acts{display:flex;gap:3px;margin-top:4px;}
+.mini-acts{display:flex;gap:3px;margin-top:5px;}
 .mini-act{background:none;border:1px solid var(--border);border-radius:5px;padding:1px 6px;font-size:9px;cursor:pointer;color:var(--text3);font-family:inherit;}
 .mini-act.al{border-color:#1d4ed8;color:#1d4ed8;background:#eff6ff;}
 .mini-act.as{border-color:#f59e0b;color:#f59e0b;background:#fffbeb;}
 .mini-act.ad{border-color:#ef4444;color:#ef4444;background:#fef2f2;}
-.loading-state{padding:20px;text-align:center;font-size:11px;color:var(--text3);}
+.loading-state{padding:24px;text-align:center;font-size:11px;color:var(--text3);}
 .bloom-strip{display:grid;grid-template-columns:repeat(4,1fr);gap:0;}
 .bloom-strip-item{padding:10px 14px;border-right:1px solid var(--border2);cursor:pointer;transition:background 0.1s;}
 .bloom-strip-item:last-child{border-right:none;}
 .bloom-strip-item:hover{background:var(--bg);}
 .bloom-strip-title{font-size:11px;font-weight:600;color:var(--text);line-height:1.35;margin-bottom:4px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;}
 .bloom-strip-meta{font-size:10px;color:#0369a1;font-weight:500;}
+.bloom-strip-date{font-size:9px;color:var(--text3);margin-top:2px;}
 .cat-page{display:grid;grid-template-columns:1fr 260px;gap:16px;}
 .feed-col{display:flex;flex-direction:column;gap:8px;}
 .feed-card{background:var(--surface);border-radius:10px;border:1px solid var(--border);padding:14px;cursor:pointer;transition:all 0.12s;display:flex;gap:12px;align-items:flex-start;}
@@ -165,9 +215,10 @@ body{background:var(--bg);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI
 .feed-card.bloom-card:hover{border-color:#bae6fd;box-shadow:0 1px 8px rgba(3,105,161,0.08);}
 .feed-av{width:36px;height:36px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:600;flex-shrink:0;}
 .feed-body{flex:1;min-width:0;}
+.feed-top-row{display:flex;align-items:baseline;gap:6px;flex-wrap:wrap;}
 .feed-src{font-size:11px;font-weight:600;}
-.feed-time{font-size:10px;color:var(--text3);}
-.feed-title{font-size:14px;font-weight:700;color:var(--text);line-height:1.35;margin:6px 0 4px;letter-spacing:-0.1px;}
+.feed-date{font-size:10px;color:var(--text3);}
+.feed-title{font-size:14px;font-weight:700;color:var(--text);line-height:1.35;margin:5px 0 4px;letter-spacing:-0.1px;}
 .feed-desc{font-size:12px;color:var(--text2);line-height:1.5;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;margin-bottom:8px;}
 .feed-footer{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:6px;}
 .feed-kws{display:flex;gap:4px;flex-wrap:wrap;}
@@ -232,6 +283,9 @@ body{background:var(--bg);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI
 .p-save{width:100%;background:#0f172a;border:none;color:#fff;border-radius:8px;padding:10px;font-size:13px;font-weight:600;cursor:pointer;margin-top:6px;font-family:inherit;}
 .alert-info{background:var(--bg);border-radius:8px;padding:10px 12px;border:1px solid var(--border);margin-bottom:10px;font-size:11px;color:var(--text2);}
 .bloom-note{background:#e0f2fe;border-radius:6px;padding:8px 10px;margin-bottom:8px;font-size:10px;color:#0369a1;font-weight:500;}
+.no-art{text-align:center;padding:60px 20px;}
+.no-art-msg{font-size:13px;color:var(--text2);margin-bottom:12px;}
+.refresh-btn{border:none;border-radius:8px;padding:8px 16px;cursor:pointer;font-size:12px;font-weight:500;color:#fff;}
 `;
 
 export default function NewsHub(){
@@ -262,10 +316,27 @@ export default function NewsHub(){
   useEffect(()=>{save('clicks',clicks);},[clicks]);
   useEffect(()=>{save('scores',scores);},[scores]);
 
-  const sc=useCallback((a)=>(scores[a.link]||0)+kw.filter(k=>(a.title+(a.desc||'')).toLowerCase().includes(k.toLowerCase())).length*3+(clicks[a.source]||0)*2,[scores,kw,clicks]);
+  const kwScore=(a)=>kw.filter(k=>(a.title+(a.desc||'')).toLowerCase().includes(k.toLowerCase())).length;
+  const sc=useCallback((a)=>(scores[a.link]||0)+kwScore(a)*3+(clicks[a.source]||0)*2,[scores,kw,clicks]);
+
+  const dedupe=(arr)=>{
+    const seen=new Set();
+    return arr.filter(a=>{
+      const key=a.title.slice(0,60).toLowerCase().replace(/\s+/g,'');
+      if(seen.has(key))return false;
+      seen.add(key);
+      return true;
+    });
+  };
+
   const sorted=useCallback((cat)=>{
     const f=search?(arts[cat]||[]).filter(a=>(a.title+(a.desc||'')).toLowerCase().includes(search)):(arts[cat]||[]);
-    return[...f].sort((a,b)=>sc(b)-sc(a)||new Date(b.pubDate)-new Date(a.pubDate));
+    const deduped=dedupe(f);
+    return deduped.sort((a,b)=>{
+      const kwDiff=kwScore(b)-kwScore(a);
+      if(kwDiff!==0)return kwDiff;
+      return new Date(b.pubDate)-new Date(a.pubDate);
+    });
   },[arts,search,sc]);
 
   const kwMatch=(a)=>kw.filter(k=>(a.title+(a.desc||'')).toLowerCase().includes(k.toLowerCase()));
@@ -295,7 +366,7 @@ export default function NewsHub(){
     const results=[];
     await Promise.allSettled((feeds[cat]||[]).filter(f=>f.on).map(async f=>{
       const items=await fetchRSS(f.url);
-      items.forEach(i=>results.push({...i,source:f.name,cat}));
+      items.forEach(i=>{if(i.title&&i.link)results.push({...i,source:f.name,cat});});
     }));
     results.sort((a,b)=>new Date(b.pubDate)-new Date(a.pubDate));
     setArts(a=>({...a,[cat]:results}));
@@ -311,6 +382,7 @@ export default function NewsHub(){
     setLoading({general:false,sports:false,business:false,finance:false,bloom:false});
     setTimeout(()=>Object.keys(CATS).forEach(c=>loadCat(c)),100);
   };
+
   const MiniActs=({a})=>(
     <div className="mini-acts">
       <button className={`mini-act ${likes[a.link]===1?'al':''}`} onClick={e=>likeArt(a.link,1,e)}>Up</button>
@@ -341,9 +413,9 @@ export default function NewsHub(){
           <div className="hero-title">{alert&&<span style={{color:'#dc2626',fontSize:'9px',fontWeight:'700',marginRight:'4px'}}>ALERT</span>}{a.title}</div>
           <div className="hero-meta">
             <span style={{color:cc.color,fontWeight:'600'}}>{a.source}</span>
-            <span>{ago(a.pubDate)}</span>
             {kws.slice(0,2).map(k=><span key={k} className="kw-tag" style={{background:cc.bg,color:cc.color}}>{k}</span>)}
           </div>
+          <div className="hero-date">{fmtDate(a.pubDate)}</div>
           <MiniActs a={a}/>
         </div>
       </div>
@@ -358,10 +430,10 @@ export default function NewsHub(){
       <div className={`feed-card ${cat==='bloom'?'bloom-card':''}`} onClick={()=>clickArt(a)}>
         <div className="feed-av" style={{background:cc.bg,color:cc.color}}>{init}</div>
         <div className="feed-body">
-          <div style={{display:'flex',alignItems:'baseline',gap:'6px'}}>
+          <div className="feed-top-row">
             <span className="feed-src" style={{color:cc.color}}>{a.source}</span>
-            <span className="feed-time">{ago(a.pubDate)}</span>
             {alert&&<span style={{background:'#fef2f2',color:'#dc2626',borderRadius:'4px',padding:'1px 5px',fontSize:'9px',fontWeight:'700'}}>ALERT</span>}
+            <span className="feed-date">{fmtDate(a.pubDate)}</span>
           </div>
           <div className="feed-title">{a.title}</div>
           {a.desc&&<div className="feed-desc">{a.desc}</div>}
@@ -389,12 +461,14 @@ export default function NewsHub(){
           </div>
           <button className="see-all" style={{color:'#0369a1'}} onClick={()=>setTab('bloom')}>All articles</button>
         </div>
-        {ld?<div className="loading-state">Loading...</div>:arts2.length===0?<div className="loading-state">No articles yet</div>:(
+        {ld?<div className="loading-state">Loading Bloom Energy and power news...</div>:
+        arts2.length===0?<div className="loading-state">No articles yet — tap R to refresh</div>:(
           <div className="bloom-strip">
             {arts2.slice(0,4).map((a,i)=>(
               <div key={i} className="bloom-strip-item" onClick={()=>clickArt(a)}>
                 <div className="bloom-strip-title">{a.title}</div>
-                <div className="bloom-strip-meta">{a.source} · {ago(a.pubDate)}</div>
+                <div className="bloom-strip-meta">{a.source}</div>
+                <div className="bloom-strip-date">{fmtDate(a.pubDate)}</div>
               </div>
             ))}
           </div>
@@ -404,7 +478,7 @@ export default function NewsHub(){
   };
 
   const CatBlock=({cat})=>{
-    const cc=CATS[cat],arts2=sorted(cat).slice(0,4),total=(arts[cat]||[]).length,ld=loading[cat];
+    const cc=CATS[cat],arts2=sorted(cat).slice(0,5),total=(arts[cat]||[]).length,ld=loading[cat];
     return(
       <div className="cat-block">
         <div className="cat-block-head">
@@ -415,7 +489,9 @@ export default function NewsHub(){
           </div>
           <button className="see-all" onClick={()=>setTab(cat)}>All</button>
         </div>
-        {ld?<div className="loading-state">Loading...</div>:arts2.length?arts2.map((a,i)=><HeroRow key={i} a={a} cat={cat}/>):<div className="loading-state">No articles yet</div>}
+        {ld?<div className="loading-state">Loading...</div>:
+        arts2.length?arts2.map((a,i)=><HeroRow key={i} a={a} cat={cat}/>):
+        <div className="loading-state">No articles — tap R to refresh</div>}
       </div>
     );
   };
@@ -425,14 +501,14 @@ export default function NewsHub(){
     return(
       <div className="ts-bar">
         <div className="ts-inner">
-          {!hasAny?<div className="ts-item"><div className="ts-cat" style={{color:'var(--text3)'}}>Loading...</div></div>:
+          {!hasAny?<div className="ts-item"><div className="ts-cat" style={{color:'var(--text3)'}}>Loading top stories...</div></div>:
           cats.map(cat=>{
             const cc=CATS[cat],top=sorted(cat)[0];
-            if(!top)return<div key={cat} className="ts-item"><div className="ts-cat" style={{color:cc.color}}>{cc.emoji} {cc.label}</div></div>;
+            if(!top)return<div key={cat} className="ts-item"><div className="ts-cat" style={{color:cc.color}}>{cc.emoji} {cc.label}</div><div className="ts-title" style={{color:'var(--text3)'}}>Loading...</div></div>;
             return<div key={cat} className="ts-item" onClick={()=>clickArt(top)}>
               <div className="ts-cat" style={{color:cc.color}}>{cc.emoji} {cc.label}</div>
               <div className="ts-title">{top.title}</div>
-              <div className="ts-src">{top.source} · {ago(top.pubDate)}</div>
+              <div className="ts-src">{top.source} · {fmtDate(top.pubDate)}</div>
             </div>;
           })}
         </div>
@@ -449,7 +525,10 @@ export default function NewsHub(){
           {arts2.slice(0,8).map((a,i)=>(
             <div key={i} className="trend-row" onClick={()=>clickArt(a)}>
               <div className="trend-n">{i+1}</div>
-              <div><div className="trend-t">{a.title.slice(0,60)}{a.title.length>60?'...':''}</div><div className="trend-s">{a.source} · {ago(a.pubDate)}</div></div>
+              <div>
+                <div className="trend-t">{a.title.slice(0,60)}{a.title.length>60?'...':''}</div>
+                <div className="trend-s">{a.source} · {fmtDate(a.pubDate)}</div>
+              </div>
             </div>
           ))}
         </div>
@@ -583,18 +662,20 @@ export default function NewsHub(){
           )}
           {mainCats.includes(tab)&&(
             loading[tab]?<div style={{textAlign:'center',padding:'60px',fontSize:'13px',color:'var(--text3)'}}>Loading...</div>:
-            sorted(tab).length===0?<div style={{textAlign:'center',padding:'60px'}}><p style={{color:'var(--text2)',marginBottom:'12px'}}>No articles found</p><button onClick={refreshAll} style={{background:'#1d4ed8',color:'#fff',border:'none',borderRadius:'8px',padding:'8px 16px',cursor:'pointer',fontSize:'12px'}}>Refresh</button></div>:
+            sorted(tab).length===0?
+            <div className="no-art"><p className="no-art-msg">No articles found — feeds may be loading</p><button className="refresh-btn" style={{background:'#1d4ed8'}} onClick={refreshAll}>Refresh Now</button></div>:
             <div className="cat-page">
               <div className="feed-col">
-                <div style={{fontSize:'10px',fontWeight:'600',color:'var(--text3)',textTransform:'uppercase',letterSpacing:'0.08em',marginBottom:'4px'}}>{CATS[tab].emoji} Top Stories - {sorted(tab).length} articles</div>
+                <div style={{fontSize:'10px',fontWeight:'600',color:'var(--text3)',textTransform:'uppercase',letterSpacing:'0.08em',marginBottom:'4px'}}>{CATS[tab].emoji} Top Stories — {sorted(tab).length} articles — sorted by relevance then recency</div>
                 {sorted(tab).slice(0,15).map((a,i)=><FeedCard key={i} a={a} cat={tab}/>)}
               </div>
               <Sidebar cat={tab}/>
             </div>
           )}
           {tab==='bloom'&&(
-            loading.bloom?<div style={{textAlign:'center',padding:'60px',fontSize:'13px',color:'var(--text3)'}}>Loading Bloom Energy...</div>:
-            sorted('bloom').length===0?<div style={{textAlign:'center',padding:'60px'}}><p style={{color:'var(--text2)',marginBottom:'12px'}}>No articles found</p><button onClick={refreshAll} style={{background:'#0369a1',color:'#fff',border:'none',borderRadius:'8px',padding:'8px 16px',cursor:'pointer',fontSize:'12px'}}>Refresh</button></div>:
+            loading.bloom?<div style={{textAlign:'center',padding:'60px',fontSize:'13px',color:'var(--text3)'}}>Loading Bloom Energy and power intelligence...</div>:
+            sorted('bloom').length===0?
+            <div className="no-art"><p className="no-art-msg">No articles found — feeds may be loading</p><button className="refresh-btn" style={{background:'#0369a1'}} onClick={refreshAll}>Refresh Now</button></div>:
             <div className="cat-page">
               <div className="feed-col">
                 <div className="bloom-banner">
@@ -612,7 +693,7 @@ export default function NewsHub(){
           {tab==='saved'&&(
             saved.length===0?
             <div className="saved-empty"><div style={{fontSize:'28px',marginBottom:'10px'}}>S</div><div style={{fontSize:'13px',fontWeight:'500',color:'var(--text2)',marginBottom:'4px'}}>No saved articles</div><div style={{fontSize:'11px'}}>Tap Save on any article to bookmark it</div></div>:
-            <div className="cat-page"><div className="feed-col"><div style={{fontSize:'10px',fontWeight:'600',color:'var(--text3)',textTransform:'uppercase',letterSpacing:'0.08em',marginBottom:'4px'}}>Saved - {saved.length} articles</div>{saved.map((a,i)=><FeedCard key={i} a={a} cat={a.cat||'general'}/>)}</div></div>
+            <div className="cat-page"><div className="feed-col"><div style={{fontSize:'10px',fontWeight:'600',color:'var(--text3)',textTransform:'uppercase',letterSpacing:'0.08em',marginBottom:'4px'}}>Saved — {saved.length} articles</div>{saved.map((a,i)=><FeedCard key={i} a={a} cat={a.cat||'general'}/>)}</div></div>
           )}
         </div>
         {showPanel&&<CustomizePanel/>}
@@ -620,4 +701,3 @@ export default function NewsHub(){
     </>
   );
 }
-
