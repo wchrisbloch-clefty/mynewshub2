@@ -370,9 +370,18 @@ export default function NewsHub(){
   const kwScore=(a)=>kw.filter(k=>(a.title+(a.desc||'')).toLowerCase().includes(k.toLowerCase())).length;
   const sc=useCallback((a)=>(scores[a.link]||0)+kwScore(a)*3+(clicks[a.source]||0)*2,[scores,kw,clicks]);
   const dedupe=(arr)=>{const seen=new Set();return arr.filter(a=>{const k=a.title.slice(0,60).toLowerCase().replace(/\s+/g,'');if(seen.has(k))return false;seen.add(k);return true;});};
+
   const sorted=useCallback((cat)=>{
     const f=search?(arts[cat]||[]).filter(a=>(a.title+(a.desc||'')).toLowerCase().includes(search)):(arts[cat]||[]);
-    return dedupe(f).sort((a,b)=>{const d=kwScore(b)-kwScore(a);if(d!==0)return d;return new Date(b.pubDate)-new Date(a.pubDate);});
+    const deduped=dedupe(f);
+    const bySource={};
+    deduped.forEach(a=>{if(!bySource[a.source])bySource[a.source]=[];bySource[a.source].push(a);});
+    Object.keys(bySource).forEach(src=>{bySource[src].sort((a,b)=>{const d=kwScore(b)-kwScore(a);if(d!==0)return d;return new Date(b.pubDate)-new Date(a.pubDate);});});
+    const srcKeys=Object.keys(bySource).sort((a,b)=>{const topA=bySource[a][0],topB=bySource[b][0];const d=kwScore(topB)-kwScore(topA);if(d!==0)return d;return new Date(topB.pubDate)-new Date(topA.pubDate);});
+    const result=[];
+    const maxLen=Math.max(...srcKeys.map(k=>bySource[k].length));
+    for(let i=0;i<maxLen;i++){srcKeys.forEach(src=>{if(bySource[src][i])result.push(bySource[src][i]);});}
+    return result;
   },[arts,search,sc]);
 
   const kwMatch=(a)=>kw.filter(k=>(a.title+(a.desc||'')).toLowerCase().includes(k.toLowerCase()));
@@ -535,7 +544,6 @@ export default function NewsHub(){
       (podEps[p.name]||[]).slice(0,3).forEach(e=>allEps.push({...e,show:p.name,host:p.host,showEmoji:p.emoji}));
     });
     allEps.sort((a,b)=>new Date(b.pubDate)-new Date(a.pubDate));
-    const displayPod=activePod||null;
     const displayEps=activePod?(podEps[activePod.name]||[]).map(e=>({...e,show:activePod.name,host:activePod.host,showEmoji:activePod.emoji})):allEps;
     const isLoading=activePod?podLoading[activePod.name]:PODCAST_FEEDS.some(p=>podLoading[p.name]);
     return(
