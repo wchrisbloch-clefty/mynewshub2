@@ -22,15 +22,19 @@ const PODCAST_FEEDS=[
 const DEFAULT_FEEDS={
   general:[
     {name:'BBC News',url:'https://feeds.bbci.co.uk/news/rss.xml',on:true},
-    {name:'NPR News',url:'https://feeds.npr.org/1001/rss.xml',on:true},
-    {name:'The Hill',url:'https://thehill.com/homenews/feed/',on:true},
-    {name:'TechCrunch',url:'https://techcrunch.com/feed/',on:true},
+    {name:'Reuters Top News',url:'https://feeds.reuters.com/reuters/topNews',on:true},
+    {name:'CNBC Top News',url:'https://www.cnbc.com/id/100003114/device/rss/rss.html',on:true},
     {name:'Fox News',url:'https://moxie.foxnews.com/google-publisher/latest.xml',on:true},
     {name:'NY Post',url:'https://nypost.com/feed/',on:true},
-    {name:'CNBC',url:'https://www.cnbc.com/id/100003114/device/rss/rss.html',on:true},
-    {name:'Houston Chronicle',url:'https://www.chron.com/rss/feed/Top-News-201.php',on:true},
-    {name:'Politico',url:'https://www.politico.com/rss/politicopicks.xml',on:true},
-    {name:'Reuters',url:'https://feeds.reuters.com/reuters/topNews',on:true},
+    {name:'The Hill',url:'https://thehill.com/homenews/feed/',on:true},
+    {name:'TechCrunch',url:'https://techcrunch.com/feed/',on:true},
+    {name:'Washington Times',url:'https://www.washingtontimes.com/rss/headlines/news/',on:true},
+    {name:'The Guardian US',url:'https://www.theguardian.com/us/rss',on:true},
+    {name:'Axios',url:'https://api.axios.com/feed/',on:true},
+    {name:'Breitbart',url:'https://feeds.feedburner.com/breitbart',on:true},
+    {name:'KHOU Houston',url:'https://www.khou.com/feeds/syndication/rss/news',on:true},
+    {name:'Click2Houston',url:'https://www.click2houston.com/rss/news.rss',on:true},
+    {name:'Chron.com',url:'https://www.chron.com/rss/feed/News-270.php',on:true},
   ],
   sports:[
     {name:'ESPN NFL',url:'https://www.espn.com/espn/rss/nfl/news',on:true},
@@ -39,10 +43,18 @@ const DEFAULT_FEEDS={
     {name:'ESPN CBB',url:'https://www.espn.com/espn/rss/ncb/news',on:true},
     {name:'CBS Sports NFL',url:'https://www.cbssports.com/rss/headlines/nfl',on:true},
     {name:'CBS Sports MLB',url:'https://www.cbssports.com/rss/headlines/mlb',on:true},
-    {name:'Pro Football Talk',url:'https://profootballtalk.nbcsports.com/feed/',on:true},
-    {name:'247Sports',url:'https://247sports.com/feeds/articles/rss/',on:true},
+    {name:'CBS Sports CFB',url:'https://www.cbssports.com/rss/headlines/college-football',on:true},
+    {name:'CBS Sports CBB',url:'https://www.cbssports.com/rss/headlines/college-basketball',on:true},
+    {name:'Pro Football Talk',url:'https://www.nbcsports.com/profootballtalk.rss',on:true},
+    {name:'Bleacher Report',url:'https://feeds.bleacherreport.com/articles/feed',on:true},
+    {name:'247Sports',url:'https://247sports.com/Page/College-Sports-News-and-Recruiting-100021/Feeds/',on:true},
+    {name:'Rivals',url:'https://n.rivals.com//feed',on:true},
+    {name:'On3 Recruiting',url:'https://www.on3.com/feed/',on:true},
+    {name:'NCAA Basketball',url:'https://www.ncaa.com/news/basketball-men/d1/rss.xml',on:true},
+    {name:'NCAA Football',url:'https://www.ncaa.com/news/football/fbs/rss.xml',on:true},
     {name:'Kentucky Sports Radio',url:'https://kentuckysportsradio.com/feed/',on:true},
-    {name:'Bleacher Report',url:'https://bleacherreport.com/articles/feed',on:true},
+    {name:'The Spun',url:'https://thespun.com/.rss/full/',on:true},
+    {name:'Yardbarker',url:'https://www.yardbarker.com/rss/sport_merge_nfl',on:true},
   ],
   business:[
     {name:'Reuters Business',url:'https://feeds.reuters.com/reuters/businessNews',on:true},
@@ -55,18 +67,20 @@ const DEFAULT_FEEDS={
     {name:'MIT Tech Review',url:'https://www.technologyreview.com/feed/',on:true},
     {name:'AI News',url:'https://artificialintelligence-news.com/feed/',on:true},
     {name:'Canary Media',url:'https://www.canarymedia.com/rss',on:true},
+    {name:'The Guardian Business',url:'https://www.theguardian.com/business/rss',on:true},
+    {name:'CNBC Tech',url:'https://www.cnbc.com/id/19854910/device/rss/rss.html',on:true},
   ],
   finance:[
     {name:'MarketWatch',url:'https://feeds.marketwatch.com/marketwatch/topstories/',on:true},
     {name:'Yahoo Finance',url:'https://finance.yahoo.com/news/rssindex',on:true},
+    {name:'Reuters Finance',url:'https://feeds.reuters.com/reuters/businessNews',on:true},
     {name:'Kiplinger',url:'https://www.kiplinger.com/rss/all',on:true},
     {name:'Motley Fool',url:'https://www.fool.com/feeds/index.aspx',on:true},
-    {name:'Seeking Alpha',url:'https://seekingalpha.com/feed.xml',on:true},
-    {name:'BiggerPockets',url:'https://www.biggerpockets.com/blog/feed',on:true},
     {name:'Investopedia',url:'https://www.investopedia.com/feedbuilder/feed/getfeed/?feedName=rss_headline',on:true},
+    {name:'BiggerPockets',url:'https://www.biggerpockets.com/blog/feed',on:true},
+    {name:'CNBC Finance',url:'https://www.cnbc.com/id/10000664/device/rss/rss.html',on:true},
   ],
   bloom:[
-    {name:'Motley Fool',url:'https://www.fool.com/feeds/index.aspx',on:true},
     {name:'Oilprice.com',url:'https://oilprice.com/rss/main',on:true},
     {name:'Utility Dive',url:'https://www.utilitydive.com/feeds/news/',on:true},
     {name:'Data Center Dynamics',url:'https://www.datacenterdynamics.com/en/rss/',on:true},
@@ -77,6 +91,7 @@ const DEFAULT_FEEDS={
     {name:'Canary Media',url:'https://www.canarymedia.com/rss',on:true},
     {name:'Rigzone',url:'https://www.rigzone.com/news/rss/rigzone_latest.aspx',on:true},
     {name:'AI News',url:'https://artificialintelligence-news.com/feed/',on:true},
+    {name:'Motley Fool',url:'https://www.fool.com/feeds/index.aspx',on:true},
     {name:'Investopedia',url:'https://www.investopedia.com/feedbuilder/feed/getfeed/?feedName=rss_headline',on:true},
   ]
 };
@@ -589,7 +604,7 @@ export default function NewsHub(){
           </div>
           <div className="side-block">
             <div className="side-title">About AI Summaries</div>
-            <div style={{fontSize:'11px',color:'var(--text2)',lineHeight:'1.6'}}>Tap <strong>AI Summary</strong> on any episode for a 2-3 sentence Claude-powered summary of what the episode covers — without listening first.</div>
+            <div style={{fontSize:'11px',color:'var(--text2)',lineHeight:'1.6'}}>Tap <strong>AI Summary</strong> on any episode for a 2-3 sentence Claude-powered summary — without listening first.</div>
           </div>
         </div>
       </div>
