@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 
 const CATS={
   general:{label:'General',color:'#1d4ed8',bg:'#eff6ff',emoji:'🌐'},
@@ -313,7 +313,6 @@ body{background:var(--bg);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI
 .trend-t{font-size:11px;font-weight:500;color:var(--text);line-height:1.3;}
 .trend-s{font-size:10px;color:var(--text3);margin-top:1px;}
 .kw-chip{display:inline-block;border-radius:20px;padding:3px 9px;font-size:10px;margin:2px;cursor:pointer;font-weight:500;}
-.bloom-kw{background:#e0f2fe;color:#0369a1;}
 .social-row{display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:1px solid var(--border2);cursor:pointer;}
 .social-row:last-child{border-bottom:none;}
 .social-av{width:24px;height:24px;border-radius:50%;background:#000;color:#fff;display:flex;align-items:center;justify-content:center;font-size:8px;font-weight:700;}
@@ -326,31 +325,42 @@ body{background:var(--bg);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI
 .bloom-banner-sub{font-size:11px;color:rgba(255,255,255,0.85);}
 .panel-overlay{position:fixed;inset:0;background:rgba(15,23,42,0.4);z-index:500;display:none;align-items:center;justify-content:center;padding:20px;}
 .panel-overlay.open{display:flex;}
-.panel{background:var(--surface);border-radius:14px;width:100%;max-width:480px;max-height:88vh;overflow-y:auto;box-shadow:0 16px 48px rgba(0,0,0,0.15);}
+.panel{background:var(--surface);border-radius:14px;width:100%;max-width:500px;max-height:88vh;overflow-y:auto;box-shadow:0 16px 48px rgba(0,0,0,0.15);}
 .panel-head{padding:16px 20px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;position:sticky;top:0;background:var(--surface);z-index:10;}
 .panel-htitle{font-size:14px;font-weight:600;color:var(--text);}
 .panel-x{background:none;border:none;font-size:16px;cursor:pointer;color:var(--text3);line-height:1;}
 .panel-body{padding:18px 20px;}
 .p-sec{margin-bottom:20px;}
 .p-lbl{font-size:9px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:0.08em;margin-bottom:8px;}
-.p-sublbl{font-size:9px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:0.06em;margin:10px 0 6px;display:flex;align-items:center;gap:6px;}
-.p-row{display:flex;align-items:center;padding:6px 0;border-bottom:1px solid var(--border2);}
+.p-row{display:flex;align-items:center;padding:7px 0;border-bottom:1px solid var(--border2);gap:8px;}
+.p-row:last-child{border-bottom:none;}
 .p-name{flex:1;font-size:12px;color:var(--text);}
+.p-count{font-size:10px;color:var(--text3);white-space:nowrap;}
+.p-del{background:none;border:none;color:var(--text3);cursor:pointer;font-size:13px;padding:0 2px;line-height:1;}
+.p-del:hover{color:#dc2626;}
 .tog{width:32px;height:18px;border-radius:9px;border:none;cursor:pointer;position:relative;transition:background 0.2s;flex-shrink:0;}
 .tog.on{background:#1d4ed8;}
 .tog.off{background:#cbd5e1;}
 .tog::after{content:'';width:14px;height:14px;background:#fff;border-radius:50%;position:absolute;top:2px;transition:left 0.15s;}
 .tog.on::after{left:16px;}
 .tog.off::after{left:2px;}
+.health-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0;}
+.health-green{background:#16a34a;}
+.health-yellow{background:#d97706;}
+.health-red{background:#dc2626;}
+.health-gray{background:#94a3b8;}
+.health-legend{display:flex;gap:12px;margin-bottom:10px;font-size:10px;color:var(--text3);flex-wrap:wrap;}
+.health-legend-item{display:flex;align-items:center;gap:4px;}
 .p-chip{display:inline-flex;align-items:center;gap:3px;border-radius:20px;padding:3px 9px;font-size:11px;margin:2px;font-weight:500;}
 .p-kw{background:#eff6ff;color:#1d4ed8;}
 .p-alert{background:#fef2f2;color:#dc2626;}
 .p-so{background:#f0fdf4;color:#166534;}
 .p-chip-x{background:none;border:none;cursor:pointer;font-size:11px;opacity:0.6;}
 .p-add{display:flex;gap:6px;margin-top:8px;}
+.p-add-2{display:grid;grid-template-columns:1fr 1fr auto;gap:6px;margin-top:8px;}
 .p-input{flex:1;border:1px solid var(--border);border-radius:6px;padding:6px 10px;font-size:12px;font-family:inherit;color:var(--text);background:var(--surface);}
 .p-input:focus{outline:none;border-color:#1d4ed8;}
-.p-add-btn{background:#1d4ed8;border:none;color:#fff;border-radius:6px;padding:6px 12px;font-size:11px;cursor:pointer;font-weight:500;font-family:inherit;}
+.p-add-btn{background:#1d4ed8;border:none;color:#fff;border-radius:6px;padding:6px 12px;font-size:11px;cursor:pointer;font-weight:500;font-family:inherit;white-space:nowrap;}
 .p-alert-btn{background:#dc2626;border:none;color:#fff;border-radius:6px;padding:6px 12px;font-size:11px;cursor:pointer;font-weight:500;font-family:inherit;}
 .p-save{width:100%;background:#0f172a;border:none;color:#fff;border-radius:8px;padding:10px;font-size:13px;font-weight:600;cursor:pointer;margin-top:6px;font-family:inherit;}
 .alert-info{background:var(--bg);border-radius:8px;padding:10px 12px;border:1px solid var(--border);margin-bottom:10px;font-size:11px;color:var(--text2);}
@@ -361,6 +371,15 @@ body{background:var(--bg);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI
 .kw-cat-tabs{display:flex;gap:4px;flex-wrap:wrap;margin-bottom:10px;}
 .kw-cat-tab{background:var(--bg);border:1px solid var(--border);border-radius:6px;padding:4px 10px;font-size:10px;cursor:pointer;font-family:inherit;color:var(--text2);font-weight:500;}
 .kw-cat-tab.active{background:#1d4ed8;color:#fff;border-color:#1d4ed8;}
+.add-source-box{background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:12px;margin-top:10px;}
+.add-source-title{font-size:10px;font-weight:600;color:var(--text2);margin-bottom:8px;}
+.p-input-sm{border:1px solid var(--border);border-radius:6px;padding:5px 8px;font-size:11px;font-family:inherit;color:var(--text);background:var(--surface);width:100%;}
+.p-input-sm:focus{outline:none;border-color:#1d4ed8;}
+.test-btn{background:var(--search);border:1px solid var(--border);color:var(--text2);border-radius:6px;padding:5px 10px;font-size:10px;cursor:pointer;font-family:inherit;white-space:nowrap;}
+.test-result{font-size:10px;margin-top:6px;padding:5px 8px;border-radius:5px;}
+.test-ok{background:#f0fdf4;color:#16a34a;}
+.test-fail{background:#fef2f2;color:#dc2626;}
+.test-loading{background:var(--bg);color:var(--text3);}
 `;
 
 export default function NewsHub(){
@@ -377,6 +396,7 @@ export default function NewsHub(){
   const[feeds,setFeeds]=useState(()=>load('feeds',DEFAULT_FEEDS));
   const[arts,setArts]=useState({general:[],sports:[],business:[],finance:[],bloom:[]});
   const[loading,setLoading]=useState({general:false,sports:false,business:false,finance:false,bloom:false});
+  const[sourceHealth,setSourceHealth]=useState({});
   const[podEps,setPodEps]=useState({});
   const[podLoading,setPodLoading]=useState({});
   const[activePod,setActivePod]=useState(null);
@@ -395,10 +415,7 @@ export default function NewsHub(){
   useEffect(()=>{save('clicks',clicks);},[clicks]);
   useEffect(()=>{save('scores',scores);},[scores]);
 
-  const kwScore=(a,cat)=>{
-    const catKws=kw[cat]||[];
-    return catKws.filter(k=>(a.title+(a.desc||'')).toLowerCase().includes(k.toLowerCase())).length;
-  };
+  const kwScore=(a,cat)=>{const catKws=kw[cat]||[];return catKws.filter(k=>(a.title+(a.desc||'')).toLowerCase().includes(k.toLowerCase())).length;};
   const sc=useCallback((a)=>(scores[a.link]||0)+kwScore(a,a.cat)*3+(clicks[a.source]||0)*2,[scores,kw,clicks]);
   const dedupe=(arr)=>{const seen=new Set();return arr.filter(a=>{const k=a.title.slice(0,60).toLowerCase().replace(/\s+/g,'');if(seen.has(k))return false;seen.add(k);return true;});};
 
@@ -439,10 +456,19 @@ export default function NewsHub(){
     if(loading[cat])return;
     setLoading(l=>({...l,[cat]:true}));
     const results=[];
+    const healthUpdates={};
     await Promise.allSettled((feeds[cat]||[]).filter(f=>f.on).map(async f=>{
+      const t0=Date.now();
       const items=await fetchRSS(f.url);
-      items.forEach(i=>{if(i.title&&i.link)results.push({...i,source:f.name,cat});});
+      const elapsed=Date.now()-t0;
+      if(items.length>0){
+        healthUpdates[f.name]=elapsed<4000?'green':'yellow';
+        items.forEach(i=>{if(i.title&&i.link)results.push({...i,source:f.name,cat});});
+      } else {
+        healthUpdates[f.name]='red';
+      }
     }));
+    setSourceHealth(h=>({...h,...healthUpdates}));
     results.sort((a,b)=>new Date(b.pubDate)-new Date(a.pubDate));
     setArts(a=>({...a,[cat]:results}));
     setLoading(l=>({...l,[cat]:false}));
@@ -466,12 +492,31 @@ export default function NewsHub(){
   const refreshAll=()=>{
     setArts({general:[],sports:[],business:[],finance:[],bloom:[]});
     setLoading({general:false,sports:false,business:false,finance:false,bloom:false});
+    setSourceHealth({});
     setPodEps({});setPodLoading({});
     setTimeout(()=>{
       Object.keys(DEFAULT_FEEDS).forEach(c=>loadCat(c));
       PODCAST_FEEDS.forEach(p=>loadPodcast(p));
     },100);
   };
+
+  const getHealthDot=(name)=>{
+    const h=sourceHealth[name];
+    if(!h)return'health-gray';
+    if(h==='green')return'health-green';
+    if(h==='yellow')return'health-yellow';
+    return'health-red';
+  };
+
+  const getHealthLabel=(name)=>{
+    const h=sourceHealth[name];
+    if(!h)return'Not checked';
+    if(h==='green')return'Loading OK';
+    if(h==='yellow')return'Slow';
+    return'Failed';
+  };
+
+  const countBySource=(cat,name)=>(arts[cat]||[]).filter(a=>a.source===name).length;
 
   const MiniActs=({a})=>(
     <div className="mini-acts">
@@ -603,9 +648,7 @@ export default function NewsHub(){
               {!activePod&&<div className="pod-show-item-dot"></div>}
             </div>
             {PODCAST_FEEDS.map((p,i)=>{
-              const eps=podEps[p.name]||[];
-              const latest=eps[0];
-              const isActive=activePod?.name===p.name;
+              const eps=podEps[p.name]||[];const latest=eps[0];const isActive=activePod?.name===p.name;
               return(
                 <div key={i} className="pod-show-item" onClick={()=>setActivePod(isActive?null:p)} style={{background:isActive?'var(--bg)':''}}>
                   <div className="pod-show-item-emoji">{p.emoji}</div>
@@ -692,9 +735,7 @@ export default function NewsHub(){
   };
 
   const Sidebar=({cat})=>{
-    const cc=CATS[cat];
-    const arts2=sorted(cat);
-    const catKws=kw[cat]||[];
+    const cc=CATS[cat],arts2=sorted(cat),catKws=kw[cat]||[];
     return(
       <div className="sidebar">
         <div className="side-block">
@@ -709,10 +750,8 @@ export default function NewsHub(){
         {cat==='bloom'&&<div className="side-block" style={{border:'1px solid #bae6fd'}}><div className="side-title" style={{color:'#0369a1'}}>About This Feed</div><div style={{fontSize:'11px',color:'var(--text2)',lineHeight:'1.6'}}>Tracks Bloom Energy (NYSE: BE), fuel cells, distributed power, AI data center power, onshoring, industrial energy, oil and gas, and utility-scale solutions.</div></div>}
         <div className="side-block">
           <div className="side-title">{cc.emoji} {cc.label} Keywords</div>
-          {catKws.map((k,i)=>(
-            <span key={i} className="kw-chip" style={{background:cc.bg,color:cc.color}} onClick={()=>setSearch(k)}>{k}</span>
-          ))}
-          {catKws.length===0&&<div style={{fontSize:'11px',color:'var(--text3)'}}>No keywords yet — add some in Customize</div>}
+          {catKws.map((k,i)=><span key={i} className="kw-chip" style={{background:cc.bg,color:cc.color}} onClick={()=>setSearch(k)}>{k}</span>)}
+          {catKws.length===0&&<div style={{fontSize:'11px',color:'var(--text3)'}}>No keywords — add in Customize</div>}
         </div>
         <div className="side-block"><div className="side-title">Alert Keywords</div>{alerts.map((a,i)=><span key={i} style={{display:'inline-block',background:'#fef2f2',color:'#dc2626',borderRadius:'20px',padding:'3px 9px',fontSize:'10px',margin:'2px',fontWeight:'500'}}>{a}</span>)}</div>
         <div className="side-block"><div className="side-title">Social</div>{social.map((h,i)=><div key={i} className="social-row" onClick={()=>window.open(`https://twitter.com/${h.replace('@','')}`)}>
@@ -729,49 +768,120 @@ export default function NewsHub(){
     const[la,setLa]=useState([...alerts]);
     const[ls,setLs]=useState([...social]);
     const[kwTab,setKwTab]=useState('general');
+    const[newName,setNewName]=useState('');
+    const[newUrl,setNewUrl]=useState('');
+    const[testState,setTestState]=useState({});
+    const[activeCat,setActiveCat]=useState('general');
+
     const saveAll=()=>{setFeeds(lf);save('feeds',lf);setKw(lk);save('kw',lk);setAlerts(la);save('alerts',la);setSocial(ls);save('social',ls);setShowPanel(false);refreshAll();};
+
+    const testFeed=async(url,key)=>{
+      setTestState(s=>({...s,[key]:'loading'}));
+      const items=await fetchRSS(url);
+      setTestState(s=>({...s,[key]:items.length>0?`ok:${items.length} articles found`:' fail'}));
+    };
+
+    const addSource=()=>{
+      if(!newName.trim()||!newUrl.trim())return;
+      setLf(prev=>{
+        const n=JSON.parse(JSON.stringify(prev));
+        if(!n[activeCat])n[activeCat]=[];
+        n[activeCat].push({name:newName.trim(),url:newUrl.trim(),on:true});
+        return n;
+      });
+      setNewName('');setNewUrl('');
+    };
+
+    const removeSource=(cat,i)=>{
+      setLf(prev=>{const n=JSON.parse(JSON.stringify(prev));n[cat].splice(i,1);return n;});
+    };
+
     const catLabels={general:'🌐 General',sports:'🏆 Sports',business:'⚡ Business',finance:'📈 Finance',bloom:'🔋 Bloom'};
+
     return(
       <div className="panel-overlay open">
         <div className="panel">
           <div className="panel-head"><span className="panel-htitle">Customize Hub</span><button className="panel-x" onClick={()=>setShowPanel(false)}>X</button></div>
           <div className="panel-body">
 
+            {/* ALERTS */}
             <div className="p-sec">
               <div className="p-lbl">Breaking News Alerts</div>
               <div className="alert-info">Red banner appears when these words hit any headline.</div>
               <div>{la.map((a,i)=><span key={i} className="p-chip p-alert">{a}<button className="p-chip-x" style={{color:'#dc2626'}} onClick={()=>setLa(x=>x.filter((_,j)=>j!==i))}>x</button></span>)}</div>
-              <div className="p-add"><input className="p-input" placeholder="e.g. hurricane, Bloom Energy..." value={newAlert} onChange={e=>setNewAlert(e.target.value)} onKeyDown={e=>{if(e.key==='Enter'&&newAlert.trim()){setLa(x=>[...x,newAlert.trim()]);setNewAlert('');}}}/><button className="p-alert-btn" onClick={()=>{if(newAlert.trim()){setLa(x=>[...x,newAlert.trim()]);setNewAlert('');}}}>Add</button></div>
+              <div className="p-add"><input className="p-input" placeholder="Add alert word..." value={newAlert} onChange={e=>setNewAlert(e.target.value)} onKeyDown={e=>{if(e.key==='Enter'&&newAlert.trim()){setLa(x=>[...x,newAlert.trim()]);setNewAlert('');}}}/><button className="p-alert-btn" onClick={()=>{if(newAlert.trim()){setLa(x=>[...x,newAlert.trim()]);setNewAlert('');}}}>Add</button></div>
             </div>
 
+            {/* KEYWORDS */}
             <div className="p-sec">
               <div className="p-lbl">Keywords by Category</div>
-              <div style={{fontSize:'11px',color:'var(--text2)',marginBottom:'10px'}}>Keywords boost matching articles to the top of each category's feed and appear as tags on cards.</div>
+              <div style={{fontSize:'11px',color:'var(--text2)',marginBottom:'10px'}}>Boost matching articles to the top of each category's feed.</div>
               <div className="kw-cat-tabs">
-                {Object.keys(catLabels).map(c=>(
-                  <button key={c} className={`kw-cat-tab ${kwTab===c?'active':''}`} onClick={()=>setKwTab(c)}>{catLabels[c]}</button>
-                ))}
+                {Object.keys(catLabels).map(c=><button key={c} className={`kw-cat-tab ${kwTab===c?'active':''}`} onClick={()=>setKwTab(c)}>{catLabels[c]}</button>)}
               </div>
-              <div>
-                {(lk[kwTab]||[]).map((k,i)=>(
-                  <span key={i} className="p-chip p-kw">{k}<button className="p-chip-x" onClick={()=>setLk(prev=>{const n={...prev};n[kwTab]=n[kwTab].filter((_,j)=>j!==i);return n;})}>x</button></span>
-                ))}
-              </div>
+              <div>{(lk[kwTab]||[]).map((k,i)=><span key={i} className="p-chip p-kw">{k}<button className="p-chip-x" onClick={()=>setLk(prev=>{const n={...prev};n[kwTab]=n[kwTab].filter((_,j)=>j!==i);return n;})}>x</button></span>)}</div>
               <div className="p-add">
                 <input className="p-input" placeholder={`Add ${kwTab} keyword...`} value={newKwVal} onChange={e=>setNewKwVal(e.target.value)} onKeyDown={e=>{if(e.key==='Enter'&&newKwVal.trim()){setLk(prev=>{const n={...prev};n[kwTab]=[...(n[kwTab]||[]),newKwVal.trim()];return n;});setNewKwVal('');}}}/>
                 <button className="p-add-btn" onClick={()=>{if(newKwVal.trim()){setLk(prev=>{const n={...prev};n[kwTab]=[...(n[kwTab]||[]),newKwVal.trim()];return n;});setNewKwVal('');}}}>Add</button>
               </div>
             </div>
 
+            {/* SOURCES PER CATEGORY */}
             {Object.keys(DEFAULT_FEEDS).map(cat=>(
               <div key={cat} className="p-sec">
                 <div className="p-lbl">{CATS[cat].emoji} {CATS[cat].label} Sources</div>
-                {cat==='bloom'&&<div className="bloom-note">Tracks: Bloom Energy, fuel cells, data center power, onshoring, industrial energy, oil and gas, utilities</div>}
-                {(lf[cat]||[]).map((f,i)=><div key={i} className="p-row"><span className="p-name">{f.name}</span><button className={`tog ${f.on?'on':'off'}`} onClick={()=>setLf(prev=>{const n=JSON.parse(JSON.stringify(prev));n[cat][i].on=!n[cat][i].on;return n;})}></button></div>)}
+                {cat==='bloom'&&<div className="bloom-note">Tracks Bloom Energy, fuel cells, data center power, onshoring, industrial energy, utilities</div>}
+                <div className="health-legend">
+                  <span className="health-legend-item"><span className="health-dot health-green"></span>Loaded</span>
+                  <span className="health-legend-item"><span className="health-dot health-yellow"></span>Slow</span>
+                  <span className="health-legend-item"><span className="health-dot health-red"></span>Failed</span>
+                  <span className="health-legend-item"><span className="health-dot health-gray"></span>Pending</span>
+                </div>
+                {(lf[cat]||[]).map((f,i)=>{
+                  const h=sourceHealth[f.name];
+                  const cnt=countBySource(cat,f.name);
+                  const testKey=`${cat}_${i}`;
+                  const ts=testState[testKey];
+                  return(
+                    <div key={i}>
+                      <div className="p-row">
+                        <span className={`health-dot ${h==='green'?'health-green':h==='yellow'?'health-yellow':h==='red'?'health-red':'health-gray'}`} title={getHealthLabel(f.name)}></span>
+                        <span className="p-name">{f.name}</span>
+                        {cnt>0&&<span className="p-count">{cnt} articles</span>}
+                        <button className="test-btn" onClick={()=>testFeed(f.url,testKey)}>Test</button>
+                        <button className={`tog ${f.on?'on':'off'}`} onClick={()=>setLf(prev=>{const n=JSON.parse(JSON.stringify(prev));n[cat][i].on=!n[cat][i].on;return n;})}></button>
+                        <button className="p-del" title="Remove source" onClick={()=>removeSource(cat,i)}>✕</button>
+                      </div>
+                      {ts&&<div className={`test-result ${ts==='loading'?'test-loading':ts.startsWith('ok')?'test-ok':'test-fail'}`}>
+                        {ts==='loading'?'Testing...':(ts.startsWith('ok')?ts.replace('ok:',''):ts.replace(' fail','Failed to load — may be blocked'))}
+                      </div>}
+                    </div>
+                  );
+                })}
+                {/* ADD CUSTOM SOURCE */}
+                <div className="add-source-box">
+                  <div className="add-source-title">Add a custom source to {CATS[cat].label}</div>
+                  <div style={{display:'flex',flexDirection:'column',gap:'6px'}}>
+                    <input className="p-input-sm" placeholder="Source name (e.g. Houston Business Journal)" value={activeCat===cat?newName:''} onChange={e=>{setActiveCat(cat);setNewName(e.target.value);}}/>
+                    <input className="p-input-sm" placeholder="RSS feed URL (e.g. https://bizjournals.com/houston/rss)" value={activeCat===cat?newUrl:''} onChange={e=>{setActiveCat(cat);setNewUrl(e.target.value);}}/>
+                    <div style={{display:'flex',gap:'6px'}}>
+                      <button className="test-btn" style={{flex:1}} onClick={()=>{if(newUrl.trim())testFeed(newUrl.trim(),`new_${cat}`);}}>Test URL</button>
+                      <button className="p-add-btn" style={{flex:1}} onClick={()=>{setActiveCat(cat);addSource();}}>Add Source</button>
+                    </div>
+                    {testState[`new_${cat}`]&&<div className={`test-result ${testState[`new_${cat}`]==='loading'?'test-loading':testState[`new_${cat}`].startsWith('ok')?'test-ok':'test-fail'}`}>
+                      {testState[`new_${cat}`]==='loading'?'Testing...':(testState[`new_${cat}`].startsWith('ok')?testState[`new_${cat}`].replace('ok:',''):testState[`new_${cat}`].replace(' fail','Failed — URL may be blocked or invalid'))}
+                    </div>}
+                  </div>
+                </div>
               </div>
             ))}
 
-            <div className="p-sec"><div className="p-lbl">Social Follows</div><div>{ls.map((s,i)=><span key={i} className="p-chip p-so">{s}<button className="p-chip-x" style={{color:'#166534'}} onClick={()=>setLs(x=>x.filter((_,j)=>j!==i))}>x</button></span>)}</div><div className="p-add"><input className="p-input" placeholder="@handle" value={newSocial} onChange={e=>setNewSocial(e.target.value)} onKeyDown={e=>{if(e.key==='Enter'&&newSocial.trim()){setLs(x=>[...x,newSocial.trim()]);setNewSocial('');}}}/><button className="p-add-btn" onClick={()=>{if(newSocial.trim()){setLs(x=>[...x,newSocial.trim()]);setNewSocial('');}}}>Add</button></div></div>
+            {/* SOCIAL */}
+            <div className="p-sec">
+              <div className="p-lbl">Social Follows</div>
+              <div>{ls.map((s,i)=><span key={i} className="p-chip p-so">{s}<button className="p-chip-x" style={{color:'#166534'}} onClick={()=>setLs(x=>x.filter((_,j)=>j!==i))}>x</button></span>)}</div>
+              <div className="p-add"><input className="p-input" placeholder="@handle" value={newSocial} onChange={e=>setNewSocial(e.target.value)} onKeyDown={e=>{if(e.key==='Enter'&&newSocial.trim()){setLs(x=>[...x,newSocial.trim()]);setNewSocial('');}}}/><button className="p-add-btn" onClick={()=>{if(newSocial.trim()){setLs(x=>[...x,newSocial.trim()]);setNewSocial('');}}}>Add</button></div>
+            </div>
 
             <button className="p-save" onClick={saveAll}>Save and Refresh</button>
           </div>
