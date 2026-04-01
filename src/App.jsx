@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+iimport { useState, useEffect, useCallback } from "react";
 
 const CATS={
   general:{label:'General',color:'#1d4ed8',bg:'#eff6ff',emoji:'🌐'},
@@ -6,17 +6,46 @@ const CATS={
   business:{label:'Business',color:'#16a34a',bg:'#f0fdf4',emoji:'⚡'},
   finance:{label:'Finance',color:'#7c3aed',bg:'#f5f3ff',emoji:'📈'},
   bloom:{label:'Bloom Energy',color:'#0369a1',bg:'#e0f2fe',emoji:'🔋'},
+  briefing:{label:'Morning Briefing',color:'#b45309',bg:'#fffbeb',emoji:'☀️'},
   podcasts:{label:'Podcasts',color:'#e11d48',bg:'#fff1f2',emoji:'🎙️'}
 };
+
+const CROSS_TAGS={
+  business:['energy','oil','gas','ERCOT','LNG','power','refinery','petrochemical','industrial','data center','onshoring','infrastructure','pipeline','utility','grid'],
+  finance:['market','stock','Fed','inflation','interest rate','investing','economy','GDP','earnings','portfolio','S&P','Nasdaq','crypto','real estate'],
+  general:['Houston','Texas','Trump','Congress','White House','Iran','tariff','geopolitical','election','policy'],
+  bloom:['Bloom Energy','fuel cell','hydrogen','microgrid','distributed power','clean energy','renewable'],
+  sports:['Texans','Astros','Braves','Kentucky','Clemson','NFL','MLB','NBA','CFB'],
+};
+
+function detectCrossTags(title,desc){
+  const text=(title+(desc||'')).toLowerCase();
+  const tags=[];
+  Object.entries(CROSS_TAGS).forEach(([cat,words])=>{
+    words.forEach(w=>{if(text.includes(w.toLowerCase()))tags.push({cat,word:w});});
+  });
+  const seen=new Set();
+  return tags.filter(t=>{if(seen.has(t.cat))return false;seen.add(t.cat);return true;});
+}
 
 const PODCAST_FEEDS=[
   {name:'Joe Rogan Experience',host:'Joe Rogan',url:'https://feeds.megaphone.fm/GLT1412515089',emoji:'🟢'},
   {name:'Ben Shapiro Show',host:'Ben Shapiro',url:'https://feeds.megaphone.fm/BVDWV5370667266',emoji:'🔵'},
   {name:'Tucker Carlson Show',host:'Tucker Carlson',url:'https://feeds.megaphone.fm/RSV1597324942',emoji:'🦅'},
   {name:'Candace',host:'Candace Owens',url:'https://feeds.megaphone.fm/candace',emoji:'🎤'},
-  {name:'Morning Wire',host:'Daily Wire',url:'https://feeds.megaphone.fm/BVDWV8747925072',emoji:'☀️'},
+  {name:'Morning Wire Podcast',host:'Daily Wire',url:'https://feeds.megaphone.fm/BVDWV8747925072',emoji:'☀️'},
   {name:'All-In Podcast',host:'Chamath & Besties',url:'https://allinchamathjason.libsyn.com/rss',emoji:'💰'},
   {name:'Flagrant',host:'Andrew Schulz',url:'https://feeds.megaphone.fm/APPI6857213837',emoji:'🔥'},
+];
+
+const BRIEFING_FEEDS=[
+  {name:'Axios News',url:'https://api.axios.com/feed/',emoji:'📰',color:'#e05c1a',desc:'Top stories from Axios'},
+  {name:'Axios Energy',url:'https://api.axios.com/feed/energy/',emoji:'⚡',color:'#e05c1a',desc:'Energy & climate news'},
+  {name:'Axios Houston',url:'https://api.axios.com/feed/houston/',emoji:'🤠',color:'#e05c1a',desc:'Houston local news'},
+  {name:'Bloomberg Morning Briefing',url:'https://feeds.bloomberg.com/politics/news.rss',emoji:'📊',color:'#1d4ed8',desc:'Markets & politics'},
+  {name:'Morning Brew',url:'https://feeds.feedburner.com/morningbrew/uqaH',emoji:'☕',color:'#2563eb',desc:'Business & tech digest'},
+  {name:'Morning Wire',url:'https://feeds.megaphone.fm/BVDWV8747925072',emoji:'📻',color:'#7c3aed',desc:'Daily Wire briefing'},
+  {name:'API Brief',url:'https://feeds.feedburner.com/ApiToday',emoji:'🛢️',color:'#92400e',desc:'American Petroleum Institute'},
 ];
 
 const DEFAULT_KW={
@@ -25,6 +54,7 @@ const DEFAULT_KW={
   business:['energy','oil','gas','data center','ERCOT','LNG','power grid','onshoring','AI','infrastructure'],
   finance:['investing','real estate','stock market','interest rates','Fed','inflation','crypto','portfolio'],
   bloom:['Bloom Energy','fuel cell','hydrogen','microgrid','distributed power','data center','onshoring','industrial energy','utility','ERCOT'],
+  briefing:['energy','Houston','economy','markets','AI','tariffs','Fed','oil','gas','tech','petroleum','pipeline'],
 };
 
 const DEFAULT_FEEDS={
@@ -104,7 +134,7 @@ const DEFAULT_FEEDS={
   ]
 };
 
-const SK='v10_';
+const SK='v11_';
 function load(k,def){try{const v=localStorage.getItem(SK+k);return v?JSON.parse(v):def;}catch{return def;}}
 function save(k,v){try{localStorage.setItem(SK+k,JSON.stringify(v));}catch{}}
 
@@ -122,12 +152,8 @@ function parseXML(txt){
     return items.map(i=>{
       const desc=(i.querySelector('description')?.textContent||i.querySelector('summary')?.textContent||'');
       const cleanDesc=desc.replace(/<[^>]*>/g,'').replace(/&amp;/g,'&').replace(/&nbsp;/g,' ').replace(/&lt;/g,'<').replace(/&gt;/g,'>').trim().slice(0,350);
-      const img=i.querySelector('enclosure')?.getAttribute('url')||
-                i.querySelector('image url')?.textContent||
-                i.querySelector('thumbnail')?.textContent||
-                extractImg(desc)||'';
-      const dur=i.querySelector('duration')?.textContent||
-                i.querySelector('itunes\\:duration')?.textContent||'';
+      const img=i.querySelector('enclosure')?.getAttribute('url')||i.querySelector('image url')?.textContent||i.querySelector('thumbnail')?.textContent||extractImg(desc)||'';
+      const dur=i.querySelector('duration')?.textContent||i.querySelector('itunes\\:duration')?.textContent||'';
       return{
         title:(i.querySelector('title')?.textContent||'').trim(),
         link:i.querySelector('link')?.textContent||i.querySelector('enclosure')?.getAttribute('url')||'',
@@ -140,14 +166,24 @@ function parseXML(txt){
 
 async function fetchRSS(url){
   try{
+    const r=await Promise.race([fetch(`https://feed2json.org/convert?url=${encodeURIComponent(url)}`),new Promise((_,rej)=>setTimeout(()=>rej('t'),8000))]);
+    const d=await r.json();
+    if(d.items?.length>0){
+      return d.items.map(i=>({
+        title:(i.title||'').trim(),link:i.url||i.id||'',
+        desc:(i.content_html||i.content_text||i.summary||'').replace(/<[^>]*>/g,'').replace(/&amp;/g,'&').replace(/&nbsp;/g,' ').trim().slice(0,350),
+        pubDate:i.date_published||i.date_modified||'',img:i.image||i.banner_image||extractImg(i.content_html||'')||'',duration:''
+      })).filter(i=>i.title&&i.link);
+    }
+  }catch{}
+  try{
     const r=await Promise.race([fetch(`https://api.rss2json.com/v1/api.json?rss_url=${encodeURIComponent(url)}&count=15`),new Promise((_,rej)=>setTimeout(()=>rej('t'),8000))]);
     const d=await r.json();
     if(d.status==='ok'&&d.items?.length>0){
       return d.items.map(i=>({
         title:(i.title||'').trim(),link:i.link||'',
         desc:(i.description||i.content||'').replace(/<[^>]*>/g,'').replace(/&amp;/g,'&').replace(/&nbsp;/g,' ').trim().slice(0,350),
-        pubDate:i.pubDate||'',img:i.thumbnail||i.enclosure?.link||extractImg(i.description||'')||'',
-        duration:i.itunes_duration||''
+        pubDate:i.pubDate||'',img:i.thumbnail||extractImg(i.description||'')||'',duration:i.itunes_duration||''
       })).filter(i=>i.title&&i.link);
     }
   }catch{}
@@ -165,6 +201,17 @@ async function fetchRSS(url){
 }
 
 async function fetchPodcast(url){
+  try{
+    const r=await Promise.race([fetch(`https://feed2json.org/convert?url=${encodeURIComponent(url)}`),new Promise((_,rej)=>setTimeout(()=>rej('t'),12000))]);
+    const d=await r.json();
+    if(d.items?.length>0){
+      return d.items.map(i=>({
+        title:(i.title||'').trim(),link:i.url||i.id||'',
+        desc:(i.content_html||i.content_text||i.summary||'').replace(/<[^>]*>/g,'').replace(/&amp;/g,'&').trim().slice(0,400),
+        pubDate:i.date_published||i.date_modified||'',img:i.image||i.banner_image||d.icon||d.favicon||'',duration:''
+      })).filter(i=>i.title);
+    }
+  }catch{}
   try{
     const r=await Promise.race([fetch(`https://api.rss2json.com/v1/api.json?rss_url=${encodeURIComponent(url)}&count=10`),new Promise((_,rej)=>setTimeout(()=>rej('t'),12000))]);
     const d=await r.json();
@@ -232,6 +279,7 @@ body{background:var(--bg);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI
 .nav-tab.active{color:#1d4ed8;background:#eff6ff;}
 .nav-tab.bloom-tab.active{color:#0369a1;background:#e0f2fe;}
 .nav-tab.pod-tab.active{color:#e11d48;background:#fff1f2;}
+.nav-tab.brief-tab.active{color:#b45309;background:#fffbeb;}
 .nav-tab:hover:not(.active){color:var(--text2);}
 .topbar-right{display:flex;gap:6px;align-items:center;flex-shrink:0;}
 .search{background:var(--search);border:1px solid var(--border);color:var(--text);border-radius:6px;padding:6px 10px;font-size:12px;width:130px;font-family:inherit;}
@@ -315,6 +363,32 @@ body{background:var(--bg);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI
 .alert-tag{background:#fef2f2;color:#dc2626;border-radius:4px;padding:1px 6px;font-size:9px;font-weight:700;}
 .summary-box{background:var(--bg);border:1px solid #7c3aed;border-radius:8px;padding:10px 12px;margin-top:8px;font-size:12px;color:var(--text2);line-height:1.6;}
 .summary-lbl{font-size:9px;font-weight:700;color:#7c3aed;text-transform:uppercase;letter-spacing:0.08em;margin-bottom:4px;}
+.brief-page{display:grid;grid-template-columns:1fr 260px;gap:16px;}
+.brief-banner{background:linear-gradient(135deg,#b45309,#d97706);border-radius:10px;padding:14px 18px;margin-bottom:12px;display:flex;align-items:center;gap:12px;}
+.brief-banner-icon{font-size:28px;}
+.brief-banner-body{flex:1;}
+.brief-banner-title{font-size:13px;font-weight:600;color:#fff;margin-bottom:2px;}
+.brief-banner-sub{font-size:11px;color:rgba(255,255,255,0.85);}
+.brief-source-tabs{display:flex;gap:4px;flex-wrap:wrap;margin-bottom:14px;}
+.brief-tab-btn{background:var(--bg);border:1px solid var(--border);border-radius:20px;padding:4px 12px;font-size:11px;cursor:pointer;font-family:inherit;font-weight:500;color:var(--text2);transition:all 0.12s;}
+.brief-tab-btn.active{background:#fffbeb;border-color:#d97706;font-weight:600;}
+.brief-card{background:var(--surface);border-radius:10px;border:1px solid var(--border);overflow:hidden;cursor:pointer;transition:all 0.12s;margin-bottom:10px;}
+.brief-card:hover{border-color:#fcd34d;box-shadow:0 2px 12px rgba(180,83,9,0.08);}
+.brief-card-img{width:100%;height:160px;object-fit:cover;display:block;}
+.brief-card-img-ph{width:100%;height:80px;display:flex;align-items:center;justify-content:center;font-size:32px;}
+.brief-card-body{padding:12px 14px 14px;}
+.brief-card-top{display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-bottom:6px;}
+.brief-src-dot{width:7px;height:7px;border-radius:50%;flex-shrink:0;}
+.brief-src-name{font-size:11px;font-weight:600;}
+.brief-card-date{font-size:10px;color:var(--text3);margin-left:auto;}
+.brief-card-title{font-size:14px;font-weight:700;color:var(--text);line-height:1.35;margin-bottom:6px;}
+.brief-card-desc{font-size:12px;color:var(--text2);line-height:1.55;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden;margin-bottom:10px;}
+.brief-card-footer{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;}
+.brief-cross-tags{display:flex;gap:4px;flex-wrap:wrap;}
+.cross-tag{font-size:10px;border-radius:20px;padding:2px 8px;font-weight:500;cursor:pointer;transition:opacity 0.1s;}
+.cross-tag:hover{opacity:0.75;}
+.brief-acts{display:flex;gap:3px;}
+.brief-sidebar{display:flex;flex-direction:column;gap:10px;}
 .pod-page{display:grid;grid-template-columns:1fr 280px;gap:16px;}
 .pod-col{display:flex;flex-direction:column;gap:10px;}
 .pod-show-header{background:linear-gradient(135deg,#e11d48,#f43f5e);border-radius:10px;padding:14px 18px;display:flex;align-items:center;gap:12px;}
@@ -438,6 +512,9 @@ export default function NewsHub(){
   const[arts,setArts]=useState({general:[],sports:[],business:[],finance:[],bloom:[]});
   const[loading,setLoading]=useState({general:false,sports:false,business:false,finance:false,bloom:false});
   const[health,setHealth]=useState({});
+  const[briefArts,setBriefArts]=useState({});
+  const[briefLoading,setBriefLoading]=useState({});
+  const[activeBriefSource,setActiveBriefSource]=useState('all');
   const[podEps,setPodEps]=useState({});
   const[podLoading,setPodLoading]=useState({});
   const[activePod,setActivePod]=useState(null);
@@ -474,6 +551,14 @@ export default function NewsHub(){
     for(let i=0;i<maxLen;i++){srcKeys.forEach(src=>{if(bySource[src]?.[i])result.push(bySource[src][i]);});}
     return result;
   },[arts,search,activeKw,sc]);
+
+  const allBriefArts=useCallback(()=>{
+    let all=[];
+    BRIEFING_FEEDS.forEach(f=>{(briefArts[f.name]||[]).forEach(a=>all.push({...a,briefSource:f.name,briefEmoji:f.emoji,briefColor:f.color}));});
+    all.sort((a,b)=>new Date(b.pubDate)-new Date(a.pubDate));
+    if(search)all=all.filter(a=>(a.title+(a.desc||'')).toLowerCase().includes(search.toLowerCase()));
+    return dedupe(all);
+  },[briefArts,search]);
 
   const kwMatch=(a,cat)=>(kw[cat]||[]).filter(k=>(a.title+(a.desc||'')).toLowerCase().includes(k.toLowerCase()));
   const isAlert=(a)=>alerts.some(al=>(a.title+(a.desc||'')).toLowerCase().includes(al.toLowerCase()));
@@ -514,6 +599,16 @@ export default function NewsHub(){
     if(hit)setBreaking(hit);
   },[feeds,alerts,loading]);
 
+  const loadBriefings=useCallback(async()=>{
+    await Promise.allSettled(BRIEFING_FEEDS.map(async f=>{
+      if(briefLoading[f.name])return;
+      setBriefLoading(l=>({...l,[f.name]:true}));
+      const items=await fetchRSS(f.url);
+      setBriefArts(prev=>({...prev,[f.name]:items.map(i=>({...i,source:f.name,cat:'briefing'}))}));
+      setBriefLoading(l=>({...l,[f.name]:false}));
+    }));
+  },[briefLoading]);
+
   const loadPodcasts=useCallback(async()=>{
     await Promise.allSettled(PODCAST_FEEDS.map(async pod=>{
       if(podLoading[pod.name])return;
@@ -526,14 +621,16 @@ export default function NewsHub(){
 
   useEffect(()=>{
     Object.keys(DEFAULT_FEEDS).forEach(c=>loadCat(c));
+    loadBriefings();
     loadPodcasts();
   },[]);
 
   const refreshAll=()=>{
     setArts({general:[],sports:[],business:[],finance:[],bloom:[]});
     setLoading({general:false,sports:false,business:false,finance:false,bloom:false});
-    setHealth({});setPodEps({});setPodLoading({});setActiveKw('');setSearch('');
-    setTimeout(()=>{Object.keys(DEFAULT_FEEDS).forEach(c=>loadCat(c));loadPodcasts();},100);
+    setHealth({});setBriefArts({});setBriefLoading({});
+    setPodEps({});setPodLoading({});setActiveKw('');setSearch('');
+    setTimeout(()=>{Object.keys(DEFAULT_FEEDS).forEach(c=>loadCat(c));loadBriefings();loadPodcasts();},100);
   };
 
   const toggleKw=(k)=>{setActiveKw(prev=>prev===k?'':k);setSearch('');};
@@ -551,11 +648,7 @@ export default function NewsHub(){
     const[imgErr,setImgErr]=useState(false);
     return(
       <div className="hero-row" onClick={()=>clickArt(a)}>
-        {a.img&&!imgErr?(
-          <img className="thumb-sm" src={a.img} loading="lazy" onError={()=>setImgErr(true)} alt=""/>
-        ):(
-          <div className="thumb-ph" style={{background:cc.bg}}>{cc.emoji}</div>
-        )}
+        {a.img&&!imgErr?<img className="thumb-sm" src={a.img} loading="lazy" onError={()=>setImgErr(true)} alt=""/>:<div className="thumb-ph" style={{background:cc.bg}}>{cc.emoji}</div>}
         <div className="hero-body">
           <div className="hero-title">{alert&&<span className="alert-tag" style={{marginRight:'4px'}}>ALERT</span>}{a.title}</div>
           <div className="hero-meta"><span style={{color:cc.color,fontWeight:'600'}}>{a.source}</span>{kws.slice(0,2).map(k=><span key={k} className="kw-tag" style={{background:cc.bg,color:cc.color}}>{k}</span>)}</div>
@@ -573,11 +666,7 @@ export default function NewsHub(){
     const[imgErr,setImgErr]=useState(false);
     return(
       <div className={`feed-card${cat==='bloom'?' bloom-card':''}`} onClick={()=>clickArt(a)}>
-        {a.img&&!imgErr?(
-          <img className="feed-hero-img" src={a.img} loading="lazy" onError={()=>setImgErr(true)} alt=""/>
-        ):(
-          <div className="feed-hero-ph" style={{background:cc.bg}}>{cc.emoji}</div>
-        )}
+        {a.img&&!imgErr?<img className="feed-hero-img" src={a.img} loading="lazy" onError={()=>setImgErr(true)} alt=""/>:<div className="feed-hero-ph" style={{background:cc.bg}}>{cc.emoji}</div>}
         <div className="feed-card-body">
           <div className="feed-top-row">
             <div className="feed-av" style={{background:cc.bg,color:cc.color}}>{init}</div>
@@ -604,17 +693,125 @@ export default function NewsHub(){
     );
   };
 
+  const BriefCard=({a})=>{
+    const crossTags=detectCrossTags(a.title,a.desc);
+    const id=btoa((a.link||'x').slice(0,40)).replace(/[^a-z0-9]/gi,'').slice(0,12);
+    const[imgErr,setImgErr]=useState(false);
+    const srcInfo=BRIEFING_FEEDS.find(f=>f.name===a.briefSource)||{color:'#b45309',emoji:'☀️'};
+    const alert=isAlert(a);
+    return(
+      <div className="brief-card" onClick={()=>clickArt(a)}>
+        {a.img&&!imgErr?<img className="brief-card-img" src={a.img} loading="lazy" onError={()=>setImgErr(true)} alt=""/>:<div className="brief-card-img-ph" style={{background:'#fffbeb'}}>{srcInfo.emoji}</div>}
+        <div className="brief-card-body">
+          <div className="brief-card-top">
+            <div className="brief-src-dot" style={{background:srcInfo.color}}></div>
+            <span className="brief-src-name" style={{color:srcInfo.color}}>{a.briefSource||a.source}</span>
+            {alert&&<span className="alert-tag">ALERT</span>}
+            <span className="brief-card-date">{fmtDate(a.pubDate)}</span>
+          </div>
+          <div className="brief-card-title">{a.title}</div>
+          {a.desc&&<div className="brief-card-desc">{a.desc}</div>}
+          {sumLoading[id]&&<div className="summary-box"><div className="summary-lbl">AI Summary</div><em style={{color:'var(--text3)'}}>Generating...</em></div>}
+          {summaries[id]&&<div className="summary-box"><div className="summary-lbl">AI Summary</div>{summaries[id]}</div>}
+          <div className="brief-card-footer">
+            <div className="brief-cross-tags">
+              {crossTags.map((t,i)=>{
+                const cc=CATS[t.cat];
+                return<span key={i} className="cross-tag" style={{background:cc.bg,color:cc.color}} onClick={e=>{e.stopPropagation();setTab(t.cat);setActiveKw(t.word);}} title={`Filter ${cc.label} by "${t.word}"`}>{cc.emoji} {t.word}</span>;
+              })}
+            </div>
+            <div className="brief-acts">
+              <button className={`act-b${likes[a.link]===1?' al':''}`} onClick={e=>likeArt(a.link,1,e)}>Up</button>
+              <button className={`act-b${isSaved(a)?' as':''}`} onClick={e=>saveArt(a,e)}>Save</button>
+              <button className={`act-b${summaries[id]||sumLoading[id]?' ai':''}`} onClick={e=>getSummary(id,a.title,a.desc,e)}>AI</button>
+              <button className="act-b" onClick={e=>{e.stopPropagation();clickArt(a);}}>Read</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  const BriefingPage=()=>{
+    const allArts=allBriefArts();
+    const filtered=activeBriefSource==='all'?allArts:allArts.filter(a=>a.briefSource===activeBriefSource);
+    const isAnyLoading=BRIEFING_FEEDS.some(f=>briefLoading[f.name]);
+    const totalLoaded=BRIEFING_FEEDS.reduce((n,f)=>n+(briefArts[f.name]||[]).length,0);
+    return(
+      <div className="brief-page">
+        <div>
+          <div className="brief-banner">
+            <div className="brief-banner-icon">☀️</div>
+            <div className="brief-banner-body">
+              <div className="brief-banner-title">Morning Briefing</div>
+              <div className="brief-banner-sub">{BRIEFING_FEEDS.length} sources · {totalLoaded} articles · Tap colored tags to jump to that category</div>
+            </div>
+            {isAnyLoading&&<div style={{fontSize:'11px',color:'rgba(255,255,255,0.8)'}}>Loading...</div>}
+          </div>
+          <div className="brief-source-tabs">
+            <button className={`brief-tab-btn${activeBriefSource==='all'?' active':''}`} style={{color:'#b45309'}} onClick={()=>setActiveBriefSource('all')}>
+              ☀️ All ({allArts.length})
+            </button>
+            {BRIEFING_FEEDS.map(f=>{
+              const count=(briefArts[f.name]||[]).length;
+              const isLoad=briefLoading[f.name];
+              return(
+                <button key={f.name} className={`brief-tab-btn${activeBriefSource===f.name?' active':''}`} style={{color:f.color}} onClick={()=>setActiveBriefSource(activeBriefSource===f.name?'all':f.name)}>
+                  {f.emoji} {f.name.replace('Bloomberg Morning Briefing','Bloomberg').replace('Morning Brew','M.Brew').replace('Morning Wire','M.Wire').replace('API Brief','API Brief')} {isLoad?'…':`(${count})`}
+                </button>
+              );
+            })}
+          </div>
+          {filtered.length===0?(
+            <div className="no-art">
+              <p className="no-art-msg">{isAnyLoading?'Loading briefings...':'No briefing articles loaded yet'}</p>
+              {!isAnyLoading&&<button className="refresh-btn" style={{background:'#b45309'}} onClick={loadBriefings}>Retry Now</button>}
+            </div>
+          ):filtered.map((a,i)=><BriefCard key={i} a={a}/>)}
+        </div>
+        <div className="brief-sidebar">
+          <div className="side-block" style={{border:'1px solid #fcd34d'}}>
+            <div className="side-title" style={{color:'#b45309'}}>☀️ Your Briefing Sources</div>
+            {BRIEFING_FEEDS.map((f,i)=>{
+              const count=(briefArts[f.name]||[]).length;
+              const isLoad=briefLoading[f.name];
+              return(
+                <div key={i} style={{display:'flex',alignItems:'center',gap:8,padding:'6px 0',borderBottom:'1px solid var(--border2)'}}>
+                  <span style={{fontSize:'14px'}}>{f.emoji}</span>
+                  <div style={{flex:1,minWidth:0}}>
+                    <div style={{fontSize:'11px',fontWeight:'600',color:f.color}}>{f.name}</div>
+                    <div style={{fontSize:'10px',color:'var(--text3)'}}>{f.desc}</div>
+                  </div>
+                  <span style={{fontSize:'10px',color:isLoad?'#3b82f6':count>0?'#16a34a':'var(--text3)',fontWeight:'600',flexShrink:0}}>
+                    {isLoad?'…':count>0?`${count} art`:'—'}
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+          <div className="side-block">
+            <div className="side-title">Cross-Category Tags</div>
+            <div style={{fontSize:'11px',color:'var(--text2)',lineHeight:'1.7',marginBottom:'8px'}}>
+              Colored pills on each card show which of your feeds it relates to. Tap any pill to jump to that category filtered by that keyword.
+            </div>
+            <div style={{display:'flex',flexWrap:'wrap',gap:'4px'}}>
+              {Object.entries(CATS).filter(([k])=>k!=='briefing'&&k!=='podcasts').map(([k,v])=>(
+                <span key={k} style={{background:v.bg,color:v.color,borderRadius:'20px',padding:'2px 8px',fontSize:'10px',fontWeight:'500'}}>{v.emoji} {v.label}</span>
+              ))}
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
   const PodCard=({ep,idx})=>{
     const id=`pod_${ep.show}_${idx}`;
     const isSv=isSaved({...ep,link:ep.link||ep.show+idx});
     const[imgErr,setImgErr]=useState(false);
     return(
       <div className="pod-card">
-        {ep.img&&!imgErr?(
-          <img className="pod-card-img" src={ep.img} loading="lazy" onError={()=>setImgErr(true)} alt=""/>
-        ):(
-          <div className="pod-card-img-ph">{ep.showEmoji}</div>
-        )}
+        {ep.img&&!imgErr?<img className="pod-card-img" src={ep.img} loading="lazy" onError={()=>setImgErr(true)} alt=""/>:<div className="pod-card-img-ph">{ep.showEmoji}</div>}
         <div className="pod-card-body">
           <div className="pod-card-top">
             <div className="pod-card-num">{idx+1}</div>
@@ -662,17 +859,9 @@ export default function NewsHub(){
             </div>
             {activePod&&<button style={{background:'rgba(255,255,255,0.2)',border:'none',color:'#fff',borderRadius:'6px',padding:'4px 10px',cursor:'pointer',fontSize:'11px',fontFamily:'inherit'}} onClick={()=>setActivePod(null)}>All Shows</button>}
           </div>
-          {isLoading&&!displayEps.length?(
-            <div className="loading-state" style={{padding:'40px'}}>
-              Loading podcast episodes — up to 20 seconds on first load...<br/>
-              <span style={{fontSize:'10px',marginTop:'8px',display:'block'}}>Joe Rogan, Tucker, All-In load fastest. Daily Wire shows may take longer.</span>
-            </div>
-          ):displayEps.length===0?(
-            <div className="loading-state" style={{padding:'40px'}}>
-              No episodes loaded yet.<br/>
-              <button style={{marginTop:'12px',background:'#e11d48',border:'none',color:'#fff',borderRadius:'8px',padding:'8px 16px',cursor:'pointer',fontSize:'12px',fontFamily:'inherit'}} onClick={loadPodcasts}>Retry Loading</button>
-            </div>
-          ):displayEps.slice(0,20).map((ep,i)=><PodCard key={i} ep={ep} idx={i}/>)}
+          {isLoading&&!displayEps.length?<div className="loading-state" style={{padding:'40px'}}>Loading podcast episodes — up to 20 seconds on first load...</div>:
+          displayEps.length===0?<div className="loading-state" style={{padding:'40px'}}>No episodes loaded yet.<br/><button style={{marginTop:'12px',background:'#e11d48',border:'none',color:'#fff',borderRadius:'8px',padding:'8px 16px',cursor:'pointer',fontSize:'12px',fontFamily:'inherit'}} onClick={loadPodcasts}>Retry Loading</button></div>:
+          displayEps.slice(0,20).map((ep,i)=><PodCard key={i} ep={ep} idx={i}/>)}
         </div>
         <div className="pod-sidebar">
           <div className="pod-show-list">
@@ -700,10 +889,6 @@ export default function NewsHub(){
               );
             })}
           </div>
-          <div className="side-block">
-            <div className="side-title">About AI Summaries</div>
-            <div style={{fontSize:'11px',color:'var(--text2)',lineHeight:'1.6'}}>Tap <strong>AI Summary</strong> on any episode for a 2-3 sentence overview without listening first.</div>
-          </div>
         </div>
       </div>
     );
@@ -717,7 +902,7 @@ export default function NewsHub(){
           <div className="cat-block-label"><div className="cat-dot" style={{background:'#0369a1'}}></div><span style={{color:'#0369a1'}}>Bloom Energy and Power Intelligence</span><span className="cat-badge">{total}</span></div>
           <button className="see-all" style={{color:'#0369a1'}} onClick={()=>setTab('bloom')}>All articles</button>
         </div>
-        {ld?<div className="loading-state">Loading...</div>:arts2.length===0?<div className="loading-state">No articles yet — tap ↺ to refresh</div>:(
+        {ld?<div className="loading-state">Loading...</div>:arts2.length===0?<div className="loading-state">No articles yet — tap ↺</div>:(
           <div className="bloom-strip">
             {arts2.slice(0,4).map((a,i)=>(
               <div key={i} className="bloom-strip-item" onClick={()=>clickArt(a)}>
@@ -751,6 +936,8 @@ export default function NewsHub(){
   const TopStories=()=>{
     const newsCats=['general','sports','business','finance','bloom'];
     const hasAny=newsCats.some(c=>(arts[c]||[]).length>0);
+    const allBrief=allBriefArts();
+    const topBrief=allBrief[0];
     const allPodEps=PODCAST_FEEDS.flatMap(p=>(podEps[p.name]||[]).slice(0,1).map(e=>({...e,show:p.name,emoji:p.emoji})));
     const latestPod=allPodEps.sort((a,b)=>new Date(b.pubDate)-new Date(a.pubDate))[0];
     return(
@@ -769,6 +956,14 @@ export default function NewsHub(){
               </div>
             </div>;
           })}
+          {topBrief&&<div className="ts-item" onClick={()=>setTab('briefing')}>
+            {topBrief.img&&<div className="ts-item-bg" style={{backgroundImage:`url(${topBrief.img})`}}></div>}
+            <div className="ts-item-content">
+              <div className="ts-cat" style={{color:'#b45309'}}>☀️ Briefing</div>
+              <div className="ts-title">{topBrief.title}</div>
+              <div className="ts-src">{topBrief.briefSource} · {fmtDate(topBrief.pubDate)}</div>
+            </div>
+          </div>}
           {latestPod&&<div className="ts-item" onClick={()=>setTab('podcasts')}>
             {latestPod.img&&<div className="ts-item-bg" style={{backgroundImage:`url(${latestPod.img})`}}></div>}
             <div className="ts-item-content">
@@ -799,13 +994,11 @@ export default function NewsHub(){
         {cat==='bloom'&&<div className="side-block" style={{border:'1px solid #bae6fd'}}><div className="side-title" style={{color:'#0369a1'}}>About This Feed</div><div style={{fontSize:'11px',color:'var(--text2)',lineHeight:'1.6'}}>Tracks Bloom Energy (NYSE: BE), fuel cells, distributed power, AI data center power, onshoring, industrial energy, oil & gas, and utility-scale solutions.</div></div>}
         <div className="side-block">
           <div className="side-title">{cc.emoji} {cc.label} Keywords</div>
-          {activeKw&&(
-            <button className="clear-kw-btn" style={{color:cc.color}} onClick={()=>setActiveKw('')}>✕ Clear: "{activeKw}"</button>
-          )}
+          {activeKw&&<button className="clear-kw-btn" style={{color:cc.color}} onClick={()=>setActiveKw('')}>✕ Clear: "{activeKw}"</button>}
           {catKws.map((k,i)=>(
             <span key={i} className={`kw-chip${activeKw===k?' kw-active':''}`} style={{background:cc.bg,color:cc.color}} onClick={()=>toggleKw(k)}>{k}</span>
           ))}
-          {catKws.length===0&&<div style={{fontSize:'11px',color:'var(--text3)'}}>No keywords — add some in Customize</div>}
+          {catKws.length===0&&<div style={{fontSize:'11px',color:'var(--text3)'}}>No keywords — add in Customize</div>}
         </div>
         <div className="side-block"><div className="side-title">Alert Keywords</div>{alerts.map((a,i)=><span key={i} style={{display:'inline-block',background:'#fef2f2',color:'#dc2626',borderRadius:'20px',padding:'3px 9px',fontSize:'10px',margin:'2px',fontWeight:'500'}}>{a}</span>)}</div>
         <div className="side-block"><div className="side-title">Social</div>{social.map((h,i)=><div key={i} className="social-row" onClick={()=>window.open(`https://twitter.com/${h.replace('@','')}`)}>
@@ -837,7 +1030,7 @@ export default function NewsHub(){
       setLf(prev=>{const n=JSON.parse(JSON.stringify(prev));if(!n[srcCat])n[srcCat]=[];n[srcCat].push({name:newName.trim(),url:newUrl.trim(),on:true});return n;});
       setNewName('');setNewUrl('');
     };
-    const catLabels={general:'🌐 General',sports:'🏆 Sports',business:'⚡ Business',finance:'📈 Finance',bloom:'🔋 Bloom'};
+    const catLabels={general:'🌐 General',sports:'🏆 Sports',business:'⚡ Business',finance:'📈 Finance',bloom:'🔋 Bloom',briefing:'☀️ Briefing'};
     const hdot=(name)=>{const h=health[name];return h==='green'?'hg':h==='yellow'?'hy':h==='red'?'hr':'hx';};
     const cnt=(cat,name)=>(arts[cat]||[]).filter(a=>a.source===name).length;
     return(
@@ -901,7 +1094,7 @@ export default function NewsHub(){
             ))}
             <div className="p-sec">
               <div className="p-lbl">Social Follows</div>
-              <div>{ls.map((s,i)=><span key={i} className="p-chip p-so">{s}<button className="p-chip-x" style={{color:'#166634'}} onClick={()=>setLs(x=>x.filter((_,j)=>j!==i))}>×</button></span>)}</div>
+              <div>{ls.map((s,i)=><span key={i} className="p-chip p-so">{s}<button className="p-chip-x" style={{color:'#166534'}} onClick={()=>setLs(x=>x.filter((_,j)=>j!==i))}>×</button></span>)}</div>
               <div className="p-add"><input className="p-input" placeholder="@handle" value={newSocial} onChange={e=>setNewSocial(e.target.value)} onKeyDown={e=>{if(e.key==='Enter'&&newSocial.trim()){setLs(x=>[...x,newSocial.trim()]);setNewSocial('');}}}/><button className="p-add-btn" onClick={()=>{if(newSocial.trim()){setLs(x=>[...x,newSocial.trim()]);setNewSocial('');}}}>Add</button></div>
             </div>
             <button className="p-save" onClick={saveAll}>Save and Refresh</button>
@@ -921,10 +1114,10 @@ export default function NewsHub(){
           <div className="topbar-inner">
             <div className="logo">My<span>News</span>Hub</div>
             <div className="nav-tabs">
-              {['today','general','sports','business','finance','bloom','podcasts','saved'].map(t=>(
-                <button key={t} className={`nav-tab${tab===t?' active':''} ${t==='bloom'?'bloom-tab':''} ${t==='podcasts'?'pod-tab':''}`}
-                  onClick={()=>{setTab(t);setActiveKw('');setSearch('');if(!['today','saved','podcasts'].includes(t)&&!(arts[t]||[]).length)loadCat(t);}}>
-                  {t==='today'?'Today':t==='bloom'?'Bloom Energy':t==='podcasts'?'🎙️ Podcasts':t==='saved'?'Saved':t.charAt(0).toUpperCase()+t.slice(1)}
+              {['today','general','sports','business','finance','bloom','briefing','podcasts','saved'].map(t=>(
+                <button key={t} className={`nav-tab${tab===t?' active':''} ${t==='bloom'?'bloom-tab':''} ${t==='podcasts'?'pod-tab':''} ${t==='briefing'?'brief-tab':''}`}
+                  onClick={()=>{setTab(t);setActiveKw('');setSearch('');if(!['today','saved','podcasts','briefing'].includes(t)&&!(arts[t]||[]).length)loadCat(t);}}>
+                  {t==='today'?'Today':t==='bloom'?'Bloom Energy':t==='podcasts'?'🎙️ Podcasts':t==='briefing'?'☀️ Briefing':t==='saved'?'Saved':t.charAt(0).toUpperCase()+t.slice(1)}
                 </button>
               ))}
             </div>
@@ -967,6 +1160,7 @@ export default function NewsHub(){
               <Sidebar cat="bloom"/>
             </div>
           )}
+          {tab==='briefing'&&<BriefingPage/>}
           {tab==='podcasts'&&<PodcastsPage/>}
           {tab==='saved'&&(
             saved.length===0?<div className="saved-empty"><div style={{fontSize:'28px',marginBottom:'10px'}}>🔖</div><div style={{fontSize:'13px',fontWeight:'500',color:'var(--text2)',marginBottom:'4px'}}>No saved items yet</div><div style={{fontSize:'11px'}}>Tap Save on any article or episode</div></div>:
