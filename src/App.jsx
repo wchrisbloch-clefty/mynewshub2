@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback } from "react";
 
 const CATS={
   general:{label:'General',color:'#1d4ed8',bg:'#eff6ff',emoji:'🌐'},
@@ -23,7 +23,7 @@ const DEFAULT_KW={
   general:['Houston','Texas','Trump','Congress','White House','geopolitical','AI','tech','Iran','tariffs'],
   sports:['Texans','Astros','Braves','Kentucky','Clemson','NFL','MLB','NBA','CFB','recruiting','transfer portal'],
   business:['energy','oil','gas','data center','ERCOT','LNG','power grid','onshoring','AI','infrastructure'],
-  finance:['investing','real estate','stock market','interest rates','Fed','inflation','crypto','portfolio','passive income'],
+  finance:['investing','real estate','stock market','interest rates','Fed','inflation','crypto','portfolio'],
   bloom:['Bloom Energy','fuel cell','hydrogen','microgrid','distributed power','data center','onshoring','industrial energy','utility','ERCOT'],
 };
 
@@ -104,48 +104,87 @@ const DEFAULT_FEEDS={
   ]
 };
 
-const SK='v9_';
+const SK='v10_';
 function load(k,def){try{const v=localStorage.getItem(SK+k);return v?JSON.parse(v):def;}catch{return def;}}
 function save(k,v){try{localStorage.setItem(SK+k,JSON.stringify(v));}catch{}}
 
-async function fetchRSS(url){
+function extractImg(html){
+  if(!html)return'';
+  const m=html.match(/<img[^>]+src=["']([^"']+)["']/i);
+  return m?m[1]:'';
+}
+
+function parseXML(txt){
   try{
-    const r=await fetch(`https://api.rss2json.com/v1/api.json?rss_url=${encodeURIComponent(url)}&count=15`);
-    const d=await r.json();
-    if(d.items&&d.items.length>0)return d.items.map(i=>({
-      title:(i.title||'').trim(),link:i.link,
-      desc:(i.description||i.content||'').replace(/<[^>]*>/g,'').replace(/&amp;/g,'&').replace(/&nbsp;/g,' ').trim().slice(0,300),
-      pubDate:i.pubDate,img:i.thumbnail||'',duration:i.itunes_duration||''
-    }));
-  }catch{}
-  try{
-    const r=await fetch(`https://api.allorigins.win/get?url=${encodeURIComponent(url)}`);
-    const d=await r.json();
-    if(d.contents){
-      const p=new DOMParser(),x=p.parseFromString(d.contents,'text/xml');
-      const items=Array.from(x.querySelectorAll('item')).slice(0,15);
-      if(items.length>0)return items.map(i=>({
+    const p=new DOMParser(),x=p.parseFromString(txt,'text/xml');
+    const items=Array.from(x.querySelectorAll('item')).slice(0,15);
+    if(!items.length)return[];
+    return items.map(i=>{
+      const desc=(i.querySelector('description')?.textContent||i.querySelector('summary')?.textContent||'');
+      const cleanDesc=desc.replace(/<[^>]*>/g,'').replace(/&amp;/g,'&').replace(/&nbsp;/g,' ').replace(/&lt;/g,'<').replace(/&gt;/g,'>').trim().slice(0,350);
+      const img=i.querySelector('enclosure')?.getAttribute('url')||
+                i.querySelector('image url')?.textContent||
+                i.querySelector('thumbnail')?.textContent||
+                extractImg(desc)||'';
+      const dur=i.querySelector('duration')?.textContent||
+                i.querySelector('itunes\\:duration')?.textContent||'';
+      return{
         title:(i.querySelector('title')?.textContent||'').trim(),
         link:i.querySelector('link')?.textContent||i.querySelector('enclosure')?.getAttribute('url')||'',
-        desc:(i.querySelector('description')?.textContent||i.querySelector('summary')?.textContent||'').replace(/<[^>]*>/g,'').replace(/&amp;/g,'&').trim().slice(0,300),
-        pubDate:i.querySelector('pubDate')?.textContent||'',
-        img:i.querySelector('image url')?.textContent||'',
-        duration:i.querySelector('duration')?.textContent||''
-      }));
+        desc:cleanDesc,pubDate:i.querySelector('pubDate')?.textContent||i.querySelector('published')?.textContent||'',
+        img,duration:dur
+      };
+    }).filter(i=>i.title&&i.link);
+  }catch{return[];}
+}
+
+async function fetchRSS(url){
+  try{
+    const r=await Promise.race([fetch(`https://api.rss2json.com/v1/api.json?rss_url=${encodeURIComponent(url)}&count=15`),new Promise((_,rej)=>setTimeout(()=>rej('t'),8000))]);
+    const d=await r.json();
+    if(d.status==='ok'&&d.items?.length>0){
+      return d.items.map(i=>({
+        title:(i.title||'').trim(),link:i.link||'',
+        desc:(i.description||i.content||'').replace(/<[^>]*>/g,'').replace(/&amp;/g,'&').replace(/&nbsp;/g,' ').trim().slice(0,350),
+        pubDate:i.pubDate||'',img:i.thumbnail||i.enclosure?.link||extractImg(i.description||'')||'',
+        duration:i.itunes_duration||''
+      })).filter(i=>i.title&&i.link);
     }
   }catch{}
   try{
-    const r=await fetch(`https://corsproxy.io/?${encodeURIComponent(url)}`);
+    const r=await Promise.race([fetch(`https://api.allorigins.win/get?url=${encodeURIComponent(url)}`),new Promise((_,rej)=>setTimeout(()=>rej('t'),8000))]);
+    const d=await r.json();
+    if(d.contents){const items=parseXML(d.contents);if(items.length>0)return items;}
+  }catch{}
+  try{
+    const r=await Promise.race([fetch(`https://corsproxy.io/?${encodeURIComponent(url)}`),new Promise((_,rej)=>setTimeout(()=>rej('t'),8000))]);
     const txt=await r.text();
-    const p=new DOMParser(),x=p.parseFromString(txt,'text/xml');
-    const items=Array.from(x.querySelectorAll('item')).slice(0,15);
-    if(items.length>0)return items.map(i=>({
-      title:(i.querySelector('title')?.textContent||'').trim(),
-      link:i.querySelector('link')?.textContent||'',
-      desc:(i.querySelector('description')?.textContent||'').replace(/<[^>]*>/g,'').replace(/&amp;/g,'&').trim().slice(0,300),
-      pubDate:i.querySelector('pubDate')?.textContent||'',
-      img:'',duration:i.querySelector('duration')?.textContent||''
-    }));
+    const items=parseXML(txt);if(items.length>0)return items;
+  }catch{}
+  return[];
+}
+
+async function fetchPodcast(url){
+  try{
+    const r=await Promise.race([fetch(`https://api.rss2json.com/v1/api.json?rss_url=${encodeURIComponent(url)}&count=10`),new Promise((_,rej)=>setTimeout(()=>rej('t'),12000))]);
+    const d=await r.json();
+    if(d.status==='ok'&&d.items?.length>0){
+      return d.items.map(i=>({
+        title:(i.title||'').trim(),link:i.link||i.enclosure?.link||'',
+        desc:(i.description||i.content||'').replace(/<[^>]*>/g,'').replace(/&amp;/g,'&').trim().slice(0,400),
+        pubDate:i.pubDate||'',img:i.thumbnail||d.feed?.image||'',duration:i.itunes_duration||''
+      })).filter(i=>i.title);
+    }
+  }catch{}
+  try{
+    const r=await Promise.race([fetch(`https://api.allorigins.win/get?url=${encodeURIComponent(url)}`),new Promise((_,rej)=>setTimeout(()=>rej('t'),12000))]);
+    const d=await r.json();
+    if(d.contents){const items=parseXML(d.contents);if(items.length>0)return items;}
+  }catch{}
+  try{
+    const r=await Promise.race([fetch(`https://corsproxy.io/?${encodeURIComponent(url)}`),new Promise((_,rej)=>setTimeout(()=>rej('t'),12000))]);
+    const txt=await r.text();
+    const items=parseXML(txt);if(items.length>0)return items;
   }catch{}
   return[];
 }
@@ -195,7 +234,7 @@ body{background:var(--bg);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI
 .nav-tab.pod-tab.active{color:#e11d48;background:#fff1f2;}
 .nav-tab:hover:not(.active){color:var(--text2);}
 .topbar-right{display:flex;gap:6px;align-items:center;flex-shrink:0;}
-.search{background:var(--search);border:1px solid var(--border);color:var(--text);border-radius:6px;padding:6px 10px;font-size:12px;width:120px;font-family:inherit;}
+.search{background:var(--search);border:1px solid var(--border);color:var(--text);border-radius:6px;padding:6px 10px;font-size:12px;width:130px;font-family:inherit;}
 .search:focus{outline:1px solid #1d4ed8;}
 .btn-icon{background:var(--search);border:1px solid var(--border);color:var(--text2);border-radius:6px;padding:6px 10px;cursor:pointer;font-size:13px;font-family:inherit;}
 .btn-blue{background:#1d4ed8;border:none;color:#fff;border-radius:6px;padding:6px 12px;cursor:pointer;font-size:12px;font-weight:500;font-family:inherit;}
@@ -204,14 +243,16 @@ body{background:var(--bg);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI
 .breaking-inner{max-width:1300px;margin:0 auto;display:flex;align-items:center;gap:10px;}
 .breaking-badge{background:#fff;color:#dc2626;font-size:9px;font-weight:700;border-radius:4px;padding:2px 6px;letter-spacing:0.05em;white-space:nowrap;}
 .breaking-text{font-size:11px;color:#fff;font-weight:500;flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
-.breaking-x{background:none;border:none;color:rgba(255,255,255,0.7);cursor:pointer;font-size:14px;line-height:1;}
+.breaking-x{background:none;border:none;color:rgba(255,255,255,0.7);cursor:pointer;font-size:14px;}
 .ts-bar{background:var(--surface);border-bottom:1px solid var(--border);overflow-x:auto;}
 .ts-inner{max-width:1300px;margin:0 auto;display:flex;}
-.ts-item{flex:1;min-width:130px;padding:10px 14px;border-right:1px solid var(--border);cursor:pointer;transition:background 0.12s;}
+.ts-item{flex:1;min-width:130px;padding:10px 14px;border-right:1px solid var(--border);cursor:pointer;transition:background 0.12s;position:relative;overflow:hidden;}
 .ts-item:last-child{border-right:none;}
 .ts-item:hover{background:var(--bg);}
+.ts-item-bg{position:absolute;inset:0;background-size:cover;background-position:center;opacity:0.13;}
+.ts-item-content{position:relative;z-index:1;}
 .ts-cat{font-size:9px;font-weight:600;text-transform:uppercase;letter-spacing:0.08em;margin-bottom:3px;}
-.ts-title{font-size:11px;font-weight:500;color:var(--text);line-height:1.35;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;}
+.ts-title{font-size:11px;font-weight:600;color:var(--text);line-height:1.35;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;}
 .ts-src{font-size:10px;color:var(--text3);margin-top:2px;}
 .main{max-width:1300px;margin:0 auto;padding:16px 20px;}
 .today-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;}
@@ -226,8 +267,8 @@ body{background:var(--bg);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI
 .hero-row{padding:10px 14px;border-bottom:1px solid var(--border2);cursor:pointer;display:flex;gap:10px;align-items:flex-start;transition:background 0.1s;}
 .hero-row:hover{background:var(--bg);}
 .hero-row:last-child{border-bottom:none;}
-.thumb-sm{width:56px;height:42px;border-radius:6px;object-fit:cover;flex-shrink:0;}
-.thumb-ph{width:56px;height:42px;border-radius:6px;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:14px;}
+.thumb-sm{width:64px;height:48px;border-radius:6px;object-fit:cover;flex-shrink:0;}
+.thumb-ph{width:64px;height:48px;border-radius:6px;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:18px;}
 .hero-body{flex:1;min-width:0;}
 .hero-title{font-size:12px;font-weight:600;color:var(--text);line-height:1.35;margin-bottom:3px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;}
 .hero-meta{font-size:10px;color:var(--text3);display:flex;align-items:center;gap:5px;flex-wrap:wrap;}
@@ -240,35 +281,38 @@ body{background:var(--bg);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI
 .mini-act.ad{border-color:#ef4444;color:#ef4444;background:#fef2f2;}
 .loading-state{padding:24px;text-align:center;font-size:11px;color:var(--text3);}
 .bloom-strip{display:grid;grid-template-columns:repeat(4,1fr);gap:0;}
-.bloom-strip-item{padding:10px 14px;border-right:1px solid var(--border2);cursor:pointer;transition:background 0.1s;}
+.bloom-strip-item{padding:10px 14px;border-right:1px solid var(--border2);cursor:pointer;transition:background 0.1s;position:relative;overflow:hidden;}
 .bloom-strip-item:last-child{border-right:none;}
 .bloom-strip-item:hover{background:var(--bg);}
+.bloom-strip-bg{position:absolute;inset:0;background-size:cover;background-position:center;opacity:0.1;}
+.bloom-strip-content{position:relative;z-index:1;}
 .bloom-strip-title{font-size:11px;font-weight:600;color:var(--text);line-height:1.35;margin-bottom:4px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;}
 .bloom-strip-meta{font-size:10px;color:#0369a1;font-weight:500;}
 .bloom-strip-date{font-size:9px;color:var(--text3);margin-top:2px;}
 .cat-page{display:grid;grid-template-columns:1fr 260px;gap:16px;}
-.feed-col{display:flex;flex-direction:column;gap:8px;}
-.feed-card{background:var(--surface);border-radius:10px;border:1px solid var(--border);padding:14px;cursor:pointer;transition:all 0.12s;display:flex;gap:12px;align-items:flex-start;}
-.feed-card:hover{border-color:#bfdbfe;box-shadow:0 1px 8px rgba(29,78,216,0.06);}
+.feed-col{display:flex;flex-direction:column;gap:10px;}
+.feed-card{background:var(--surface);border-radius:10px;border:1px solid var(--border);overflow:hidden;cursor:pointer;transition:all 0.12s;}
+.feed-card:hover{border-color:#bfdbfe;box-shadow:0 2px 12px rgba(29,78,216,0.08);}
 .feed-card.bloom-card:hover{border-color:#bae6fd;}
-.feed-av{width:36px;height:36px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:600;flex-shrink:0;}
-.feed-body{flex:1;min-width:0;}
-.feed-top-row{display:flex;align-items:baseline;gap:6px;flex-wrap:wrap;}
+.feed-hero-img{width:100%;height:180px;object-fit:cover;display:block;}
+.feed-hero-ph{width:100%;height:100px;display:flex;align-items:center;justify-content:center;font-size:36px;}
+.feed-card-body{padding:12px 14px 14px;}
+.feed-top-row{display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-bottom:6px;}
+.feed-av{width:22px;height:22px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:700;flex-shrink:0;}
 .feed-src{font-size:11px;font-weight:600;}
-.feed-date{font-size:10px;color:var(--text3);}
-.feed-title{font-size:14px;font-weight:700;color:var(--text);line-height:1.35;margin:5px 0 4px;letter-spacing:-0.1px;}
-.feed-desc{font-size:12px;color:var(--text2);line-height:1.5;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;margin-bottom:8px;}
+.feed-date{font-size:10px;color:var(--text3);margin-left:auto;}
+.feed-title{font-size:15px;font-weight:700;color:var(--text);line-height:1.35;margin-bottom:6px;letter-spacing:-0.2px;}
+.feed-desc{font-size:12px;color:var(--text2);line-height:1.55;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden;margin-bottom:10px;}
 .feed-footer{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:6px;}
 .feed-kws{display:flex;gap:4px;flex-wrap:wrap;}
 .feed-acts{display:flex;gap:3px;}
-.act-b{background:none;border:1px solid var(--border);border-radius:5px;padding:2px 7px;font-size:10px;cursor:pointer;color:var(--text3);font-family:inherit;}
+.act-b{background:none;border:1px solid var(--border);border-radius:5px;padding:2px 8px;font-size:10px;cursor:pointer;color:var(--text3);font-family:inherit;}
 .act-b:hover{border-color:#1d4ed8;color:#1d4ed8;}
 .act-b.al{border-color:#1d4ed8;color:#1d4ed8;background:#eff6ff;}
 .act-b.as{border-color:#f59e0b;color:#f59e0b;background:#fffbeb;}
 .act-b.ad{border-color:#ef4444;color:#ef4444;background:#fef2f2;}
 .act-b.ai{border-color:#7c3aed;color:#7c3aed;background:#f5f3ff;}
-.feed-img{width:80px;height:60px;border-radius:8px;object-fit:cover;flex-shrink:0;}
-.feed-img-ph{width:80px;height:60px;border-radius:8px;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:22px;}
+.alert-tag{background:#fef2f2;color:#dc2626;border-radius:4px;padding:1px 6px;font-size:9px;font-weight:700;}
 .summary-box{background:var(--bg);border:1px solid #7c3aed;border-radius:8px;padding:10px 12px;margin-top:8px;font-size:12px;color:var(--text2);line-height:1.6;}
 .summary-lbl{font-size:9px;font-weight:700;color:#7c3aed;text-transform:uppercase;letter-spacing:0.08em;margin-bottom:4px;}
 .pod-page{display:grid;grid-template-columns:1fr 280px;gap:16px;}
@@ -277,14 +321,17 @@ body{background:var(--bg);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI
 .pod-show-emoji{font-size:28px;}
 .pod-show-info{flex:1;}
 .pod-show-name{font-size:13px;font-weight:700;color:#fff;}
-.pod-show-host{font-size:11px;color:rgba(255,255,255,0.8);margin-top:2px;}
-.pod-card{background:var(--surface);border-radius:10px;border:1px solid var(--border);padding:14px;transition:all 0.12s;}
+.pod-show-host{font-size:11px;color:rgba(255,255,255,0.85);margin-top:2px;}
+.pod-card{background:var(--surface);border-radius:10px;border:1px solid var(--border);overflow:hidden;transition:all 0.12s;}
 .pod-card:hover{border-color:#fda4af;}
-.pod-card-top{display:flex;align-items:flex-start;gap:12px;margin-bottom:10px;}
-.pod-card-num{font-size:22px;font-weight:800;color:var(--border);min-width:28px;line-height:1;}
-.pod-card-body{flex:1;min-width:0;}
+.pod-card-img{width:100%;height:140px;object-fit:cover;display:block;}
+.pod-card-img-ph{width:100%;height:80px;display:flex;align-items:center;justify-content:center;font-size:32px;background:var(--bg);}
+.pod-card-body{padding:12px 14px 14px;}
+.pod-card-top{display:flex;align-items:flex-start;gap:10px;margin-bottom:8px;}
+.pod-card-num{font-size:20px;font-weight:800;color:var(--border);min-width:26px;line-height:1;}
+.pod-card-info{flex:1;min-width:0;}
 .pod-card-show{font-size:10px;font-weight:600;color:#e11d48;margin-bottom:2px;}
-.pod-card-title{font-size:14px;font-weight:700;color:var(--text);line-height:1.35;margin-bottom:4px;cursor:pointer;}
+.pod-card-title{font-size:13px;font-weight:700;color:var(--text);line-height:1.35;margin-bottom:4px;cursor:pointer;}
 .pod-card-title:hover{color:#e11d48;}
 .pod-card-meta{font-size:10px;color:var(--text3);display:flex;gap:8px;flex-wrap:wrap;}
 .pod-card-desc{font-size:12px;color:var(--text2);line-height:1.5;margin-top:6px;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden;}
@@ -312,7 +359,9 @@ body{background:var(--bg);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI
 .trend-n{font-size:14px;font-weight:700;color:var(--border);min-width:18px;line-height:1;}
 .trend-t{font-size:11px;font-weight:500;color:var(--text);line-height:1.3;}
 .trend-s{font-size:10px;color:var(--text3);margin-top:1px;}
-.kw-chip{display:inline-block;border-radius:20px;padding:3px 9px;font-size:10px;margin:2px;cursor:pointer;font-weight:500;}
+.kw-chip{display:inline-block;border-radius:20px;padding:3px 9px;font-size:10px;margin:2px;cursor:pointer;font-weight:500;transition:opacity 0.1s;}
+.kw-chip:hover{opacity:0.75;}
+.kw-chip.kw-active{outline:2px solid currentColor;outline-offset:1px;}
 .social-row{display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:1px solid var(--border2);cursor:pointer;}
 .social-row:last-child{border-bottom:none;}
 .social-av{width:24px;height:24px;border-radius:50%;background:#000;color:#fff;display:flex;align-items:center;justify-content:center;font-size:8px;font-weight:700;}
@@ -328,36 +377,28 @@ body{background:var(--bg);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI
 .panel{background:var(--surface);border-radius:14px;width:100%;max-width:500px;max-height:88vh;overflow-y:auto;box-shadow:0 16px 48px rgba(0,0,0,0.15);}
 .panel-head{padding:16px 20px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;position:sticky;top:0;background:var(--surface);z-index:10;}
 .panel-htitle{font-size:14px;font-weight:600;color:var(--text);}
-.panel-x{background:none;border:none;font-size:16px;cursor:pointer;color:var(--text3);line-height:1;}
+.panel-x{background:none;border:none;font-size:16px;cursor:pointer;color:var(--text3);}
 .panel-body{padding:18px 20px;}
 .p-sec{margin-bottom:20px;}
 .p-lbl{font-size:9px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:0.08em;margin-bottom:8px;}
 .p-row{display:flex;align-items:center;padding:7px 0;border-bottom:1px solid var(--border2);gap:8px;}
-.p-row:last-child{border-bottom:none;}
+.p-row:last-of-type{border-bottom:none;}
 .p-name{flex:1;font-size:12px;color:var(--text);}
 .p-count{font-size:10px;color:var(--text3);white-space:nowrap;}
-.p-del{background:none;border:none;color:var(--text3);cursor:pointer;font-size:13px;padding:0 2px;line-height:1;}
+.p-del{background:none;border:none;color:var(--text3);cursor:pointer;font-size:13px;padding:0 2px;}
 .p-del:hover{color:#dc2626;}
 .tog{width:32px;height:18px;border-radius:9px;border:none;cursor:pointer;position:relative;transition:background 0.2s;flex-shrink:0;}
-.tog.on{background:#1d4ed8;}
-.tog.off{background:#cbd5e1;}
+.tog.on{background:#1d4ed8;}.tog.off{background:#cbd5e1;}
 .tog::after{content:'';width:14px;height:14px;background:#fff;border-radius:50%;position:absolute;top:2px;transition:left 0.15s;}
-.tog.on::after{left:16px;}
-.tog.off::after{left:2px;}
-.health-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0;}
-.health-green{background:#16a34a;}
-.health-yellow{background:#d97706;}
-.health-red{background:#dc2626;}
-.health-gray{background:#94a3b8;}
-.health-legend{display:flex;gap:12px;margin-bottom:10px;font-size:10px;color:var(--text3);flex-wrap:wrap;}
-.health-legend-item{display:flex;align-items:center;gap:4px;}
+.tog.on::after{left:16px;}.tog.off::after{left:2px;}
+.hdot{width:8px;height:8px;border-radius:50%;flex-shrink:0;}
+.hg{background:#16a34a;}.hy{background:#d97706;}.hr{background:#dc2626;}.hx{background:#94a3b8;}
+.hlegend{display:flex;gap:12px;margin-bottom:10px;font-size:10px;color:var(--text3);flex-wrap:wrap;}
+.hlegend span{display:flex;align-items:center;gap:4px;}
 .p-chip{display:inline-flex;align-items:center;gap:3px;border-radius:20px;padding:3px 9px;font-size:11px;margin:2px;font-weight:500;}
-.p-kw{background:#eff6ff;color:#1d4ed8;}
-.p-alert{background:#fef2f2;color:#dc2626;}
-.p-so{background:#f0fdf4;color:#166534;}
+.p-kw{background:#eff6ff;color:#1d4ed8;}.p-alert{background:#fef2f2;color:#dc2626;}.p-so{background:#f0fdf4;color:#166534;}
 .p-chip-x{background:none;border:none;cursor:pointer;font-size:11px;opacity:0.6;}
 .p-add{display:flex;gap:6px;margin-top:8px;}
-.p-add-2{display:grid;grid-template-columns:1fr 1fr auto;gap:6px;margin-top:8px;}
 .p-input{flex:1;border:1px solid var(--border);border-radius:6px;padding:6px 10px;font-size:12px;font-family:inherit;color:var(--text);background:var(--surface);}
 .p-input:focus{outline:none;border-color:#1d4ed8;}
 .p-add-btn{background:#1d4ed8;border:none;color:#fff;border-radius:6px;padding:6px 12px;font-size:11px;cursor:pointer;font-weight:500;font-family:inherit;white-space:nowrap;}
@@ -371,37 +412,37 @@ body{background:var(--bg);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI
 .kw-cat-tabs{display:flex;gap:4px;flex-wrap:wrap;margin-bottom:10px;}
 .kw-cat-tab{background:var(--bg);border:1px solid var(--border);border-radius:6px;padding:4px 10px;font-size:10px;cursor:pointer;font-family:inherit;color:var(--text2);font-weight:500;}
 .kw-cat-tab.active{background:#1d4ed8;color:#fff;border-color:#1d4ed8;}
-.add-source-box{background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:12px;margin-top:10px;}
-.add-source-title{font-size:10px;font-weight:600;color:var(--text2);margin-bottom:8px;}
-.p-input-sm{border:1px solid var(--border);border-radius:6px;padding:5px 8px;font-size:11px;font-family:inherit;color:var(--text);background:var(--surface);width:100%;}
+.add-src-box{background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:12px;margin-top:10px;}
+.add-src-lbl{font-size:10px;font-weight:600;color:var(--text2);margin-bottom:8px;}
+.p-input-sm{border:1px solid var(--border);border-radius:6px;padding:5px 8px;font-size:11px;font-family:inherit;color:var(--text);background:var(--surface);width:100%;margin-bottom:6px;}
 .p-input-sm:focus{outline:none;border-color:#1d4ed8;}
-.test-btn{background:var(--search);border:1px solid var(--border);color:var(--text2);border-radius:6px;padding:5px 10px;font-size:10px;cursor:pointer;font-family:inherit;white-space:nowrap;}
-.test-result{font-size:10px;margin-top:6px;padding:5px 8px;border-radius:5px;}
-.test-ok{background:#f0fdf4;color:#16a34a;}
-.test-fail{background:#fef2f2;color:#dc2626;}
-.test-loading{background:var(--bg);color:var(--text3);}
+.test-btn{background:var(--search);border:1px solid var(--border);color:var(--text2);border-radius:6px;padding:5px 10px;font-size:10px;cursor:pointer;font-family:inherit;}
+.tresult{font-size:10px;margin-top:6px;padding:5px 8px;border-radius:5px;}
+.tok{background:#f0fdf4;color:#16a34a;}.tfail{background:#fef2f2;color:#dc2626;}.tload{background:var(--bg);color:var(--text3);}
+.clear-kw-btn{background:var(--bg);border:1px solid var(--border);border-radius:5px;padding:2px 8px;font-size:10px;cursor:pointer;font-family:inherit;margin-bottom:6px;}
 `;
 
 export default function NewsHub(){
   const[tab,setTab]=useState('today');
   const[search,setSearch]=useState('');
+  const[activeKw,setActiveKw]=useState('');
   const[dark,setDark]=useState(()=>load('dark',false));
   const[saved,setSaved]=useState(()=>load('saved',[]));
   const[likes,setLikes]=useState(()=>load('likes',{}));
   const[clicks,setClicks]=useState(()=>load('clicks',{}));
   const[scores,setScores]=useState(()=>load('scores',{}));
   const[kw,setKw]=useState(()=>load('kw',DEFAULT_KW));
-  const[alerts,setAlerts]=useState(()=>load('alerts',['Texans','Astros','Kentucky','Clemson','ERCOT','Bloom Energy','fuel cell','hurricane','earthquake','breaking']));
-  const[social,setSocial]=useState(()=>load('social',['@HoustonTexans','@astros','@KentuckyMBB','@ClemsonFB','@Bloomberg','@OilandGasJnl','@BloomEnergy']));
+  const[alerts,setAlerts]=useState(()=>load('alerts',['Texans','Astros','Kentucky','Clemson','ERCOT','Bloom Energy','hurricane','breaking']));
+  const[social,setSocial]=useState(()=>load('social',['@HoustonTexans','@astros','@KentuckyMBB','@ClemsonFB','@BloomEnergy']));
   const[feeds,setFeeds]=useState(()=>load('feeds',DEFAULT_FEEDS));
   const[arts,setArts]=useState({general:[],sports:[],business:[],finance:[],bloom:[]});
   const[loading,setLoading]=useState({general:false,sports:false,business:false,finance:false,bloom:false});
-  const[sourceHealth,setSourceHealth]=useState({});
+  const[health,setHealth]=useState({});
   const[podEps,setPodEps]=useState({});
   const[podLoading,setPodLoading]=useState({});
   const[activePod,setActivePod]=useState(null);
   const[summaries,setSummaries]=useState({});
-  const[summaryLoading,setSummaryLoading]=useState({});
+  const[sumLoading,setSumLoading]=useState({});
   const[breaking,setBreaking]=useState(null);
   const[showPanel,setShowPanel]=useState(false);
   const[newKwTab,setNewKwTab]=useState('general');
@@ -415,108 +456,87 @@ export default function NewsHub(){
   useEffect(()=>{save('clicks',clicks);},[clicks]);
   useEffect(()=>{save('scores',scores);},[scores]);
 
-  const kwScore=(a,cat)=>{const catKws=kw[cat]||[];return catKws.filter(k=>(a.title+(a.desc||'')).toLowerCase().includes(k.toLowerCase())).length;};
+  const kwScore=(a,cat)=>{const ks=kw[cat]||[];return ks.filter(k=>(a.title+(a.desc||'')).toLowerCase().includes(k.toLowerCase())).length;};
   const sc=useCallback((a)=>(scores[a.link]||0)+kwScore(a,a.cat)*3+(clicks[a.source]||0)*2,[scores,kw,clicks]);
-  const dedupe=(arr)=>{const seen=new Set();return arr.filter(a=>{const k=a.title.slice(0,60).toLowerCase().replace(/\s+/g,'');if(seen.has(k))return false;seen.add(k);return true;});};
+  const dedupe=(arr)=>{const seen=new Set();return arr.filter(a=>{const k=(a.title||'').slice(0,60).toLowerCase().replace(/\s+/g,'');if(seen.has(k))return false;seen.add(k);return true;});};
 
   const sorted=useCallback((cat)=>{
-    const f=search?(arts[cat]||[]).filter(a=>(a.title+(a.desc||'')).toLowerCase().includes(search)):(arts[cat]||[]);
+    let f=arts[cat]||[];
+    if(activeKw){f=f.filter(a=>(a.title+(a.desc||'')).toLowerCase().includes(activeKw.toLowerCase()));}
+    else if(search){f=f.filter(a=>(a.title+(a.desc||'')).toLowerCase().includes(search.toLowerCase()));}
     const deduped=dedupe(f);
     const bySource={};
     deduped.forEach(a=>{if(!bySource[a.source])bySource[a.source]=[];bySource[a.source].push(a);});
     Object.keys(bySource).forEach(src=>{bySource[src].sort((a,b)=>{const d=kwScore(b,cat)-kwScore(a,cat);if(d!==0)return d;return new Date(b.pubDate)-new Date(a.pubDate);});});
     const srcKeys=Object.keys(bySource).sort((a,b)=>{const topA=bySource[a][0],topB=bySource[b][0];const d=kwScore(topB,cat)-kwScore(topA,cat);if(d!==0)return d;return new Date(topB.pubDate)-new Date(topA.pubDate);});
     const result=[];
-    const maxLen=Math.max(...srcKeys.map(k=>bySource[k].length));
-    for(let i=0;i<maxLen;i++){srcKeys.forEach(src=>{if(bySource[src][i])result.push(bySource[src][i]);});}
+    const maxLen=Math.max(0,...srcKeys.map(k=>bySource[k].length));
+    for(let i=0;i<maxLen;i++){srcKeys.forEach(src=>{if(bySource[src]?.[i])result.push(bySource[src][i]);});}
     return result;
-  },[arts,search,sc]);
+  },[arts,search,activeKw,sc]);
 
   const kwMatch=(a,cat)=>(kw[cat]||[]).filter(k=>(a.title+(a.desc||'')).toLowerCase().includes(k.toLowerCase()));
   const isAlert=(a)=>alerts.some(al=>(a.title+(a.desc||'')).toLowerCase().includes(al.toLowerCase()));
   const isSaved=(a)=>saved.some(s=>s.link===a.link);
 
   const clickArt=(a)=>{setClicks(c=>({...c,[a.source]:(c[a.source]||0)+1}));setScores(s=>({...s,[a.link]:(s[a.link]||0)+3}));window.open(a.link,'_blank');};
-  const likeArt=(link,v,e)=>{e?.stopPropagation();setLikes(l=>{const prev=l[link]||0;if(prev===v){const n={...l};delete n[link];return n;}return{...l,[link]:v};});setScores(s=>{const prev=likes[link]||0;return{...s,[link]:(s[link]||0)-prev*5+v*5};});};
+  const likeArt=(link,v,e)=>{e?.stopPropagation();setLikes(l=>{const prev=l[link]||0;if(prev===v){const n={...l};delete n[link];return n;}return{...l,[link]:v};});};
   const saveArt=(a,e)=>{e?.stopPropagation();setSaved(s=>s.some(x=>x.link===a.link)?s.filter(x=>x.link!==a.link):[...s,a]);};
 
   const getSummary=async(id,title,desc,e)=>{
     e?.stopPropagation();
     if(summaries[id]){setSummaries(s=>{const n={...s};delete n[id];return n;});return;}
-    setSummaryLoading(l=>({...l,[id]:true}));
+    setSumLoading(l=>({...l,[id]:true}));
     try{
       const resp=await fetch('https://api.anthropic.com/v1/messages',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({model:'claude-sonnet-4-20250514',max_tokens:1000,messages:[{role:'user',content:`Summarize this in 2-3 concise sentences. Be direct and factual. Title: ${title}. Content: ${desc||''}`}]})});
       const data=await resp.json();
       setSummaries(s=>({...s,[id]:data.content?.[0]?.text||'Summary unavailable.'}));
-    }catch{setSummaries(s=>({...s,[id]:'Summary unavailable.'}));}
-    setSummaryLoading(l=>({...l,[id]:false}));
+    }catch{setSummaries(s=>({...s,[id]:'Could not generate summary.'}));}
+    setSumLoading(l=>({...l,[id]:false}));
   };
 
   const loadCat=useCallback(async(cat)=>{
     if(loading[cat])return;
     setLoading(l=>({...l,[cat]:true}));
-    const results=[];
-    const healthUpdates={};
+    const results=[];const healthUp={};
     await Promise.allSettled((feeds[cat]||[]).filter(f=>f.on).map(async f=>{
       const t0=Date.now();
       const items=await fetchRSS(f.url);
       const elapsed=Date.now()-t0;
-      if(items.length>0){
-        healthUpdates[f.name]=elapsed<4000?'green':'yellow';
-        items.forEach(i=>{if(i.title&&i.link)results.push({...i,source:f.name,cat});});
-      } else {
-        healthUpdates[f.name]='red';
-      }
+      healthUp[f.name]=items.length>0?(elapsed<5000?'green':'yellow'):'red';
+      items.forEach(i=>{if(i.title&&i.link)results.push({...i,source:f.name,cat});});
     }));
-    setSourceHealth(h=>({...h,...healthUpdates}));
+    setHealth(h=>({...h,...healthUp}));
     results.sort((a,b)=>new Date(b.pubDate)-new Date(a.pubDate));
     setArts(a=>({...a,[cat]:results}));
     setLoading(l=>({...l,[cat]:false}));
-    const hit=results.find(a=>alerts.some(al=>(a.title+(a.desc||'')).toLowerCase().includes(al.toLowerCase())));
+    const hit=results.find(a=>isAlert(a));
     if(hit)setBreaking(hit);
   },[feeds,alerts,loading]);
 
-  const loadPodcast=useCallback(async(pod)=>{
-    if(podLoading[pod.name])return;
-    setPodLoading(l=>({...l,[pod.name]:true}));
-    const eps=await fetchRSS(pod.url);
-    setPodEps(p=>({...p,[pod.name]:eps.map(e=>({...e,show:pod.name,host:pod.host,showEmoji:pod.emoji}))}));
-    setPodLoading(l=>({...l,[pod.name]:false}));
-  },[podLoading]);
+  const loadPodcasts=useCallback(async()=>{
+    await Promise.allSettled(PODCAST_FEEDS.map(async pod=>{
+      if(podLoading[pod.name])return;
+      setPodLoading(l=>({...l,[pod.name]:true}));
+      const eps=await fetchPodcast(pod.url);
+      setPodEps(p=>({...p,[pod.name]:eps.map(e=>({...e,show:pod.name,host:pod.host,showEmoji:pod.emoji}))}));
+      setPodLoading(l=>({...l,[pod.name]:false}));
+    }));
+  },[]);
 
   useEffect(()=>{
     Object.keys(DEFAULT_FEEDS).forEach(c=>loadCat(c));
-    PODCAST_FEEDS.forEach(p=>loadPodcast(p));
+    loadPodcasts();
   },[]);
 
   const refreshAll=()=>{
     setArts({general:[],sports:[],business:[],finance:[],bloom:[]});
     setLoading({general:false,sports:false,business:false,finance:false,bloom:false});
-    setSourceHealth({});
-    setPodEps({});setPodLoading({});
-    setTimeout(()=>{
-      Object.keys(DEFAULT_FEEDS).forEach(c=>loadCat(c));
-      PODCAST_FEEDS.forEach(p=>loadPodcast(p));
-    },100);
+    setHealth({});setPodEps({});setPodLoading({});setActiveKw('');setSearch('');
+    setTimeout(()=>{Object.keys(DEFAULT_FEEDS).forEach(c=>loadCat(c));loadPodcasts();},100);
   };
 
-  const getHealthDot=(name)=>{
-    const h=sourceHealth[name];
-    if(!h)return'health-gray';
-    if(h==='green')return'health-green';
-    if(h==='yellow')return'health-yellow';
-    return'health-red';
-  };
-
-  const getHealthLabel=(name)=>{
-    const h=sourceHealth[name];
-    if(!h)return'Not checked';
-    if(h==='green')return'Loading OK';
-    if(h==='yellow')return'Slow';
-    return'Failed';
-  };
-
-  const countBySource=(cat,name)=>(arts[cat]||[]).filter(a=>a.source===name).length;
+  const toggleKw=(k)=>{setActiveKw(prev=>prev===k?'':k);setSearch('');};
 
   const MiniActs=({a})=>(
     <div className="mini-acts">
@@ -526,26 +546,18 @@ export default function NewsHub(){
     </div>
   );
 
-  const FullActs=({a})=>{
-    const id=btoa(a.link.slice(0,40)).replace(/[^a-z0-9]/gi,'').slice(0,12);
-    return(
-      <div className="feed-acts">
-        <button className={`act-b ${likes[a.link]===1?'al':''}`} onClick={e=>likeArt(a.link,1,e)}>Up</button>
-        <button className={`act-b ${likes[a.link]===-1?'ad':''}`} onClick={e=>likeArt(a.link,-1,e)}>Down</button>
-        <button className={`act-b ${isSaved(a)?'as':''}`} onClick={e=>saveArt(a,e)}>Save</button>
-        <button className={`act-b ${summaries[id]||summaryLoading[id]?'ai':''}`} onClick={e=>getSummary(id,a.title,a.desc,e)}>AI</button>
-        <button className="act-b" onClick={()=>clickArt(a)}>Read</button>
-      </div>
-    );
-  };
-
   const HeroRow=({a,cat})=>{
     const cc=CATS[cat],kws=kwMatch(a,cat),alert=isAlert(a);
+    const[imgErr,setImgErr]=useState(false);
     return(
       <div className="hero-row" onClick={()=>clickArt(a)}>
-        {a.img?<img className="thumb-sm" src={a.img} loading="lazy" onError={e=>e.target.style.display='none'} alt=""/>:<div className="thumb-ph" style={{background:cc.bg}}>{cc.emoji}</div>}
+        {a.img&&!imgErr?(
+          <img className="thumb-sm" src={a.img} loading="lazy" onError={()=>setImgErr(true)} alt=""/>
+        ):(
+          <div className="thumb-ph" style={{background:cc.bg}}>{cc.emoji}</div>
+        )}
         <div className="hero-body">
-          <div className="hero-title">{alert&&<span style={{color:'#dc2626',fontSize:'9px',fontWeight:'700',marginRight:'4px'}}>ALERT</span>}{a.title}</div>
+          <div className="hero-title">{alert&&<span className="alert-tag" style={{marginRight:'4px'}}>ALERT</span>}{a.title}</div>
           <div className="hero-meta"><span style={{color:cc.color,fontWeight:'600'}}>{a.source}</span>{kws.slice(0,2).map(k=><span key={k} className="kw-tag" style={{background:cc.bg,color:cc.color}}>{k}</span>)}</div>
           <div className="hero-date">{fmtDate(a.pubDate)}</div>
           <MiniActs a={a}/>
@@ -557,26 +569,37 @@ export default function NewsHub(){
   const FeedCard=({a,cat})=>{
     const cc=CATS[cat],kws=kwMatch(a,cat),alert=isAlert(a);
     const init=(a.source||'?').slice(0,2).toUpperCase();
-    const id=btoa(a.link.slice(0,40)).replace(/[^a-z0-9]/gi,'').slice(0,12);
+    const id=btoa((a.link||'x').slice(0,40)).replace(/[^a-z0-9]/gi,'').slice(0,12);
+    const[imgErr,setImgErr]=useState(false);
     return(
-      <div className={`feed-card ${cat==='bloom'?'bloom-card':''}`} onClick={()=>clickArt(a)}>
-        <div className="feed-av" style={{background:cc.bg,color:cc.color}}>{init}</div>
-        <div className="feed-body">
+      <div className={`feed-card${cat==='bloom'?' bloom-card':''}`} onClick={()=>clickArt(a)}>
+        {a.img&&!imgErr?(
+          <img className="feed-hero-img" src={a.img} loading="lazy" onError={()=>setImgErr(true)} alt=""/>
+        ):(
+          <div className="feed-hero-ph" style={{background:cc.bg}}>{cc.emoji}</div>
+        )}
+        <div className="feed-card-body">
           <div className="feed-top-row">
+            <div className="feed-av" style={{background:cc.bg,color:cc.color}}>{init}</div>
             <span className="feed-src" style={{color:cc.color}}>{a.source}</span>
-            {alert&&<span style={{background:'#fef2f2',color:'#dc2626',borderRadius:'4px',padding:'1px 5px',fontSize:'9px',fontWeight:'700'}}>ALERT</span>}
+            {alert&&<span className="alert-tag">ALERT</span>}
             <span className="feed-date">{fmtDate(a.pubDate)}</span>
           </div>
           <div className="feed-title">{a.title}</div>
           {a.desc&&<div className="feed-desc">{a.desc}</div>}
-          {summaryLoading[id]&&<div className="summary-box"><div className="summary-lbl">AI Summary</div><em style={{color:'var(--text3)'}}>Generating...</em></div>}
+          {sumLoading[id]&&<div className="summary-box"><div className="summary-lbl">AI Summary</div><em style={{color:'var(--text3)'}}>Generating...</em></div>}
           {summaries[id]&&<div className="summary-box"><div className="summary-lbl">AI Summary</div>{summaries[id]}</div>}
           <div className="feed-footer">
             <div className="feed-kws">{kws.slice(0,3).map(k=><span key={k} className="kw-tag" style={{background:cc.bg,color:cc.color}}>{k}</span>)}</div>
-            <FullActs a={a}/>
+            <div className="feed-acts">
+              <button className={`act-b${likes[a.link]===1?' al':''}`} onClick={e=>likeArt(a.link,1,e)}>Up</button>
+              <button className={`act-b${likes[a.link]===-1?' ad':''}`} onClick={e=>likeArt(a.link,-1,e)}>Down</button>
+              <button className={`act-b${isSaved(a)?' as':''}`} onClick={e=>saveArt(a,e)}>Save</button>
+              <button className={`act-b${summaries[id]||sumLoading[id]?' ai':''}`} onClick={e=>getSummary(id,a.title,a.desc,e)}>AI</button>
+              <button className="act-b" onClick={e=>{e.stopPropagation();clickArt(a);}}>Read</button>
+            </div>
           </div>
         </div>
-        {a.img?<img className="feed-img" src={a.img} loading="lazy" onError={e=>e.target.style.display='none'} alt=""/>:<div className="feed-img-ph" style={{background:cc.bg}}>{cc.emoji}</div>}
       </div>
     );
   };
@@ -584,31 +607,39 @@ export default function NewsHub(){
   const PodCard=({ep,idx})=>{
     const id=`pod_${ep.show}_${idx}`;
     const isSv=isSaved({...ep,link:ep.link||ep.show+idx});
+    const[imgErr,setImgErr]=useState(false);
     return(
       <div className="pod-card">
-        <div className="pod-card-top">
-          <div className="pod-card-num">{idx+1}</div>
-          <div className="pod-card-body">
-            <div className="pod-card-show">{ep.showEmoji} {ep.show}</div>
-            <div className="pod-card-title" onClick={()=>ep.link&&window.open(ep.link,'_blank')}>{ep.title}</div>
-            <div className="pod-card-meta">
-              <span>{fmtDate(ep.pubDate)}</span>
-              {ep.duration&&<span>{fmtDuration(ep.duration)}</span>}
-              <span style={{color:'#e11d48',fontWeight:'500'}}>{ep.host}</span>
+        {ep.img&&!imgErr?(
+          <img className="pod-card-img" src={ep.img} loading="lazy" onError={()=>setImgErr(true)} alt=""/>
+        ):(
+          <div className="pod-card-img-ph">{ep.showEmoji}</div>
+        )}
+        <div className="pod-card-body">
+          <div className="pod-card-top">
+            <div className="pod-card-num">{idx+1}</div>
+            <div className="pod-card-info">
+              <div className="pod-card-show">{ep.showEmoji} {ep.show}</div>
+              <div className="pod-card-title" onClick={()=>ep.link&&window.open(ep.link,'_blank')}>{ep.title}</div>
+              <div className="pod-card-meta">
+                <span>{fmtDate(ep.pubDate)}</span>
+                {ep.duration&&<span>{fmtDuration(ep.duration)}</span>}
+                <span style={{color:'#e11d48',fontWeight:'500'}}>{ep.host}</span>
+              </div>
             </div>
-            {ep.desc&&<div className="pod-card-desc">{ep.desc}</div>}
           </div>
-        </div>
-        {summaryLoading[id]&&<div className="pod-summary"><div className="pod-summary-lbl">AI Summary</div><em style={{color:'var(--text3)'}}>Generating summary...</em></div>}
-        {summaries[id]&&<div className="pod-summary"><div className="pod-summary-lbl">AI Episode Summary</div>{summaries[id]}</div>}
-        <div className="pod-card-footer">
-          <button className="pod-btn" onClick={()=>ep.link&&window.open(ep.link,'_blank')}>Listen</button>
-          <button className={`pod-btn ${summaries[id]||summaryLoading[id]?'ai-active':''}`} onClick={e=>getSummary(id,ep.title,ep.desc,e)}>
-            {summaryLoading[id]?'Summarizing...':summaries[id]?'Hide Summary':'AI Summary'}
-          </button>
-          <button className={`pod-btn ${isSv?'saved-btn':''}`} onClick={e=>saveArt({...ep,link:ep.link||ep.show+idx,source:ep.show,cat:'podcasts'},e)}>
-            {isSv?'Saved':'Save'}
-          </button>
+          {ep.desc&&<div className="pod-card-desc">{ep.desc}</div>}
+          {sumLoading[id]&&<div className="pod-summary"><div className="pod-summary-lbl">AI Summary</div><em style={{color:'var(--text3)'}}>Generating...</em></div>}
+          {summaries[id]&&<div className="pod-summary"><div className="pod-summary-lbl">AI Episode Summary</div>{summaries[id]}</div>}
+          <div className="pod-card-footer">
+            <button className="pod-btn" onClick={()=>ep.link&&window.open(ep.link,'_blank')}>Listen</button>
+            <button className={`pod-btn${summaries[id]||sumLoading[id]?' ai-active':''}`} onClick={e=>getSummary(id,ep.title,ep.desc,e)}>
+              {sumLoading[id]?'Summarizing...':summaries[id]?'Hide Summary':'AI Summary'}
+            </button>
+            <button className={`pod-btn${isSv?' saved-btn':''}`} onClick={e=>saveArt({...ep,link:ep.link||ep.show+idx,source:ep.show,cat:'podcasts'},e)}>
+              {isSv?'Saved':'Save'}
+            </button>
+          </div>
         </div>
       </div>
     );
@@ -616,9 +647,7 @@ export default function NewsHub(){
 
   const PodcastsPage=()=>{
     const allEps=[];
-    PODCAST_FEEDS.forEach(p=>{
-      (podEps[p.name]||[]).slice(0,3).forEach(e=>allEps.push({...e,show:p.name,host:p.host,showEmoji:p.emoji}));
-    });
+    PODCAST_FEEDS.forEach(p=>{(podEps[p.name]||[]).slice(0,3).forEach(e=>allEps.push({...e,show:p.name,host:p.host,showEmoji:p.emoji}));});
     allEps.sort((a,b)=>new Date(b.pubDate)-new Date(a.pubDate));
     const displayEps=activePod?(podEps[activePod.name]||[]).map(e=>({...e,show:activePod.name,host:activePod.host,showEmoji:activePod.emoji})):allEps;
     const isLoading=activePod?podLoading[activePod.name]:PODCAST_FEEDS.some(p=>podLoading[p.name]);
@@ -631,10 +660,19 @@ export default function NewsHub(){
               <div className="pod-show-name">{activePod?activePod.name:'All Podcasts — Latest Episodes'}</div>
               <div className="pod-show-host">{activePod?`Hosted by ${activePod.host}`:`${PODCAST_FEEDS.length} shows · AI summaries on every episode`}</div>
             </div>
+            {activePod&&<button style={{background:'rgba(255,255,255,0.2)',border:'none',color:'#fff',borderRadius:'6px',padding:'4px 10px',cursor:'pointer',fontSize:'11px',fontFamily:'inherit'}} onClick={()=>setActivePod(null)}>All Shows</button>}
           </div>
-          {isLoading&&!displayEps.length?<div className="loading-state" style={{padding:'40px'}}>Loading episodes...</div>:
-          displayEps.length===0?<div className="loading-state" style={{padding:'40px'}}>No episodes yet — tap R to refresh</div>:
-          displayEps.slice(0,20).map((ep,i)=><PodCard key={i} ep={ep} idx={i}/>)}
+          {isLoading&&!displayEps.length?(
+            <div className="loading-state" style={{padding:'40px'}}>
+              Loading podcast episodes — up to 20 seconds on first load...<br/>
+              <span style={{fontSize:'10px',marginTop:'8px',display:'block'}}>Joe Rogan, Tucker, All-In load fastest. Daily Wire shows may take longer.</span>
+            </div>
+          ):displayEps.length===0?(
+            <div className="loading-state" style={{padding:'40px'}}>
+              No episodes loaded yet.<br/>
+              <button style={{marginTop:'12px',background:'#e11d48',border:'none',color:'#fff',borderRadius:'8px',padding:'8px 16px',cursor:'pointer',fontSize:'12px',fontFamily:'inherit'}} onClick={loadPodcasts}>Retry Loading</button>
+            </div>
+          ):displayEps.slice(0,20).map((ep,i)=><PodCard key={i} ep={ep} idx={i}/>)}
         </div>
         <div className="pod-sidebar">
           <div className="pod-show-list">
@@ -654,8 +692,9 @@ export default function NewsHub(){
                   <div className="pod-show-item-emoji">{p.emoji}</div>
                   <div className="pod-show-item-info">
                     <div className="pod-show-item-name" style={{color:isActive?'#e11d48':''}}>{p.name}</div>
-                    <div className="pod-show-item-ep">{podLoading[p.name]?'Loading...':(latest?latest.title.slice(0,40)+'...':'No episodes yet')}</div>
+                    <div className="pod-show-item-ep">{podLoading[p.name]?'Loading...':(latest?latest.title.slice(0,38)+'...':'No episodes yet')}</div>
                   </div>
+                  {eps.length>0&&<span style={{fontSize:'9px',color:'#16a34a',fontWeight:'600',flexShrink:0}}>{eps.length}ep</span>}
                   {isActive&&<div className="pod-show-item-dot"></div>}
                 </div>
               );
@@ -663,7 +702,7 @@ export default function NewsHub(){
           </div>
           <div className="side-block">
             <div className="side-title">About AI Summaries</div>
-            <div style={{fontSize:'11px',color:'var(--text2)',lineHeight:'1.6'}}>Tap <strong>AI Summary</strong> on any episode for a 2-3 sentence Claude-powered summary — without listening first.</div>
+            <div style={{fontSize:'11px',color:'var(--text2)',lineHeight:'1.6'}}>Tap <strong>AI Summary</strong> on any episode for a 2-3 sentence overview without listening first.</div>
           </div>
         </div>
       </div>
@@ -678,13 +717,16 @@ export default function NewsHub(){
           <div className="cat-block-label"><div className="cat-dot" style={{background:'#0369a1'}}></div><span style={{color:'#0369a1'}}>Bloom Energy and Power Intelligence</span><span className="cat-badge">{total}</span></div>
           <button className="see-all" style={{color:'#0369a1'}} onClick={()=>setTab('bloom')}>All articles</button>
         </div>
-        {ld?<div className="loading-state">Loading...</div>:arts2.length===0?<div className="loading-state">No articles yet — tap R</div>:(
+        {ld?<div className="loading-state">Loading...</div>:arts2.length===0?<div className="loading-state">No articles yet — tap ↺ to refresh</div>:(
           <div className="bloom-strip">
             {arts2.slice(0,4).map((a,i)=>(
               <div key={i} className="bloom-strip-item" onClick={()=>clickArt(a)}>
-                <div className="bloom-strip-title">{a.title}</div>
-                <div className="bloom-strip-meta">{a.source}</div>
-                <div className="bloom-strip-date">{fmtDate(a.pubDate)}</div>
+                {a.img&&<div className="bloom-strip-bg" style={{backgroundImage:`url(${a.img})`}}></div>}
+                <div className="bloom-strip-content">
+                  <div className="bloom-strip-title">{a.title}</div>
+                  <div className="bloom-strip-meta">{a.source}</div>
+                  <div className="bloom-strip-date">{fmtDate(a.pubDate)}</div>
+                </div>
               </div>
             ))}
           </div>
@@ -714,20 +756,26 @@ export default function NewsHub(){
     return(
       <div className="ts-bar">
         <div className="ts-inner">
-          {!hasAny?<div className="ts-item"><div className="ts-cat" style={{color:'var(--text3)'}}>Loading...</div></div>:
+          {!hasAny?<div className="ts-item"><div className="ts-item-content"><div className="ts-cat" style={{color:'var(--text3)'}}>Loading feeds...</div></div></div>:
           newsCats.map(cat=>{
             const cc=CATS[cat],top=sorted(cat)[0];
-            if(!top)return<div key={cat} className="ts-item"><div className="ts-cat" style={{color:cc.color}}>{cc.emoji} {cc.label}</div></div>;
+            if(!top)return<div key={cat} className="ts-item"><div className="ts-item-content"><div className="ts-cat" style={{color:cc.color}}>{cc.emoji} {cc.label}</div></div></div>;
             return<div key={cat} className="ts-item" onClick={()=>clickArt(top)}>
-              <div className="ts-cat" style={{color:cc.color}}>{cc.emoji} {cc.label}</div>
-              <div className="ts-title">{top.title}</div>
-              <div className="ts-src">{top.source} · {fmtDate(top.pubDate)}</div>
+              {top.img&&<div className="ts-item-bg" style={{backgroundImage:`url(${top.img})`}}></div>}
+              <div className="ts-item-content">
+                <div className="ts-cat" style={{color:cc.color}}>{cc.emoji} {cc.label}</div>
+                <div className="ts-title">{top.title}</div>
+                <div className="ts-src">{top.source} · {fmtDate(top.pubDate)}</div>
+              </div>
             </div>;
           })}
           {latestPod&&<div className="ts-item" onClick={()=>setTab('podcasts')}>
-            <div className="ts-cat" style={{color:'#e11d48'}}>{latestPod.emoji} Podcast</div>
-            <div className="ts-title">{latestPod.title}</div>
-            <div className="ts-src">{latestPod.show} · {fmtDate(latestPod.pubDate)}</div>
+            {latestPod.img&&<div className="ts-item-bg" style={{backgroundImage:`url(${latestPod.img})`}}></div>}
+            <div className="ts-item-content">
+              <div className="ts-cat" style={{color:'#e11d48'}}>{latestPod.emoji} Podcast</div>
+              <div className="ts-title">{latestPod.title}</div>
+              <div className="ts-src">{latestPod.show} · {fmtDate(latestPod.pubDate)}</div>
+            </div>
           </div>}
         </div>
       </div>
@@ -746,17 +794,23 @@ export default function NewsHub(){
               <div><div className="trend-t">{a.title.slice(0,60)}{a.title.length>60?'...':''}</div><div className="trend-s">{a.source} · {fmtDate(a.pubDate)}</div></div>
             </div>
           ))}
+          {arts2.length===0&&<div style={{fontSize:'11px',color:'var(--text3)'}}>Loading articles...</div>}
         </div>
-        {cat==='bloom'&&<div className="side-block" style={{border:'1px solid #bae6fd'}}><div className="side-title" style={{color:'#0369a1'}}>About This Feed</div><div style={{fontSize:'11px',color:'var(--text2)',lineHeight:'1.6'}}>Tracks Bloom Energy (NYSE: BE), fuel cells, distributed power, AI data center power, onshoring, industrial energy, oil and gas, and utility-scale solutions.</div></div>}
+        {cat==='bloom'&&<div className="side-block" style={{border:'1px solid #bae6fd'}}><div className="side-title" style={{color:'#0369a1'}}>About This Feed</div><div style={{fontSize:'11px',color:'var(--text2)',lineHeight:'1.6'}}>Tracks Bloom Energy (NYSE: BE), fuel cells, distributed power, AI data center power, onshoring, industrial energy, oil & gas, and utility-scale solutions.</div></div>}
         <div className="side-block">
           <div className="side-title">{cc.emoji} {cc.label} Keywords</div>
-          {catKws.map((k,i)=><span key={i} className="kw-chip" style={{background:cc.bg,color:cc.color}} onClick={()=>setSearch(k)}>{k}</span>)}
-          {catKws.length===0&&<div style={{fontSize:'11px',color:'var(--text3)'}}>No keywords — add in Customize</div>}
+          {activeKw&&(
+            <button className="clear-kw-btn" style={{color:cc.color}} onClick={()=>setActiveKw('')}>✕ Clear: "{activeKw}"</button>
+          )}
+          {catKws.map((k,i)=>(
+            <span key={i} className={`kw-chip${activeKw===k?' kw-active':''}`} style={{background:cc.bg,color:cc.color}} onClick={()=>toggleKw(k)}>{k}</span>
+          ))}
+          {catKws.length===0&&<div style={{fontSize:'11px',color:'var(--text3)'}}>No keywords — add some in Customize</div>}
         </div>
         <div className="side-block"><div className="side-title">Alert Keywords</div>{alerts.map((a,i)=><span key={i} style={{display:'inline-block',background:'#fef2f2',color:'#dc2626',borderRadius:'20px',padding:'3px 9px',fontSize:'10px',margin:'2px',fontWeight:'500'}}>{a}</span>)}</div>
         <div className="side-block"><div className="side-title">Social</div>{social.map((h,i)=><div key={i} className="social-row" onClick={()=>window.open(`https://twitter.com/${h.replace('@','')}`)}>
           <div className="social-av">{h.replace('@','').slice(0,2).toUpperCase()}</div>
-          <span className="social-name">{h}</span><span className="social-arr">go</span>
+          <span className="social-name">{h}</span><span className="social-arr">→</span>
         </div>)}</div>
       </div>
     );
@@ -768,121 +822,88 @@ export default function NewsHub(){
     const[la,setLa]=useState([...alerts]);
     const[ls,setLs]=useState([...social]);
     const[kwTab,setKwTab]=useState('general');
+    const[srcCat,setSrcCat]=useState('general');
     const[newName,setNewName]=useState('');
     const[newUrl,setNewUrl]=useState('');
     const[testState,setTestState]=useState({});
-    const[activeCat,setActiveCat]=useState('general');
-
     const saveAll=()=>{setFeeds(lf);save('feeds',lf);setKw(lk);save('kw',lk);setAlerts(la);save('alerts',la);setSocial(ls);save('social',ls);setShowPanel(false);refreshAll();};
-
     const testFeed=async(url,key)=>{
       setTestState(s=>({...s,[key]:'loading'}));
       const items=await fetchRSS(url);
-      setTestState(s=>({...s,[key]:items.length>0?`ok:${items.length} articles found`:' fail'}));
+      setTestState(s=>({...s,[key]:items.length>0?`ok ${items.length} articles loaded`:'fail'}));
     };
-
-    const addSource=()=>{
+    const addSrc=()=>{
       if(!newName.trim()||!newUrl.trim())return;
-      setLf(prev=>{
-        const n=JSON.parse(JSON.stringify(prev));
-        if(!n[activeCat])n[activeCat]=[];
-        n[activeCat].push({name:newName.trim(),url:newUrl.trim(),on:true});
-        return n;
-      });
+      setLf(prev=>{const n=JSON.parse(JSON.stringify(prev));if(!n[srcCat])n[srcCat]=[];n[srcCat].push({name:newName.trim(),url:newUrl.trim(),on:true});return n;});
       setNewName('');setNewUrl('');
     };
-
-    const removeSource=(cat,i)=>{
-      setLf(prev=>{const n=JSON.parse(JSON.stringify(prev));n[cat].splice(i,1);return n;});
-    };
-
     const catLabels={general:'🌐 General',sports:'🏆 Sports',business:'⚡ Business',finance:'📈 Finance',bloom:'🔋 Bloom'};
-
+    const hdot=(name)=>{const h=health[name];return h==='green'?'hg':h==='yellow'?'hy':h==='red'?'hr':'hx';};
+    const cnt=(cat,name)=>(arts[cat]||[]).filter(a=>a.source===name).length;
     return(
       <div className="panel-overlay open">
         <div className="panel">
-          <div className="panel-head"><span className="panel-htitle">Customize Hub</span><button className="panel-x" onClick={()=>setShowPanel(false)}>X</button></div>
+          <div className="panel-head"><span className="panel-htitle">Customize Hub</span><button className="panel-x" onClick={()=>setShowPanel(false)}>✕</button></div>
           <div className="panel-body">
-
-            {/* ALERTS */}
             <div className="p-sec">
               <div className="p-lbl">Breaking News Alerts</div>
-              <div className="alert-info">Red banner appears when these words hit any headline.</div>
-              <div>{la.map((a,i)=><span key={i} className="p-chip p-alert">{a}<button className="p-chip-x" style={{color:'#dc2626'}} onClick={()=>setLa(x=>x.filter((_,j)=>j!==i))}>x</button></span>)}</div>
+              <div className="alert-info">Red banner fires when any headline contains these words.</div>
+              <div>{la.map((a,i)=><span key={i} className="p-chip p-alert">{a}<button className="p-chip-x" style={{color:'#dc2626'}} onClick={()=>setLa(x=>x.filter((_,j)=>j!==i))}>×</button></span>)}</div>
               <div className="p-add"><input className="p-input" placeholder="Add alert word..." value={newAlert} onChange={e=>setNewAlert(e.target.value)} onKeyDown={e=>{if(e.key==='Enter'&&newAlert.trim()){setLa(x=>[...x,newAlert.trim()]);setNewAlert('');}}}/><button className="p-alert-btn" onClick={()=>{if(newAlert.trim()){setLa(x=>[...x,newAlert.trim()]);setNewAlert('');}}}>Add</button></div>
             </div>
-
-            {/* KEYWORDS */}
             <div className="p-sec">
               <div className="p-lbl">Keywords by Category</div>
-              <div style={{fontSize:'11px',color:'var(--text2)',marginBottom:'10px'}}>Boost matching articles to the top of each category's feed.</div>
-              <div className="kw-cat-tabs">
-                {Object.keys(catLabels).map(c=><button key={c} className={`kw-cat-tab ${kwTab===c?'active':''}`} onClick={()=>setKwTab(c)}>{catLabels[c]}</button>)}
-              </div>
-              <div>{(lk[kwTab]||[]).map((k,i)=><span key={i} className="p-chip p-kw">{k}<button className="p-chip-x" onClick={()=>setLk(prev=>{const n={...prev};n[kwTab]=n[kwTab].filter((_,j)=>j!==i);return n;})}>x</button></span>)}</div>
+              <div style={{fontSize:'11px',color:'var(--text2)',marginBottom:'10px'}}>Keywords boost matching articles to the top of each category. Click any keyword chip in the sidebar to filter by it.</div>
+              <div className="kw-cat-tabs">{Object.keys(catLabels).map(c=><button key={c} className={`kw-cat-tab${kwTab===c?' active':''}`} onClick={()=>setKwTab(c)}>{catLabels[c]}</button>)}</div>
+              <div>{(lk[kwTab]||[]).map((k,i)=><span key={i} className="p-chip p-kw">{k}<button className="p-chip-x" onClick={()=>setLk(prev=>{const n={...prev};n[kwTab]=n[kwTab].filter((_,j)=>j!==i);return n;})}>×</button></span>)}</div>
               <div className="p-add">
                 <input className="p-input" placeholder={`Add ${kwTab} keyword...`} value={newKwVal} onChange={e=>setNewKwVal(e.target.value)} onKeyDown={e=>{if(e.key==='Enter'&&newKwVal.trim()){setLk(prev=>{const n={...prev};n[kwTab]=[...(n[kwTab]||[]),newKwVal.trim()];return n;});setNewKwVal('');}}}/>
                 <button className="p-add-btn" onClick={()=>{if(newKwVal.trim()){setLk(prev=>{const n={...prev};n[kwTab]=[...(n[kwTab]||[]),newKwVal.trim()];return n;});setNewKwVal('');}}}>Add</button>
               </div>
             </div>
-
-            {/* SOURCES PER CATEGORY */}
             {Object.keys(DEFAULT_FEEDS).map(cat=>(
               <div key={cat} className="p-sec">
                 <div className="p-lbl">{CATS[cat].emoji} {CATS[cat].label} Sources</div>
                 {cat==='bloom'&&<div className="bloom-note">Tracks Bloom Energy, fuel cells, data center power, onshoring, industrial energy, utilities</div>}
-                <div className="health-legend">
-                  <span className="health-legend-item"><span className="health-dot health-green"></span>Loaded</span>
-                  <span className="health-legend-item"><span className="health-dot health-yellow"></span>Slow</span>
-                  <span className="health-legend-item"><span className="health-dot health-red"></span>Failed</span>
-                  <span className="health-legend-item"><span className="health-dot health-gray"></span>Pending</span>
+                <div className="hlegend">
+                  <span><span className="hdot hg"></span>Loaded</span>
+                  <span><span className="hdot hy"></span>Slow</span>
+                  <span><span className="hdot hr"></span>Failed</span>
+                  <span><span className="hdot hx"></span>Pending</span>
                 </div>
                 {(lf[cat]||[]).map((f,i)=>{
-                  const h=sourceHealth[f.name];
-                  const cnt=countBySource(cat,f.name);
-                  const testKey=`${cat}_${i}`;
-                  const ts=testState[testKey];
+                  const tk=`${cat}_${i}`;const ts=testState[tk];const c=cnt(cat,f.name);
                   return(
                     <div key={i}>
                       <div className="p-row">
-                        <span className={`health-dot ${h==='green'?'health-green':h==='yellow'?'health-yellow':h==='red'?'health-red':'health-gray'}`} title={getHealthLabel(f.name)}></span>
+                        <span className={`hdot ${hdot(f.name)}`} title={health[f.name]||'not loaded'}></span>
                         <span className="p-name">{f.name}</span>
-                        {cnt>0&&<span className="p-count">{cnt} articles</span>}
-                        <button className="test-btn" onClick={()=>testFeed(f.url,testKey)}>Test</button>
-                        <button className={`tog ${f.on?'on':'off'}`} onClick={()=>setLf(prev=>{const n=JSON.parse(JSON.stringify(prev));n[cat][i].on=!n[cat][i].on;return n;})}></button>
-                        <button className="p-del" title="Remove source" onClick={()=>removeSource(cat,i)}>✕</button>
+                        {c>0&&<span className="p-count">{c} art</span>}
+                        <button className="test-btn" onClick={()=>testFeed(f.url,tk)}>Test</button>
+                        <button className={`tog${f.on?' on':' off'}`} onClick={()=>setLf(prev=>{const n=JSON.parse(JSON.stringify(prev));n[cat][i].on=!n[cat][i].on;return n;})}></button>
+                        <button className="p-del" onClick={()=>setLf(prev=>{const n=JSON.parse(JSON.stringify(prev));n[cat].splice(i,1);return n;})}>✕</button>
                       </div>
-                      {ts&&<div className={`test-result ${ts==='loading'?'test-loading':ts.startsWith('ok')?'test-ok':'test-fail'}`}>
-                        {ts==='loading'?'Testing...':(ts.startsWith('ok')?ts.replace('ok:',''):ts.replace(' fail','Failed to load — may be blocked'))}
-                      </div>}
+                      {ts&&<div className={`tresult${ts==='loading'?' tload':ts.startsWith('ok')?' tok':' tfail'}`}>{ts==='loading'?'Testing...':(ts.startsWith('ok')?'✓ '+ts.replace('ok ',''):'✗ Failed — source may be blocked or invalid')}</div>}
                     </div>
                   );
                 })}
-                {/* ADD CUSTOM SOURCE */}
-                <div className="add-source-box">
-                  <div className="add-source-title">Add a custom source to {CATS[cat].label}</div>
-                  <div style={{display:'flex',flexDirection:'column',gap:'6px'}}>
-                    <input className="p-input-sm" placeholder="Source name (e.g. Houston Business Journal)" value={activeCat===cat?newName:''} onChange={e=>{setActiveCat(cat);setNewName(e.target.value);}}/>
-                    <input className="p-input-sm" placeholder="RSS feed URL (e.g. https://bizjournals.com/houston/rss)" value={activeCat===cat?newUrl:''} onChange={e=>{setActiveCat(cat);setNewUrl(e.target.value);}}/>
-                    <div style={{display:'flex',gap:'6px'}}>
-                      <button className="test-btn" style={{flex:1}} onClick={()=>{if(newUrl.trim())testFeed(newUrl.trim(),`new_${cat}`);}}>Test URL</button>
-                      <button className="p-add-btn" style={{flex:1}} onClick={()=>{setActiveCat(cat);addSource();}}>Add Source</button>
-                    </div>
-                    {testState[`new_${cat}`]&&<div className={`test-result ${testState[`new_${cat}`]==='loading'?'test-loading':testState[`new_${cat}`].startsWith('ok')?'test-ok':'test-fail'}`}>
-                      {testState[`new_${cat}`]==='loading'?'Testing...':(testState[`new_${cat}`].startsWith('ok')?testState[`new_${cat}`].replace('ok:',''):testState[`new_${cat}`].replace(' fail','Failed — URL may be blocked or invalid'))}
-                    </div>}
+                <div className="add-src-box">
+                  <div className="add-src-lbl">+ Add custom source to {CATS[cat].label}</div>
+                  <input className="p-input-sm" placeholder="Source name (e.g. Houston Biz Journal)" value={srcCat===cat?newName:''} onChange={e=>{setSrcCat(cat);setNewName(e.target.value);}}/>
+                  <input className="p-input-sm" placeholder="RSS URL (e.g. https://example.com/feed)" value={srcCat===cat?newUrl:''} onChange={e=>{setSrcCat(cat);setNewUrl(e.target.value);}}/>
+                  <div style={{display:'flex',gap:'6px'}}>
+                    <button className="test-btn" style={{flex:1}} onClick={()=>{const u=(srcCat===cat?newUrl:'').trim();if(u)testFeed(u,`new_${cat}`);}}>Test URL</button>
+                    <button className="p-add-btn" style={{flex:1}} onClick={()=>{setSrcCat(cat);addSrc();}}>Add Source</button>
                   </div>
+                  {testState[`new_${cat}`]&&<div className={`tresult${testState[`new_${cat}`]==='loading'?' tload':testState[`new_${cat}`].startsWith('ok')?' tok':' tfail'}`}>{testState[`new_${cat}`]==='loading'?'Testing...':(testState[`new_${cat}`].startsWith('ok')?'✓ '+testState[`new_${cat}`].replace('ok ',''):'✗ Failed — URL may be blocked or invalid')}</div>}
                 </div>
               </div>
             ))}
-
-            {/* SOCIAL */}
             <div className="p-sec">
               <div className="p-lbl">Social Follows</div>
-              <div>{ls.map((s,i)=><span key={i} className="p-chip p-so">{s}<button className="p-chip-x" style={{color:'#166534'}} onClick={()=>setLs(x=>x.filter((_,j)=>j!==i))}>x</button></span>)}</div>
+              <div>{ls.map((s,i)=><span key={i} className="p-chip p-so">{s}<button className="p-chip-x" style={{color:'#166634'}} onClick={()=>setLs(x=>x.filter((_,j)=>j!==i))}>×</button></span>)}</div>
               <div className="p-add"><input className="p-input" placeholder="@handle" value={newSocial} onChange={e=>setNewSocial(e.target.value)} onKeyDown={e=>{if(e.key==='Enter'&&newSocial.trim()){setLs(x=>[...x,newSocial.trim()]);setNewSocial('');}}}/><button className="p-add-btn" onClick={()=>{if(newSocial.trim()){setLs(x=>[...x,newSocial.trim()]);setNewSocial('');}}}>Add</button></div>
             </div>
-
             <button className="p-save" onClick={saveAll}>Save and Refresh</button>
           </div>
         </div>
@@ -902,36 +923,53 @@ export default function NewsHub(){
             <div className="nav-tabs">
               {['today','general','sports','business','finance','bloom','podcasts','saved'].map(t=>(
                 <button key={t} className={`nav-tab${tab===t?' active':''} ${t==='bloom'?'bloom-tab':''} ${t==='podcasts'?'pod-tab':''}`}
-                  onClick={()=>{setTab(t);setSearch('');if(!['today','saved','podcasts'].includes(t)&&!(arts[t]||[]).length)loadCat(t);}}>
-                  {t==='today'?'Today':t==='bloom'?'Bloom Energy':t==='podcasts'?'Podcasts':t==='saved'?'Saved':t.charAt(0).toUpperCase()+t.slice(1)}
+                  onClick={()=>{setTab(t);setActiveKw('');setSearch('');if(!['today','saved','podcasts'].includes(t)&&!(arts[t]||[]).length)loadCat(t);}}>
+                  {t==='today'?'Today':t==='bloom'?'Bloom Energy':t==='podcasts'?'🎙️ Podcasts':t==='saved'?'Saved':t.charAt(0).toUpperCase()+t.slice(1)}
                 </button>
               ))}
             </div>
             <div className="topbar-right">
-              <input className="search" placeholder="Search..." value={search} onChange={e=>setSearch(e.target.value.toLowerCase())}/>
-              <button className="btn-icon" onClick={refreshAll} title="Refresh">R</button>
-              <button className="btn-icon" onClick={()=>setDark(d=>!d)} title="Dark mode">{dark?'L':'D'}</button>
+              <input className="search" placeholder="Search..." value={search} onChange={e=>{setSearch(e.target.value);setActiveKw('');}}/>
+              <button className="btn-icon" onClick={refreshAll} title="Refresh">↺</button>
+              <button className="btn-icon" onClick={()=>setDark(d=>!d)} title="Dark mode">{dark?'☀':'🌙'}</button>
               <button className="btn-blue" onClick={()=>setShowPanel(true)}>Customize</button>
             </div>
           </div>
         </div>
-        {breaking&&<div className="breaking show"><div className="breaking-inner"><span className="breaking-badge">BREAKING</span><span className="breaking-text">{breaking.title} — {breaking.source}</span><button className="breaking-x" onClick={()=>setBreaking(null)}>X</button></div></div>}
+        {breaking&&<div className="breaking show"><div className="breaking-inner"><span className="breaking-badge">BREAKING</span><span className="breaking-text">{breaking.title} — {breaking.source}</span><button className="breaking-x" onClick={()=>setBreaking(null)}>✕</button></div></div>}
         <TopStories/>
         <div className="main">
           {tab==='today'&&<div className="today-grid">{mainCats.map(c=><CatBlock key={c} cat={c}/>)}<BloomBlock/></div>}
           {mainCats.includes(tab)&&(
-            loading[tab]?<div style={{textAlign:'center',padding:'60px',fontSize:'13px',color:'var(--text3)'}}>Loading...</div>:
-            sorted(tab).length===0?<div className="no-art"><p className="no-art-msg">No articles found</p><button className="refresh-btn" style={{background:'#1d4ed8'}} onClick={refreshAll}>Refresh Now</button></div>:
-            <div className="cat-page"><div className="feed-col"><div style={{fontSize:'10px',fontWeight:'600',color:'var(--text3)',textTransform:'uppercase',letterSpacing:'0.08em',marginBottom:'4px'}}>{CATS[tab].emoji} Top Stories — {sorted(tab).length} articles</div>{sorted(tab).slice(0,15).map((a,i)=><FeedCard key={i} a={a} cat={tab}/>)}</div><Sidebar cat={tab}/></div>
+            loading[tab]&&!(arts[tab]||[]).length?<div style={{textAlign:'center',padding:'60px',fontSize:'13px',color:'var(--text3)'}}>Loading {CATS[tab].label}...</div>:
+            sorted(tab).length===0?<div className="no-art">
+              <p className="no-art-msg">{activeKw?`No "${activeKw}" articles found`:'No articles loaded yet'}</p>
+              <button className="refresh-btn" style={{background:activeKw?'#64748b':'#1d4ed8'}} onClick={activeKw?()=>setActiveKw(''):refreshAll}>{activeKw?'Clear Filter':'Refresh Now'}</button>
+            </div>:
+            <div className="cat-page">
+              <div className="feed-col">
+                <div style={{fontSize:'10px',fontWeight:'600',color:'var(--text3)',textTransform:'uppercase',letterSpacing:'0.08em',marginBottom:'4px'}}>
+                  {CATS[tab].emoji} {activeKw?`"${activeKw}" in ${CATS[tab].label} — ${sorted(tab).length} results`:`Top Stories — ${sorted(tab).length} articles`}
+                </div>
+                {sorted(tab).slice(0,15).map((a,i)=><FeedCard key={i} a={a} cat={tab}/>)}
+              </div>
+              <Sidebar cat={tab}/>
+            </div>
           )}
           {tab==='bloom'&&(
-            loading.bloom?<div style={{textAlign:'center',padding:'60px',fontSize:'13px',color:'var(--text3)'}}>Loading...</div>:
-            sorted('bloom').length===0?<div className="no-art"><p className="no-art-msg">No articles found</p><button className="refresh-btn" style={{background:'#0369a1'}} onClick={refreshAll}>Refresh Now</button></div>:
-            <div className="cat-page"><div className="feed-col"><div className="bloom-banner"><div style={{fontSize:'28px'}}>🔋</div><div className="bloom-banner-body"><div className="bloom-banner-title">Bloom Energy and Power Intelligence</div><div className="bloom-banner-sub">Fuel cells · Data center power · Onshoring · Industrial energy · {sorted('bloom').length} articles</div></div></div>{sorted('bloom').slice(0,15).map((a,i)=><FeedCard key={i} a={a} cat="bloom"/>)}</div><Sidebar cat="bloom"/></div>
+            loading.bloom&&!(arts.bloom||[]).length?<div style={{textAlign:'center',padding:'60px',fontSize:'13px',color:'var(--text3)'}}>Loading Bloom Energy feed...</div>:
+            sorted('bloom').length===0?<div className="no-art"><p className="no-art-msg">{activeKw?`No "${activeKw}" Bloom articles`:'No articles loaded yet'}</p><button className="refresh-btn" style={{background:activeKw?'#64748b':'#0369a1'}} onClick={activeKw?()=>setActiveKw(''):refreshAll}>{activeKw?'Clear Filter':'Refresh Now'}</button></div>:
+            <div className="cat-page">
+              <div className="feed-col">
+                <div className="bloom-banner"><div style={{fontSize:'28px'}}>🔋</div><div className="bloom-banner-body"><div className="bloom-banner-title">Bloom Energy and Power Intelligence</div><div className="bloom-banner-sub">Fuel cells · Data center power · Onshoring · Industrial energy · {sorted('bloom').length} articles{activeKw?` · Filtered: "${activeKw}"`:''}</div></div></div>
+                {sorted('bloom').slice(0,15).map((a,i)=><FeedCard key={i} a={a} cat="bloom"/>)}
+              </div>
+              <Sidebar cat="bloom"/>
+            </div>
           )}
           {tab==='podcasts'&&<PodcastsPage/>}
           {tab==='saved'&&(
-            saved.length===0?<div className="saved-empty"><div style={{fontSize:'28px',marginBottom:'10px'}}>S</div><div style={{fontSize:'13px',fontWeight:'500',color:'var(--text2)',marginBottom:'4px'}}>No saved items</div><div style={{fontSize:'11px'}}>Tap Save on any article or episode</div></div>:
+            saved.length===0?<div className="saved-empty"><div style={{fontSize:'28px',marginBottom:'10px'}}>🔖</div><div style={{fontSize:'13px',fontWeight:'500',color:'var(--text2)',marginBottom:'4px'}}>No saved items yet</div><div style={{fontSize:'11px'}}>Tap Save on any article or episode</div></div>:
             <div className="cat-page"><div className="feed-col"><div style={{fontSize:'10px',fontWeight:'600',color:'var(--text3)',textTransform:'uppercase',letterSpacing:'0.08em',marginBottom:'4px'}}>Saved — {saved.length} items</div>{saved.map((a,i)=>a.cat==='podcasts'?<PodCard key={i} ep={a} idx={i}/>:<FeedCard key={i} a={a} cat={a.cat||'general'}/>)}</div></div>
           )}
         </div>
