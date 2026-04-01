@@ -1,5 +1,4 @@
 import { useState, useEffect, useCallback } from "react";
-import { useState, useEffect, useCallback } from "react";
 
 const CATS={
   general:{label:'General',color:'#1d4ed8',bg:'#eff6ff',emoji:'🌐'},
