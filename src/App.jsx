@@ -166,14 +166,20 @@ function parseXML(txt){
 
 async function fetchRSS(url){
   try{
+    const r=await Promise.race([
+      fetch(`/api/rss?url=${encodeURIComponent(url)}`),
+      new Promise((_,rej)=>setTimeout(()=>rej('t'),8000))
+    ]);
+    if(r.ok){const txt=await r.text();const items=parseXML(txt);if(items.length>0)return items;}
+  }catch{}
+  try{
     const r=await Promise.race([fetch(`https://api.rss2json.com/v1/api.json?rss_url=${encodeURIComponent(url)}&count=15`),new Promise((_,rej)=>setTimeout(()=>rej('t'),8000))]);
     const d=await r.json();
     if(d.status==='ok'&&d.items?.length>0){
       return d.items.map(i=>({
         title:(i.title||'').trim(),link:i.link||'',
         desc:(i.description||i.content||'').replace(/<[^>]*>/g,'').replace(/&amp;/g,'&').replace(/&nbsp;/g,' ').trim().slice(0,350),
-        pubDate:i.pubDate||'',img:i.thumbnail||extractImg(i.description||'')||'',
-        duration:i.itunes_duration||''
+        pubDate:i.pubDate||'',img:i.thumbnail||extractImg(i.description||'')||'',duration:i.itunes_duration||''
       })).filter(i=>i.title&&i.link);
     }
   }catch{}
@@ -187,22 +193,17 @@ async function fetchRSS(url){
     const txt=await r.text();
     const items=parseXML(txt);if(items.length>0)return items;
   }catch{}
-  try{
-    const r=await Promise.race([fetch(`https://www.toptal.com/developers/feed2json/to-json?url=${encodeURIComponent(url)}`),new Promise((_,rej)=>setTimeout(()=>rej('t'),8000))]);
-    const d=await r.json();
-    if(d.items?.length>0){
-      return d.items.map(i=>({
-        title:(i.title||'').trim(),link:i.url||i.id||'',
-        desc:(i.content_html||i.content_text||i.summary||'').replace(/<[^>]*>/g,'').replace(/&amp;/g,'&').trim().slice(0,350),
-        pubDate:i.date_published||i.date_modified||'',
-        img:i.image||extractImg(i.content_html||'')||'',duration:''
-      })).filter(i=>i.title&&i.link);
-    }
-  }catch{}
   return[];
 }
 
 async function fetchPodcast(url){
+  try{
+    const r=await Promise.race([
+      fetch(`/api/rss?url=${encodeURIComponent(url)}`),
+      new Promise((_,rej)=>setTimeout(()=>rej('t'),12000))
+    ]);
+    if(r.ok){const txt=await r.text();const items=parseXML(txt);if(items.length>0)return items;}
+  }catch{}
   try{
     const r=await Promise.race([fetch(`https://api.rss2json.com/v1/api.json?rss_url=${encodeURIComponent(url)}&count=10`),new Promise((_,rej)=>setTimeout(()=>rej('t'),12000))]);
     const d=await r.json();
@@ -210,8 +211,7 @@ async function fetchPodcast(url){
       return d.items.map(i=>({
         title:(i.title||'').trim(),link:i.link||i.enclosure?.link||'',
         desc:(i.description||i.content||'').replace(/<[^>]*>/g,'').replace(/&amp;/g,'&').trim().slice(0,400),
-        pubDate:i.pubDate||'',img:i.thumbnail||d.feed?.image||'',
-        duration:i.itunes_duration||''
+        pubDate:i.pubDate||'',img:i.thumbnail||d.feed?.image||'',duration:i.itunes_duration||''
       })).filter(i=>i.title);
     }
   }catch{}
@@ -709,7 +709,7 @@ export default function NewsHub(){
             <div className="brief-cross-tags">
               {crossTags.map((t,i)=>{
                 const cc=CATS[t.cat];
-                return<span key={i} className="cross-tag" style={{background:cc.bg,color:cc.color}} onClick={e=>{e.stopPropagation();setTab(t.cat);setActiveKw(t.word);}} title={`Filter ${cc.label} by "${t.word}"`}>{cc.emoji} {t.word}</span>;
+                return<span key={i} className="cross-tag" style={{background:cc.bg,color:cc.color}} onClick={e=>{e.stopPropagation();setTab(t.cat);setActiveKw(t.word);}}>{cc.emoji} {t.word}</span>;
               })}
             </div>
             <div className="brief-acts">
@@ -741,9 +741,7 @@ export default function NewsHub(){
             {isAnyLoading&&<div style={{fontSize:'11px',color:'rgba(255,255,255,0.8)'}}>Loading...</div>}
           </div>
           <div className="brief-source-tabs">
-            <button className={`brief-tab-btn${activeBriefSource==='all'?' active':''}`} style={{color:'#b45309'}} onClick={()=>setActiveBriefSource('all')}>
-              ☀️ All ({allArts.length})
-            </button>
+            <button className={`brief-tab-btn${activeBriefSource==='all'?' active':''}`} style={{color:'#b45309'}} onClick={()=>setActiveBriefSource('all')}>☀️ All ({allArts.length})</button>
             {BRIEFING_FEEDS.map(f=>{
               const count=(briefArts[f.name]||[]).length;
               const isLoad=briefLoading[f.name];
@@ -774,18 +772,14 @@ export default function NewsHub(){
                     <div style={{fontSize:'11px',fontWeight:'600',color:f.color}}>{f.name}</div>
                     <div style={{fontSize:'10px',color:'var(--text3)'}}>{f.desc}</div>
                   </div>
-                  <span style={{fontSize:'10px',color:isLoad?'#3b82f6':count>0?'#16a34a':'var(--text3)',fontWeight:'600',flexShrink:0}}>
-                    {isLoad?'…':count>0?`${count} art`:'—'}
-                  </span>
+                  <span style={{fontSize:'10px',color:isLoad?'#3b82f6':count>0?'#16a34a':'var(--text3)',fontWeight:'600',flexShrink:0}}>{isLoad?'…':count>0?`${count} art`:'—'}</span>
                 </div>
               );
             })}
           </div>
           <div className="side-block">
             <div className="side-title">Cross-Category Tags</div>
-            <div style={{fontSize:'11px',color:'var(--text2)',lineHeight:'1.7',marginBottom:'8px'}}>
-              Colored pills on each card show which of your feeds it relates to. Tap any pill to jump to that category filtered by that keyword.
-            </div>
+            <div style={{fontSize:'11px',color:'var(--text2)',lineHeight:'1.7',marginBottom:'8px'}}>Colored pills on each card show which of your feeds it relates to. Tap any pill to jump to that category filtered by that keyword.</div>
             <div style={{display:'flex',flexWrap:'wrap',gap:'4px'}}>
               {Object.entries(CATS).filter(([k])=>k!=='briefing'&&k!=='podcasts').map(([k,v])=>(
                 <span key={k} style={{background:v.bg,color:v.color,borderRadius:'20px',padding:'2px 8px',fontSize:'10px',fontWeight:'500'}}>{v.emoji} {v.label}</span>
