@@ -166,24 +166,14 @@ function parseXML(txt){
 
 async function fetchRSS(url){
   try{
-    const r=await Promise.race([fetch(`https://feed2json.org/convert?url=${encodeURIComponent(url)}`),new Promise((_,rej)=>setTimeout(()=>rej('t'),8000))]);
-    const d=await r.json();
-    if(d.items?.length>0){
-      return d.items.map(i=>({
-        title:(i.title||'').trim(),link:i.url||i.id||'',
-        desc:(i.content_html||i.content_text||i.summary||'').replace(/<[^>]*>/g,'').replace(/&amp;/g,'&').replace(/&nbsp;/g,' ').trim().slice(0,350),
-        pubDate:i.date_published||i.date_modified||'',img:i.image||i.banner_image||extractImg(i.content_html||'')||'',duration:''
-      })).filter(i=>i.title&&i.link);
-    }
-  }catch{}
-  try{
     const r=await Promise.race([fetch(`https://api.rss2json.com/v1/api.json?rss_url=${encodeURIComponent(url)}&count=15`),new Promise((_,rej)=>setTimeout(()=>rej('t'),8000))]);
     const d=await r.json();
     if(d.status==='ok'&&d.items?.length>0){
       return d.items.map(i=>({
         title:(i.title||'').trim(),link:i.link||'',
         desc:(i.description||i.content||'').replace(/<[^>]*>/g,'').replace(/&amp;/g,'&').replace(/&nbsp;/g,' ').trim().slice(0,350),
-        pubDate:i.pubDate||'',img:i.thumbnail||extractImg(i.description||'')||'',duration:i.itunes_duration||''
+        pubDate:i.pubDate||'',img:i.thumbnail||extractImg(i.description||'')||'',
+        duration:i.itunes_duration||''
       })).filter(i=>i.title&&i.link);
     }
   }catch{}
@@ -197,21 +187,22 @@ async function fetchRSS(url){
     const txt=await r.text();
     const items=parseXML(txt);if(items.length>0)return items;
   }catch{}
-  return[];
-}
-
-async function fetchPodcast(url){
   try{
-    const r=await Promise.race([fetch(`https://feed2json.org/convert?url=${encodeURIComponent(url)}`),new Promise((_,rej)=>setTimeout(()=>rej('t'),12000))]);
+    const r=await Promise.race([fetch(`https://www.toptal.com/developers/feed2json/to-json?url=${encodeURIComponent(url)}`),new Promise((_,rej)=>setTimeout(()=>rej('t'),8000))]);
     const d=await r.json();
     if(d.items?.length>0){
       return d.items.map(i=>({
         title:(i.title||'').trim(),link:i.url||i.id||'',
-        desc:(i.content_html||i.content_text||i.summary||'').replace(/<[^>]*>/g,'').replace(/&amp;/g,'&').trim().slice(0,400),
-        pubDate:i.date_published||i.date_modified||'',img:i.image||i.banner_image||d.icon||d.favicon||'',duration:''
-      })).filter(i=>i.title);
+        desc:(i.content_html||i.content_text||i.summary||'').replace(/<[^>]*>/g,'').replace(/&amp;/g,'&').trim().slice(0,350),
+        pubDate:i.date_published||i.date_modified||'',
+        img:i.image||extractImg(i.content_html||'')||'',duration:''
+      })).filter(i=>i.title&&i.link);
     }
   }catch{}
+  return[];
+}
+
+async function fetchPodcast(url){
   try{
     const r=await Promise.race([fetch(`https://api.rss2json.com/v1/api.json?rss_url=${encodeURIComponent(url)}&count=10`),new Promise((_,rej)=>setTimeout(()=>rej('t'),12000))]);
     const d=await r.json();
@@ -219,7 +210,8 @@ async function fetchPodcast(url){
       return d.items.map(i=>({
         title:(i.title||'').trim(),link:i.link||i.enclosure?.link||'',
         desc:(i.description||i.content||'').replace(/<[^>]*>/g,'').replace(/&amp;/g,'&').trim().slice(0,400),
-        pubDate:i.pubDate||'',img:i.thumbnail||d.feed?.image||'',duration:i.itunes_duration||''
+        pubDate:i.pubDate||'',img:i.thumbnail||d.feed?.image||'',
+        duration:i.itunes_duration||''
       })).filter(i=>i.title);
     }
   }catch{}
@@ -757,7 +749,7 @@ export default function NewsHub(){
               const isLoad=briefLoading[f.name];
               return(
                 <button key={f.name} className={`brief-tab-btn${activeBriefSource===f.name?' active':''}`} style={{color:f.color}} onClick={()=>setActiveBriefSource(activeBriefSource===f.name?'all':f.name)}>
-                  {f.emoji} {f.name.replace('Bloomberg Morning Briefing','Bloomberg').replace('Morning Brew','M.Brew').replace('Morning Wire','M.Wire').replace('API Brief','API Brief')} {isLoad?'…':`(${count})`}
+                  {f.emoji} {f.name.replace('Bloomberg Morning Briefing','Bloomberg').replace('Morning Brew','M.Brew').replace('Morning Wire','M.Wire')} {isLoad?'…':`(${count})`}
                 </button>
               );
             })}
