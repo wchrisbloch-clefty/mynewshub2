@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef, useMemo } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 
 const SK='v12_';
 function load(k,def){try{const v=localStorage.getItem(SK+k);return v?JSON.parse(v):def;}catch{return def;}}
@@ -336,14 +336,7 @@ const DEFAULT_FEEDS={
 
 const WX_CODES={0:'Clear',1:'Mostly Clear',2:'Partly Cloudy',3:'Overcast',45:'Foggy',61:'Light Rain',63:'Rain',65:'Heavy Rain',71:'Light Snow',73:'Snow',80:'Showers',95:'Thunderstorm'};
 const WX_EMOJI={0:'☀️',1:'🌤️',2:'⛅',3:'☁️',45:'🌫️',61:'🌧️',63:'🌧️',65:'🌧️',71:'🌨️',73:'❄️',80:'🌦️',95:'⛈️'};
-
-const SPORT_TABS=[
-  {id:'mlb',label:'MLB',emoji:'⚾'},
-  {id:'nfl',label:'NFL',emoji:'🏈'},
-  {id:'ncaab',label:'NCAAB',emoji:'🏀'},
-  {id:'ncaaf',label:'NCAAF',emoji:'🏈'},
-  {id:'golf',label:'Golf',emoji:'⛳'},
-];
+const SPORT_TABS=[{id:'mlb',label:'MLB',emoji:'⚾'},{id:'nfl',label:'NFL',emoji:'🏈'},{id:'ncaab',label:'NCAAB',emoji:'🏀'},{id:'ncaaf',label:'NCAAF',emoji:'🏈'},{id:'golf',label:'Golf',emoji:'⛳'}];
 
 const css=`
 *{box-sizing:border-box;margin:0;padding:0;}
@@ -649,7 +642,7 @@ body{background:var(--bg);font-family:-apple-system,BlinkMacSystemFont,'SF Pro D
 .yt-act.saved{border-color:#f59e0b;color:#f59e0b;background:#fffbeb;}
 .tw-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:10px;padding:14px 16px;}
 .tw-card{background:var(--surface2);border-radius:10px;border:1px solid var(--border);padding:14px;display:flex;flex-direction:column;align-items:center;gap:8px;cursor:pointer;transition:all 0.12s;}
-.tw-card:hover{border-color:#1d9bf0;box-shadow:0 2px 12px rgba(29,155,240,0.12);}
+.tw-card:hover{border-color:#1d9bf0;}
 .tw-avatar{width:48px;height:48px;border-radius:50%;background:linear-gradient(135deg,#1d9bf0,#0369a1);display:flex;align-items:center;justify-content:center;font-size:18px;font-weight:700;color:#fff;}
 .tw-handle{font-size:13px;font-weight:700;color:var(--text);}
 .tw-label{font-size:11px;color:var(--text2);}
@@ -657,7 +650,7 @@ body{background:var(--bg);font-family:-apple-system,BlinkMacSystemFont,'SF Pro D
 .tw-open{font-size:11px;color:#1d9bf0;font-weight:500;}
 .li-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:10px;padding:14px 16px;}
 .li-card{background:var(--surface2);border-radius:10px;border:1px solid var(--border);padding:14px;cursor:pointer;transition:all 0.12s;}
-.li-card:hover{border-color:#0a66c2;box-shadow:0 2px 12px rgba(10,102,194,0.12);}
+.li-card:hover{border-color:#0a66c2;}
 .li-top{display:flex;align-items:center;gap:10px;margin-bottom:8px;}
 .li-emoji{font-size:24px;width:40px;height:40px;display:flex;align-items:center;justify-content:center;background:linear-gradient(135deg,#0a66c2,#0369a1);border-radius:8px;}
 .li-info{flex:1;}
@@ -724,7 +717,6 @@ body{background:var(--bg);font-family:-apple-system,BlinkMacSystemFont,'SF Pro D
 @media(max-width:900px){.main{grid-template-columns:1fr;padding:10px;}.sidebar-col{display:none;}.pod-page{grid-template-columns:1fr;}.pod-sidebar{display:none;}.brief-page{grid-template-columns:1fr;}.brief-sidebar{display:none;}:root{--hero-h:320px;}.pic-card{width:180px;}.pic-card.wide{width:220px;}.yt-grid{grid-template-columns:1fr 1fr;}}
 @media(max-width:600px){.topbar-inner{height:46px;}.search{width:110px;}:root{--hero-h:260px;}.hero-content{padding:16px;}.hero-title{font-size:16px;}.pic-card{width:160px;}.yt-grid{grid-template-columns:1fr;}.tw-grid{grid-template-columns:1fr 1fr;}.li-grid{grid-template-columns:1fr;}}
 `;
-
 function ScoresSection(){
   const[sport,setSport]=useState('mlb');
   const[scores,setScores]=useState({});
@@ -822,7 +814,6 @@ function SocialPage({getSummary,summaries,sumLoading,saveArt,isSaved,readLaterAr
   const[newYtName,setNewYtName]=useState('');
   const[newLiName,setNewLiName]=useState('');
   const[newLiUrl,setNewLiUrl]=useState('');
-
   const loadYt=useCallback(async()=>{
     setYtLoading(true);
     await Promise.allSettled(ytChannels.slice(0,20).map(async ch=>{
@@ -833,19 +824,15 @@ function SocialPage({getSummary,summaries,sumLoading,saveArt,isSaved,readLaterAr
     }));
     setYtLoading(false);
   },[ytChannels]);
-
   useEffect(()=>{loadYt();},[]);
-
   const allVideos=Object.values(ytVideos).flat().sort((a,b)=>new Date(b.pubDate)-new Date(a.pubDate));
   const filteredVideos=ytFilter==='all'?allVideos:allVideos.filter(v=>v.category===ytFilter);
   const artId=(a)=>btoa((a.link||'x').slice(0,40)).replace(/[^a-z0-9]/gi,'').slice(0,12);
-
   const addTwitter=()=>{if(!newTwHandle.trim())return;const handle=newTwHandle.replace('@','').trim();const u=[...twitterAccounts,{handle,label:newTwLabel.trim()||handle,emoji:'🐦',category:'custom'}];setTwitterAccounts(u);save('tw_accounts',u);setNewTwHandle('');setNewTwLabel('');};
   const addYoutube=()=>{if(!newYtUrl.trim()||!newYtName.trim())return;const match=newYtUrl.match(/channel\/([A-Za-z0-9_-]+)/);const channelId=match?match[1]:'UC'+Math.random().toString(36).slice(2,20);const u=[...ytChannels,{name:newYtName.trim(),channelId,category:'custom',emoji:'📺'}];setYtChannels(u);save('yt_channels',u);setNewYtUrl('');setNewYtName('');};
   const addLinkedin=()=>{if(!newLiName.trim())return;const u=[...linkedinPages,{name:newLiName.trim(),url:newLiUrl.trim()||'https://www.linkedin.com',emoji:'💼',category:'custom'}];setLinkedinPages(u);save('li_pages',u);setNewLiName('');setNewLiUrl('');};
   const removeTwitter=(i)=>{const u=twitterAccounts.filter((_,j)=>j!==i);setTwitterAccounts(u);save('tw_accounts',u);};
   const removeLinkedin=(i)=>{const u=linkedinPages.filter((_,j)=>j!==i);setLinkedinPages(u);save('li_pages',u);};
-
   return(
     <div className="social-page">
       <div className="social-header">
@@ -853,7 +840,6 @@ function SocialPage({getSummary,summaries,sumLoading,saveArt,isSaved,readLaterAr
         <div className="social-header-body"><div className="social-header-title">Social Dashboard</div><div className="social-header-sub">YouTube · Twitter/X · LinkedIn — fully customizable</div></div>
         <button className="hero-act" onClick={loadYt}>↺ Refresh YouTube</button>
       </div>
-
       <div className="social-network-section">
         <div className="social-net-head" onClick={()=>setYtOpen(o=>!o)}>
           <div className="social-net-title"><span style={{fontSize:18}}>▶️</span> YouTube<span className="social-net-badge">{ytChannels.length} channels · {allVideos.length} videos</span></div>
@@ -895,7 +881,6 @@ function SocialPage({getSummary,summaries,sumLoading,saveArt,isSaved,readLaterAr
           </>
         )}
       </div>
-
       <div className="social-network-section">
         <div className="social-net-head" onClick={()=>setTwOpen(o=>!o)}>
           <div className="social-net-title"><span style={{fontSize:18}}>𝕏</span> Twitter / X<span className="social-net-badge">{twitterAccounts.length} accounts</span></div>
@@ -903,7 +888,7 @@ function SocialPage({getSummary,summaries,sumLoading,saveArt,isSaved,readLaterAr
         </div>
         {twOpen&&(
           <>
-            <div style={{padding:'10px 16px 4px',fontSize:11,color:'var(--text3)'}}>Tap any card to open their profile. Full feed integration coming next session with OAuth.</div>
+            <div style={{padding:'10px 16px 4px',fontSize:11,color:'var(--text3)'}}>Tap any card to open their profile. Full feed integration coming next session.</div>
             <div className="tw-grid">
               {twitterAccounts.map((acc,i)=>(
                 <div key={i} className="tw-card" onClick={()=>window.open(`https://twitter.com/${acc.handle}`)}>
@@ -924,7 +909,6 @@ function SocialPage({getSummary,summaries,sumLoading,saveArt,isSaved,readLaterAr
           </>
         )}
       </div>
-
       <div className="social-network-section">
         <div className="social-net-head" onClick={()=>setLiOpen(o=>!o)}>
           <div className="social-net-title"><span style={{fontSize:18}}>💼</span> LinkedIn<span className="social-net-badge">{linkedinPages.length} pages</span></div>
@@ -934,7 +918,7 @@ function SocialPage({getSummary,summaries,sumLoading,saveArt,isSaved,readLaterAr
           <>
             <div className="li-oauth-banner">
               <div style={{fontSize:24}}>🔗</div>
-              <div className="li-oauth-text"><div className="li-oauth-title">Connect your LinkedIn account</div><div className="li-oauth-sub">See your personal feed — OAuth login coming next session with Supabase sync</div></div>
+              <div className="li-oauth-text"><div className="li-oauth-title">Connect your LinkedIn account</div><div className="li-oauth-sub">See your personal feed — OAuth login coming next session</div></div>
               <button className="li-oauth-btn" onClick={()=>alert('LinkedIn OAuth coming next session!')}>Connect →</button>
             </div>
             <div className="li-grid">
@@ -1326,37 +1310,39 @@ export default function NewsHub(){
     );
   };
 
-const TodayPage=()=>{
-    const trends=useMemo(()=>trendingKws(),[arts,briefArts]);
-    return(
-      <div className="main">
-        <div className="main-feed">
-          {trendingKws().length>0&&(<div className="trending-bar"><span className="trending-lbl">Trending</span>{{trendingKws().map((t,i)=><span key={i} className={`trend-chip${activeKw===t?' active':''}`} onClick={()=>setActiveKw(prev=>prev===t?'':t)}>{t}</span>)}</div>)}
-          <div className="follow-section">
-            <div className="follow-title">Your Topics</div>
-            <div className="follow-pills">
-              {['Houston','Astros','Texans','Energy','Oil','AI','Trump','Fed','Kentucky','Clemson','Braves','Markets','LNG','ERCOT','Bloom Energy','Real Estate','NFL','MLB','Data Center','Geopolitics','Entrepreneurship'].map(t=>(
-                <span key={t} className={`follow-pill${following.includes(t)?' following':''}`} onClick={()=>toggleFollow(t)}>{following.includes(t)?'✓':'+'}  {t}</span>
-              ))}
-            </div>
+  const TodayPage=()=>(
+    <div className="main">
+      <div className="main-feed">
+        {trendingKws().length>0&&(
+          <div className="trending-bar">
+            <span className="trending-lbl">Trending</span>
+            {trendingKws().map((t,i)=><span key={i} className={`trend-chip${activeKw===t?' active':''}`} onClick={()=>setActiveKw(prev=>prev===t?'':t)}>{t}</span>)}
           </div>
-          <HSection cat="general"  title="General News" emoji="🌐" color="#1d4ed8"/>
-          <HSection cat="houston"  title="Houston Local" emoji="🤠" color="#b45309"/>
-          <HSection cat="sports"   title="Sports"        emoji="🏆" color="#d97706"/>
-          <HSection cat="business" title="Business"      emoji="⚡" color="#16a34a"/>
-          <HSection cat="finance"  title="Finance"       emoji="📈" color="#7c3aed"/>
-          <HSection cat="bloom"    title="Bloom Energy"  emoji="🔋" color="#0369a1"/>
+        )}
+        <div className="follow-section">
+          <div className="follow-title">Your Topics</div>
+          <div className="follow-pills">
+            {['Houston','Astros','Texans','Energy','Oil','AI','Trump','Fed','Kentucky','Clemson','Braves','Markets','LNG','ERCOT','Bloom Energy','Real Estate','NFL','MLB','Data Center','Geopolitics','Entrepreneurship'].map(t=>(
+              <span key={t} className={`follow-pill${following.includes(t)?' following':''}`} onClick={()=>toggleFollow(t)}>{following.includes(t)?'✓':'+'}  {t}</span>
+            ))}
+          </div>
         </div>
-        <div className="sidebar-col">
-          <ScoresSection/>
-          {readLater.length>0&&(<div className="side-block"><div className="side-title">📌 Read Later ({readLater.length})</div>{readLater.slice(0,5).map((a,i)=>(<div key={i} className="read-later-item" onClick={()=>clickArt(a)}><div className="rl-dot"/><div><div className="rl-title">{a.title.slice(0,60)}{a.title.length>60?'...':''}</div><div className="rl-src">{a.source}</div></div></div>))}{readLater.length>5&&<div style={{fontSize:10,color:'var(--text3)',marginTop:6}}>{readLater.length-5} more in Saved tab</div>}</div>)}
-          <div className="side-block"><div className="side-title">🔥 Trending Now</div>{sorted('general').slice(0,6).map((a,i)=>(<div key={i} className="trend-row" onClick={()=>clickArt(a)}><div className="trend-n">{i+1}</div><div><div className="trend-t">{a.title.slice(0,55)}{a.title.length>55?'...':''}</div><div className="trend-s">{a.source} · {fmtDate(a.pubDate)}</div></div></div>))}</div>
-          <div className="side-block"><div className="side-title">🚨 Alerts</div>{alerts.map((a,i)=><span key={i} style={{display:'inline-block',background:'#fef2f2',color:'#dc2626',borderRadius:20,padding:'3px 9px',fontSize:10,margin:2,fontWeight:500}}>{a}</span>)}</div>
-          <div className="side-block"><div className="side-title">Social</div>{social.map((h,i)=>(<div key={i} className="social-row" onClick={()=>window.open(`https://twitter.com/${h.replace('@','')}`)}>  <div className="social-av">{h.replace('@','').slice(0,2).toUpperCase()}</div><span className="social-name">{h}</span><span className="social-arr">→</span></div>))}</div>
-        </div>
+        <HSection cat="general"  title="General News" emoji="🌐" color="#1d4ed8"/>
+        <HSection cat="houston"  title="Houston Local" emoji="🤠" color="#b45309"/>
+        <HSection cat="sports"   title="Sports"        emoji="🏆" color="#d97706"/>
+        <HSection cat="business" title="Business"      emoji="⚡" color="#16a34a"/>
+        <HSection cat="finance"  title="Finance"       emoji="📈" color="#7c3aed"/>
+        <HSection cat="bloom"    title="Bloom Energy"  emoji="🔋" color="#0369a1"/>
       </div>
-    );
-  };
+      <div className="sidebar-col">
+        <ScoresSection/>
+        {readLater.length>0&&(<div className="side-block"><div className="side-title">📌 Read Later ({readLater.length})</div>{readLater.slice(0,5).map((a,i)=>(<div key={i} className="read-later-item" onClick={()=>clickArt(a)}><div className="rl-dot"/><div><div className="rl-title">{a.title.slice(0,60)}{a.title.length>60?'...':''}</div><div className="rl-src">{a.source}</div></div></div>))}{readLater.length>5&&<div style={{fontSize:10,color:'var(--text3)',marginTop:6}}>{readLater.length-5} more in Saved tab</div>}</div>)}
+        <div className="side-block"><div className="side-title">🔥 Trending Now</div>{sorted('general').slice(0,6).map((a,i)=>(<div key={i} className="trend-row" onClick={()=>clickArt(a)}><div className="trend-n">{i+1}</div><div><div className="trend-t">{a.title.slice(0,55)}{a.title.length>55?'...':''}</div><div className="trend-s">{a.source} · {fmtDate(a.pubDate)}</div></div></div>))}</div>
+        <div className="side-block"><div className="side-title">🚨 Alerts</div>{alerts.map((a,i)=><span key={i} style={{display:'inline-block',background:'#fef2f2',color:'#dc2626',borderRadius:20,padding:'3px 9px',fontSize:10,margin:2,fontWeight:500}}>{a}</span>)}</div>
+        <div className="side-block"><div className="side-title">Social</div>{social.map((h,i)=>(<div key={i} className="social-row" onClick={()=>window.open(`https://twitter.com/${h.replace('@','')}`)}>  <div className="social-av">{h.replace('@','').slice(0,2).toUpperCase()}</div><span className="social-name">{h}</span><span className="social-arr">→</span></div>))}</div>
+      </div>
+    </div>
+  );
 
   const PodcastsPage=()=>{
     const allEps=[];
