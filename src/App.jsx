@@ -797,7 +797,6 @@ function WeatherBar(){
     </div>
   );
 }
-
 function SocialPage({getSummary,summaries,sumLoading,saveArt,isSaved,readLaterArt,isReadLater}){
   const[ytChannels,setYtChannels]=useState(()=>load('yt_channels',DEFAULT_YT_CHANNELS));
   const[twitterAccounts,setTwitterAccounts]=useState(()=>load('tw_accounts',DEFAULT_TWITTER));
