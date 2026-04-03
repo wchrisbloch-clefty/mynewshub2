@@ -908,3 +908,631 @@ export default function NewsHub(){
     </>
   );
 }
+function ScoresSection(){
+  const[sport,setSport]=useState('mlb');
+  const[scores,setScores]=useState({});
+  const[loading,setLoading]=useState({});
+  const[lastUpdate,setLastUpdate]=useState(null);
+  const timerRef=useRef(null);
+  const fetchScores=useCallback(async(sportId)=>{
+    setLoading(l=>({...l,[sportId]:true}));
+    try{
+      const sportMap={mlb:'baseball/mlb',nfl:'football/nfl',ncaab:'basketball/mens-college-basketball',ncaaf:'football/college-football',golf:'golf/pga'};
+      const resp=await fetch('https://site.api.espn.com/apis/site/v2/sports/'+sportMap[sportId]+'/scoreboard');
+      if(!resp.ok)throw new Error('failed');
+      const data=await resp.json();
+      const events=(data.events||[]).slice(0,8).map(e=>{
+        const comp=e.competitions?.[0];
+        const home=comp?.competitors?.find(c=>c.homeAway==='home');
+        const away=comp?.competitors?.find(c=>c.homeAway==='away');
+        const detail=comp?.status?.type?.shortDetail||comp?.status?.type?.description||'';
+        const isLive=comp?.status?.type?.state==='in';
+        const isFinal=comp?.status?.type?.completed;
+        return{id:e.id,homeTeam:home?.team?.shortDisplayName||'',homeScore:home?.score||'',awayTeam:away?.team?.shortDisplayName||'',awayScore:away?.score||'',detail,isLive,isFinal,homeWinning:isFinal&&parseInt(home?.score||0)>parseInt(away?.score||0),awayWinning:isFinal&&parseInt(away?.score||0)>parseInt(home?.score||0)};
+      });
+      setScores(s=>({...s,[sportId]:events}));setLastUpdate(new Date());
+    }catch{setScores(s=>({...s,[sportId]:[]}));}
+    setLoading(l=>({...l,[sportId]:false}));
+  },[]);
+  useEffect(()=>{fetchScores(sport);if(timerRef.current)clearInterval(timerRef.current);timerRef.current=setInterval(()=>fetchScores(sport),90000);return()=>{if(timerRef.current)clearInterval(timerRef.current);};},[sport,fetchScores]);
+  const games=scores[sport]||[];
+  return(
+    <div className="scores-section">
+      <div className="scores-head"><div className="scores-title">Live Scores</div><div className="scores-refresh">{lastUpdate?'Updated '+fmtDate(lastUpdate):'Auto-refreshes 90s'}</div></div>
+      <div className="sport-tabs">{SPORT_TABS.map(s=><button key={s.id} className={'sport-tab'+(sport===s.id?' active':'')} onClick={()=>setSport(s.id)}>{s.label}</button>)}</div>
+      <div className="scores-list">
+        {loading[sport]?<div className="scores-empty">Loading...</div>:games.length===0?<div className="scores-empty">{sport==='ncaaf'?'NCAAF season Aug-Jan':'No games today'}</div>:
+        games.map((g,i)=>(
+          <div key={i} className="score-card">
+            <div className="score-teams">
+              <div className="score-team"><span className="score-team-name">{g.awayTeam}</span>{g.awayScore!==''&&<span className={'score-team-score'+(g.awayWinning?' winning':'')}>{g.awayScore}</span>}</div>
+              <div className="score-team"><span className="score-team-name">{g.homeTeam}</span>{g.homeScore!==''&&<span className={'score-team-score'+(g.homeWinning?' winning':'')}>{g.homeScore}</span>}</div>
+            </div>
+            <div className={'score-status'+(g.isLive?' live':g.isFinal?' final':' sched')}>{g.isLive?'LIVE':g.isFinal?'Final':g.detail||'Soon'}</div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+function WeatherBar(){
+  const[weather,setWeather]=useState([]);
+  const[cities,setCities]=useState(()=>load('wx_cities',[{name:'Houston TX',lat:29.7604,lon:-95.3698},{name:'Louisville KY',lat:38.2527,lon:-85.7585}]));
+  useEffect(()=>{
+    const fetchAll=async()=>{
+      const results=await Promise.all(cities.map(async city=>{
+        try{const r=await fetch('https://api.open-meteo.com/v1/forecast?latitude='+city.lat+'&longitude='+city.lon+'&current=temperature_2m,weathercode,windspeed_10m,relativehumidity_2m&temperature_unit=fahrenheit&windspeed_unit=mph');const d=await r.json();const c=d.current;return{name:city.name,temp:Math.round(c.temperature_2m),wind:Math.round(c.windspeed_10m),humidity:c.relativehumidity_2m,cond:WX_CODES[c.weathercode]||'Clear'};}
+        catch{return{name:city.name,temp:'--',wind:'--',humidity:'--',cond:'--'};}
+      }));
+      setWeather(results);
+    };
+    fetchAll();const t=setInterval(fetchAll,600000);return()=>clearInterval(t);
+  },[cities]);
+  return(
+    <div className="wx-bar"><div className="wx-inner">
+      {weather.map((w,i)=>(
+        <React.Fragment key={w.name}>
+          {i>0&&<div className="wx-divider"/>}
+          <div className="wx-city"><div><div className="wx-name">{w.name}</div><div className="wx-temp">{w.temp}F</div><div className="wx-cond">{w.cond}</div></div></div>
+          <div className="wx-detail">{w.humidity}% / {w.wind}mph</div>
+        </React.Fragment>
+      ))}
+      <div className="wx-divider"/>
+      <button className="wx-add" onClick={()=>{const name=prompt('City name:');const lat=parseFloat(prompt('Latitude:'));const lon=parseFloat(prompt('Longitude:'));if(name&&!isNaN(lat)&&!isNaN(lon)){const u=[...cities,{name,lat,lon}];setCities(u);save('wx_cities',u);}}}>+ City</button>
+    </div></div>
+  );
+}
+function SocialPage({getSummary,summaries,sumLoading,saveArt,isSaved,readLaterArt,isReadLater}){
+  const[ytChannels,setYtChannels]=useState(()=>load('yt_channels',DEFAULT_YT));
+  const[twitterAccounts,setTwitterAccounts]=useState(()=>load('tw_accounts',DEFAULT_TWITTER));
+  const[linkedinPages,setLinkedinPages]=useState(()=>load('li_pages',DEFAULT_LINKEDIN));
+  const[ytVideos,setYtVideos]=useState({});
+  const[ytLoading,setYtLoading]=useState(false);
+  const[ytFilter,setYtFilter]=useState('all');
+  const[ytOpen,setYtOpen]=useState(true);
+  const[twOpen,setTwOpen]=useState(true);
+  const[liOpen,setLiOpen]=useState(true);
+  const[newTwHandle,setNewTwHandle]=useState('');
+  const[newTwLabel,setNewTwLabel]=useState('');
+  const[newYtUrl,setNewYtUrl]=useState('');
+  const[newYtName,setNewYtName]=useState('');
+  const[newLiName,setNewLiName]=useState('');
+  const[newLiUrl,setNewLiUrl]=useState('');
+  const loadYt=useCallback(async()=>{
+    setYtLoading(true);
+    await Promise.allSettled(ytChannels.slice(0,20).map(async ch=>{
+      try{const items=await fetchRSS('https://www.youtube.com/feeds/videos.xml?channel_id='+ch.channelId);if(items.length>0)setYtVideos(v=>({...v,[ch.channelId]:items.slice(0,4).map(i=>({...i,channelName:ch.name,category:ch.category,channelId:ch.channelId}))}));}catch{}
+    }));
+    setYtLoading(false);
+  },[ytChannels]);
+  useEffect(()=>{loadYt();},[]);
+  const allVideos=Object.values(ytVideos).flat().sort((a,b)=>new Date(b.pubDate)-new Date(a.pubDate));
+  const filteredVideos=ytFilter==='all'?allVideos:allVideos.filter(v=>v.category===ytFilter);
+  const addTwitter=()=>{if(!newTwHandle.trim())return;const handle=newTwHandle.replace('@','').trim();const u=[...twitterAccounts,{handle,label:newTwLabel.trim()||handle,category:'custom'}];setTwitterAccounts(u);save('tw_accounts',u);setNewTwHandle('');setNewTwLabel('');};
+  const addYoutube=()=>{if(!newYtUrl.trim()||!newYtName.trim())return;const match=newYtUrl.match(/channel\/([A-Za-z0-9_-]+)/);const channelId=match?match[1]:'UC'+Math.random().toString(36).slice(2,20);const u=[...ytChannels,{name:newYtName.trim(),channelId,category:'custom'}];setYtChannels(u);save('yt_channels',u);setNewYtUrl('');setNewYtName('');};
+  const addLinkedin=()=>{if(!newLiName.trim())return;const u=[...linkedinPages,{name:newLiName.trim(),url:newLiUrl.trim()||'https://www.linkedin.com',category:'custom'}];setLinkedinPages(u);save('li_pages',u);setNewLiName('');setNewLiUrl('');};
+  const removeTwitter=(i)=>{const u=twitterAccounts.filter((_,j)=>j!==i);setTwitterAccounts(u);save('tw_accounts',u);};
+  const removeLinkedin=(i)=>{const u=linkedinPages.filter((_,j)=>j!==i);setLinkedinPages(u);save('li_pages',u);};
+  return(
+    <div className="social-page">
+      <div className="social-header"><div className="social-header-body"><div className="social-header-title">Social Dashboard</div><div className="social-header-sub">YouTube - Twitter/X - LinkedIn - fully customizable</div></div><button className="hero-act" onClick={loadYt}>Refresh YouTube</button></div>
+      <div className="social-network-section">
+        <div className="social-net-head" onClick={()=>setYtOpen(o=>!o)}><div className="social-net-title">YouTube<span className="social-net-badge">{ytChannels.length} channels - {allVideos.length} videos</span></div><span className={'social-net-toggle'+(ytOpen?' open':'')}>v</span></div>
+        {ytOpen&&(<>
+          <div className="yt-filter-tabs">{YT_CATS.map(c=><button key={c.id} className={'yt-filter-tab'+(ytFilter===c.id?' active':'')} onClick={()=>setYtFilter(c.id)}>{c.label}</button>)}</div>
+          {ytLoading&&!filteredVideos.length?<div className="yt-loading">Loading YouTube feeds...</div>:filteredVideos.length===0?<div className="yt-loading">No videos yet - tap Refresh above</div>:(
+            <div className="yt-grid">{filteredVideos.slice(0,24).map((v,i)=>{
+              const id=artId(v);
+              return(<div key={i} className="yt-card">
+                {v.img?<img className="yt-thumb" src={v.img} loading="lazy" alt=""/>:<div className="yt-thumb-ph">[YT]</div>}
+                <div className="yt-card-body">
+                  <div className="yt-channel-row"><span className="yt-channel-name">{v.channelName}</span><span className="yt-card-date">{fmtDate(v.pubDate)}</span></div>
+                  <div className="yt-card-title">{v.title}</div>
+                  {v.desc&&<div className="yt-card-desc">{v.desc}</div>}
+                  {sumLoading[id]&&<div style={{fontSize:10,color:'#7c3aed',margin:'4px 0'}}>Generating summary...</div>}
+                  {summaries[id]&&<div className="summary-box"><div className="summary-lbl">AI Summary</div>{summaries[id]}</div>}
+                  <div className="yt-card-acts">
+                    <button className="yt-act watch" onClick={()=>window.open(v.link,'_blank')}>Watch</button>
+                    <button className={'yt-act ai'+(summaries[id]||sumLoading[id]?' saved':'')} onClick={e=>getSummary(id,v.title,v.desc,e)}>{sumLoading[id]?'...':summaries[id]?'Hide AI':'AI'}</button>
+                    <button className={'yt-act'+(isSaved(v)?' saved':'')} onClick={e=>saveArt({...v,cat:'social'},e)}>{isSaved(v)?'Saved':'Save'}</button>
+                    <button className={'yt-act'+(isReadLater(v)?' saved':'')} onClick={e=>readLaterArt({...v,cat:'social'},e)}>Later</button>
+                  </div>
+                </div>
+              </div>);
+            })}</div>
+          )}
+          <div className="social-add-form"><input className="social-add-input" placeholder="Channel name" value={newYtName} onChange={e=>setNewYtName(e.target.value)}/><input className="social-add-input" placeholder="YouTube channel URL" value={newYtUrl} onChange={e=>setNewYtUrl(e.target.value)}/><button className="social-add-btn" onClick={addYoutube}>+ Add</button></div>
+        </>)}
+      </div>
+      <div className="social-network-section">
+        <div className="social-net-head" onClick={()=>setTwOpen(o=>!o)}><div className="social-net-title">Twitter / X<span className="social-net-badge">{twitterAccounts.length} accounts</span></div><span className={'social-net-toggle'+(twOpen?' open':'')}>v</span></div>
+        {twOpen&&(<>
+          <div style={{padding:'10px 16px 4px',fontSize:11,color:'var(--text3)'}}>Tap any card to open profile. Full feed coming next session.</div>
+          <div className="tw-grid">{twitterAccounts.map((acc,i)=>(
+            <div key={i} className="tw-card" onClick={()=>window.open('https://twitter.com/'+acc.handle)}>
+              <div className="tw-avatar">{acc.handle.slice(0,2).toUpperCase()}</div>
+              <div className="tw-handle">@{acc.handle}</div><div className="tw-label">{acc.label}</div>
+              <div className="tw-open">Open on X</div>
+              <button style={{background:'none',border:'none',color:'var(--text3)',fontSize:10,cursor:'pointer'}} onClick={e=>{e.stopPropagation();removeTwitter(i);}}>Remove</button>
+            </div>
+          ))}</div>
+          <div className="social-add-form"><input className="social-add-input" placeholder="@handle" value={newTwHandle} onChange={e=>setNewTwHandle(e.target.value)}/><input className="social-add-input" placeholder="Display name" value={newTwLabel} onChange={e=>setNewTwLabel(e.target.value)}/><button className="social-add-btn" onClick={addTwitter}>+ Add</button></div>
+        </>)}
+      </div>
+      <div className="social-network-section">
+        <div className="social-net-head" onClick={()=>setLiOpen(o=>!o)}><div className="social-net-title">LinkedIn<span className="social-net-badge">{linkedinPages.length} pages</span></div><span className={'social-net-toggle'+(liOpen?' open':'')}>v</span></div>
+        {liOpen&&(<>
+          <div className="li-oauth-banner"><div className="li-oauth-text"><div className="li-oauth-title">Connect your LinkedIn account</div><div className="li-oauth-sub">OAuth login coming next session with Supabase sync</div></div><button className="li-oauth-btn" onClick={()=>alert('LinkedIn OAuth coming next session!')}>Connect</button></div>
+          <div className="li-grid">{linkedinPages.map((pg,i)=>(
+            <div key={i} className="li-card" onClick={()=>window.open(pg.url,'_blank')}>
+              <div className="li-top"><div className="li-av">LI</div><div><div className="li-name">{pg.name}</div><div className="li-cat">{pg.category}</div></div></div>
+              <div className="li-open">Open on LinkedIn</div>
+              <button style={{background:'none',border:'none',color:'var(--text3)',fontSize:10,cursor:'pointer',marginTop:6}} onClick={e=>{e.stopPropagation();removeLinkedin(i);}}>Remove</button>
+            </div>
+          ))}</div>
+          <div className="social-add-form"><input className="social-add-input" placeholder="Company or person name" value={newLiName} onChange={e=>setNewLiName(e.target.value)}/><input className="social-add-input" placeholder="LinkedIn URL" value={newLiUrl} onChange={e=>setNewLiUrl(e.target.value)}/><button className="social-add-btn" onClick={addLinkedin}>+ Add</button></div>
+        </>)}
+      </div>
+    </div>
+  );
+}
+export default function NewsHub(){
+  const[tab,setTab]=useState('today');
+  const[search,setSearch]=useState('');
+  const[activeKw,setActiveKw]=useState('');
+  const[compact,setCompact]=useState(()=>load('compact',false));
+  const[dark,setDark]=useState(()=>load('dark',false));
+  const[saved,setSaved]=useState(()=>load('saved',[]));
+  const[readLater,setReadLater]=useState(()=>load('readlater',[]));
+  const[likes,setLikes]=useState(()=>load('likes',{}));
+  const[kw,setKw]=useState(()=>load('kw',DEFAULT_KW));
+  const[following,setFollowing]=useState(()=>load('following',['Houston','Astros','Energy','AI','Trump','Fed']));
+  const[alerts,setAlerts]=useState(()=>load('alerts',['Texans','Astros','Kentucky','Clemson','ERCOT','Bloom Energy','hurricane','breaking']));
+  const[socialFollows,setSocialFollows]=useState(()=>load('social',['@HoustonTexans','@astros','@KentuckyMBB','@ClemsonFB','@BloomEnergy']));
+  const[feeds,setFeeds]=useState(()=>load('feeds',DEFAULT_FEEDS));
+  const[arts,setArts]=useState({general:[],sports:[],business:[],finance:[],bloom:[],houston:[]});
+  const[loading,setLoading]=useState({general:false,sports:false,business:false,finance:false,bloom:false,houston:false});
+  const[health,setHealth]=useState({});
+  const[briefArts,setBriefArts]=useState({});
+  const[briefLoading,setBriefLoading]=useState({});
+  const[activeBriefSource,setActiveBriefSource]=useState('all');
+  const[podEps,setPodEps]=useState({});
+  const[podLoading,setPodLoading]=useState({});
+  const[activePod,setActivePod]=useState(null);
+  const[summaries,setSummaries]=useState({});
+  const[sumLoading,setSumLoading]=useState({});
+  const[breaking,setBreaking]=useState(null);
+  const[showPanel,setShowPanel]=useState(false);
+  const[heroIdx,setHeroIdx]=useState(0);
+  const heroTimer=useRef(null);
+  const[newKwVal,setNewKwVal]=useState('');
+  const[newAlert,setNewAlert]=useState('');
+  const[newSocial,setNewSocial]=useState('');
+  const[kwTab,setKwTab]=useState('general');
+  useEffect(()=>{save('dark',dark);document.body.className=dark?'dark':'';},[dark]);
+  useEffect(()=>{save('compact',compact);},[compact]);
+  useEffect(()=>{save('saved',saved);},[saved]);
+  useEffect(()=>{save('readlater',readLater);},[readLater]);
+  useEffect(()=>{save('likes',likes);},[likes]);
+  useEffect(()=>{save('following',following);},[following]);
+  const kwScore=(a,cat)=>{const ks=kw[cat]||[];return ks.filter(k=>(a.title+(a.desc||'')).toLowerCase().includes(k.toLowerCase())).length;};
+  const dedupe=(arr)=>{const seen=new Set();return arr.filter(a=>{const k=(a.title||'').slice(0,60).toLowerCase().replace(/\s+/g,'');if(seen.has(k))return false;seen.add(k);return true;});};
+  const sorted=useCallback((cat)=>{
+    let f=arts[cat]||[];
+    if(activeKw)f=f.filter(a=>(a.title+(a.desc||'')).toLowerCase().includes(activeKw.toLowerCase()));
+    else if(search)f=f.filter(a=>(a.title+(a.desc||'')).toLowerCase().includes(search.toLowerCase()));
+    const deduped=dedupe(f);
+    const bySource={};
+    deduped.forEach(a=>{if(!bySource[a.source])bySource[a.source]=[];bySource[a.source].push(a);});
+    Object.keys(bySource).forEach(src=>{bySource[src].sort((a,b)=>{const d=kwScore(b,cat)-kwScore(a,cat);if(d!==0)return d;return new Date(b.pubDate)-new Date(a.pubDate);});});
+    const srcKeys=Object.keys(bySource).sort((a,b)=>{const topA=bySource[a][0],topB=bySource[b][0];const d=kwScore(topB,cat)-kwScore(topA,cat);if(d!==0)return d;return new Date(topB.pubDate)-new Date(topA.pubDate);});
+    const result=[];const maxLen=Math.max(0,...srcKeys.map(k=>bySource[k].length));
+    for(let i=0;i<maxLen;i++){srcKeys.forEach(src=>{if(bySource[src]?.[i])result.push(bySource[src][i]);});}
+    return result;
+  },[arts,search,activeKw]);
+  const allBriefArts=useCallback(()=>{
+    let all=[];
+    BRIEFING_FEEDS.forEach(f=>{(briefArts[f.name]||[]).forEach(a=>all.push({...a,briefSource:f.name,briefColor:f.color}));});
+    all.sort((a,b)=>new Date(b.pubDate)-new Date(a.pubDate));
+    if(search)all=all.filter(a=>(a.title+(a.desc||'')).toLowerCase().includes(search.toLowerCase()));
+    return dedupe(all);
+  },[briefArts,search]);
+  const heroArts=useCallback(()=>{
+    const all=[];
+    MAIN_CATS.forEach(cat=>{sorted(cat).filter(a=>a.img).slice(0,3).forEach(a=>all.push({...a,cat}));});
+    allBriefArts().filter(a=>a.img).slice(0,2).forEach(a=>all.push({...a,cat:'briefing'}));
+    all.sort((a,b)=>new Date(b.pubDate)-new Date(a.pubDate));
+    return dedupe(all).slice(0,8);
+  },[sorted,allBriefArts]);
+  const trendingKws=useCallback(()=>{
+    const wordCount={};
+    const stop=new Set(['the','a','an','in','on','at','to','for','of','and','or','is','are','was','were','be','been','has','have','had','that','this','with','from','by','as','its','it','but','not','we','he','she','they','you','i','our','your','their','will','can','may','would','could','should','after','before','about','over','under','more','also','just','than','then','when','where','what','who','which','how','why','new','first','last','one','two','three','all','some','many','most','no','us','up','out','if','so','do','did','does','being','into','through','during','while','since','between','both','each','few','other','such','only','same','too','very','there']);
+    [...Object.values(arts).flat(),...Object.values(briefArts).flat()].forEach(a=>{(a.title||'').split(/\s+/).forEach(w=>{const c=w.replace(/[^a-zA-Z]/g,'').toLowerCase();if(c.length>3&&!stop.has(c))wordCount[c]=(wordCount[c]||0)+1;});});
+    return Object.entries(wordCount).filter(([,c])=>c>=2).sort((a,b)=>b[1]-a[1]).slice(0,20).map(([w])=>w.charAt(0).toUpperCase()+w.slice(1));
+  },[arts,briefArts]);
+  const tickerHeadlines=useCallback(()=>dedupe([...sorted('general').slice(0,5),...sorted('sports').slice(0,3),...sorted('business').slice(0,3)]).slice(0,12),[sorted]);
+  const kwMatch=(a,cat)=>(kw[cat]||[]).filter(k=>(a.title+(a.desc||'')).toLowerCase().includes(k.toLowerCase()));
+  const isAlert=(a)=>alerts.some(al=>(a.title+(a.desc||'')).toLowerCase().includes(al.toLowerCase()));
+  const isSaved=(a)=>saved.some(s=>s.link===a.link);
+  const isReadLater=(a)=>readLater.some(s=>s.link===a.link);
+  const clickArt=(a)=>window.open(a.link,'_blank');
+  const likeArt=(link,v,e)=>{e?.stopPropagation();setLikes(l=>{const prev=l[link]||0;if(prev===v){const n={...l};delete n[link];return n;}return{...l,[link]:v};});};
+  const saveArt=(a,e)=>{e?.stopPropagation();setSaved(s=>s.some(x=>x.link===a.link)?s.filter(x=>x.link!==a.link):[...s,a]);};
+  const readLaterArt=(a,e)=>{e?.stopPropagation();setReadLater(s=>s.some(x=>x.link===a.link)?s.filter(x=>x.link!==a.link):[...s,{...a,savedAt:new Date().toISOString()}]);};
+  const toggleFollow=(t)=>setFollowing(f=>f.includes(t)?f.filter(x=>x!==t):[...f,t]);
+  const getSummary=async(id,title,desc,e)=>{
+    e?.stopPropagation();
+    if(summaries[id]){setSummaries(s=>{const n={...s};delete n[id];return n;});return;}
+    setSumLoading(l=>({...l,[id]:true}));
+    try{const resp=await fetch('/api/summarize',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({title,content:desc||''})});const data=await resp.json();setSummaries(s=>({...s,[id]:data.summary||'Summary unavailable.'}));}
+    catch{setSummaries(s=>({...s,[id]:'Could not generate summary.'}));}
+    setSumLoading(l=>({...l,[id]:false}));
+  };
+  const loadCat=useCallback(async(cat)=>{
+    if(loading[cat])return;
+    setLoading(l=>({...l,[cat]:true}));
+    const results=[];const healthUp={};
+    const feedList=cat==='houston'?HOUSTON_FEEDS:(feeds[cat]||[]);
+    await Promise.allSettled(feedList.filter(f=>f.on).map(async f=>{
+      const t0=Date.now();const items=await fetchRSS(f.url);const elapsed=Date.now()-t0;
+      healthUp[f.name]=items.length>0?(elapsed<5000?'green':'yellow'):'red';
+      items.forEach(i=>{if(i.title&&i.link)results.push({...i,source:f.name,cat});});
+    }));
+    setHealth(h=>({...h,...healthUp}));
+    results.sort((a,b)=>new Date(b.pubDate)-new Date(a.pubDate));
+    setArts(a=>({...a,[cat]:results}));
+    setLoading(l=>({...l,[cat]:false}));
+    const hit=results.find(a=>isAlert(a));if(hit)setBreaking(hit);
+  },[feeds,alerts,loading]);
+  const loadBriefings=useCallback(async()=>{
+    await Promise.allSettled(BRIEFING_FEEDS.map(async f=>{
+      if(briefLoading[f.name])return;
+      setBriefLoading(l=>({...l,[f.name]:true}));
+      const items=await fetchRSS(f.url);
+      setBriefArts(prev=>({...prev,[f.name]:items.map(i=>({...i,source:f.name,cat:'briefing'}))}));
+      setBriefLoading(l=>({...l,[f.name]:false}));
+    }));
+  },[briefLoading]);
+  const loadPodcasts=useCallback(async()=>{
+    await Promise.allSettled(PODCAST_FEEDS.map(async pod=>{
+      if(podLoading[pod.name])return;
+      setPodLoading(l=>({...l,[pod.name]:true}));
+      const eps=await fetchPodcast(pod.url);
+      setPodEps(p=>({...p,[pod.name]:eps.map(e=>({...e,show:pod.name,host:pod.host}))}));
+      setPodLoading(l=>({...l,[pod.name]:false}));
+    }));
+  },[]);
+  useEffect(()=>{MAIN_CATS.forEach(c=>loadCat(c));loadBriefings();loadPodcasts();},[]);
+  useEffect(()=>{
+    const ha=heroArts();if(!ha.length)return;
+    heroTimer.current=setInterval(()=>setHeroIdx(i=>(i+1)%ha.length),6000);
+    return()=>{if(heroTimer.current)clearInterval(heroTimer.current);};
+  },[heroArts]);
+  const refreshAll=()=>{
+    setArts({general:[],sports:[],business:[],finance:[],bloom:[],houston:[]});
+    setLoading({general:false,sports:false,business:false,finance:false,bloom:false,houston:false});
+    setHealth({});setBriefArts({});setBriefLoading({});
+    setPodEps({});setPodLoading({});setActiveKw('');setSearch('');setHeroIdx(0);
+    setTimeout(()=>{MAIN_CATS.forEach(c=>loadCat(c));loadBriefings();loadPodcasts();},100);
+  };
+  const heroes=heroArts();
+  function PicCard({a,cat,wide}){
+    const cc=CATS[cat]||CATS.general;const id=artId(a);const[imgErr,setImgErr]=useState(false);
+    return(
+      <div className={'pic-card'+(wide?' wide':'')} onClick={()=>clickArt(a)}>
+        {a.img&&!imgErr?<img className="pic-card-img" src={a.img} loading="lazy" onError={()=>setImgErr(true)} alt=""/>:<div className="pic-card-img-ph">{cc.label.slice(0,2)}</div>}
+        <div className="pic-card-overlay">
+          <span className="pic-card-cat" style={{background:cc.color+'cc',color:'#fff'}}>{cc.label}</span>
+          <div className="pic-card-title">{a.title}</div>
+          <div className="pic-card-meta"><span className="pic-card-src">{a.source}</span></div>
+          <div className="pic-card-acts">
+            <button className={'pic-act'+(isSaved(a)?' saved':'')} onClick={e=>saveArt(a,e)}>{isSaved(a)?'Saved':'Save'}</button>
+            <button className={'pic-act'+(isReadLater(a)?' saved':'')} onClick={e=>readLaterArt(a,e)}>Later</button>
+            <button className="pic-act" onClick={e=>getSummary(id,a.title,a.desc,e)}>{sumLoading[id]?'..':summaries[id]?'Hide AI':'AI'}</button>
+          </div>
+          {summaries[id]&&<div style={{marginTop:6,background:'rgba(0,0,0,0.6)',borderRadius:6,padding:'6px 8px',fontSize:10,color:'#e9d5ff',lineHeight:1.5}}>{summaries[id]}</div>}
+        </div>
+      </div>
+    );
+  }
+  function HSection({cat,title,color}){
+    const arts2=sorted(cat);const rowRef=useRef(null);
+    const scroll=(dir)=>{if(rowRef.current)rowRef.current.scrollBy({left:dir*240,behavior:'smooth'});};
+    if(arts2.length===0&&loading[cat])return(<div className="section"><div className="section-head"><div className="section-label"><div className="section-dot" style={{background:color}}/>{title}</div></div><div className="loading-state">Loading {title}...</div></div>);
+    if(arts2.length===0)return null;
+    return(
+      <div className="section">
+        <div className="section-head">
+          <div className="section-label"><div className="section-dot" style={{background:color}}/>{title}<span className="section-count">{arts2.length}</span></div>
+          <div className="section-actions"><button className="h-arrow" onClick={()=>scroll(-1)}>Left</button><button className="h-arrow" onClick={()=>scroll(1)}>Right</button><button className="see-all" onClick={()=>{setTab(cat);setActiveKw('');setSearch('');}}>See All</button></div>
+        </div>
+        <div className="h-row" ref={rowRef}>{arts2.slice(0,12).map((a,i)=><PicCard key={i} a={a} cat={cat} wide={i===0}/>)}</div>
+      </div>
+    );
+  }
+  function FeedCard({a,cat}){
+    const cc=CATS[cat]||CATS.general;const kws=kwMatch(a,cat);const id=artId(a);const[imgErr,setImgErr]=useState(false);
+    return(
+      <div className="feed-card" onClick={()=>clickArt(a)}>
+        <div className="feed-hero-wrap">
+          {a.img&&!imgErr?<img className="feed-hero-img" src={a.img} loading="lazy" onError={()=>setImgErr(true)} alt=""/>:<div className="feed-hero-ph">{cc.label}</div>}
+          {a.img&&!imgErr&&<div className="feed-hero-gradient"/>}
+          <span className="feed-cat-badge" style={{background:cc.color,color:'#fff'}}>{cc.label}</span>
+          <span className="feed-read-badge">{readTime(a.desc)}</span>
+        </div>
+        <div className="feed-card-body">
+          <div className="feed-top-row"><div className="feed-av" style={{background:cc.bg,color:cc.color}}>{(a.source||'?').slice(0,2).toUpperCase()}</div><span className="feed-src" style={{color:cc.color}}>{a.source}</span>{isAlert(a)&&<span className="alert-tag">ALERT</span>}<span className="feed-date">{fmtDate(a.pubDate)}</span></div>
+          <div className="feed-title">{a.title}</div>
+          {a.desc&&<div className="feed-desc">{a.desc}</div>}
+          {sumLoading[id]&&<div className="summary-box"><div className="summary-lbl">AI Summary</div>Generating...</div>}
+          {summaries[id]&&<div className="summary-box"><div className="summary-lbl">AI Summary</div>{summaries[id]}</div>}
+          <div className="feed-footer">
+            <div style={{display:'flex',gap:4,flexWrap:'wrap'}}>{kws.slice(0,3).map(k=><span key={k} className="kw-tag" style={{background:cc.bg,color:cc.color}}>{k}</span>)}</div>
+            <div className="feed-acts">
+              <button className={'act-b'+(likes[a.link]===1?' al':'')} onClick={e=>likeArt(a.link,1,e)}>Up</button>
+              <button className={'act-b'+(likes[a.link]===-1?' al':'')} onClick={e=>likeArt(a.link,-1,e)}>Dn</button>
+              <button className={'act-b'+(isSaved(a)?' as':'')} onClick={e=>saveArt(a,e)}>Save</button>
+              <button className={'act-b'+(isReadLater(a)?' as':'')} onClick={e=>readLaterArt(a,e)}>Later</button>
+              <button className={'act-b'+(summaries[id]||sumLoading[id]?' ai':'')} onClick={e=>getSummary(id,a.title,a.desc,e)}>AI</button>
+              <button className="act-b" onClick={e=>{e.stopPropagation();clickArt(a);}}>Read</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+  function CompactCard({a,cat}){
+    const cc=CATS[cat]||CATS.general;const id=artId(a);const[imgErr,setImgErr]=useState(false);
+    return(
+      <div className="compact-card" onClick={()=>clickArt(a)}>
+        {a.img&&!imgErr?<img className="compact-thumb" src={a.img} loading="lazy" onError={()=>setImgErr(true)} alt=""/>:<div className="compact-thumb-ph">{cc.label.slice(0,2)}</div>}
+        <div className="compact-body">
+          <div className="compact-title">{isAlert(a)&&<span className="alert-tag" style={{marginRight:4}}>ALERT</span>}{a.title}</div>
+          <div className="compact-meta"><span style={{color:cc.color,fontWeight:600}}>{a.source}</span><span>{fmtDate(a.pubDate)}</span></div>
+          <div className="compact-acts">
+            <button className={'mini-act'+(likes[a.link]===1?' al':'')} onClick={e=>likeArt(a.link,1,e)}>Up</button>
+            <button className={'mini-act'+(isSaved(a)?' as':'')} onClick={e=>saveArt(a,e)}>Save</button>
+            <button className={'mini-act'+(isReadLater(a)?' as':'')} onClick={e=>readLaterArt(a,e)}>Later</button>
+            <button className={'mini-act'+(summaries[id]||sumLoading[id]?' al':'')} onClick={e=>getSummary(id,a.title,a.desc,e)}>AI</button>
+          </div>
+          {summaries[id]&&<div style={{fontSize:10,color:'var(--text2)',marginTop:4,lineHeight:1.5}}>{summaries[id]}</div>}
+        </div>
+      </div>
+    );
+  }
+  function BriefCard({a}){
+    const crossTags=detectCrossTags(a.title,a.desc);const id=artId(a);const[imgErr,setImgErr]=useState(false);
+    const srcInfo=BRIEFING_FEEDS.find(f=>f.name===a.briefSource)||{color:'#92400e'};
+    return(
+      <div className="brief-card" onClick={()=>clickArt(a)}>
+        {a.img&&!imgErr?<img className="brief-card-img" src={a.img} loading="lazy" onError={()=>setImgErr(true)} alt=""/>:<div className="brief-card-img-ph">BR</div>}
+        <div className="brief-card-body">
+          <div className="brief-card-top"><div className="brief-src-dot" style={{background:srcInfo.color}}/><span className="brief-src-name" style={{color:srcInfo.color}}>{a.briefSource||a.source}</span>{isAlert(a)&&<span className="alert-tag">ALERT</span>}<span className="brief-card-date">{fmtDate(a.pubDate)}</span></div>
+          <div className="brief-card-title">{a.title}</div>
+          {a.desc&&<div className="brief-card-desc">{a.desc}</div>}
+          {summaries[id]&&<div className="summary-box"><div className="summary-lbl">AI Summary</div>{summaries[id]}</div>}
+          <div className="brief-card-footer">
+            <div className="brief-cross-tags">{crossTags.map((t,i)=>{const cc=CATS[t.cat];return<span key={i} className="cross-tag" style={{background:cc.bg,color:cc.color}} onClick={e=>{e.stopPropagation();setTab(t.cat);setActiveKw(t.word);}}>{t.word}</span>;})}</div>
+            <div style={{display:'flex',gap:3}}>
+              <button className={'act-b'+(isSaved(a)?' as':'')} onClick={e=>saveArt(a,e)}>Save</button>
+              <button className={'act-b'+(isReadLater(a)?' as':'')} onClick={e=>readLaterArt(a,e)}>Later</button>
+              <button className={'act-b'+(summaries[id]||sumLoading[id]?' ai':'')} onClick={e=>getSummary(id,a.title,a.desc,e)}>AI</button>
+              <button className="act-b" onClick={e=>{e.stopPropagation();clickArt(a);}}>Read</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+  function PodCard({ep,idx}){
+    const id='pod_'+ep.show+'_'+idx;const isSv=isSaved({...ep,link:ep.link||ep.show+idx});const[imgErr,setImgErr]=useState(false);const[showPlayer,setShowPlayer]=useState(false);
+    const audioUrl=ep.link&&(ep.link.includes('.mp3')||ep.link.includes('.m4a'))?ep.link:null;
+    return(
+      <div className="pod-card">
+        {ep.img&&!imgErr?<img className="pod-card-img" src={ep.img} loading="lazy" onError={()=>setImgErr(true)} alt=""/>:<div className="pod-card-img-ph">POD</div>}
+        <div className="pod-card-body">
+          <div className="pod-card-top"><div className="pod-card-num">{idx+1}</div><div className="pod-card-info"><div className="pod-card-show">{ep.show}</div><div className="pod-card-title" onClick={()=>ep.link&&window.open(ep.link,'_blank')}>{ep.title}</div><div className="pod-card-meta"><span>{fmtDate(ep.pubDate)}</span>{ep.duration&&<span>{fmtDuration(ep.duration)}</span>}<span style={{color:'#e11d48'}}>{ep.host}</span></div></div></div>
+          {ep.desc&&<div className="pod-card-desc">{ep.desc}</div>}
+          {showPlayer&&audioUrl&&<div className="mini-player"><audio controls src={audioUrl} style={{flex:1,height:28}}/></div>}
+          {summaries[id]&&<div className="pod-summary"><div className="pod-summary-lbl">AI Summary</div>{summaries[id]}</div>}
+          <div className="pod-card-footer">
+            <button className="pod-btn" onClick={()=>ep.link&&window.open(ep.link,'_blank')}>Listen</button>
+            {audioUrl&&<button className={'pod-btn'+(showPlayer?' ai-active':'')} onClick={()=>setShowPlayer(p=>!p)}>{showPlayer?'Hide':'Play'}</button>}
+            <button className={'pod-btn'+(summaries[id]||sumLoading[id]?' ai-active':'')} onClick={e=>getSummary(id,ep.title,ep.desc,e)}>{sumLoading[id]?'Summarizing...':summaries[id]?'Hide AI':'AI Summary'}</button>
+            <button className={'pod-btn'+(isSv?' saved-btn':'')} onClick={e=>saveArt({...ep,link:ep.link||ep.show+idx,source:ep.show,cat:'podcasts'},e)}>{isSv?'Saved':'Save'}</button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+  function CatPage({cat}){
+    const cc=CATS[cat]||CATS.general;const arts2=sorted(cat);const catKws=kw[cat]||[];
+    return(
+      <div className="main">
+        <div className="main-feed">
+          {activeKw&&(<div style={{display:'flex',alignItems:'center',gap:8,padding:'8px 14px',background:'var(--surface)',borderRadius:10,border:'1px solid var(--border)'}}><span style={{fontSize:12,color:'var(--text2)'}}>Filtered: "{activeKw}" - {arts2.length} results</span><button onClick={()=>setActiveKw('')} style={{marginLeft:'auto',background:'none',border:'1px solid var(--border)',borderRadius:6,padding:'2px 8px',fontSize:11,cursor:'pointer',color:'var(--text3)'}}>Clear</button></div>)}
+          {arts2.length===0?(<div className="no-art"><p className="no-art-msg">{loading[cat]?'Loading '+cc.label+'...':activeKw?'No "'+activeKw+'" articles':'No articles yet'}</p>{!loading[cat]&&<button className="refresh-btn" style={{background:cc.color}} onClick={refreshAll}>Refresh</button>}</div>):
+          compact?(<div className="section">{arts2.slice(0,30).map((a,i)=><CompactCard key={i} a={a} cat={cat}/>)}</div>):
+          (<div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(300px,1fr))',gap:14}}>{arts2.slice(0,15).map((a,i)=><FeedCard key={i} a={a} cat={cat}/>)}</div>)}
+        </div>
+        <div className="sidebar-col">
+          <div className="side-block"><div className="side-title">Trending in {cc.label}</div>{arts2.slice(0,8).map((a,i)=>(<div key={i} className="trend-row" onClick={()=>clickArt(a)}><div className="trend-n">{i+1}</div><div><div className="trend-t">{a.title.slice(0,60)}{a.title.length>60?'...':''}</div><div className="trend-s">{a.source} - {fmtDate(a.pubDate)}</div></div></div>))}</div>
+          <div className="side-block"><div className="side-title">{cc.label} Keywords</div>{catKws.map((k,i)=>(<span key={i} className={'kw-chip'+(activeKw===k?' kw-active':'')} style={{background:cc.bg,color:cc.color}} onClick={()=>setActiveKw(prev=>prev===k?'':k)}>{k}</span>))}</div>
+          <ScoresSection/>
+        </div>
+      </div>
+    );
+  }
+  function TodayPage(){
+    return(
+      <div className="main">
+        <div className="main-feed">
+          {trendingKws().length>0&&(<div className="trending-bar"><span style={{fontSize:10,fontWeight:700,color:'var(--text3)',textTransform:'uppercase',whiteSpace:'nowrap',flexShrink:0}}>Trending</span>{trendingKws().map((t,i)=><span key={i} className={'trend-chip'+(activeKw===t?' active':'')} onClick={()=>setActiveKw(prev=>prev===t?'':t)}>{t}</span>)}</div>)}
+          <div className="follow-section">
+            <div className="follow-title">Your Topics</div>
+            <div className="follow-pills">
+              {['Houston','Astros','Texans','Energy','Oil','AI','Trump','Fed','Kentucky','Clemson','Braves','Markets','LNG','ERCOT','Bloom Energy','Real Estate','NFL','MLB','Data Center','Geopolitics','Entrepreneurship'].map(t=>(
+                <span key={t} className={'follow-pill'+(following.includes(t)?' following':'')} onClick={()=>toggleFollow(t)}>{following.includes(t)?'+ ':''}{t}</span>
+              ))}
+            </div>
+          </div>
+          <HSection cat="general" title="General News" color="#1d4ed8"/>
+          <HSection cat="houston" title="Houston Local" color="#b45309"/>
+          <HSection cat="sports" title="Sports" color="#d97706"/>
+          <HSection cat="business" title="Business" color="#16a34a"/>
+          <HSection cat="finance" title="Finance" color="#7c3aed"/>
+          <HSection cat="bloom" title="Bloom Energy" color="#0369a1"/>
+        </div>
+        <div className="sidebar-col">
+          <ScoresSection/>
+          {readLater.length>0&&(<div className="side-block"><div className="side-title">Read Later ({readLater.length})</div>{readLater.slice(0,5).map((a,i)=>(<div key={i} className="read-later-item" onClick={()=>clickArt(a)}><div className="rl-dot"/><div><div className="rl-title">{a.title.slice(0,60)}{a.title.length>60?'...':''}</div><div className="rl-src">{a.source}</div></div></div>))}{readLater.length>5&&<div style={{fontSize:10,color:'var(--text3)',marginTop:6}}>{readLater.length-5} more in Saved tab</div>}</div>)}
+          <div className="side-block"><div className="side-title">Trending Now</div>{sorted('general').slice(0,6).map((a,i)=>(<div key={i} className="trend-row" onClick={()=>clickArt(a)}><div className="trend-n">{i+1}</div><div><div className="trend-t">{a.title.slice(0,55)}{a.title.length>55?'...':''}</div><div className="trend-s">{a.source} - {fmtDate(a.pubDate)}</div></div></div>))}</div>
+          <div className="side-block"><div className="side-title">Alerts</div>{alerts.map((a,i)=><span key={i} style={{display:'inline-block',background:'#fef2f2',color:'#dc2626',borderRadius:20,padding:'3px 9px',fontSize:10,margin:2,fontWeight:500}}>{a}</span>)}</div>
+          <div className="side-block"><div className="side-title">Social</div>{socialFollows.map((h,i)=>(<div key={i} className="social-row" onClick={()=>window.open('https://twitter.com/'+h.replace('@',''))}><div className="social-av">{h.replace('@','').slice(0,2).toUpperCase()}</div><span className="social-name">{h}</span><span className="social-arr">-></span></div>))}</div>
+        </div>
+      </div>
+    );
+  }
+  function PodcastsPage(){
+    const allEps=[];
+    PODCAST_FEEDS.forEach(p=>{(podEps[p.name]||[]).slice(0,3).forEach(e=>allEps.push({...e,show:p.name,host:p.host}));});
+    allEps.sort((a,b)=>new Date(b.pubDate)-new Date(a.pubDate));
+    const displayEps=activePod?(podEps[activePod.name]||[]).map(e=>({...e,show:activePod.name,host:activePod.host})):allEps;
+    const isLoad=activePod?podLoading[activePod.name]:PODCAST_FEEDS.some(p=>podLoading[p.name]);
+    return(
+      <div className="pod-page">
+        <div className="pod-col">
+          <div className="pod-show-header"><div className="pod-show-info"><div className="pod-show-name">{activePod?activePod.name:'All Podcasts'}</div><div className="pod-show-host">{activePod?'Hosted by '+activePod.host:PODCAST_FEEDS.length+' shows - AI summaries - Inline player'}</div></div>{activePod&&<button style={{background:'rgba(255,255,255,0.2)',border:'none',color:'#fff',borderRadius:6,padding:'4px 10px',cursor:'pointer',fontSize:11,fontFamily:'inherit'}} onClick={()=>setActivePod(null)}>All Shows</button>}</div>
+          {isLoad&&!displayEps.length?<div className="loading-state" style={{padding:40}}>Loading episodes...</div>:displayEps.length===0?<div className="loading-state" style={{padding:40}}>No episodes yet.<br/><button style={{marginTop:12,background:'#e11d48',border:'none',color:'#fff',borderRadius:8,padding:'8px 16px',cursor:'pointer',fontSize:12,fontFamily:'inherit'}} onClick={loadPodcasts}>Retry</button></div>:displayEps.slice(0,20).map((ep,i)=><PodCard key={i} ep={ep} idx={i}/>)}
+        </div>
+        <div className="pod-sidebar"><div className="pod-show-list">
+          <div className="side-title">Shows</div>
+          <div className="pod-show-item" onClick={()=>setActivePod(null)} style={{background:!activePod?'var(--surface2)':''}}><div className="pod-show-item-info"><div className="pod-show-item-name" style={{color:!activePod?'#e11d48':''}}>All Shows</div><div className="pod-show-item-ep">Latest from all {PODCAST_FEEDS.length} shows</div></div>{!activePod&&<div className="pod-show-item-dot"/>}</div>
+          {PODCAST_FEEDS.map((p,i)=>{const eps=podEps[p.name]||[];const latest=eps[0];const isActive=activePod?.name===p.name;return(<div key={i} className="pod-show-item" onClick={()=>setActivePod(isActive?null:p)} style={{background:isActive?'var(--surface2)':''}}><div className="pod-show-item-info"><div className="pod-show-item-name" style={{color:isActive?'#e11d48':''}}>{p.name}</div><div className="pod-show-item-ep">{podLoading[p.name]?'Loading...':(latest?latest.title.slice(0,38)+'...':'No episodes yet')}</div></div>{eps.length>0&&<span style={{fontSize:9,color:'#16a34a',fontWeight:600,flexShrink:0}}>{eps.length}ep</span>}{isActive&&<div className="pod-show-item-dot"/>}</div>);})}
+        </div></div>
+      </div>
+    );
+  }
+  function BriefingPage(){
+    const allArts=allBriefArts();const filtered=activeBriefSource==='all'?allArts:allArts.filter(a=>a.briefSource===activeBriefSource);
+    const isAnyLoading=BRIEFING_FEEDS.some(f=>briefLoading[f.name]);const totalLoaded=BRIEFING_FEEDS.reduce((n,f)=>n+(briefArts[f.name]||[]).length,0);
+    return(
+      <div className="brief-page">
+        <div>
+          <div className="brief-banner"><div className="brief-banner-body"><div className="brief-banner-title">Morning Briefing</div><div className="brief-banner-sub">{BRIEFING_FEEDS.length} sources - {totalLoaded} articles</div></div>{isAnyLoading&&<div style={{fontSize:11,color:'rgba(255,255,255,0.8)'}}>Loading...</div>}</div>
+          <div className="brief-source-tabs"><button className={'brief-tab-btn'+(activeBriefSource==='all'?' active':'')} style={{color:'#92400e'}} onClick={()=>setActiveBriefSource('all')}>All ({allArts.length})</button>{BRIEFING_FEEDS.map(f=>{const count=(briefArts[f.name]||[]).length;const isLoad=briefLoading[f.name];return(<button key={f.name} className={'brief-tab-btn'+(activeBriefSource===f.name?' active':'')} style={{color:f.color}} onClick={()=>setActiveBriefSource(activeBriefSource===f.name?'all':f.name)}>{f.name} {isLoad?'...':'('+count+')'}</button>);})}</div>
+          {filtered.length===0?(<div className="no-art"><p className="no-art-msg">{isAnyLoading?'Loading briefings...':'No briefing articles yet'}</p>{!isAnyLoading&&<button className="refresh-btn" style={{background:'#92400e'}} onClick={loadBriefings}>Retry</button>}</div>):filtered.map((a,i)=><BriefCard key={i} a={a}/>)}
+        </div>
+        <div className="brief-sidebar"><div className="side-block"><div className="side-title">Sources</div>{BRIEFING_FEEDS.map((f,i)=>{const count=(briefArts[f.name]||[]).length;const isLoad=briefLoading[f.name];return(<div key={i} style={{display:'flex',alignItems:'center',gap:8,padding:'6px 0',borderBottom:'1px solid var(--border2)'}}><div style={{flex:1,minWidth:0}}><div style={{fontSize:11,fontWeight:600,color:f.color}}>{f.name}</div><div style={{fontSize:10,color:'var(--text3)'}}>{f.desc}</div></div><span style={{fontSize:10,color:isLoad?'#3b82f6':count>0?'#16a34a':'var(--text3)',fontWeight:600,flexShrink:0}}>{isLoad?'...':count>0?count:'none'}</span></div>);})}</div></div>
+      </div>
+    );
+  }
+  function SavedPage(){
+    const[savedTab,setSavedTab]=useState('saved');const items=savedTab==='saved'?saved:readLater;
+    return(
+      <div className="main">
+        <div className="main-feed">
+          {readLater.length>0&&(<div className="read-later-banner"><div className="rl-banner-text"><div className="rl-banner-title">Read Later - {readLater.length} article{readLater.length!==1?'s':''}</div><div className="rl-banner-sub">Articles flagged to read when you have time</div></div></div>)}
+          <div style={{display:'flex',gap:8,marginBottom:12}}><button onClick={()=>setSavedTab('saved')} className={'brief-tab-btn'+(savedTab==='saved'?' active':'')}>Saved ({saved.length})</button><button onClick={()=>setSavedTab('later')} className={'brief-tab-btn'+(savedTab==='later'?' active':'')}>Read Later ({readLater.length})</button></div>
+          {items.length===0?(<div className="saved-empty"><div style={{fontSize:28,marginBottom:10}}>{ savedTab==='saved'?'Bookmark':'Pin'}</div><div style={{fontSize:13,fontWeight:500,color:'var(--text2)',marginBottom:4}}>{savedTab==='saved'?'No saved items yet':'No read later items'}</div><div style={{fontSize:11,color:'var(--text3)'}}>Tap Save or Later on any article</div></div>):
+          compact?(<div className="section">{items.map((a,i)=>a.cat==='podcasts'?<PodCard key={i} ep={a} idx={i}/>:<CompactCard key={i} a={a} cat={a.cat||'general'}/>)}</div>):
+          (<div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(300px,1fr))',gap:14}}>{items.map((a,i)=>a.cat==='podcasts'?<PodCard key={i} ep={a} idx={i}/>:<FeedCard key={i} a={a} cat={a.cat||'general'}/>)}</div>)}
+        </div>
+        <div className="sidebar-col"><ScoresSection/></div>
+      </div>
+    );
+  }
+  function CustomizePanel(){
+    const[lf,setLf]=useState(JSON.parse(JSON.stringify(feeds)));
+    const[lk,setLk]=useState(JSON.parse(JSON.stringify(kw)));
+    const[la,setLa]=useState([...alerts]);const[ls,setLs]=useState([...socialFollows]);
+    const[srcCat,setSrcCat]=useState('general');const[newName,setNewName]=useState('');const[newUrl,setNewUrl]=useState('');const[testState,setTestState]=useState({});
+    const saveAll=()=>{setFeeds(lf);save('feeds',lf);setKw(lk);save('kw',lk);setAlerts(la);save('alerts',la);setSocialFollows(ls);save('social',ls);setShowPanel(false);refreshAll();};
+    const testFeed=async(url,key)=>{setTestState(s=>({...s,[key]:'loading'}));const items=await fetchRSS(url);setTestState(s=>({...s,[key]:items.length>0?'ok '+items.length+' articles':'fail'}));};
+    const addSrc=()=>{if(!newName.trim()||!newUrl.trim())return;setLf(prev=>{const n=JSON.parse(JSON.stringify(prev));if(!n[srcCat])n[srcCat]=[];n[srcCat].push({name:newName.trim(),url:newUrl.trim(),on:true});return n;});setNewName('');setNewUrl('');};
+    const hdot=(name)=>{const h=health[name];return h==='green'?'hg':h==='yellow'?'hy':h==='red'?'hr':'hx';};
+    const cnt=(cat,name)=>(arts[cat]||[]).filter(a=>a.source===name).length;
+    const catLabels={general:'General',sports:'Sports',business:'Business',finance:'Finance',bloom:'Bloom',briefing:'Briefing'};
+    return(
+      <div className="panel-overlay open"><div className="panel">
+        <div className="panel-head"><span className="panel-htitle">Customize Hub</span><button className="panel-x" onClick={()=>setShowPanel(false)}>X</button></div>
+        <div className="panel-body">
+          <div className="p-sec"><div className="p-lbl">Breaking News Alerts</div><div className="alert-info">Red banner fires when any headline contains these words.</div><div>{la.map((a,i)=><span key={i} className="p-chip p-alert">{a}<button className="p-chip-x" style={{color:'#dc2626'}} onClick={()=>setLa(x=>x.filter((_,j)=>j!==i))}>x</button></span>)}</div><div className="p-add"><input className="p-input" placeholder="Add alert word..." value={newAlert} onChange={e=>setNewAlert(e.target.value)} onKeyDown={e=>{if(e.key==='Enter'&&newAlert.trim()){setLa(x=>[...x,newAlert.trim()]);setNewAlert('');}}}/><button className="p-alert-btn" onClick={()=>{if(newAlert.trim()){setLa(x=>[...x,newAlert.trim()]);setNewAlert('');}}}>Add</button></div></div>
+          <div className="p-sec"><div className="p-lbl">Keywords by Category</div><div className="kw-cat-tabs">{Object.keys(catLabels).map(c=><button key={c} className={'kw-cat-tab'+(kwTab===c?' active':'')} onClick={()=>setKwTab(c)}>{catLabels[c]}</button>)}</div><div>{(lk[kwTab]||[]).map((k,i)=><span key={i} className="p-chip p-kw">{k}<button className="p-chip-x" onClick={()=>setLk(prev=>{const n={...prev};n[kwTab]=n[kwTab].filter((_,j)=>j!==i);return n;})}>x</button></span>)}</div><div className="p-add"><input className="p-input" placeholder={'Add '+kwTab+' keyword...'} value={newKwVal} onChange={e=>setNewKwVal(e.target.value)} onKeyDown={e=>{if(e.key==='Enter'&&newKwVal.trim()){setLk(prev=>{const n={...prev};n[kwTab]=[...(n[kwTab]||[]),newKwVal.trim()];return n;});setNewKwVal('');}}}/><button className="p-add-btn" onClick={()=>{if(newKwVal.trim()){setLk(prev=>{const n={...prev};n[kwTab]=[...(n[kwTab]||[]),newKwVal.trim()];return n;});setNewKwVal('');}}}>Add</button></div></div>
+          {Object.keys(DEFAULT_FEEDS).map(cat=>(
+            <div key={cat} className="p-sec">
+              <div className="p-lbl">{CATS[cat]?.label} Sources</div>
+              <div className="hlegend"><span><span className="hdot hg"/>Loaded</span><span><span className="hdot hy"/>Slow</span><span><span className="hdot hr"/>Failed</span><span><span className="hdot hx"/>Pending</span></div>
+              {(lf[cat]||[]).map((f,i)=>{const tk=cat+'_'+i;const ts=testState[tk];const c=cnt(cat,f.name);return(<div key={i}><div className="p-row"><span className={'hdot '+hdot(f.name)}/><span className="p-name">{f.name}</span>{c>0&&<span className="p-count">{c} art</span>}<button className="test-btn" onClick={()=>testFeed(f.url,tk)}>Test</button><button className={'tog'+(f.on?' on':' off')} onClick={()=>setLf(prev=>{const n=JSON.parse(JSON.stringify(prev));n[cat][i].on=!n[cat][i].on;return n;})}/><button className="p-del" onClick={()=>setLf(prev=>{const n=JSON.parse(JSON.stringify(prev));n[cat].splice(i,1);return n;})}>X</button></div>{ts&&<div className={'tresult'+(ts==='loading'?' tload':ts.startsWith('ok')?' tok':' tfail')}>{ts==='loading'?'Testing...':(ts.startsWith('ok')?'OK: '+ts.replace('ok ',''):'Failed')}</div>}</div>);})}
+              <div className="add-src-box"><div className="add-src-lbl">Add source to {CATS[cat]?.label}</div><input className="p-input-sm" placeholder="Source name" value={srcCat===cat?newName:''} onChange={e=>{setSrcCat(cat);setNewName(e.target.value);}}/><input className="p-input-sm" placeholder="RSS URL" value={srcCat===cat?newUrl:''} onChange={e=>{setSrcCat(cat);setNewUrl(e.target.value);}}/><div style={{display:'flex',gap:6}}><button className="test-btn" style={{flex:1}} onClick={()=>{const u=(srcCat===cat?newUrl:'').trim();if(u)testFeed(u,'new_'+cat);}}>Test URL</button><button className="p-add-btn" style={{flex:1}} onClick={()=>{setSrcCat(cat);addSrc();}}>Add Source</button></div>{testState['new_'+cat]&&<div className={'tresult'+(testState['new_'+cat]==='loading'?' tload':testState['new_'+cat].startsWith('ok')?' tok':' tfail')}>{testState['new_'+cat]==='loading'?'Testing...':(testState['new_'+cat].startsWith('ok')?'OK: '+testState['new_'+cat].replace('ok ',''):'Failed')}</div>}</div>
+            </div>
+          ))}
+          <div className="p-sec"><div className="p-lbl">Social Follows</div><div>{ls.map((s,i)=><span key={i} className="p-chip p-so">{s}<button className="p-chip-x" style={{color:'#166534'}} onClick={()=>setLs(x=>x.filter((_,j)=>j!==i))}>x</button></span>)}</div><div className="p-add"><input className="p-input" placeholder="@handle" value={newSocial} onChange={e=>setNewSocial(e.target.value)} onKeyDown={e=>{if(e.key==='Enter'&&newSocial.trim()){setLs(x=>[...x,newSocial.trim()]);setNewSocial('');}}}/><button className="p-add-btn" onClick={()=>{if(newSocial.trim()){setLs(x=>[...x,newSocial.trim()]);setNewSocial('');}}}>Add</button></div></div>
+          <button className="p-save" onClick={saveAll}>Save and Refresh</button>
+        </div>
+      </div></div>
+    );
+  }
+  return(
+    <>
+      <style>{css}</style>
+      <div className={'hub'+(dark?' dark':'')}>
+        <div className="topbar"><div className="topbar-inner">
+          <div className="logo">My<span>News</span>Hub<span className="logo-dot"/></div>
+          <div className="nav-tabs">
+            {[{id:'today',label:'Today'},{id:'general',label:'General'},{id:'sports',label:'Sports'},{id:'business',label:'Business'},{id:'finance',label:'Finance'},{id:'bloom',label:'Bloom'},{id:'houston',label:'Houston'},{id:'briefing',label:'Briefing'},{id:'podcasts',label:'Podcasts'},{id:'social',label:'Social'},{id:'saved',label:'Saved'}].map(t=>(
+              <button key={t.id} className={'nav-tab'+(tab===t.id?' active':'')} onClick={()=>{setTab(t.id);setActiveKw('');setSearch('');if(MAIN_CATS.includes(t.id)&&!(arts[t.id]||[]).length)loadCat(t.id);}}>
+                {t.label}{t.id==='saved'&&(saved.length+readLater.length)>0?' ('+(saved.length+readLater.length)+')':''}
+              </button>
+            ))}
+          </div>
+          <div className="topbar-right">
+            <div className="search-wrap"><span className="search-icon">Search</span><input className="search" placeholder="Search..." value={search} onChange={e=>{setSearch(e.target.value);setActiveKw('');}}/></div>
+            <button className="compact-toggle" onClick={()=>setCompact(c=>!c)}>{compact?'Full':'Compact'}</button>
+            <button className="btn-icon" onClick={refreshAll}>Refresh</button>
+            <button className="btn-icon" onClick={()=>setDark(d=>!d)}>{dark?'Light':'Dark'}</button>
+            <button className="btn-blue" onClick={()=>setShowPanel(true)}>Customize</button>
+          </div>
+        </div></div>
+        <WeatherBar/>
+        {breaking&&(<div className="breaking show"><div className="breaking-inner"><span className="breaking-badge">BREAKING</span><span className="breaking-text">{breaking.title} - {breaking.source}</span><button className="breaking-x" onClick={()=>setBreaking(null)}>X</button></div></div>)}
+        {(tab==='today'||MAIN_CATS.includes(tab))&&(
+          <div className="hero-carousel">
+            {heroes.length===0?<div className="hero-bg-ph">NEWS</div>:heroes.map((a,i)=>{
+              const cc=CATS[a.cat]||CATS.general;const id=artId(a);
+              return(
+                <div key={i} className={'hero-slide'+(i===heroIdx?' active':'')}>
+                  {a.img?<img className="hero-bg" src={a.img} alt=""/>:<div className="hero-bg-ph">{cc.label}</div>}
+                  <div className="hero-overlay"/>
+                  <div className="hero-content">
+                    <span className="hero-cat" style={{background:cc.color,color:'#fff'}}>{cc.label}</span>
+                    <div className="hero-title" onClick={()=>clickArt(a)}>{a.title}</div>
+                    <div className="hero-meta"><span className="hero-src">{a.source}</span><span className="hero-date">{fmtDate(a.pubDate)}</span></div>
+                    <div className="hero-acts">
+                      <button className="hero-act" onClick={()=>clickArt(a)}>Read</button>
+                      <button className={'hero-act'+(isSaved(a)?' as':'')} onClick={e=>saveArt(a,e)}>{isSaved(a)?'Saved':'Save'}</button>
+                      <button className={'hero-act'+(isReadLater(a)?' as':'')} onClick={e=>readLaterArt(a,e)}>Later</button>
+                      <button className="hero-act" onClick={e=>getSummary(id,a.title,a.desc,e)}>{sumLoading[id]?'Generating...':summaries[id]?'Hide AI':'AI Summary'}</button>
+                    </div>
+                    {summaries[id]&&<div style={{marginTop:8,background:'rgba(0,0,0,0.65)',borderRadius:8,padding:'8px 12px',fontSize:12,color:'#e9d5ff',lineHeight:1.6,maxWidth:600}}>{summaries[id]}</div>}
+                  </div>
+                </div>
+              );
+            })}
+            {heroes.length>0&&<><button className="hero-nav prev" onClick={()=>{setHeroIdx(i=>(i-1+heroes.length)%heroes.length);if(heroTimer.current)clearInterval(heroTimer.current);}}>Prev</button><button className="hero-nav next" onClick={()=>{setHeroIdx(i=>(i+1)%heroes.length);if(heroTimer.current)clearInterval(heroTimer.current);}}>Next</button><div className="hero-dots">{heroes.map((_,i)=><div key={i} className={'hero-dot'+(i===heroIdx?' active':'')} onClick={()=>setHeroIdx(i)}/>)}</div></>}
+          </div>
+        )}
+        {tickerHeadlines().length>0&&(
+          <div className="ticker"><div className="ticker-inner"><div className="ticker-label">LIVE</div><div style={{overflow:'hidden',flex:1}}><div className="ticker-track">{[...tickerHeadlines(),...tickerHeadlines()].map((a,i)=><span key={i} className="ticker-item" onClick={()=>clickArt(a)}>{a.title} - </span>)}</div></div></div>
+        )}
+        {tab==='today'&&<TodayPage/>}
+        {MAIN_CATS.includes(tab)&&<CatPage cat={tab}/>}
+        {tab==='briefing'&&<div style={{maxWidth:1400,margin:'0 auto',padding:16}}><BriefingPage/></div>}
+        {tab==='podcasts'&&<div style={{maxWidth:1400,margin:'0 auto',padding:16}}><PodcastsPage/></div>}
+        {tab==='social'&&<SocialPage getSummary={getSummary} summaries={summaries} sumLoading={sumLoading} saveArt={saveArt} isSaved={isSaved} readLaterArt={readLaterArt} isReadLater={isReadLater}/>}
+        {tab==='saved'&&<SavedPage/>}
+        {showPanel&&<CustomizePanel/>}
+      </div>
+    </>
+  );
+}
