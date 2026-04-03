@@ -1331,7 +1331,7 @@ const TodayPage=()=>{
     return(
       <div className="main">
         <div className="main-feed">
-          {trends.length>0&&(<div className="trending-bar"><span className="trending-lbl">Trending</span>{trends.map((t,i)=><span key={i} className={`trend-chip${activeKw===t?' active':''}`} onClick={()=>setActiveKw(prev=>prev===t?'':t)}>{t}</span>)}</div>)}
+          {trendingKws().length>0&&(<div className="trending-bar"><span className="trending-lbl">Trending</span>{{trendingKws().map((t,i)=><span key={i} className={`trend-chip${activeKw===t?' active':''}`} onClick={()=>setActiveKw(prev=>prev===t?'':t)}>{t}</span>)}</div>)}
           <div className="follow-section">
             <div className="follow-title">Your Topics</div>
             <div className="follow-pills">
