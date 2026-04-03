@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 
 const SK='v12_';
 function load(k,def){try{const v=localStorage.getItem(SK+k);return v?JSON.parse(v):def;}catch{return def;}}
@@ -1326,8 +1326,8 @@ export default function NewsHub(){
     );
   };
 
-  const TodayPage=()=>{
-    const trends=trendingKws();
+const TodayPage=()=>{
+    const trends=useMemo(()=>trendingKws(),[arts,briefArts]);
     return(
       <div className="main">
         <div className="main-feed">
