@@ -1,4 +1,4 @@
-import{useState,useEffect,useCallback,useRef}from"react";
+import React {useState,useEffect,useCallback,useRef}from"react";
 const SK='v12_';
 function load(k,def){try{const v=localStorage.getItem(SK+k);return v?JSON.parse(v):def;}catch{return def;}}
 function save(k,v){try{localStorage.setItem(SK+k,JSON.stringify(v));}catch{}}
