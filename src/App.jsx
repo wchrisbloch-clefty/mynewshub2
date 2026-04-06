@@ -1,269 +1,29 @@
-import React,{useState,useEffect,useCallback,useRef}from"react";
-
-const SK = 'v12_';
-function load(k, def) { try { const v = localStorage.getItem(SK + k); return v ? JSON.parse(v) : def; } catch { return def; } }
-function save(k, v) { try { localStorage.setItem(SK + k, JSON.stringify(v)); } catch {} }
-
-const CATS = { /* unchanged from your original */ };
-const CROSS_TAGS = { /* unchanged */ };
-const DEFAULT_STOCKS = ['BE', 'CL=F', 'BTC-USD', 'NG=F'];
-const DEFAULT_YT = [ /* unchanged */ ];
-const YT_CATS = [ /* unchanged */ ];
-const DEFAULT_TWITTER = [ /* unchanged */ ];
-const PODCAST_FEEDS = [ /* unchanged */ ];
-const BRIEFING_FEEDS = [ /* unchanged */ ];
-const HOUSTON_FEEDS = [ /* unchanged */ ];
-const DEFAULT_KW = { /* unchanged */ };
-const DEFAULT_FEEDS = { /* unchanged */ };
-const WX_CODES = { /* unchanged */ };
-const SPORT_TABS = [ /* unchanged */ ];
-const MAIN_CATS = ['general', 'sports', 'business', 'finance', 'bloom', 'houston'];
-
-// Helper functions (parseXML, fetchRSS, fetchPodcast, fmtDate, etc.) — kept exactly as in your original for compatibility
-// ... (paste all your original helper functions here: detectCrossTags, readTime, extractImg, parseXML, fetchRSS, fetchPodcast, fmtDate, fmtDuration, artId, etc.)
-
-// StockBar, WeatherBar, ScoresSection — kept mostly original, minor tweaks for mobile
-
-function StockBar() { /* your original StockBar with minor mobile padding adjustments */ }
-function WeatherBar() { /* your original */ }
-function ScoresSection() { /* your original */ }
-
-// New: Morning Digest component
-function MorningDigest({ arts, briefArts, kw }) {
-  const digestText = useMemo(() => {
-    // Simple client-side "digest" — in production, call your /api/summarize with combined top headlines
-    const topHeadlines = [
-      ...Object.values(arts).flat().slice(0, 5),
-      ...Object.values(briefArts).flat().slice(0, 3)
-    ].map(a => a.title).slice(0, 8);
-    return "Morning brief: " + topHeadlines.join(" • ") + ". Focus on energy, Houston, and your teams today.";
-  }, [arts, briefArts]);
-
-  return (
-    <div style={{background: 'linear-gradient(135deg, #1d4ed8, #3b82f6)', color: '#fff', borderRadius: 12, padding: 16, marginBottom: 16}}>
-      <div style={{fontSize: 13, fontWeight: 700, marginBottom: 4}}>Good morning, Chris • Your Digest</div>
-      <div style={{fontSize: 12, lineHeight: 1.5, opacity: 0.9}}>{digestText}</div>
-      <button style={{marginTop: 10, background: '#fff', color: '#1d4ed8', border: 'none', borderRadius: 6, padding: '6px 12px', fontSize: 11, fontWeight: 600}}
-        onClick={() => alert('Full AI digest coming — call your summarize API here with top headlines')}>
-        Generate Full AI Brief
-      </button>
-    </div>
-  );
-}
-
-// Enhanced SocialPage
-function SocialPage({ getSummary, summaries, sumLoading, saveArt, isSaved, readLaterArt, isReadLater }) {
-  const [ytChannels] = useState(() => load('yt_channels', DEFAULT_YT));
-  const [twitterAccounts] = useState(() => load('tw_accounts', DEFAULT_TWITTER));
-  const [ytFilter, setYtFilter] = useState('all');
-  const [ytVideos, setYtVideos] = useState({});
-  const [ytLoading, setYtLoading] = useState(false);
-
-  // Load YouTube (your original logic)
-  const loadYt = useCallback(async () => { /* your original loadYt */ }, []);
-
-  useEffect(() => { loadYt(); }, [loadYt]);
-
-  const allVideos = Object.values(ytVideos).flat().sort((a, b) => new Date(b.pubDate) - new Date(a.pubDate));
-  const filteredVideos = ytFilter === 'all' ? allVideos : allVideos.filter(v => v.category === ytFilter);
-
-  // Placeholder for mixed social feed (extend with real X fetch later)
-  const mixedSocial = useMemo(() => {
-    return [...filteredVideos.slice(0, 6), ...twitterAccounts.slice(0, 4).map(acc => ({
-      title: `Latest from @${acc.handle}`,
-      link: `https://twitter.com/${acc.handle}`,
-      desc: `${acc.label} updates`,
-      img: '',
-      source: 'X',
-      cat: 'social'
-    }))];
-  }, [filteredVideos, twitterAccounts]);
-
-  return (
-    <div className="social-page" style={{padding: 16}}>
-      <div className="social-header"> {/* your original header */} </div>
-
-      {/* New: Unified Latest Social */}
-      <div style={{marginBottom: 24}}>
-        <div style={{fontSize: 15, fontWeight: 700, marginBottom: 12}}>Latest from Social</div>
-        <div className="yt-grid">
-          {mixedSocial.slice(0, 12).map((item, i) => (
-            <div key={i} className="yt-card" onClick={() => window.open(item.link, '_blank')}>
-              {/* card rendering similar to FeedCard for consistency */}
-              <div style={{padding: 12}}>
-                <div style={{fontWeight: 700}}>{item.title}</div>
-                <div style={{fontSize: 11, color: '#888', marginTop: 4}}>{item.source}</div>
-                <div className="yt-card-acts" style={{marginTop: 10}}>
-                  <button onClick={e => { e.stopPropagation(); window.open(item.link, '_blank'); }}>Open</button>
-                  <button onClick={e => { e.stopPropagation(); getSummary(artId(item), item.title, item.desc, e); }}>AI</button>
-                </div>
-              </div>
-            </div>
-          ))}
-        </div>
-      </div>
-
-      {/* Rest of your original Social sections (YouTube filters, Twitter grid, LinkedIn) remain */}
-      {/* ... your original SocialPage content ... */}
-    </div>
-  );
-}
-
-// Enhanced PodcastsPage
-function PodcastsPage({ podEps, podLoading, activePod, setActivePod, getSummary, summaries, sumLoading, saveArt, isSaved }) {
-  const [queue, setQueue] = useState(() => load('pod_queue', []));
-  const [nowPlaying, setNowPlaying] = useState(null);
-
-  const allEps = useMemo(() => {
-    let eps = [];
-    PODCAST_FEEDS.forEach(p => {
-      (podEps[p.name] || []).forEach(e => eps.push({ ...e, show: p.name, host: p.host }));
-    });
-    return eps.sort((a, b) => new Date(b.pubDate) - new Date(a.pubDate));
-  }, [podEps]);
-
-  // Continue Listening (last 2 with progress simulation)
-  const continueListening = useMemo(() => allEps.slice(0, 2), [allEps]);
-
-  return (
-    <div className="pod-page">
-      {/* New: Continue Listening Banner */}
-      {continueListening.length > 0 && (
-        <div style={{background: '#e11d48', color: '#fff', padding: 14, borderRadius: 12, marginBottom: 16}}>
-          <div style={{fontWeight: 700}}>Continue Listening</div>
-          {continueListening.map((ep, i) => (
-            <div key={i} style={{marginTop: 8, display: 'flex', gap: 10, alignItems: 'center'}}>
-              <button onClick={() => setNowPlaying(ep)}>▶ {ep.title.slice(0, 40)}...</button>
-            </div>
-          ))}
-        </div>
-      )}
-
-      {/* Rest of your Podcasts UI with added queue and sticky mini-player if nowPlaying */}
-      {/* ... your original PodcastsPage content ... */}
-
-      {/* Sticky Mini Player (mobile friendly) */}
-      {nowPlaying && (
-        <div style={{position: 'fixed', bottom: 0, left: 0, right: 0, background: '#161b22', padding: 12, borderTop: '1px solid #333', zIndex: 400}}>
-          <audio controls autoPlay src={nowPlaying.link} style={{width: '100%'}} />
-          <button onClick={() => setNowPlaying(null)}>Close</button>
-        </div>
-      )}
-    </div>
-  );
-}
-
-// Main NewsHub component with layout improvements
-export default function NewsHub() {
-  // All your original state variables...
-
-  const [lastVisit, setLastVisit] = useState(() => load('lastVisit', Date.now()));
-  const isMobile = typeof window !== 'undefined' && window.innerWidth < 900;
-
-  // Time-of-day logic for smart defaults
-  const hour = new Date().getHours();
-  const isMorning = hour < 10;
-
-  // Collapsible state for mobile sections
-  const [collapsed, setCollapsed] = useState({});
-
-  const toggleCollapse = (cat) => setCollapsed(c => ({ ...c, [cat]: !c[cat] }));
-
-  // Enhanced TodayPage with Morning Digest and collapsible sections
-  function TodayPage() {
-    return (
-      <div className="main">
-        <div className="main-feed">
-          <MorningDigest arts={arts} briefArts={briefArts} kw={kw} />
-
-          {/* Your Topics — made scrollable chips */}
-          <div className="follow-section">
-            <div className="follow-title">Your Topics</div>
-            <div style={{display: 'flex', overflowX: 'auto', gap: 8, padding: '8px 0'}}>
-              {['Houston','Astros','Texans','Energy','Oil','AI','Trump','Fed','Kentucky','Clemson','Bloom Energy'].map(t => (
-                <span key={t} className={'follow-pill' + (following.includes(t) ? ' following' : '')} onClick={() => toggleFollow(t)}>
-                  {t}
-                </span>
-              ))}
-            </div>
-          </div>
-
-          {/* Collapsible sections on mobile */}
-          {MAIN_CATS.map(cat => {
-            const arts2 = sorted(cat);
-            const cc = CATS[cat] || CATS.general;
-            const isCol = collapsed[cat] !== false; // default open
-            return (
-              <div key={cat} className="section" style={{marginBottom: 16}}>
-                <div className="section-head" onClick={isMobile ? () => toggleCollapse(cat) : undefined} style={{cursor: isMobile ? 'pointer' : 'default'}}>
-                  <div className="section-label">
-                    <div className="section-dot" style={{background: cc.color}} /> {cc.label} <span className="section-count">{arts2.length}</span>
-                  </div>
-                  {isMobile && <span>{isCol ? '▼' : '▶'}</span>}
-                </div>
-                {(!isMobile || isCol) && (
-                  <div className="h-row">
-                    {arts2.slice(0, 8).map((a, i) => <PicCard key={i} a={a} cat={cat} wide={i===0} />)}
-                  </div>
-                )}
-              </div>
-            );
-          })}
-        </div>
-
-        {/* Sidebar or Floating Quick View on mobile */}
-        <div className="sidebar-col">
-          <ScoresSection />
-          {/* Trending, Read Later, Alerts — your original sidebar content */}
-        </div>
-
-        {/* Mobile floating button for Quick View */}
-        {isMobile && (
-          <button style={{position: 'fixed', bottom: 80, right: 20, background: '#1d4ed8', color: '#fff', borderRadius: '50%', width: 56, height: 56, fontSize: 24, boxShadow: '0 4px 12px rgba(0,0,0,0.3)'}}
-            onClick={() => alert('Quick View: Scores + Trending — expand this into a bottom sheet in future')}>
-            📊
-          </button>
-        )}
-      </div>
-    );
-  }
-
-  // Rest of your original NewsHub component (CatPage, BriefingPage, SavedPage, CustomizePanel, hero, ticker, etc.)
-  // Apply similar mobile tweaks to hero height, card sizes, etc.
-
-  // In return statement:
-  return (
-    <>
-      <style>{css /* add your updated CSS with mobile media queries below */}</style>
-      <div className={'hub' + (dark ? ' dark' : '')}>
-        {/* Your topbar, StockBar, WeatherBar, breaking banner — unchanged */}
-
-        {/* Hero with reduced mobile height via CSS */}
-
-        {tab === 'today' && <TodayPage />}
-        {MAIN_CATS.includes(tab) && <CatPage cat={tab} />}
-        {/* other tabs */}
-
-        {/* Add pull-to-refresh hint or logic if desired */}
-      </div>
-    </>
-  );
-}
-
-// Updated CSS additions (append to your existing css string)
-const extraCSS = `
-@media (max-width: 900px) {
-  :root { --hero-h: 280px; }
-  .main { grid-template-columns: 1fr; padding: 12px; gap: 12px; }
-  .h-row { gap: 12px; padding: 12px 0; }
-  .pic-card { width: 260px; }
-  .section-head { padding: 14px 16px; }
-  .follow-pills { flex-wrap: nowrap; overflow-x: auto; }
-}
-
-/* Sticky mini player styles already in Podcasts */
-`;
-
-// Paste your full original css + extraCSS
-
-// Note: For full ERCOT widget or real X RSS, add a new fetch function using public ERCOT API endpoints (e.g., grid conditions) and a Twitter RSS proxy if needed.
+import React,{useState,useEffect,useCallback,useMemo,useRef}from"react";
+const SK='v12_';
+function load(k,def){try{const v=localStorage.getItem(SK+k);return v?JSON.parse(v):def;}catch{return def;}}
+function save(k,v){try{localStorage.setItem(SK+k,JSON.stringify(v));}catch{}}
+const CATS={general:{label:'General',color:'#1d4ed8',bg:'#eff6ff'},sports:{label:'Sports',color:'#d97706',bg:'#fef3c7'},business:{label:'Business',color:'#16a34a',bg:'#f0fdf4'},finance:{label:'Finance',color:'#7c3aed',bg:'#f5f3ff'},bloom:{label:'Bloom Energy',color:'#0369a1',bg:'#e0f2fe'},houston:{label:'Houston',color:'#b45309',bg:'#fffbeb'},briefing:{label:'Briefing',color:'#92400e',bg:'#fef3c7'},podcasts:{label:'Podcasts',color:'#e11d48',bg:'#fff1f2'},social:{label:'Social',color:'#0ea5e9',bg:'#e0f2fe'}};
+const CROSS_TAGS={business:['energy','oil','gas','ERCOT','LNG','power','refinery','petrochemical','data center','infrastructure'],finance:['market','stock','Fed','inflation','interest rate','investing','economy','earnings','crypto','real estate'],general:['Houston','Texas','Trump','Congress','White House','Iran','tariff','geopolitical','election'],bloom:['Bloom Energy','fuel cell','hydrogen','microgrid','distributed power','clean energy'],sports:['Texans','Astros','Braves','Kentucky','Clemson','NFL','MLB','NBA']};
+function detectCrossTags(title,desc){const text=(title+(desc||'')).toLowerCase();const tags=[];Object.entries(CROSS_TAGS).forEach(([cat,words])=>{words.forEach(w=>{if(text.includes(w.toLowerCase()))tags.push({cat,word:w});});});const seen=new Set();return tags.filter(t=>{if(seen.has(t.cat))return false;seen.add(t.cat);return true;});}
+function readTime(desc){if(!desc)return'1 min';return Math.max(1,Math.round((desc||'').split(' ').length/200))+' min read';}
+function extractImg(html){if(!html)return'';const m=html.match(/<img[^>]+src=["']([^"']+)["']/i);return m?m[1]:'';}
+function parseXML(txt){try{const p=new DOMParser(),x=p.parseFromString(txt,'text/xml');const items=Array.from(x.querySelectorAll('item')).slice(0,15);if(!items.length)return[];return items.map(i=>{const desc=(i.querySelector('description')?.textContent||'');const cleanDesc=desc.replace(/<[^>]*>/g,'').replace(/&amp;/g,'&').replace(/&nbsp;/g,' ').trim().slice(0,350);const img=i.querySelector('enclosure')?.getAttribute('url')||extractImg(desc)||'';const dur=i.querySelector('duration')?.textContent||'';return{title:(i.querySelector('title')?.textContent||'').trim(),link:i.querySelector('link')?.textContent||'',desc:cleanDesc,pubDate:i.querySelector('pubDate')?.textContent||'',img,duration:dur};}).filter(i=>i.title&&i.link);}catch{return[];}}
+async function fetchRSS(url){try{const r=await Promise.race([fetch('/api/rss?url='+encodeURIComponent(url)),new Promise((_,rej)=>setTimeout(()=>rej('t'),8000))]);if(r.ok){const txt=await r.text();const items=parseXML(txt);if(items.length>0)return items;}}catch{}try{const r=await Promise.race([fetch('https://api.rss2json.com/v1/api.json?rss_url='+encodeURIComponent(url)+'&count=15'),new Promise((_,rej)=>setTimeout(()=>rej('t'),8000))]);const d=await r.json();if(d.status==='ok'&&d.items?.length>0){return d.items.map(i=>({title:(i.title||'').trim(),link:i.link||'',desc:(i.description||i.content||'').replace(/<[^>]*>/g,'').replace(/&amp;/g,'&').trim().slice(0,350),pubDate:i.pubDate||'',img:i.thumbnail||extractImg(i.description||'')||'',duration:i.itunes_duration||''})).filter(i=>i.title&&i.link);}}catch{}try{const r=await Promise.race([fetch('https://api.allorigins.win/get?url='+encodeURIComponent(url)),new Promise((_,rej)=>setTimeout(()=>rej('t'),8000))]);const d=await r.json();if(d.contents){const items=parseXML(d.contents);if(items.length>0)return items;}}catch{}return[];}
+async function fetchPodcast(url){try{const r=await Promise.race([fetch('/api/rss?url='+encodeURIComponent(url)),new Promise((_,rej)=>setTimeout(()=>rej('t'),12000))]);if(r.ok){const txt=await r.text();const items=parseXML(txt);if(items.length>0)return items;}}catch{}try{const r=await Promise.race([fetch('https://api.rss2json.com/v1/api.json?rss_url='+encodeURIComponent(url)+'&count=10'),new Promise((_,rej)=>setTimeout(()=>rej('t'),12000))]);const d=await r.json();if(d.status==='ok'&&d.items?.length>0){return d.items.map(i=>({title:(i.title||'').trim(),link:i.link||i.enclosure?.link||'',desc:(i.description||i.content||'').replace(/<[^>]*>/g,'').trim().slice(0,400),pubDate:i.pubDate||'',img:i.thumbnail||d.feed?.image||'',duration:i.itunes_duration||''})).filter(i=>i.title);}}catch{}return[];}
+function fmtDate(d){if(!d)return'';try{const dt=new Date(d);if(isNaN(dt.getTime()))return'';const now=new Date(),diff=Math.floor((now-dt)/1000);const days=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];const months=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];const dayName=days[dt.getDay()],mon=months[dt.getMonth()],date=dt.getDate();let h=dt.getHours(),m=dt.getMinutes(),ampm=h>=12?'PM':'AM';h=h%12||12;const mm=m<10?'0'+m:m;const timeStr=h+':'+mm+' '+ampm;if(diff<60)return'Just now';if(diff<3600)return Math.floor(diff/60)+'m ago';if(diff<86400)return dayName+' '+timeStr;if(diff<604800)return dayName+' - '+mon+' '+date;return mon+' '+date;}catch{return'';}}
+function fmtDuration(s){if(!s)return'';const parts=s.split(':').map(Number);if(parts.length===3){const[h,m]=parts;return h>0?h+'h '+m+'m':m+'m';}if(parts.length===2){return parts[0]+'m';}const tot=parseInt(s);if(isNaN(tot))return s;const h=Math.floor(tot/3600),m=Math.floor((tot%3600)/60);return h>0?h+'h '+m+'m':m+'m';}
+function artId(a){return btoa((a.link||'x').slice(0,40)).replace(/[^a-z0-9]/gi,'').slice(0,12);}
+const DEFAULT_STOCKS=['BE','CL=F','BTC-USD','NG=F'];
+const DEFAULT_YT=[{name:'ESPN',channelId:'UCiWLfSweyRNmLpgEHekhoAg',category:'sports'},{name:'NFL',channelId:'UCB12jqis1Ml8NQoOzLjycBg',category:'sports'},{name:'MLB',channelId:'UCoLrcjPV5PbUrUyXf5MJ7Xw',category:'sports'},{name:'Bleacher Report',channelId:'UCNSxRCbCkFYmCqQxn0xMHBQ',category:'sports'},{name:'Kentucky Athletics',channelId:'UCqr_Kp7GCmN0KHFiXcwmIoA',category:'sports'},{name:'Houston Astros',channelId:'UCZFNnLMjfBaFaOBLDLzNGLw',category:'sports'},{name:'Fox News',channelId:'UCXIJgqnII2ZOINSWNOGFThA',category:'news'},{name:'Fox Business',channelId:'UCF9IOB2TExg3QIBupFtBDxg',category:'news'},{name:'Newsmax',channelId:'UCx6h-dWzJ5NpAlja1YsApdg',category:'news'},{name:'Breitbart',channelId:'UCysEngjfeIYapEER9K8aikQ',category:'news'},{name:'Epoch Times',channelId:'UC0q_0GVd3KCLT5KRXmW4GFQ',category:'news'},{name:'Tim Pool',channelId:'UCG749Dj4V2fKa143f8sE60Q',category:'news'},{name:'Redacted',channelId:'UCf7pMDKGvvfTbSoKzHaAqsA',category:'news'},{name:'Tucker Carlson',channelId:'UCNjKf5DkSgSWWm5_xCu9jXQ',category:'news'},{name:'Russell Brand',channelId:'UCo3HvSHyMxBShmdSrWe-C-A',category:'news'},{name:'Glenn Beck',channelId:'UCyVZ9bBIyGFJRyXMNYAhBhQ',category:'news'},{name:'Timcast IRL',channelId:'UCe02lGcO-ahAURWuxAJnjdA',category:'news'},{name:'CNBC',channelId:'UCvJJ_dzjViJCoLf5uKUTwoA',category:'business'},{name:'Bloomberg',channelId:'UCIALMKvObZNtJ6AmdCLP7Lg',category:'business'},{name:'Bloom Energy',channelId:'UCyC3mAfSGJb2-woJMHMjEAg',category:'business'},{name:'Patrick Bet-David',channelId:'UCZFv3YtBD7nHfuRKKiOuFyA',category:'business'},{name:'Valuetainment',channelId:'UCnqv3pfaYorwvsqpia6lMrg',category:'business'},{name:'Lex Fridman',channelId:'UCSHZKyawb77ixDdsGog4iWA',category:'tech'},{name:'AI Explained',channelId:'UCNJ1Ymd5yFuUPtn21xtRbbw',category:'tech'},{name:'Fireship',channelId:'UCsBjURrPoezykLs9EqgamOA',category:'tech'},{name:'My First Million',channelId:'UCuZTEW7HmYBYFjXBJKn3o1g',category:'entrepreneur'},{name:'Gary Vee',channelId:'UCktlDNRTv9plsRbv45rBgaw',category:'entrepreneur'},{name:'Alex Hormozi',channelId:'UCg6IE5tCQzByFBWzj7UNtBw',category:'entrepreneur'},{name:'Joe Rogan',channelId:'UCnxGkOGNMqe8UqkJsVKwrdg',category:'podcasts'},{name:'Ben Shapiro',channelId:'UCnQC_G5Yjc2jCQpvNwznBXQ',category:'podcasts'},{name:'All-In Podcast',channelId:'UCESLZhusAkFfsNsApnjF_Cg',category:'podcasts'},{name:'Morning Wire',channelId:'UCSTJcXGMFgHlSq2gTLIXNBA',category:'podcasts'},{name:'Andrew Schulz',channelId:'UCzWQYUVCpZqtN93H8RR44Qw',category:'podcasts'}];
+const YT_CATS=[{id:'all',label:'All'},{id:'news',label:'News'},{id:'sports',label:'Sports'},{id:'business',label:'Business'},{id:'tech',label:'Tech'},{id:'entrepreneur',label:'Entrepreneur'},{id:'podcasts',label:'Podcasts'}];
+const DEFAULT_TWITTER=[{handle:'HoustonTexans',label:'Houston Texans',category:'sports'},{handle:'astros',label:'Houston Astros',category:'sports'},{handle:'KentuckyMBB',label:'Kentucky Basketball',category:'sports'},{handle:'ClemsonFB',label:'Clemson Football',category:'sports'},{handle:'BloomEnergy',label:'Bloom Energy',category:'business'},{handle:'ExxonMobil',label:'ExxonMobil',category:'business'},{handle:'Lex_Fridman',label:'Lex Fridman',category:'tech'},{handle:'TimPool',label:'Tim Pool',category:'news'},{handle:'TuckerCarlson',label:'Tucker Carlson',category:'news'},{handle:'PatrickBetDavid',label:'Patrick Bet-David',category:'business'},{handle:'AlexHormozi',label:'Alex Hormozi',category:'entrepreneur'},{handle:'realDonaldTrump',label:'Donald Trump',category:'news'}];
+const DEFAULT_LINKEDIN=[{name:'Bloom Energy',url:'https://www.linkedin.com/company/bloom-energy',category:'energy'},{name:'ExxonMobil',url:'https://www.linkedin.com/company/exxonmobil',category:'energy'},{name:'Valero Energy',url:'https://www.linkedin.com/company/valero-energy',category:'energy'},{name:'Marathon Petroleum',url:'https://www.linkedin.com/company/marathon-petroleum',category:'energy'},{name:'Chevron',url:'https://www.linkedin.com/company/chevron',category:'energy'},{name:'Stepan Company',url:'https://www.linkedin.com/company/stepan-company',category:'energy'},{name:'OpenAI',url:'https://www.linkedin.com/company/openai',category:'tech'},{name:'Anthropic',url:'https://www.linkedin.com/company/anthropic',category:'tech'},{name:'NVIDIA',url:'https://www.linkedin.com/company/nvidia',category:'tech'},{name:'Microsoft',url:'https://www.linkedin.com/company/microsoft',category:'tech'}];
+const PODCAST_FEEDS=[{name:'Joe Rogan Experience',host:'Joe Rogan',url:'https://feeds.megaphone.fm/GLT1412515089'},{name:'Ben Shapiro Show',host:'Ben Shapiro',url:'https://feeds.megaphone.fm/BVDWV5370667266'},{name:'Tucker Carlson Show',host:'Tucker Carlson',url:'https://feeds.megaphone.fm/RSV1597324942'},{name:'Candace',host:'Candace Owens',url:'https://feeds.megaphone.fm/candace'},{name:'Morning Wire Podcast',host:'Daily Wire',url:'https://feeds.megaphone.fm/BVDWV8747925072'},{name:'All-In Podcast',host:'Chamath and Besties',url:'https://allinchamathjason.libsyn.com/rss'},{name:'Flagrant',host:'Andrew Schulz',url:'https://feeds.megaphone.fm/APPI6857213837'}];
+const BRIEFING_FEEDS=[{name:'Axios News',url:'https://api.axios.com/feed/',color:'#e05c1a',desc:'Top stories'},{name:'Axios Energy',url:'https://api.axios.com/feed/energy/',color:'#e05c1a',desc:'Energy news'},{name:'Axios Houston',url:'https://api.axios.com/feed/houston/',color:'#e05c1a',desc:'Houston news'},{name:'Bloomberg',url:'https://feeds.bloomberg.com/politics/news.rss',color:'#1d4ed8',desc:'Markets and politics'},{name:'Morning Brew',url:'https://feeds.feedburner.com/morningbrew/uqaH',color:'#2563eb',desc:'Business digest'},{name:'Morning Wire',url:'https://feeds.megaphone.fm/BVDWV8747925072',color:'#7c3aed',desc:'Daily Wire briefing'},{name:'API Brief',url:'https://feeds.feedburner.com/ApiToday',color:'#92400e',desc:'Petroleum Institute'}];
+const HOUSTON_FEEDS=[{name:'KHOU Houston',url:'https://www.khou.com/feeds/syndication/rss/news',on:true},{name:'Click2Houston',url:'https://www.click2houston.com/rss/news.rss',on:true},{name:'Chron.com',url:'https://www.chron.com/rss/feed/News-270.php',on:true},{name:'Axios Houston',url:'https://api.axios.com/feed/houston/',on:true}];
+const DEFAULT_KW={general:['Houston','Texas','Trump','Congress','White House','geopolitical','AI','tech','Iran','tariffs'],sports:['Texans','Astros','Braves','Kentucky','Clemson','NFL','MLB','NCAAB','NCAAF','recruiting'],business:['energy','oil','gas','data center','ERCOT','LNG','power grid','onshoring','AI','infrastructure'],finance:['investing','real estate','stock market','interest rates','Fed','inflation','crypto','portfolio'],bloom:['Bloom Energy','fuel cell','hydrogen','microgrid','distributed power','data center','onshoring','industrial energy','utility','ERCOT'],briefing:['energy','Houston','economy','markets','AI','tariffs','Fed','oil','gas','tech','petroleum','pipeline'],houston:['Houston','Harris County','HISD','mayor','Astros','Texans','weather','flooding','rodeo']};
+const DEFAULT_FEEDS={general:[{name:'BBC News',url:'https://feeds.bbci.co.uk/news/rss.xml',on:true},{name:'Reuters Top News',url:'https://feeds.reuters.com/reuters/topNews',on:true},{name:'CNBC Top News',url:'https://www.cnbc.com/id/100003114/device/rss/rss.html',on:true},{name:'Fox News',url:'https://moxie.foxnews.com/google-publisher/latest.xml',on:true},{name:'NY Post',url:'https://nypost.com/feed/',on:true},{name:'The Hill',url:'https://thehill.com/homenews/feed/',on:true},{name:'TechCrunch',url:'https://techcrunch.com/feed/',on:true},{name:'The Guardian US',url:'https://www.theguardian.com/us/rss',on:true},{name:'Axios',url:'https://api.axios.com/feed/',on:true},{name:'Breitbart',url:'https://feeds.feedburner.com/breitbart',on:true}],sports:[{name:'ESPN NFL',url:'https://www.espn.com/espn/rss/nfl/news',on:true},{name:'ESPN MLB',url:'https://www.espn.com/espn/rss/mlb/news',on:true},{name:'ESPN CFB',url:'https://www.espn.com/espn/rss/ncf/news',on:true},{name:'ESPN CBB',url:'https://www.espn.com/espn/rss/ncb/news',on:true},{name:'CBS Sports NFL',url:'https://www.cbssports.com/rss/headlines/nfl',on:true},{name:'CBS Sports MLB',url:'https://www.cbssports.com/rss/headlines/mlb',on:true},{name:'Pro Football Talk',url:'https://www.nbcsports.com/profootballtalk.rss',on:true},{name:'Bleacher Report',url:'https://feeds.bleacherreport.com/articles/feed',on:true},{name:'Kentucky Sports Radio',url:'https://kentuckysportsradio.com/feed/',on:true},{name:'On3 Recruiting',url:'https://www.on3.com/feed/',on:true}],business:[{name:'Reuters Business',url:'https://feeds.reuters.com/reuters/businessNews',on:true},{name:'CNBC Energy',url:'https://www.cnbc.com/id/10000664/device/rss/rss.html',on:true},{name:'Oilprice.com',url:'https://oilprice.com/rss/main',on:true},{name:'Utility Dive',url:'https://www.utilitydive.com/feeds/news/',on:true},{name:'Data Center Dynamics',url:'https://www.datacenterdynamics.com/en/rss/',on:true},{name:'Power Magazine',url:'https://www.powermag.com/feed/',on:true},{name:'Rigzone',url:'https://www.rigzone.com/news/rss/rigzone_latest.aspx',on:true},{name:'MIT Tech Review',url:'https://www.technologyreview.com/feed/',on:true},{name:'AI News',url:'https://artificialintelligence-news.com/feed/',on:true},{name:'Canary Media',url:'https://www.canarymedia.com/rss',on:true}],finance:[{name:'MarketWatch',url:'https://feeds.marketwatch.com/marketwatch/topstories/',on:true},{name:'Yahoo Finance',url:'https://finance.yahoo.com/news/rssindex',on:true},{name:'Kiplinger',url:'https://www.kiplinger.com/rss/all',on:true},{name:'Motley Fool',url:'https://www.fool.com/feeds/index.aspx',on:true},{name:'BiggerPockets',url:'https://www.biggerpockets.com/blog/feed',on:true},{name:'CNBC Finance',url:'https://www.cnbc.com/id/10000664/device/rss/rss.html',on:true}],bloom:[{name:'Oilprice.com',url:'https://oilprice.com/rss/main',on:true},{name:'Utility Dive',url:'https://www.utilitydive.com/feeds/news/',on:true},{name:'Data Center Dynamics',url:'https://www.datacenterdynamics.com/en/rss/',on:true},{name:'Power Magazine',url:'https://www.powermag.com/feed/',on:true},{name:'Reuters Business',url:'https://feeds.reuters.com/reuters/businessNews',on:true},{name:'MIT Tech Review',url:'https://www.technologyreview.com/feed/',on:true},{name:'AI News',url:'https://artificialintelligence-news.com/feed/',on:true}]};
+const WX_CODES={0:'Clear',1:'Mostly Clear',2:'Partly Cloudy',3:'Overcast',45:'Foggy',61:'Light Rain',63:'Rain',65:'Heavy Rain',71:'Light Snow',73:'Snow',80:'Showers',95:'Thunderstorm'};
+const SPORT_TABS=[{id:'mlb',label:'MLB'},{id:'nfl',label:'NFL'},{id:'ncaab',label:'NCAAB'},{id:'ncaaf',label:'NCAAF'},{id:'golf',label:'Golf'}];
+const MAIN_CATS=['general','sports','business','finance','bloom','houston'];
+const css=`*{box-sizing:border-box;margin:0;padding:0;}:root{--bg:#f0f2f5;--surface:#fff;--surface2:#f8f9fa;--border:#e2e5ea;--border2:#f0f2f5;--text:#0d1117;--text2:#57606a;--text3:#8b949e;--nav:#fff;--search:#f0f2f5;--accent:#1d4ed8;--hero-h:420px;--card-radius:12px;}.dark{--bg:#0d1117;--surface:#161b22;--surface2:#21262d;--border:#30363d;--border2:#21262d;--text:#e6edf3;--text2:#8b949e;--text3:#484f58;--nav:#161b22;--search:#21262d;}body{background:var(--bg);font-family:-apple-system,BlinkMacSystemFont,Segoe UI,sans-serif;color:var(--text);}.hub{min-height:100vh;}.topbar{background:var(--nav);border-bottom:1px solid var(--border);padding:0 16px;position:sticky;top:0;z-index:300;box-shadow:0 1px 8px rgba(0,0,0,0.06);}.topbar-inner{max-width:1400px;margin:0 auto;display:flex;align-items:center;gap:10px;height:52px;}.logo{font-size:17px;font-weight:800;color:var(--text);flex-shrink:0;}.logo span{color:#1d4ed8;}.logo-dot{width:6px;height:6px;border-radius:50%;background:#e11d48;display:inline-block;margin-left:2px;vertical-align:middle;}.nav-tabs{display:flex;gap:1px;flex:1;overflow-x:auto;scrollbar-width:none;}.nav-tabs::-webkit-scrollbar{display:none;}.nav-tab{background:transparent;border:none;color:var(--text3);padding:6px 11px;cursor:pointer;font-size:12px;font-weight:500;white-space:nowrap;font-family:inherit;border-radius:8px;}.nav-tab.active{color:var(--accent);background:#eff6ff;font-weight:600;}.topbar-right{display:flex;gap:6px;align-items:center;flex-shrink:0;}.search-wrap{position:relative;}.search{background:var(--search);border:1px solid var(--border);color:var(--text);border-radius:20px;padding:6px 12px 6px 32px;font-size:12px;width:150px;font-family:inherit;}.search:focus{outline:none;border-color:var(--accent);width:200px;}.search-icon{position:absolute;left:10px;top:50%;transform:translateY(-50%);font-size:12px;color:var(--text3);pointer-events:none;}.btn-icon{background:var(--search);border:1px solid var(--border);color:var(--text2);border-radius:8px;padding:6px 10px;cursor:pointer;font-size:13px;font-family:inherit;}.btn-blue{background:var(--accent);border:none;color:#fff;border-radius:8px;padding:6px 14px;cursor:pointer;font-size:12px;font-weight:600;font-family:inherit;}.compact-toggle{background:var(--search);border:1px solid var(--border);color:var(--text2);border-radius:8px;padding:5px 10px;cursor:pointer;font-size:11px;font-family:inherit;font-weight:500;}.stock-bar{background:#0a0e1a;padding:4px 16px;overflow-x:auto;scrollbar-width:none;border-bottom:1px solid #1e293b;}.stock-bar::-webkit-scrollbar{display:none;}.stock-inner{max-width:1400px;margin:0 auto;display:flex;gap:20px;align-items:center;min-height:26px;}.stock-label{font-size:9px;font-weight:700;color:#475569;text-transform:uppercase;flex-shrink:0;}.stock-item{display:flex;align-items:center;gap:5px;flex-shrink:0;}.stock-sym{font-size:10px;font-weight:700;color:#94a3b8;}.stock-price{font-size:11px;font-weight:700;color:#e2e8f0;}.stock-chg{font-size:10px;font-weight:600;}.stock-up{color:#22c55e;}.stock-dn{color:#ef4444;}.stock-add-wrap{margin-left:auto;display:flex;gap:6px;align-items:center;flex-shrink:0;}.stock-input{background:#1e293b;border:1px solid #334155;color:#e2e8f0;border-radius:4px;padding:2px 6px;font-size:10px;width:72px;font-family:inherit;}.stock-btn{background:#1d4ed8;border:none;color:#fff;border-radius:4px;padding:2px 8px;font-size:10px;cursor:pointer;font-family:inherit;}.stock-rm{background:#334155;border:none;color:#94a3b8;border-radius:4px;padding:2px 6px;font-size:10px;cursor:pointer;font-family:inherit;}.wx-bar{background:linear-gradient(135deg,#1e3a5f,#0369a1);padding:6px 16px;overflow-x:auto;scrollbar-width:none;}.wx-bar::-webkit-scrollbar{display:none;}.wx-inner{max-width:1400px;margin:0 auto;display:flex;gap:20px;align-items:center;}.wx-city{display:flex;align-items:center;gap:8px;flex-shrink:0;}.wx-temp{font-size:15px;font-weight:700;color:#fff;}.wx-name{font-size:10px;color:rgba(255,255,255,0.7);text-transform:uppercase;}.wx-cond{font-size:10px;color:rgba(255,255,255,0.8);}.wx-divider{width:1px;height:28px;background:rgba(255,255,255,0.2);flex-shrink:0;}.wx-detail{font-size:10px;color:rgba(255,255,255,0.75);}.wx-add{background:rgba(255,255,255,0.15);border:1px solid rgba(255,255,255,0.3);color:#fff;border-radius:6px;padding:3px 8px;font-size:10px;cursor:pointer;font-family:inherit;}.ticker{background:#0d1117;padding:5px 0;overflow:hidden;}.ticker-inner{display:flex;align-items:center;}.ticker-label{background:#e11d48;color:#fff;font-size:9px;font-weight:700;padding:2px 8px;white-space:nowrap;flex-shrink:0;margin-right:12px;}.ticker-track{display:flex;white-space:nowrap;animation:ticker 40s linear infinite;}.ticker-track:hover{animation-play-state:paused;}@keyframes ticker{0%{transform:translateX(0);}100%{transform:translateX(-50%);}}.ticker-item{font-size:11px;color:#e6edf3;padding:0 24px;display:inline-block;cursor:pointer;}.breaking{background:#dc2626;display:none;padding:6px 16px;}.breaking.show{display:block;}.breaking-
