@@ -1343,7 +1343,6 @@ function FeedCard({a,cat,isSaved,onSave,onRead,relatedSources,selectMode,isSelec
     </div>
   );
 }
-
 function TeamModal({team,onClose}){
   if(!team)return null;
   const espnUrl=TEAM_URLS[team]||`https://www.espn.com/search/results?q=${encodeURIComponent(team)}`;
@@ -1360,7 +1359,6 @@ function TeamModal({team,onClose}){
     </div>
   );
 }
-
 function Sidebar({cat,arts,kw,health,activeKw,setActiveKw,activeSource,setActiveSource,onRead,followedTeams,onTeamClick,breakingItems,generalArts}){
   const cc=CATS[cat]||CATS.general;
   const catKws=kw[cat]||[];
@@ -1384,7 +1382,6 @@ function Sidebar({cat,arts,kw,health,activeKw,setActiveKw,activeSource,setActive
     </div>
   );
 }
-
 function SourceFooter({cat,feeds,arts}){
   let sources=[];
   if(!cat){const seen=new Set();Object.values(feeds).flat().forEach(f=>{if(f.on&&!seen.has(f.name)&&SOURCE_URLS[f.name]){seen.add(f.name);sources.push(f);}});const allArts=Object.values(arts).flat(),counts={};allArts.forEach(a=>{counts[a.source]=(counts[a.source]||0)+1;});sources.sort((a,b)=>(counts[b.name]||0)-(counts[a.name]||0));sources=sources.slice(0,18);}
@@ -1392,7 +1389,6 @@ function SourceFooter({cat,feeds,arts}){
   if(!sources.length)return null;
   return(<div className="src-footer"><div className="sf-lbl">Sources</div><div className="sf-links">{sources.map((f,i)=><span key={f.name} style={{display:'inline-flex',alignItems:'center'}}><a className="sf-link" href={SOURCE_URLS[f.name]} target="_blank" rel="noreferrer" onClick={e=>e.stopPropagation()}>{f.name}</a>{i<sources.length-1&&<span className="sf-sep">·</span>}</span>)}</div></div>);
 }
-
 const CAT_LABELS={general:'🌐 General',sports:'🏆 Sports',business:'⚡ Business',finance:'📈 Finance',bloom:'🔋 Bloom',comedy:'😂 Comedy'};
 function CustomizePanel({feeds,kw,alerts,health,arts,followedTeams,onClose,onSave}){
   const[lf,setLf]=useState(JSON.parse(JSON.stringify(feeds)));
@@ -1459,7 +1455,6 @@ function CustomizePanel({feeds,kw,alerts,health,arts,followedTeams,onClose,onSav
     </div>
   );
 }
-
 export default function App(){
   const[tab,setTab]=useState('today');
   const[search,setSearch]=useState('');
