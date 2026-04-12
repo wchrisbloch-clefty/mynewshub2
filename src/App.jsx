@@ -220,6 +220,17 @@ body{background:var(--bg);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI
 .feed-col{display:flex;flex-direction:column;gap:12px;}
 @media(max-width:900px){.page-grid{grid-template-columns:1fr;}.sidebar{display:none;}}
 @media(max-width:600px){.page{padding:12px 14px;}}
+.mob-fab{display:none;position:fixed;bottom:20px;right:20px;z-index:400;background:#1d4ed8;border:none;color:#fff;border-radius:50%;width:52px;height:52px;font-size:20px;cursor:pointer;box-shadow:0 4px 16px rgba(29,78,216,.4);align-items:center;justify-content:center;transition:transform .15s;}
+.mob-fab:hover{transform:scale(1.08);}
+@media(max-width:900px){.mob-fab{display:flex;}}
+.mob-drawer-ov{display:none;position:fixed;inset:0;background:rgba(10,15,30,.5);z-index:450;backdrop-filter:blur(3px);}
+.mob-drawer-ov.open{display:block;}
+.mob-drawer{position:fixed;top:0;right:0;bottom:0;width:300px;max-width:90vw;background:var(--surface);z-index:460;overflow-y:auto;transform:translateX(100%);transition:transform .25s cubic-bezier(.4,0,.2,1);box-shadow:-8px 0 32px rgba(0,0,0,.15);}
+.mob-drawer.open{transform:translateX(0);}
+.mob-drawer-hd{padding:16px 18px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;background:var(--surface);z-index:10;}
+.mob-drawer-ttl{font-size:13px;font-weight:800;color:var(--text);}
+.mob-drawer-x{background:none;border:none;font-size:20px;cursor:pointer;color:var(--text3);line-height:1;}
+.mob-drawer-body{padding:14px 16px;display:flex;flex-direction:column;gap:12px;}
 .hero-wrap{border-radius:var(--radius);overflow:hidden;background:var(--surface);border:1px solid var(--border);margin-bottom:4px;}
 .hero-main{position:relative;cursor:pointer;display:block;}
 .hero-img{width:100%;height:320px;object-fit:cover;display:block;}
@@ -648,11 +659,10 @@ function CustomizePanel({feeds,kw,alerts,health,arts,followedTeams,onClose,onSav
           </div>}
           {activeSection==='teams'&&<div>
             <div className="cp-sec-ttl">My Teams</div>
-            <div className="cp-desc">Your followed teams appear at the top of the Sports sidebar and in a strip above the Sports feed. Tap any team to see their ESPN page, schedule, roster, and latest news.</div>
+            <div className="cp-desc">Your followed teams appear at the top of the Sports sidebar. Tap any team pill to open ESPN schedule, roster, and news.</div>
             <div className="cp-chips">{lt.map((t,i)=><span key={i} className="cp-chip cp-tm">{t}<button className="cp-cx" onClick={()=>setLt(x=>x.filter((_,j)=>j!==i))}>✕</button></span>)}{!lt.length&&<span style={{fontSize:'11px',color:'var(--text3)'}}>No teams followed yet</span>}</div>
             <div className="cp-add"><input className="cp-inp" placeholder="Team name (e.g. Texans, Lakers...)" value={newTeam} onChange={e=>setNewTeam(e.target.value)} onKeyDown={e=>{if(e.key==='Enter'&&newTeam.trim()){setLt(x=>[...x,newTeam.trim()]);setNewTeam('');}}}/>
             <button className="cp-btn cp-btn-amber" onClick={()=>{if(newTeam.trim()){setLt(x=>[...x,newTeam.trim()]);setNewTeam('');}}}>Follow</button></div>
-            <div style={{marginTop:'14px',padding:'10px 12px',background:'var(--bg)',borderRadius:'8px',fontSize:'11px',color:'var(--text2)',lineHeight:'1.6'}}><strong>Tip:</strong> Tap any team pill in Sports to open ESPN schedule, roster, and news.</div>
           </div>}
           {activeSection==='sources'&&<div>
             <div className="cp-sec-ttl">Sources</div>
@@ -701,6 +711,7 @@ export default function App(){
   const[selectMode,setSelectMode]=useState(false);
   const[selected,setSelected]=useState([]);
   const[teamModal,setTeamModal]=useState(null);
+  const[mobDrawer,setMobDrawer]=useState(false);
 
   useEffect(()=>{sv('dark',dark);document.body.className=dark?'dark':'';},[dark]);
   useEffect(()=>{sv('saved',saved);},[saved]);
@@ -759,7 +770,7 @@ export default function App(){
   const shareSelected=()=>{const text=selected.map(a=>`${a.title}\n${a.link}`).join('\n\n');if(navigator.share){navigator.share({text}).catch(()=>{});}else{navigator.clipboard.writeText(text).then(()=>alert('Copied!'));}};
   const handleTickerClick=t=>{setSearch(t.label.toLowerCase());const map={'Bloom Energy':'bloom','Crude Oil':'business','Bitcoin':'finance'};if(map[t.label])handleTabChange(map[t.label]);};
   const handleCustomizeSave=({feeds:nf,kw:nk,alerts:na,followedTeams:nt})=>{setFeeds(nf);sv('feeds',nf);setKw(nk);sv('kw',nk);setAlerts(na);sv('alerts',na);setFollowedTeams(nt);sv('teams',nt);setShowPanel(false);refreshAll();};
-  const handleTabChange=t=>{setTab(t);setSearch('');setActiveKw(null);setActiveSrc(null);setSelectMode(false);setSelected([]);if(!['today','saved','podcasts'].includes(t)&&!(arts[t]||[]).length)loadCat(t);};
+  const handleTabChange=t=>{setTab(t);setSearch('');setActiveKw(null);setActiveSrc(null);setSelectMode(false);setSelected([]);setMobDrawer(false);if(!['today','saved','podcasts'].includes(t)&&!(arts[t]||[]).length)loadCat(t);};
   const getRelated=(a,cat)=>{const matched=kwMatch(a,cat);if(!matched.length)return[];return(arts[cat]||[]).filter(x=>x.link!==a.link&&matched.some(k=>(x.title+(x.desc||'')).toLowerCase().includes(k.toLowerCase()))).slice(0,4);};
   const NEWS_CATS=['general','sports','business','finance','bloom','comedy'];
 
@@ -778,9 +789,7 @@ export default function App(){
           <div className="feed-col">
             <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:'2px'}}>
               <span style={{fontSize:'10px',fontWeight:'800',color:'var(--text3)',textTransform:'uppercase',letterSpacing:'.09em'}}>{cc.emoji} {cc.label}{items.length>0?` — ${items.length} articles`:''}</span>
-              <div style={{display:'flex',gap:'6px',alignItems:'center'}}>
-                <button style={{fontSize:'10px',fontWeight:'700',background:'none',border:'1px solid var(--border)',borderRadius:'6px',padding:'3px 9px',cursor:'pointer',color:'var(--text3)',fontFamily:'inherit'}} onClick={()=>{setSelectMode(!selectMode);setSelected([]);}}>{selectMode?'Cancel':'Select'}</button>
-              </div>
+              <button style={{fontSize:'10px',fontWeight:'700',background:'none',border:'1px solid var(--border)',borderRadius:'6px',padding:'3px 9px',cursor:'pointer',color:'var(--text3)',fontFamily:'inherit'}} onClick={()=>{setSelectMode(!selectMode);setSelected([]);}}>{selectMode?'Cancel':'Select'}</button>
             </div>
             {(activeKw||activeSrc)&&<div style={{display:'flex',gap:'6px',flexWrap:'wrap',marginBottom:'4px'}}>
               {activeKw&&<span style={{background:cc.bg,color:cc.color,borderRadius:'20px',padding:'4px 12px',fontSize:'10px',fontWeight:'700',display:'inline-flex',alignItems:'center',gap:'6px'}}>🔍 {activeKw}<button onClick={()=>setActiveKw(null)} style={{background:'none',border:'none',cursor:'pointer',color:'inherit',fontSize:'13px',padding:0}}>✕</button></span>}
@@ -880,11 +889,30 @@ export default function App(){
       {tab==='podcasts'&&<PodcastsPage/>}
       {tab==='saved'&&<SavedPage/>}
       {showPanel&&<CustomizePanel feeds={feeds} kw={kw} alerts={alerts} health={health} arts={arts} followedTeams={followedTeams} onClose={()=>setShowPanel(false)} onSave={handleCustomizeSave}/>}
-      {teamModal&&<TeamModal team={teamModal} onClose={()=>setTeamModal
-        {tab==='podcasts'&&<PodcastsPage/>}
-      {tab==='saved'&&<SavedPage/>}
-      {showPanel&&<CustomizePanel feeds={feeds} kw={kw} alerts={alerts} health={health} arts={arts} followedTeams={followedTeams} onClose={()=>setShowPanel(false)} onSave={handleCustomizeSave}/>}
       {teamModal&&<TeamModal team={teamModal} onClose={()=>setTeamModal(null)}/>}
+      {NEWS_CATS.includes(tab)&&(
+        <button className="mob-fab" onClick={()=>setMobDrawer(true)}>☰</button>
+      )}
+      <div className={`mob-drawer-ov ${mobDrawer?'open':''}`} onClick={()=>setMobDrawer(false)}>
+        <div className={`mob-drawer ${mobDrawer?'open':''}`} onClick={e=>e.stopPropagation()}>
+          <div className="mob-drawer-hd">
+            <span className="mob-drawer-ttl">{NEWS_CATS.includes(tab)?`${CATS[tab]?.emoji||''} ${CATS[tab]?.label||'Topics'}`:'Topics'}</span>
+            <button className="mob-drawer-x" onClick={()=>setMobDrawer(false)}>✕</button>
+          </div>
+          <div className="mob-drawer-body">
+            {NEWS_CATS.includes(tab)&&(
+              <Sidebar
+                cat={tab} arts={arts} kw={kw} health={health}
+                activeKw={activeKw} setActiveKw={k=>{setActiveKw(k);setActiveSrc(null);setMobDrawer(false);}}
+                activeSource={activeSrc} setActiveSource={s=>{setActiveSrc(s);setActiveKw(null);setMobDrawer(false);}}
+                onRead={a=>{onRead(a);setMobDrawer(false);}}
+                followedTeams={followedTeams} onTeamClick={t=>{setTeamModal(t);setMobDrawer(false);}}
+                breakingItems={breakingItems.filter(a=>a.cat===tab)}
+              />
+            )}
+          </div>
+        </div>
+      </div>
     </div></>
   );
 }
