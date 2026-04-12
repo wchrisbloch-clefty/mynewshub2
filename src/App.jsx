@@ -875,13 +875,13 @@ export default function App(){
     <><style>{CSS}</style>
     <div className={`hub${dark?' dark':''}`}>
       <TopBar tab={tab} setTab={handleTabChange} search={search} setSearch={setSearch} dark={dark} setDark={setDark} onCustomize={()=>setShowPanel(true)} onRefresh={refreshAll} breakingItems={breakingItems} onTickerClick={handleTickerClick}/>
-      return(
-    <><style>{CSS}</style>
-    <div className={`hub${dark?' dark':''}`}>
-      <TopBar tab={tab} setTab={handleTabChange} search={search} setSearch={setSearch} dark={dark} setDark={setDark} onCustomize={()=>setShowPanel(true)} onRefresh={refreshAll} breakingItems={breakingItems} onTickerClick={handleTickerClick}/>
       {tab==='today'&&<TodayPage/>}
       {NEWS_CATS.includes(tab)&&<FeedPage cat={tab}/>}
       {tab==='podcasts'&&<PodcastsPage/>}
+      {tab==='saved'&&<SavedPage/>}
+      {showPanel&&<CustomizePanel feeds={feeds} kw={kw} alerts={alerts} health={health} arts={arts} followedTeams={followedTeams} onClose={()=>setShowPanel(false)} onSave={handleCustomizeSave}/>}
+      {teamModal&&<TeamModal team={teamModal} onClose={()=>setTeamModal
+        {tab==='podcasts'&&<PodcastsPage/>}
       {tab==='saved'&&<SavedPage/>}
       {showPanel&&<CustomizePanel feeds={feeds} kw={kw} alerts={alerts} health={health} arts={arts} followedTeams={followedTeams} onClose={()=>setShowPanel(false)} onSave={handleCustomizeSave}/>}
       {teamModal&&<TeamModal team={teamModal} onClose={()=>setTeamModal(null)}/>}
