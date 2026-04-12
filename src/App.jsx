@@ -723,7 +723,6 @@ function CustomizePanel({feeds,kw,alerts,health,arts,followedTeams,onClose,onSav
     </div>
   );
 }
-
 export default function App(){
   const[tab,setTab]=useState('today');
   const[search,setSearch]=useState('');
@@ -735,7 +734,6 @@ export default function App(){
   const[feeds,setFeeds]=useState(()=>ld('feeds',DEFAULT_FEEDS));
   const[followedTeams,setFollowedTeams]=useState(()=>ld('teams',DEFAULT
                                                         import { useState, useEffect, useCallback } from "react";
-
 const CATS={
   general:{label:'General',color:'#1d4ed8',bg:'#eff6ff',emoji:'🌐'},
   sports:{label:'Sports',color:'#d97706',bg:'#fef3c7',emoji:'🏆'},
