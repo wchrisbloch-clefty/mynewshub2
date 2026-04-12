@@ -881,3 +881,10 @@ export default function App(){
       {tab==='saved'&&<SavedPage/>}
       {showPanel&&<CustomizePanel feeds={feeds} kw={kw} alerts={alerts} health={health} arts={arts} followedTeams={followedTeams} onClose={()=>setShowPanel(false)} onSave={handleCustomizeSave}/>}
       {teamModal&&<TeamModal team={teamModal} onClose={()=>setTeamModal
+{tab==='podcasts'&&<PodcastsPage/>}
+      {tab==='saved'&&<SavedPage/>}
+      {showPanel&&<CustomizePanel feeds={feeds} kw={kw} alerts={alerts} health={health} arts={arts} followedTeams={followedTeams} onClose={()=>setShowPanel(false)} onSave={handleCustomizeSave}/>}
+      {teamModal&&<TeamModal team={teamModal} onClose={()=>setTeamModal(null)}/>}
+    </div></>
+  );
+}
