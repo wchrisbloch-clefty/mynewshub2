@@ -671,7 +671,7 @@ function CustomizePanel({ feeds, kw, alerts, health, arts, onClose, onSave }) {
             </div>
             <div className="cp-add">
               <input className="cp-input" placeholder={`Add ${kwTab} keyword...`} value={newKw} onChange={e=>setNewKw(e.target.value)} onKeyDown={e=>{if(e.key==='Enter'&&newKw.trim()){setLk(p=>{const n={...p};n[kwTab]=[...(n[kwTab]||[]),newKw.trim()];return n;});setNewKw('');}}}/>
-              <button className="cp-btn" onClick={()=>{if(newKw.trim()){setLk(p=>{const n={...p};n[kwTab]=[...(n[kwTab]||[]),newKw.trim()];return n;});setNewKw('');}}>Add</button>
+              <button className="cp-btn" onClick={()=>{ if(newKw.trim()){ setLk(p=>{ const n={...p}; n[kwTab]=[...(n[kwTab]||[]),newKw.trim()]; return n; }); setNewKw(''); } }}>Add</button>
             </div>
           </div>
           <div className="cp-sec">
