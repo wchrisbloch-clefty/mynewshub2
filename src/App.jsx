@@ -476,7 +476,7 @@ body:JSON.stringify({model:‘claude-sonnet-4-20250514’,max_tokens:1000,
 messages:[{role:‘user’,content:`Summarize this news article in 2-3 concise sentences. Be direct and factual. Title: ${a.title}. Content: ${a.desc||''}`}]})});
 const data = await resp.json();
 setSummary(data.content?.[0]?.text || ‘Summary unavailable.’);
-} catch { setSummary(‘Summary unavailable — check connection.’); }
+} catch { setSummary(‘Summary unavailable  -  check connection.’); }
 setLoadingSum(false);
 };
 
@@ -653,7 +653,7 @@ const countBySource=(cat,name)=>(arts[cat]||[]).filter(a=>a.source===name).lengt
 
 const TestResult=({tkey})=>{
 const ts=testState[tkey];if(!ts)return null;
-return <div className={`cp-test-result ${ts==='loading'?'cp-test-load':ts.startsWith('ok')?'cp-test-ok':'cp-test-fail'}`}>{ts===‘loading’?‘Testing…’:ts.startsWith(‘ok’)?`✓ ${ts.replace('ok:','')}`:‘✗ Failed — feed may be blocked’}</div>;
+return <div className={`cp-test-result ${ts==='loading'?'cp-test-load':ts.startsWith('ok')?'cp-test-ok':'cp-test-fail'}`}>{ts===‘loading’?‘Testing…’:ts.startsWith(‘ok’)?`✓ ${ts.replace('ok:','')}`:‘✗ Failed  -  feed may be blocked’}</div>;
 };
 
 return (
@@ -790,7 +790,7 @@ const q=quotes[t.sym];const up=q?q.chg>=0:null;
 return (
 <div key={t.sym} className=“ticker-item” onClick={()=>onTickerClick&&onTickerClick(t)}>
 <span className="ticker-sym" style={{color:t.color}}>{t.sym}</span>
-{q?(<><span className="ticker-price">${q.price.toLocaleString(‘en-US’,{minimumFractionDigits:2,maximumFractionDigits:2})}</span><span className={`ticker-chg ${up?'ticker-up':'ticker-down'}`}>{up?‘▲’:‘▼’} {Math.abs(q.pct).toFixed(2)}%</span></>):<span className="ticker-price">—</span>}
+{q?(<><span className="ticker-price">${q.price.toLocaleString(‘en-US’,{minimumFractionDigits:2,maximumFractionDigits:2})}</span><span className={`ticker-chg ${up?'ticker-up':'ticker-down'}`}>{up?‘▲’:‘▼’} {Math.abs(q.pct).toFixed(2)}%</span></>):<span className="ticker-price"> - </span>}
 </div>
 );
 })}
@@ -945,7 +945,7 @@ return (
 <div className="page-grid">
 <div className="feed-col">
 <div style={{display:‘flex’,alignItems:‘center’,justifyContent:‘space-between’,marginBottom:‘4px’}}>
-<span className="page-header">{cc.emoji} {cc.label} {items.length>0?`— ${items.length} articles`:’’}</span>
+<span className="page-header">{cc.emoji} {cc.label} {items.length>0?` -  ${items.length} articles`:’’}</span>
 </div>
 {(activeKw||activeSrc)&&(
 <div style={{display:‘flex’,gap:‘6px’,flexWrap:‘wrap’,marginBottom:‘4px’}}>
@@ -1098,7 +1098,7 @@ const SavedPage=()=>(
 <div className="page">
 {saved.length===0
 ?<div className="saved-empty"><div style={{fontSize:‘32px’,marginBottom:‘12px’}}>☆</div><div style={{fontSize:‘13px’,fontWeight:‘500’,color:‘var(–text2)’}}>No saved items yet</div><div style={{fontSize:‘11px’,color:‘var(–text3)’,marginTop:‘4px’}}>Tap Save on any article or episode</div></div>
-:<div className="page-grid"><div className="feed-col"><span className="page-header">Saved — {saved.length} items</span>{saved.map((a,i)=><FeedCard key={i} a={a} cat={a.cat||‘general’} isSaved={true} onSave={onSave} onRead={onRead}/>)}</div></div>
+:<div className="page-grid"><div className="feed-col"><span className="page-header">Saved  -  {saved.length} items</span>{saved.map((a,i)=><FeedCard key={i} a={a} cat={a.cat||‘general’} isSaved={true} onSave={onSave} onRead={onRead}/>)}</div></div>
 }
 </div>
 );
