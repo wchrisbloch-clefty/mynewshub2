@@ -682,7 +682,7 @@ return (
 </div>
 <div className="cp-add">
 <input className=“cp-input” placeholder=“Add alert word…” value={newAlert} onChange={e=>setNewAlert(e.target.value)} onKeyDown={e=>{if(e.key===‘Enter’&&newAlert.trim()){setLa(x=>[…x,newAlert.trim()]);setNewAlert(’’);}}}/>
-<button className=“cp-btn cp-btn-red” onClick={()=>{if(newAlert.trim()){setLa(x=>[…x,newAlert.trim()]);setNewAlert(’’);}}>Add</button>
+<button className=“cp-btn cp-btn-red” onClick={()=>{ if(newAlert.trim()){ setLa(x=>[…x,newAlert.trim()]); setNewAlert(’’); } }}>Add</button>
 </div>
 </div>
 <div className="cp-sec">
@@ -1117,6 +1117,4 @@ return (
 </div>
 </>
 );
-}
-}
 }
