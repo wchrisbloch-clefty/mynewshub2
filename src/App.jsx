@@ -1,19 +1,3 @@
-// MyNewsHub v14 — Chunk A
-// ─────────────────────────────────────────────────────────────────────────────
-// Changes from v13:
-//  • Storage key bump v13_ → v14_ with one-time migration
-//  • Image extraction: checks media:content, media:thumbnail, enclosure, image/url,
-//    and regex-extracts first <img> from description HTML
-//  • RSS proxy chain: AbortController 8s timeout per proxy, better error surfacing
-//  • AI Summary button: shows "Requires Backend (Chunk B)" tooltip instead of hanging
-//  • Social Follows: restored as curated link-list section on each category page
-//  • Sports scoreboard: live scores for Texans/Rockets/Astros/Braves/UK MBB/UK FB/Clemson FB
-//    via ESPN public JSON, rendered on Today page + Sports page sidebar
-//  • Per-category Customize button inline on each category header
-//  • Trending/Topics/Sources sidebar now works for Comedy + Podcasts pages too
-//  • Source health now includes failure reason (timeout / blocked / empty)
-// ─────────────────────────────────────────────────────────────────────────────
-
 import { useState, useEffect, useCallback, useMemo } from 'react';
 
 // ─── CATEGORIES ───────────────────────────────────────────────────────────────
@@ -377,6 +361,17 @@ async function fetchWeather() {
 }
 
 async function fetchQuote(sym) {
+  // Priority 1: our own /api/quote serverless proxy (CORS-clean, cached)
+  try {
+    const r = await fetchWithTimeout(`/api/quote?sym=${encodeURIComponent(sym)}`, 7000);
+    if (r.ok) {
+      const d = await r.json();
+      if (typeof d.price === 'number') {
+        return { price: d.price, chg: d.chg, pct: d.pct };
+      }
+    }
+  } catch {}
+  // Fallback: legacy allorigins path (works inconsistently)
   try {
     const url = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(sym)}?interval=1d&range=1d`;
     const proxy = `https://api.allorigins.win/get?url=${encodeURIComponent(url)}`;
@@ -642,6 +637,14 @@ body{background:var(--bg);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI
 .today-item-body{flex:1;min-width:0;}
 .today-item-title{font-size:11px;font-weight:600;color:var(--text);line-height:1.35;margin-bottom:2px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;}
 .today-item-src{font-size:10px;color:var(--text3);}
+.today-item-wrap{border-bottom:1px solid var(--border2);}
+.today-item-wrap:last-child{border-bottom:none;}
+.today-item-wrap .today-item{border-bottom:none;}
+.today-ai-btn{background:none;border:1px solid var(--border);color:var(--text3);border-radius:5px;padding:3px 7px;font-size:11px;cursor:pointer;font-family:inherit;font-weight:600;flex-shrink:0;align-self:flex-start;transition:all 0.1s;}
+.today-ai-btn:hover{border-color:#7c3aed;color:#7c3aed;}
+.today-ai-btn.on{border-color:#7c3aed;color:#7c3aed;background:#f5f3ff;}
+.today-ai-btn:disabled{cursor:wait;opacity:0.7;}
+.today-summary{padding:0 14px 10px 73px;font-size:11px;color:var(--text2);line-height:1.55;}
 .today-bloom-row{grid-column:1/-1;}
 .bloom-strip{display:grid;grid-template-columns:repeat(4,1fr);}
 .bloom-strip-item{padding:10px 14px;border-right:1px solid var(--border2);cursor:pointer;transition:background 0.1s;}
@@ -994,6 +997,51 @@ function FeedCard({ a, cat, isSaved, onSave, onRead, relatedSources }) {
         </button>
         <a className="fc-read-link" href={a.link} target="_blank" rel="noreferrer" onClick={e => { e.stopPropagation(); onRead(a); }}>Read → {a.source}</a>
       </div>
+    </div>
+  );
+}
+
+// ─── TODAY ITEM (compact card for home page with inline AI summary) ─────────
+function TodayItem({ a, cc, onRead }) {
+  const [showSum, setShowSum] = useState(false);
+  const [sum, setSum] = useState('');
+  const [err, setErr] = useState('');
+  const [loadingSum, setLoadingSum] = useState(false);
+  const [imgErr, setImgErr] = useState(false);
+
+  const handleAI = async (e) => {
+    e.stopPropagation();
+    if (showSum) { setShowSum(false); return; }
+    if (sum || err) { setShowSum(true); return; }
+    setShowSum(true); setLoadingSum(true);
+    const { summary, error } = await fetchAISummary({ type: 'article', title: a.title, content: a.desc || '' });
+    if (summary) setSum(summary); else setErr(error || 'Summary unavailable');
+    setLoadingSum(false);
+  };
+
+  return (
+    <div className="today-item-wrap">
+      <div className="today-item" onClick={() => onRead(a)}>
+        {a.img && !imgErr
+          ? <img className="today-thumb" src={a.img} loading="lazy" onError={() => setImgErr(true)} alt=""/>
+          : <div className="today-thumb-ph" style={{background:cc.bg}}>{cc.emoji}</div>}
+        <div className="today-item-body">
+          <div className="today-item-title">{a.title}</div>
+          <div className="today-item-src">{a.source} · {fmtDate(a.pubDate)}</div>
+        </div>
+        <button className={`today-ai-btn ${showSum ? 'on' : ''}`} title="AI Summary" onClick={handleAI} disabled={loadingSum}>
+          {loadingSum ? '...' : '✦'}
+        </button>
+      </div>
+      {showSum && (
+        <div className="today-summary" onClick={e => e.stopPropagation()}>
+          {loadingSum
+            ? <em style={{color:'var(--text3)'}}>Generating summary...</em>
+            : err
+              ? <span style={{color:'#dc2626'}}>{err}</span>
+              : sum}
+        </div>
+      )}
     </div>
   );
 }
@@ -1697,16 +1745,7 @@ export default function App() {
                   </div>
                   {loading[cat] ? <div style={{padding:'20px', textAlign:'center', fontSize:'11px', color:'var(--text3)'}}>Loading...</div>
                   : items.length === 0 ? <div style={{padding:'20px', textAlign:'center', fontSize:'11px', color:'var(--text3)'}}>No articles yet</div>
-                  : items.map((a, i) => (
-                    <div key={i} className="today-item" onClick={() => onRead(a)}>
-                      {a.img ? <img className="today-thumb" src={a.img} loading="lazy" onError={e => e.target.style.display = 'none'} alt=""/>
-                      : <div className="today-thumb-ph" style={{background:cc.bg}}>{cc.emoji}</div>}
-                      <div className="today-item-body">
-                        <div className="today-item-title">{a.title}</div>
-                        <div className="today-item-src">{a.source} · {fmtDate(a.pubDate)}</div>
-                      </div>
-                    </div>
-                  ))}
+                  : items.map((a, i) => <TodayItem key={i} a={a} cc={cc} onRead={onRead}/>)}
                 </div>
               );
             })}
