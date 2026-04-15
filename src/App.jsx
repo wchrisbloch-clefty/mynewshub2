@@ -1,5 +1,21 @@
+// MyNewsHub v14 — Chunk A
+// ─────────────────────────────────────────────────────────────────────────────
+// Changes from v13:
+//  • Storage key bump v13_ → v14_ with one-time migration
+//  • Image extraction: checks media:content, media:thumbnail, enclosure, image/url,
+//    and regex-extracts first <img> from description HTML
+//  • RSS proxy chain: AbortController 8s timeout per proxy, better error surfacing
+//  • AI Summary button: shows "Requires Backend (Chunk B)" tooltip instead of hanging
+//  • Social Follows: restored as curated link-list section on each category page
+//  • Sports scoreboard: live scores for Texans/Rockets/Astros/Braves/UK MBB/UK FB/Clemson FB
+//    via ESPN public JSON, rendered on Today page + Sports page sidebar
+//  • Per-category Customize button inline on each category header
+//  • Trending/Topics/Sources sidebar now works for Comedy + Podcasts pages too
+//  • Source health now includes failure reason (timeout / blocked / empty)
+// ─────────────────────────────────────────────────────────────────────────────
+
 import { useState, useEffect, useCallback, useMemo } from 'react';
- 
+
 // ─── CATEGORIES ───────────────────────────────────────────────────────────────
 const CATS = {
   general:  { label:'General',      color:'#1d4ed8', bg:'#eff6ff', emoji:'🌐' },
@@ -9,13 +25,13 @@ const CATS = {
   bloom:    { label:'Bloom Energy', color:'#0369a1', bg:'#e0f2fe', emoji:'🔋' },
   comedy:   { label:'Comedy',       color:'#db2777', bg:'#fdf2f8', emoji:'😂' },
 };
- 
+
 const TICKERS = [
   { sym:'BE',   label:'Bloom Energy', color:'#0369a1' },
   { sym:'CL=F', label:'Crude Oil',    color:'#16a34a' },
   { sym:'BTC',  label:'Bitcoin',      color:'#d97706' },
 ];
- 
+
 const PODCAST_FEEDS = [
   { name:'Joe Rogan Experience', host:'Joe Rogan',         url:'https://feeds.megaphone.fm/GLT1412515089',   emoji:'🟢' },
   { name:'Ben Shapiro Show',     host:'Ben Shapiro',       url:'https://feeds.megaphone.fm/BVDWV5370667266', emoji:'🔵' },
@@ -25,7 +41,7 @@ const PODCAST_FEEDS = [
   { name:'All-In Podcast',       host:'Chamath & Besties', url:'https://allinchamathjason.libsyn.com/rss',   emoji:'💰' },
   { name:'Flagrant',             host:'Andrew Schulz',     url:'https://feeds.megaphone.fm/APPI6857213837',  emoji:'🔥' },
 ];
- 
+
 const DEFAULT_KW = {
   general:  ['Houston','Texas','Trump','Congress','White House','geopolitical','AI','tech','Iran','tariffs'],
   sports:   ['Texans','Rockets','Astros','Braves','Kentucky','Clemson','NFL','MLB','NBA','CFB','recruiting','transfer portal'],
@@ -34,7 +50,7 @@ const DEFAULT_KW = {
   bloom:    ['Bloom Energy','fuel cell','hydrogen','microgrid','distributed power','data center','onshoring','industrial energy','utility','ERCOT'],
   comedy:   ['satire','parody','humor','comedy'],
 };
- 
+
 const DEFAULT_FEEDS = {
   general: [
     { name:'BBC News',          url:'https://feeds.bbci.co.uk/news/rss.xml',                                    on:true },
@@ -109,7 +125,7 @@ const DEFAULT_FEEDS = {
     { name:'The Onion',       url:'https://www.theonion.com/rss', on:true },
   ],
 };
- 
+
 // ─── SOCIAL FOLLOWS (restored from prior version) ────────────────────────────
 // These are honest curated links — clicking opens the account on the platform.
 // Not a live feed. Editable via Customize panel > Social tab.
@@ -151,7 +167,7 @@ const DEFAULT_SOCIAL = {
     youtube:   ['TheBabylonBee','TheOnion'],
   },
 };
- 
+
 // ─── SPORTS SCOREBOARD CONFIG ────────────────────────────────────────────────
 // ESPN public API: site.api.espn.com/apis/site/v2/sports/{sport}/{league}/scoreboard
 // No auth, no key, returns JSON, CORS-friendly.
@@ -164,11 +180,11 @@ const SCORE_TEAMS = [
   { team:'UK Football',  sport:'football',   league:'college-football',          match:'Kentucky',          emoji:'🏈' },
   { team:'Clemson FB',   sport:'football',   league:'college-football',          match:'Clemson',           emoji:'🏈' },
 ];
- 
+
 // ─── STORAGE (with v13 → v14 migration) ──────────────────────────────────────
 const SK = 'v14_';
 const OLD_SK = 'v13_';
- 
+
 // URGENT_WORDS are a small, curated list that drives the red BREAKING ticker.
 // Separate from keyword "alerts" (which are per-category filters) to avoid
 // constant noise when routine words like team names match every headline.
@@ -178,7 +194,7 @@ const DEFAULT_URGENT = [
   'explosion', 'evacuation', 'shooting', 'tsunami', 'pandemic',
   'recall', 'outage', 'market crash', 'flash flood', 'state of emergency',
 ];
- 
+
 function ld(k, d) {
   try {
     let v = localStorage.getItem(SK + k);
@@ -191,7 +207,7 @@ function ld(k, d) {
   } catch { return d; }
 }
 function sv(k, v) { try { localStorage.setItem(SK + k, JSON.stringify(v)); } catch {} }
- 
+
 // ─── IMAGE EXTRACTION (fixed) ────────────────────────────────────────────────
 // Tries every known location RSS feeds put images, in order of preference.
 function extractImage(item, descHTML) {
@@ -224,7 +240,7 @@ function extractImage(item, descHTML) {
   }
   return '';
 }
- 
+
 // Same for rss2json-format items (already parsed to JSON)
 function extractImageFromJson(i) {
   if (i.thumbnail && i.thumbnail.length > 10) return i.thumbnail;
@@ -234,7 +250,7 @@ function extractImageFromJson(i) {
   if (m) return m[1];
   return '';
 }
- 
+
 // ─── RSS FETCH (with timeouts and error reasons) ─────────────────────────────
 function parseXML(txt) {
   const p = new DOMParser(), x = p.parseFromString(txt, 'text/xml');
@@ -253,7 +269,7 @@ function parseXML(txt) {
     };
   });
 }
- 
+
 async function fetchWithTimeout(url, ms = 8000) {
   const ctrl = new AbortController();
   const timer = setTimeout(() => ctrl.abort(), ms);
@@ -264,7 +280,7 @@ async function fetchWithTimeout(url, ms = 8000) {
     clearTimeout(timer);
   }
 }
- 
+
 // Returns { items, reason } where reason is empty on success or explains the failure
 async function fetchRSS(url) {
   // Priority 1: Our own Vercel /api/rss proxy (most reliable, respects CORS, caches)
@@ -319,7 +335,7 @@ async function fetchRSS(url) {
   } catch {}
   return { items: [], reason: 'All proxies failed — /api/rss, rss2json, allorigins, corsproxy.io' };
 }
- 
+
 // ─── DATE FORMATTER ───────────────────────────────────────────────────────────
 function fmtDate(d) {
   if (!d) return '';
@@ -336,7 +352,7 @@ function fmtDate(d) {
     return `${months[dt.getMonth()]} ${dt.getDate()} · ${timeStr}`;
   } catch { return ''; }
 }
- 
+
 function fmtDuration(s) {
   if (!s) return '';
   const parts = s.split(':').map(Number);
@@ -346,12 +362,12 @@ function fmtDuration(s) {
   const h = Math.floor(tot / 3600), m = Math.floor((tot % 3600) / 60);
   return h > 0 ? `${h}h ${m}m` : `${m}m`;
 }
- 
+
 // ─── WEATHER ──────────────────────────────────────────────────────────────────
 const HOUSTON = { lat:29.7604, lon:-95.3698 };
 const WX_CODES = { 0:'Clear',1:'Mostly Clear',2:'Partly Cloudy',3:'Overcast',45:'Foggy',48:'Icy Fog',51:'Light Drizzle',53:'Drizzle',55:'Heavy Drizzle',61:'Light Rain',63:'Rain',65:'Heavy Rain',71:'Light Snow',73:'Snow',75:'Heavy Snow',80:'Showers',81:'Heavy Showers',95:'Thunderstorm',99:'Severe Storm' };
 const WX_EMOJI = { 0:'☀️',1:'🌤️',2:'⛅',3:'☁️',45:'🌫️',48:'🌫️',51:'🌦️',53:'🌦️',55:'🌧️',61:'🌧️',63:'🌧️',65:'⛈️',71:'🌨️',73:'❄️',75:'❄️',80:'🌦️',81:'🌧️',95:'⛈️',99:'🌪️' };
- 
+
 async function fetchWeather() {
   try {
     const r = await fetchWithTimeout(`https://api.open-meteo.com/v1/forecast?latitude=${HOUSTON.lat}&longitude=${HOUSTON.lon}&current=temperature_2m,weathercode,windspeed_10m&temperature_unit=fahrenheit&windspeed_unit=mph&timezone=America%2FChicago`);
@@ -359,7 +375,7 @@ async function fetchWeather() {
     return { temp:Math.round(c.temperature_2m), code:c.weathercode, wind:Math.round(c.windspeed_10m), desc:WX_CODES[c.weathercode] || 'Unknown', emoji:WX_EMOJI[c.weathercode] || '🌡️' };
   } catch { return null; }
 }
- 
+
 async function fetchQuote(sym) {
   try {
     const url = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(sym)}?interval=1d&range=1d`;
@@ -371,7 +387,7 @@ async function fetchQuote(sym) {
     return { price, chg, pct };
   } catch { return null; }
 }
- 
+
 // ─── SPORTS SCOREBOARD FETCH ─────────────────────────────────────────────────
 async function fetchScoreboard(sport, league) {
   try {
@@ -402,7 +418,7 @@ async function fetchScoreboard(sport, league) {
     });
   } catch { return []; }
 }
- 
+
 async function fetchAllScores() {
   // Fetch each unique sport/league combo once, filter client-side to our teams
   const combos = [...new Set(SCORE_TEAMS.map(t => `${t.sport}|${t.league}`))];
@@ -419,7 +435,7 @@ async function fetchAllScores() {
   }));
   return results;
 }
- 
+
 // ─── SOCIAL URL BUILDERS ─────────────────────────────────────────────────────
 function socialUrl(platform, handle) {
   const h = handle.replace(/^@/, '');
@@ -437,7 +453,7 @@ const SOCIAL_META = {
   instagram: { label:'Instagram',   color:'#e1306c', bg:'#fdeff5', icon:'IG' },
   youtube:   { label:'YouTube',     color:'#ff0000', bg:'#fee',    icon:'▶' },
 };
- 
+
 // ─── GLOBAL CSS ───────────────────────────────────────────────────────────────
 const GLOBAL_CSS = `
 *{box-sizing:border-box;margin:0;padding:0;}
@@ -445,7 +461,7 @@ const GLOBAL_CSS = `
 .dark{--bg:#0f172a;--surface:#1e293b;--border:#334155;--border2:#253347;--text:#f1f5f9;--text2:#94a3b8;--text3:#475569;}
 body{background:var(--bg);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;}
 .hub{background:var(--bg);min-height:100vh;}
- 
+
 /* topbar */
 .topbar-wrap{position:sticky;top:0;z-index:300;}
 .utility-strip{background:#0f172a;padding:0 20px;display:flex;align-items:center;height:32px;overflow:hidden;}
@@ -492,7 +508,7 @@ body{background:var(--bg);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI
 .nav-btn{background:#f1f5f9;border:1px solid #e8e8e8;color:#475569;border-radius:6px;padding:5px 10px;cursor:pointer;font-size:12px;font-family:inherit;font-weight:500;}
 .dark .nav-btn{background:#0f172a;border-color:#334155;color:#94a3b8;}
 .nav-btn-blue{background:#1d4ed8;border:none;color:#fff;border-radius:6px;padding:5px 12px;cursor:pointer;font-size:12px;font-weight:600;font-family:inherit;}
- 
+
 /* page layout */
 .page{max-width:1300px;margin:0 auto;padding:16px 20px;}
 .page-grid{display:grid;grid-template-columns:1fr 280px;gap:16px;align-items:start;}
@@ -505,7 +521,7 @@ body{background:var(--bg);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI
 .empty-icon{font-size:32px;margin-bottom:10px;}
 .empty-msg{font-size:13px;color:var(--text2);margin-bottom:14px;}
 .refresh-btn{background:#1d4ed8;border:none;color:#fff;border-radius:8px;padding:8px 18px;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;}
- 
+
 /* feed card */
 .fc{background:var(--surface);border-radius:10px;border:1px solid var(--border);padding:12px 14px;cursor:pointer;transition:border-color 0.12s,box-shadow 0.12s;display:flex;flex-direction:column;gap:0;}
 .fc:hover{border-color:#bfdbfe;box-shadow:0 1px 8px rgba(29,78,216,0.07);}
@@ -533,7 +549,7 @@ body{background:var(--bg);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI
 .fc-more-lbl{font-size:10px;color:var(--text3);}
 .fc-more-src{font-size:10px;font-weight:600;border-radius:4px;padding:1px 6px;cursor:pointer;border:1px solid var(--border);color:var(--text2);background:none;font-family:inherit;transition:all 0.1s;}
 .fc-more-src:hover{border-color:#1d4ed8;color:#1d4ed8;}
- 
+
 /* sidebar */
 .sidebar{display:flex;flex-direction:column;gap:10px;min-width:0;}
 .sb-block{background:var(--surface);border-radius:10px;border:1px solid var(--border);overflow:hidden;}
@@ -564,7 +580,7 @@ body{background:var(--bg);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI
 .trend-body{flex:1;min-width:0;}
 .trend-title{font-size:11px;font-weight:600;color:var(--text);line-height:1.35;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;margin-bottom:2px;}
 .trend-src{font-size:10px;color:var(--text3);}
- 
+
 /* scoreboard */
 .score-block{background:var(--surface);border-radius:10px;border:1px solid var(--border);overflow:hidden;}
 .score-head{padding:10px 14px 8px;border-bottom:1px solid var(--border2);display:flex;align-items:center;justify-content:space-between;}
@@ -583,7 +599,7 @@ body{background:var(--bg);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI
 .score-status{font-size:9px;color:var(--text3);margin-top:4px;text-transform:uppercase;letter-spacing:0.04em;}
 .score-status.live{color:#dc2626;font-weight:700;}
 .score-none{padding:10px 14px;font-size:10px;color:var(--text3);font-style:italic;text-align:center;}
- 
+
 /* social follows */
 .social-block{background:var(--surface);border-radius:10px;border:1px solid var(--border);padding:14px 16px;margin-top:14px;}
 .social-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;}
@@ -598,7 +614,7 @@ body{background:var(--bg);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI
 .social-handles{display:flex;flex-wrap:wrap;gap:4px;}
 .social-handle{font-size:10px;font-weight:500;color:var(--text2);background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:3px 9px;text-decoration:none;transition:all 0.1s;}
 .social-handle:hover{border-color:currentColor;color:var(--text);transform:translateY(-1px);}
- 
+
 /* Social PAGE (full tab) — distinct from the per-category SocialFollows block */
 .social-page-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;gap:12px;flex-wrap:wrap;}
 .social-page-title{font-size:18px;font-weight:800;color:var(--text);letter-spacing:-0.4px;}
@@ -611,7 +627,7 @@ body{background:var(--bg);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI
 .social-cat-plat-head{display:flex;align-items:center;gap:6px;margin-bottom:8px;}
 .social-cat-plat .social-handles{display:flex;flex-wrap:wrap;gap:5px;}
 .social-cat-plat .social-handle{font-size:11px;padding:4px 10px;border-width:1px;}
- 
+
 /* Today page */
 .today-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;}
 .today-block{background:var(--surface);border-radius:10px;border:1px solid var(--border);overflow:hidden;}
@@ -634,7 +650,7 @@ body{background:var(--bg);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI
 .bloom-strip-src{font-size:10px;color:#0369a1;font-weight:500;}
 .bloom-strip-date{font-size:9px;color:var(--text3);margin-top:2px;}
 .today-main{display:grid;grid-template-columns:1fr 280px;gap:16px;align-items:start;}
- 
+
 /* podcast */
 .pod-page{display:grid;grid-template-columns:1fr 280px;gap:16px;}
 .pod-col{display:flex;flex-direction:column;gap:10px;}
@@ -665,11 +681,11 @@ body{background:var(--bg);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI
 .pod-show-ep{font-size:10px;color:var(--text3);margin-top:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:160px;}
 .pod-show-dot{width:6px;height:6px;border-radius:50%;background:#e11d48;flex-shrink:0;margin-left:auto;}
 .saved-empty{text-align:center;padding:80px 20px;}
- 
+
 /* AI-coming-soon banner */
 .ai-banner{background:linear-gradient(135deg,#f5f3ff,#faf5ff);border:1px solid #ddd6fe;border-radius:8px;padding:9px 12px;margin-bottom:10px;display:flex;align-items:center;gap:9px;font-size:11px;color:#6d28d9;}
 .ai-banner-icon{font-size:14px;}
- 
+
 /* customize panel */
 .cp-overlay{position:fixed;inset:0;background:rgba(15,23,42,0.5);z-index:600;display:flex;align-items:center;justify-content:center;padding:20px;}
 .cp-panel{background:var(--surface);border-radius:14px;width:100%;max-width:520px;max-height:90vh;overflow-y:auto;box-shadow:0 20px 60px rgba(0,0,0,0.2);}
@@ -722,7 +738,7 @@ body{background:var(--bg);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI
 .cp-plat-tabs{display:flex;gap:4px;margin-bottom:10px;flex-wrap:wrap;}
 .cp-plat-tab{background:var(--bg);border:1px solid var(--border);border-radius:6px;padding:4px 10px;font-size:10px;cursor:pointer;font-family:inherit;color:var(--text2);font-weight:500;}
 .cp-plat-tab.active{background:#0f172a;color:#fff;border-color:#0f172a;}
- 
+
 /* source footer */
 .src-footer{margin-top:24px;padding-top:14px;border-top:1px solid var(--border2);}
 .src-footer-label{font-size:9px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:0.09em;margin-bottom:8px;}
@@ -730,21 +746,21 @@ body{background:var(--bg);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI
 .src-footer-link{font-size:10px;color:var(--text3);text-decoration:none;padding:2px 7px;border-radius:4px;transition:color 0.1s,background 0.1s;font-weight:500;white-space:nowrap;}
 .src-footer-link:hover{color:var(--text);background:var(--border2);}
 .src-footer-sep{font-size:9px;color:var(--border);user-select:none;}
- 
+
 /* ─── RESPONSIVE BREAKPOINTS ───────────────────────────────────────────────
    Desktop ≥1100  → 2-col feed+sidebar, full nav, hover states
    Tablet 900-1100 → same grid, tighter padding
    Tablet 640-900  → single column, sidebar flows below feed
    Mobile <640    → hamburger nav, bottom-sheet customize, bigger tap targets
 ─────────────────────────────────────────────────────────────────────────── */
- 
+
 /* Tablet: single column */
 @media (max-width: 1100px) {
   .page { padding: 14px 16px; }
   .page-grid { gap: 14px; }
   .today-grid { gap: 10px; }
 }
- 
+
 @media (max-width: 900px) {
   .page-grid, .pod-page { grid-template-columns: 1fr; gap: 12px; }
   .today-grid { grid-template-columns: 1fr; }
@@ -755,7 +771,7 @@ body{background:var(--bg);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI
   .logo { font-size: 14px; }
   .search-input { width: 90px; }
 }
- 
+
 /* Mobile: compact everything, bigger tap targets */
 @media (max-width: 640px) {
   .page { padding: 10px 12px; }
@@ -766,7 +782,7 @@ body{background:var(--bg);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI
   .ticker-item { padding: 4px 6px; }
   .ticker-sym { font-size: 10px; }
   .ticker-price { font-size: 10px; }
- 
+
   .nav-bar { padding: 0 12px; }
   .nav-bar-inner { height: 52px; gap: 6px; }
   .logo { font-size: 13px; }
@@ -774,16 +790,16 @@ body{background:var(--bg);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI
   .nav-tab { padding: 8px 10px; font-size: 11px; min-height: 44px; display: flex; align-items: center; }
   .search-input { display: none; }
   .nav-btn, .nav-btn-blue { padding: 8px 10px; min-height: 40px; font-size: 11px; }
- 
+
   .breaking-strip { height: 34px; }
   .breaking-label { font-size: 8px; padding: 2px 6px; }
   .breaking-item { font-size: 10px; }
   .breaking-ticker-inner { animation-duration: 60s; gap: 40px; }
- 
+
   .bloom-strip { grid-template-columns: 1fr; }
   .bloom-strip-item { border-right: none; border-bottom: 1px solid var(--border2); }
   .bloom-strip-item:last-child { border-bottom: none; }
- 
+
   /* Feed cards — bigger thumbnails stack below text on narrow screens */
   .fc { padding: 12px; }
   .fc-body { flex-direction: column; gap: 10px; }
@@ -792,13 +808,13 @@ body{background:var(--bg);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI
   .fc-desc { font-size: 12px; -webkit-line-clamp: 3; }
   .fc-act { padding: 6px 10px; font-size: 11px; min-height: 36px; }
   .fc-read-link { font-size: 11px; }
- 
+
   /* Today page cards — compact */
   .today-block-head { padding: 10px 12px 8px; }
   .today-item { padding: 10px 12px; }
   .today-thumb, .today-thumb-ph { width: 60px; height: 45px; }
   .today-item-title { font-size: 12px; }
- 
+
   /* Sidebar — full width, collapsible feel */
   .sb-block { border-radius: 8px; }
   .sb-head { padding: 12px; }
@@ -806,7 +822,7 @@ body{background:var(--bg);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI
   .kw-chip { padding: 5px 12px; font-size: 11px; min-height: 28px; }
   .src-row { padding: 10px 12px; min-height: 40px; }
   .trend-row { padding: 10px 12px; min-height: 44px; }
- 
+
   /* Podcast cards */
   .pod-header { padding: 12px 14px; }
   .pod-header-name { font-size: 14px; }
@@ -814,7 +830,7 @@ body{background:var(--bg);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI
   .pod-title { font-size: 14px; }
   .pod-btn { padding: 8px 12px; font-size: 11px; min-height: 36px; }
   .pod-show-item { padding: 12px 0; }
- 
+
   /* Customize panel → bottom-sheet pattern on mobile */
   .cp-overlay { padding: 0; align-items: flex-end; }
   .cp-panel { max-width: 100%; max-height: 92vh; border-radius: 16px 16px 0 0; }
@@ -829,12 +845,12 @@ body{background:var(--bg);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI
   .cp-tog { width: 36px; height: 20px; }
   .cp-tog::after { width: 16px; height: 16px; }
   .cp-tog.on::after { left: 18px; }
- 
+
   /* Per-category customize button goes full width on mobile */
   .page-customize-btn { width: 100%; margin-top: 6px; padding: 10px; font-size: 12px; min-height: 40px; }
   .page-header-row { flex-direction: column; align-items: stretch; gap: 6px; }
 }
- 
+
 /* Extra-small phones */
 @media (max-width: 380px) {
   .logo { font-size: 12px; }
@@ -842,7 +858,7 @@ body{background:var(--bg);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI
   .nav-btn, .nav-btn-blue { padding: 6px 8px; font-size: 10px; }
   .fc-thumb, .fc-thumb-ph { height: 140px; }
 }
- 
+
 /* Always: readable tap targets for all interactive elements on touch devices */
 @media (hover: none) {
   button, a, .src-row, .trend-row, .today-item, .fc, .pod-card {
@@ -851,7 +867,7 @@ body{background:var(--bg);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI
   .fc:hover, .pod-card:hover { border-color: var(--border); box-shadow: none; }
 }
 `;
- 
+
 // ─── SOURCE URL MAP ───────────────────────────────────────────────────────────
 const SOURCE_URLS = {
   'BBC News':'https://www.bbc.com/news','Reuters Top News':'https://www.reuters.com','CNBC Top News':'https://www.cnbc.com',
@@ -877,18 +893,63 @@ const SOURCE_URLS = {
   'Investopedia':'https://www.investopedia.com','BiggerPockets':'https://www.biggerpockets.com',
   'CNBC Finance':'https://www.cnbc.com','The Babylon Bee':'https://babylonbee.com','The Onion':'https://www.theonion.com',
 };
- 
-// ─── AI SUMMARY DISABLED NOTICE ─────────────────────────────────────────────
-// Temporary: AI summaries hang forever because browser can't call api.anthropic.com (CORS).
-// Chunk B will add /api/summarize.js as a Vercel serverless function to fix this.
-const AI_DISABLED_MSG = 'AI summaries need a backend — coming in the next update';
- 
+
+// ─── AI SUMMARY (Chunk B) ──────────────────────────────────────────────────
+// Calls our /api/summarize.js Vercel function (which holds the Anthropic API
+// key server-side). Browser → /api/summarize → api.anthropic.com → 2-3 sentence
+// summary. Cached server-side for 24h to avoid re-summarizing the same article.
+async function fetchAISummary({ type, title, content }) {
+  try {
+    const r = await fetch('/api/summarize', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ type, title, content }),
+      signal: AbortSignal.timeout(12000),
+    });
+    if (!r.ok) {
+      const errBody = await r.json().catch(() => ({}));
+      const detail = errBody.error || `HTTP ${r.status}`;
+      // Distinguish "backend missing/misconfigured" from "transient fetch failure"
+      // so we can show a useful message to the user.
+      if (r.status === 500 && /ANTHROPIC_API_KEY/i.test(detail)) {
+        return { summary: '', error: 'Backend not configured: add ANTHROPIC_API_KEY in Vercel → Settings → Environment Variables, then redeploy.' };
+      }
+      if (r.status === 504) {
+        return { summary: '', error: 'Summary timed out — try again in a moment.' };
+      }
+      return { summary: '', error: `Summary unavailable (${detail.slice(0, 100)})` };
+    }
+    const data = await r.json();
+    return { summary: data.summary || '', error: '' };
+  } catch (err) {
+    return { summary: '', error: err.name === 'TimeoutError' ? 'Summary timed out' : 'Network error reaching /api/summarize' };
+  }
+}
+
 // ─── FEED CARD ───────────────────────────────────────────────────────────────
 function FeedCard({ a, cat, isSaved, onSave, onRead, relatedSources }) {
   const [imgErr, setImgErr] = useState(false);
+  const [showSummary, setShowSummary] = useState(false);
+  const [summary, setSummary] = useState('');
+  const [summaryErr, setSummaryErr] = useState('');
+  const [loadingSum, setLoadingSum] = useState(false);
   const cc = CATS[cat] || CATS.general;
   const topKw = a.matchedKw?.[0] || null;
- 
+
+  const handleAI = async (e) => {
+    e.stopPropagation();
+    if (showSummary) { setShowSummary(false); return; }
+    if (summary || summaryErr) { setShowSummary(true); return; }
+    setShowSummary(true); setLoadingSum(true);
+    const { summary: s, error } = await fetchAISummary({
+      type: 'article',
+      title: a.title,
+      content: a.desc || '',
+    });
+    if (s) setSummary(s); else setSummaryErr(error || 'Summary unavailable');
+    setLoadingSum(false);
+  };
+
   return (
     <div className={`fc ${cat}`} onClick={() => onRead(a)}>
       <div className="fc-meta">
@@ -906,6 +967,16 @@ function FeedCard({ a, cat, isSaved, onSave, onRead, relatedSources }) {
           {a.desc && <div className="fc-desc">{a.desc}</div>}
         </div>
       </div>
+      {showSummary && (
+        <div className="fc-summary" onClick={e => e.stopPropagation()}>
+          <div className="fc-summary-lbl">✦ AI Summary</div>
+          {loadingSum
+            ? <div style={{fontSize:'11px', color:'var(--text3)', fontStyle:'italic'}}>Generating summary...</div>
+            : summaryErr
+              ? <div style={{fontSize:'11px', color:'#dc2626'}}>{summaryErr}</div>
+              : <div className="fc-summary-text">{summary}</div>}
+        </div>
+      )}
       {relatedSources && relatedSources.length > 0 && (
         <div className="fc-more" onClick={e => e.stopPropagation()}>
           <span className="fc-more-lbl">Also covering:</span>
@@ -918,15 +989,15 @@ function FeedCard({ a, cat, isSaved, onSave, onRead, relatedSources }) {
         <button className={`fc-act ${isSaved ? 'saved' : ''}`} onClick={e => { e.stopPropagation(); onSave(a); }}>
           {isSaved ? '★ Saved' : '☆ Save'}
         </button>
-        <button className="fc-act disabled" title={AI_DISABLED_MSG} disabled>
-          ✦ AI Summary (soon)
+        <button className={`fc-act ${showSummary ? 'ai-on' : ''}`} onClick={handleAI} disabled={loadingSum}>
+          ✦ {loadingSum ? 'Thinking...' : showSummary ? 'Hide AI' : 'AI Summary'}
         </button>
         <a className="fc-read-link" href={a.link} target="_blank" rel="noreferrer" onClick={e => { e.stopPropagation(); onRead(a); }}>Read → {a.source}</a>
       </div>
     </div>
   );
 }
- 
+
 // ─── SCOREBOARD COMPONENT ────────────────────────────────────────────────────
 function Scoreboard({ scores, loading }) {
   return (
@@ -979,7 +1050,7 @@ function Scoreboard({ scores, loading }) {
     </div>
   );
 }
- 
+
 // ─── SIDEBAR ─────────────────────────────────────────────────────────────────
 function Sidebar({ cat, arts, kw, health, activeKw, setActiveKw, activeSource, setActiveSource, onRead, scores, scoresLoading, showScoreboard }) {
   const cc = CATS[cat] || CATS.general;
@@ -989,7 +1060,7 @@ function Sidebar({ cat, arts, kw, health, activeKw, setActiveKw, activeSource, s
   catArts.forEach(a => { srcCounts[a.source] = (srcCounts[a.source] || 0) + 1; });
   const sources = [...new Set(catArts.map(a => a.source))];
   const trending = catArts.slice(0, 10);
- 
+
   return (
     <div className="sidebar">
       {activeKw && (
@@ -1060,7 +1131,7 @@ function Sidebar({ cat, arts, kw, health, activeKw, setActiveKw, activeSource, s
     </div>
   );
 }
- 
+
 // ─── SOCIAL FOLLOWS BLOCK ────────────────────────────────────────────────────
 function SocialFollows({ cat, social }) {
   const catSocial = social[cat];
@@ -1096,11 +1167,11 @@ function SocialFollows({ cat, social }) {
     </div>
   );
 }
- 
+
 // ─── CUSTOMIZE PANEL ─────────────────────────────────────────────────────────
 const CAT_LABELS = { general:'🌐 General',sports:'🏆 Sports',business:'⚡ Business',finance:'📈 Finance',bloom:'🔋 Bloom',comedy:'😂 Comedy' };
 const PLAT_LABELS = { twitter:'𝕏', linkedin:'in', instagram:'IG', youtube:'▶' };
- 
+
 function CustomizePanel({ feeds, kw, alerts, urgent, social, health, arts, initialTab, initialCat, onClose, onSave }) {
   const [lf, setLf] = useState(JSON.parse(JSON.stringify(feeds)));
   const [lk, setLk] = useState(JSON.parse(JSON.stringify(kw)));
@@ -1118,19 +1189,19 @@ function CustomizePanel({ feeds, kw, alerts, urgent, social, health, arts, initi
   const [newUrl, setNewUrl] = useState('');
   const [newHandle, setNewHandle] = useState('');
   const [testState, setTestState] = useState({});
- 
+
   const testFeed = async (url, key) => {
     setTestState(s => ({...s, [key]:'loading'}));
     const { items, reason } = await fetchRSS(url);
     setTestState(s => ({...s, [key]:items.length > 0 ? `ok:${items.length} articles` : `fail:${reason || 'empty'}`}));
   };
- 
+
   const addSource = () => {
     if (!newName.trim() || !newUrl.trim()) return;
     setLf(prev => { const n = JSON.parse(JSON.stringify(prev)); if (!n[srcTab]) n[srcTab] = []; n[srcTab].push({name:newName.trim(), url:newUrl.trim(), on:true}); return n; });
     setNewName(''); setNewUrl('');
   };
- 
+
   const addHandle = () => {
     const h = newHandle.trim();
     if (!h) return;
@@ -1144,7 +1215,7 @@ function CustomizePanel({ feeds, kw, alerts, urgent, social, health, arts, initi
     });
     setNewHandle('');
   };
- 
+
   const removeHandle = (idx) => {
     setLs(prev => {
       const n = JSON.parse(JSON.stringify(prev));
@@ -1152,9 +1223,9 @@ function CustomizePanel({ feeds, kw, alerts, urgent, social, health, arts, initi
       return n;
     });
   };
- 
+
   const countBySource = (cat, name) => (arts[cat] || []).filter(a => a.source === name).length;
- 
+
   const TestResult = ({tkey}) => {
     const ts = testState[tkey]; if (!ts) return null;
     const isOk = ts.startsWith('ok');
@@ -1162,7 +1233,7 @@ function CustomizePanel({ feeds, kw, alerts, urgent, social, health, arts, initi
     const msg = isLoad ? 'Testing...' : isOk ? `✓ ${ts.replace('ok:','')}` : `✗ ${ts.replace('fail:','Failed — ')}`;
     return <div className={`cp-test-result ${isLoad ? 'cp-test-load' : isOk ? 'cp-test-ok' : 'cp-test-fail'}`}>{msg}</div>;
   };
- 
+
   return (
     <div className="cp-overlay" onClick={onClose}>
       <div className="cp-panel" onClick={e => e.stopPropagation()}>
@@ -1175,7 +1246,7 @@ function CustomizePanel({ feeds, kw, alerts, urgent, social, health, arts, initi
               </button>
             ))}
           </div>
- 
+
           {secTab === 'keywords' && (
             <div className="cp-sec">
               <div className="cp-lbl">Keywords by Category</div>
@@ -1191,7 +1262,7 @@ function CustomizePanel({ feeds, kw, alerts, urgent, social, health, arts, initi
               </div>
             </div>
           )}
- 
+
           {secTab === 'alerts' && (
             <div className="cp-sec">
               <div className="cp-lbl">Breaking News Ticker Words</div>
@@ -1213,7 +1284,7 @@ function CustomizePanel({ feeds, kw, alerts, urgent, social, health, arts, initi
               </div>
             </div>
           )}
- 
+
           {secTab === 'sources' && (
             <div className="cp-sec">
               <div className="cp-lbl">Sources</div>
@@ -1254,7 +1325,7 @@ function CustomizePanel({ feeds, kw, alerts, urgent, social, health, arts, initi
               </div>
             </div>
           )}
- 
+
           {secTab === 'social' && (
             <div className="cp-sec">
               <div className="cp-lbl">Social Follows by Category</div>
@@ -1281,14 +1352,14 @@ function CustomizePanel({ feeds, kw, alerts, urgent, social, health, arts, initi
               </div>
             </div>
           )}
- 
+
           <button className="cp-save" onClick={() => onSave({feeds:lf, kw:lk, alerts:la, urgent:lu, social:ls})}>Save & Refresh</button>
         </div>
       </div>
     </div>
   );
 }
- 
+
 // ─── SOURCE FOOTER ───────────────────────────────────────────────────────────
 function SourceFooter({ cat, feeds, arts }) {
   let sources = [];
@@ -1318,25 +1389,25 @@ function SourceFooter({ cat, feeds, arts }) {
     </div>
   );
 }
- 
+
 // ─── TOP BAR ─────────────────────────────────────────────────────────────────
 function TopBar({ tab, setTab, search, setSearch, dark, setDark, onCustomize, onRefresh, breakingItems, onTickerClick }) {
   const [wx, setWx] = useState(null);
   const [quotes, setQuotes] = useState({});
   const [showBreaking, setShowBreaking] = useState(true);
- 
+
   useEffect(() => {
     fetchWeather().then(setWx);
     TICKERS.forEach(t => fetchQuote(t.sym).then(q => q && setQuotes(prev => ({...prev, [t.sym]:q}))));
     const iv = setInterval(() => { TICKERS.forEach(t => fetchQuote(t.sym).then(q => q && setQuotes(prev => ({...prev, [t.sym]:q})))); }, 300000);
     return () => clearInterval(iv);
   }, []);
- 
+
   const hasBreaking = breakingItems && breakingItems.length > 0;
   const tickerItems = hasBreaking ? [...breakingItems, ...breakingItems] : [];
   const ALL_TABS = ['today','general','sports','business','finance','bloom','comedy','podcasts','social','saved'];
   const TAB_LABELS = { today:'Today', bloom:'Bloom Energy', podcasts:'Podcasts', social:'Social', saved:'Saved', comedy:'Comedy' };
- 
+
   return (
     <div className="topbar-wrap">
       <div className="utility-strip">
@@ -1393,7 +1464,7 @@ function TopBar({ tab, setTab, search, setSearch, dark, setDark, onCustomize, on
     </div>
   );
 }
- 
+
 // ─── MAIN APP ────────────────────────────────────────────────────────────────
 export default function App() {
   const [tab, setTab]           = useState('today');
@@ -1418,11 +1489,11 @@ export default function App() {
   const [activeSrc, setActiveSrc]   = useState(null);
   const [scores, setScores]         = useState({});
   const [scoresLoading, setScoresLoading] = useState(false);
- 
+
   useEffect(() => { sv('dark', dark); document.body.className = dark ? 'dark' : ''; }, [dark]);
   useEffect(() => { sv('saved', saved); }, [saved]);
   useEffect(() => { sv('clicks', clicks); }, [clicks]);
- 
+
   const breakingItems = useMemo(
     () => {
       const seen = new Set();
@@ -1443,17 +1514,17 @@ export default function App() {
     },
     [arts, urgent]
   );
- 
+
   const kwMatch = useCallback(
     (a, cat) => (kw[cat] || []).filter(k => (a.title + (a.desc || '')).toLowerCase().includes(k.toLowerCase())),
     [kw]
   );
- 
+
   const dedupe = arr => {
     const seen = new Set();
     return arr.filter(a => { const k = a.title.slice(0, 60).toLowerCase().replace(/\s+/g, ''); if (seen.has(k)) return false; seen.add(k); return true; });
   };
- 
+
   // Build a set of title-keys for articles that appear in a "specific" category
   // (anything other than general). Used to hide duplicates from the general feed
   // so General becomes a true "everything else" bucket.
@@ -1467,7 +1538,7 @@ export default function App() {
     });
     return keys;
   }, [arts]);
- 
+
   const sorted = useCallback((cat) => {
     let arr = arts[cat] || [];
     if (search) arr = arr.filter(a => (a.title + (a.desc || '')).toLowerCase().includes(search));
@@ -1485,7 +1556,7 @@ export default function App() {
     arr.sort((a, b) => { const ka = kwMatch(a, cat).length, kb = kwMatch(b, cat).length; if (kb !== ka) return kb - ka; return new Date(b.pubDate) - new Date(a.pubDate); });
     return arr.map(a => ({...a, matchedKw:kwMatch(a, cat), isAlert:urgent.some(u => (a.title + (a.desc || '')).toLowerCase().includes(u.toLowerCase()))}));
   }, [arts, search, activeKw, activeSrc, kwMatch, urgent, specificCatKeys]);
- 
+
   const loadCat = useCallback(async (cat) => {
     setLoading(l => ({...l, [cat]:true}));
     const results = [], hUpdates = {};
@@ -1499,21 +1570,21 @@ export default function App() {
     setArts(a => ({...a, [cat]:results}));
     setLoading(l => ({...l, [cat]:false}));
   }, [feeds]);
- 
+
   const loadPod = useCallback(async (pod) => {
     setPodLoading(l => ({...l, [pod.name]:true}));
     const { items } = await fetchRSS(pod.url);
     setPodEps(p => ({...p, [pod.name]:items.map(e => ({...e, show:pod.name, host:pod.host, emoji:pod.emoji}))}));
     setPodLoading(l => ({...l, [pod.name]:false}));
   }, []);
- 
+
   const loadScores = useCallback(async () => {
     setScoresLoading(true);
     const s = await fetchAllScores();
     setScores(s);
     setScoresLoading(false);
   }, []);
- 
+
   const refreshAll = () => {
     setArts({general:[], sports:[], business:[], finance:[], bloom:[], comedy:[]});
     setLoading({general:false, sports:false, business:false, finance:false, bloom:false, comedy:false});
@@ -1524,7 +1595,7 @@ export default function App() {
       loadScores();
     }, 80);
   };
- 
+
   useEffect(() => {
     Object.keys(DEFAULT_FEEDS).forEach(c => loadCat(c));
     PODCAST_FEEDS.forEach(p => loadPod(p));
@@ -1534,17 +1605,17 @@ export default function App() {
     return () => clearInterval(iv);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
- 
+
   const onRead = a => { setClicks(c => ({...c, [a.source]:(c[a.source] || 0) + 1})); window.open(a.link, '_blank'); };
   const onSave = a => setSaved(s => s.some(x => x.link === a.link) ? s.filter(x => x.link !== a.link) : [...s, a]);
   const isSavedFn = a => saved.some(s => s.link === a.link);
- 
+
   const handleTickerClick = t => {
     setSearch(t.label.toLowerCase());
     const catMap = {'Bloom Energy':'bloom', 'Crude Oil':'business', 'Bitcoin':'finance'};
     if (catMap[t.label]) setTab(catMap[t.label]);
   };
- 
+
   const handleCustomizeSave = ({feeds:nf, kw:nk, alerts:na, urgent:nu, social:ns}) => {
     setFeeds(nf); sv('feeds', nf);
     setKw(nk); sv('kw', nk);
@@ -1553,24 +1624,24 @@ export default function App() {
     setSocial(ns); sv('social', ns);
     setShowPanel(false); refreshAll();
   };
- 
+
   const openCustomize = (initialTab = 'keywords', initialCat = 'general') => {
     setPanelInitial({tab:initialTab, cat:initialCat});
     setShowPanel(true);
   };
- 
+
   const handleTabChange = t => {
     setTab(t); setSearch(''); setActiveKw(null); setActiveSrc(null);
     if (!['today','saved','podcasts'].includes(t) && !(arts[t] || []).length) loadCat(t);
   };
- 
+
   const getRelated = (a, cat) => {
     const matched = kwMatch(a, cat); if (!matched.length) return [];
     return (arts[cat] || []).filter(x => x.link !== a.link && matched.some(k => (x.title + (x.desc || '')).toLowerCase().includes(k.toLowerCase()))).slice(0, 4);
   };
- 
+
   const NEWS_CATS = ['general','sports','business','finance','bloom','comedy'];
- 
+
   // ─── FEED PAGE ──────────────────────────────────────────────────────────
   const FeedPage = ({cat}) => {
     const cc = CATS[cat]; const items = sorted(cat); const isLoading = loading[cat];
@@ -1581,10 +1652,6 @@ export default function App() {
             <div className="page-header-row">
               <span className="page-header">{cc.emoji} {cc.label}{items.length > 0 ? ` — ${items.length} articles` : ''}</span>
               <button className="page-customize-btn" onClick={() => openCustomize('sources', cat)}>⚙ Customize {cc.label}</button>
-            </div>
-            <div className="ai-banner">
-              <span className="ai-banner-icon">✦</span>
-              <span>AI Summaries are coming in the next update — we need to add a small backend function first. Everything else works.</span>
             </div>
             {(activeKw || activeSrc) && (
               <div style={{display:'flex', gap:'6px', flexWrap:'wrap', marginBottom:'4px'}}>
@@ -1613,16 +1680,12 @@ export default function App() {
       </div>
     );
   };
- 
+
   // ─── TODAY PAGE ─────────────────────────────────────────────────────────
   const TodayPage = () => (
     <div className="page">
       <div className="today-main">
         <div>
-          <div className="ai-banner">
-            <span className="ai-banner-icon">✦</span>
-            <span>AI Summaries are coming in the next update — we need to add a small backend function first. Everything else works.</span>
-          </div>
           <div className="today-grid">
             {['general','sports','business','finance'].map(cat => {
               const cc = CATS[cat], items = sorted(cat).slice(0, 4), total = (arts[cat] || []).length;
@@ -1688,14 +1751,32 @@ export default function App() {
       </div>
     </div>
   );
- 
+
   // ─── PODCASTS PAGE ──────────────────────────────────────────────────────
   const PodcastsPage = () => {
     const allEps = PODCAST_FEEDS.flatMap(p => (podEps[p.name] || []).slice(0, 3).map(e => ({...e, show:p.name, host:p.host, emoji:p.emoji}))).sort((a, b) => new Date(b.pubDate) - new Date(a.pubDate));
     const displayEps = activePod ? (podEps[activePod.name] || []).map(e => ({...e, show:activePod.name, host:activePod.host, emoji:activePod.emoji})) : allEps;
- 
+
     const PodCard = ({ep, idx}) => {
+      const [showSum, setShowSum] = useState(false);
+      const [podSum, setPodSum] = useState('');
+      const [podErr, setPodErr] = useState('');
+      const [loadSum, setLoadSum] = useState(false);
       const sv2 = isSavedFn({...ep, link:ep.link || ep.show + idx});
+
+      const handlePodAI = async () => {
+        if (showSum) { setShowSum(false); return; }
+        if (podSum || podErr) { setShowSum(true); return; }
+        setShowSum(true); setLoadSum(true);
+        const { summary: s, error } = await fetchAISummary({
+          type: 'podcast',
+          title: ep.title,
+          content: ep.desc || '',
+        });
+        if (s) setPodSum(s); else setPodErr(error || 'Summary unavailable');
+        setLoadSum(false);
+      };
+
       return (
         <div className="pod-card">
           <div className="pod-card-top">
@@ -1707,15 +1788,27 @@ export default function App() {
               {ep.desc && <div className="pod-desc">{ep.desc}</div>}
             </div>
           </div>
+          {showSum && (
+            <div className="pod-summary">
+              <div className="pod-summary-lbl">✦ AI Summary</div>
+              {loadSum
+                ? <div style={{fontSize:'11px', color:'var(--text3)', fontStyle:'italic'}}>Generating summary...</div>
+                : podErr
+                  ? <div style={{fontSize:'11px', color:'#dc2626'}}>{podErr}</div>
+                  : <div>{podSum}</div>}
+            </div>
+          )}
           <div className="pod-actions">
             <button className="pod-btn" onClick={() => ep.link && window.open(ep.link, '_blank')}>Listen</button>
-            <button className="pod-btn disabled" disabled title={AI_DISABLED_MSG}>✦ AI Summary (soon)</button>
+            <button className={`pod-btn ${showSum ? 'ai-on' : ''}`} onClick={handlePodAI} disabled={loadSum}>
+              ✦ {loadSum ? 'Thinking...' : showSum ? 'Hide AI' : 'AI Summary'}
+            </button>
             <button className={`pod-btn ${sv2 ? 'saved' : ''}`} onClick={() => onSave({...ep, link:ep.link || ep.show + idx, source:ep.show, cat:'podcasts'})}>{sv2 ? '★ Saved' : '☆ Save'}</button>
           </div>
         </div>
       );
     };
- 
+
     return (
       <div className="page">
         <div className="pod-page">
@@ -1726,10 +1819,6 @@ export default function App() {
                 <div className="pod-header-name">{activePod ? activePod.name : 'All Podcasts'}</div>
                 <div className="pod-header-sub">{activePod ? `Hosted by ${activePod.host}` : `${PODCAST_FEEDS.length} shows`}</div>
               </div>
-            </div>
-            <div className="ai-banner">
-              <span className="ai-banner-icon">✦</span>
-              <span>AI Summaries are coming in the next update — we need to add a small backend function first.</span>
             </div>
             {displayEps.length === 0 ? <div className="empty-state"><div className="empty-msg">Loading episodes...</div></div>
             : displayEps.slice(0, 20).map((ep, i) => <PodCard key={i} ep={ep} idx={i}/>)}
@@ -1775,7 +1864,7 @@ export default function App() {
       </div>
     );
   };
- 
+
   const SavedPage = () => (
     <div className="page">
       {saved.length === 0
@@ -1784,7 +1873,7 @@ export default function App() {
       }
     </div>
   );
- 
+
   // ─── SOCIAL PAGE ────────────────────────────────────────────────────────
   // One-stop hub showing all your followed handles across every category
   // and platform. Click any handle to open it on the source platform.
@@ -1842,7 +1931,7 @@ export default function App() {
       </div>
     );
   };
- 
+
   // ─── RENDER ─────────────────────────────────────────────────────────────
   return (
     <>
