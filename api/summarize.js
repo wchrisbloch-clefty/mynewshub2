@@ -1,22 +1,38 @@
-// /api/summarize.js
-// Vercel serverless function — proxies AI summary requests to Anthropic's API.
+// /api/summarize.js — v2
+// Vercel serverless function that proxies AI summary requests to Anthropic.
 // Browser cannot call api.anthropic.com directly (CORS + key exposure), so this
-// runs server-side, holds the API key in env vars, and returns just the summary text.
+// runs server-side, holds the API key in env vars, returns 2-3 sentence summary.
 //
-// Setup required:
-//   1. This file lives at /api/summarize.js in the repo root (next to /api/rss.js)
-//   2. Vercel → Project Settings → Environment Variables → add:
-//        Name:  ANTHROPIC_API_KEY
-//        Value: sk-ant-...   (get from console.anthropic.com → API Keys)
-//        Apply to: Production, Preview, Development
-//   3. Redeploy after adding the env var (Vercel doesn't auto-pick-up new vars)
+// Setup:
+//   1. File lives at /api/summarize.js (next to /api/rss.js)
+//   2. Vercel → Settings → Environment Variables → ANTHROPIC_API_KEY = sk-ant-...
+//   3. REDEPLOY after adding the env var (Vercel doesn't pick it up automatically)
 
 const ALLOWED_TYPES = ['article', 'podcast'];
-const MAX_INPUT_CHARS = 4000;     // Truncate huge descriptions to control token spend
-const MAX_OUTPUT_TOKENS = 250;    // 2-3 sentences fits comfortably
+const MAX_INPUT_CHARS = 4000;
+const MAX_OUTPUT_TOKENS = 250;
+const MODEL = 'claude-sonnet-4-5';  // Current Sonnet, billed at standard rate
+
+// Vercel does NOT auto-parse req.body for plain serverless functions
+// (only Next.js does). We need to read the raw stream ourselves.
+async function readBody(req) {
+  // Some Vercel runtimes DO pre-parse — check first
+  if (req.body && typeof req.body === 'object' && !req.body.on) return req.body;
+  if (typeof req.body === 'string') {
+    try { return JSON.parse(req.body); } catch { return {}; }
+  }
+  // Fall back to manually reading the stream
+  return await new Promise((resolve) => {
+    let data = '';
+    req.on('data', chunk => { data += chunk; });
+    req.on('end', () => {
+      try { resolve(JSON.parse(data || '{}')); } catch { resolve({}); }
+    });
+    req.on('error', () => resolve({}));
+  });
+}
 
 export default async function handler(req, res) {
-  // CORS — same origin in production, but harmless if Vercel routes differently
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
@@ -26,27 +42,29 @@ export default async function handler(req, res) {
   const apiKey = process.env.ANTHROPIC_API_KEY;
   if (!apiKey) {
     return res.status(500).json({
-      error: 'Missing ANTHROPIC_API_KEY env var. Add it in Vercel → Settings → Environment Variables, then redeploy.'
+      error: 'Missing ANTHROPIC_API_KEY env var. Add it in Vercel → Settings → Environment Variables, then redeploy.',
     });
   }
 
-  // Vercel parses JSON body automatically when Content-Type is application/json
-  const { type = 'article', title = '', content = '' } = req.body || {};
+  let body;
+  try { body = await readBody(req); }
+  catch (e) { return res.status(400).json({ error: 'Could not read request body: ' + e.message }); }
+
+  const { type = 'article', title = '', content = '' } = body;
 
   if (!ALLOWED_TYPES.includes(type)) {
-    return res.status(400).json({ error: `type must be one of: ${ALLOWED_TYPES.join(', ')}` });
+    return res.status(400).json({ error: `Invalid type "${type}" — must be article or podcast` });
   }
-  if (!title.trim()) {
-    return res.status(400).json({ error: 'title is required' });
+  if (!title || !String(title).trim()) {
+    return res.status(400).json({ error: 'Missing title in request body. Body received: ' + JSON.stringify(body).slice(0, 200) });
   }
 
-  // Truncate to avoid blowing token budget on unusually long descriptions
   const safeTitle   = String(title).slice(0, 500);
   const safeContent = String(content).slice(0, MAX_INPUT_CHARS);
 
   const prompt = type === 'podcast'
-    ? `Summarize this podcast episode in 2-3 concise sentences. Be direct and factual. Skip generic phrases like "this episode discusses" — start with the actual content.\n\nTitle: ${safeTitle}\n\nDescription: ${safeContent}`
-    : `Summarize this news article in 2-3 concise sentences. Be direct and factual. Skip generic phrases like "this article reports" — start with the actual news.\n\nTitle: ${safeTitle}\n\nContent: ${safeContent}`;
+    ? `Summarize this podcast episode in 2-3 concise sentences. Be direct and factual. Skip filler like "this episode discusses" — start with the actual content.\n\nTitle: ${safeTitle}\n\nDescription: ${safeContent}`
+    : `Summarize this news article in 2-3 concise sentences. Be direct and factual. Skip filler like "this article reports" — start with the actual news.\n\nTitle: ${safeTitle}\n\nContent: ${safeContent}`;
 
   try {
     const upstream = await fetch('https://api.anthropic.com/v1/messages', {
@@ -57,37 +75,43 @@ export default async function handler(req, res) {
         'anthropic-version': '2023-06-01',
       },
       body: JSON.stringify({
-        model: 'claude-sonnet-4-5',   // Fast + cheap for summaries; swap to claude-opus-4-5 if you want top quality
+        model: MODEL,
         max_tokens: MAX_OUTPUT_TOKENS,
         messages: [{ role: 'user', content: prompt }],
       }),
-      // Vercel free tier defaults to 10s timeout; Claude usually responds in 2-4s
       signal: AbortSignal.timeout(9000),
     });
 
+    const upstreamText = await upstream.text();
+
     if (!upstream.ok) {
-      const errText = await upstream.text();
+      // Surface Anthropic's actual error message so we can diagnose 400s precisely
+      let errDetail = upstreamText.slice(0, 500);
+      try {
+        const errJson = JSON.parse(upstreamText);
+        errDetail = errJson?.error?.message || errDetail;
+      } catch {}
       return res.status(upstream.status).json({
-        error: `Anthropic API ${upstream.status}`,
-        detail: errText.slice(0, 500),
+        error: `Anthropic ${upstream.status}: ${errDetail}`,
       });
     }
 
-    const data = await upstream.json();
-    const summary = data?.content?.[0]?.text?.trim() || '';
+    let data;
+    try { data = JSON.parse(upstreamText); }
+    catch { return res.status(502).json({ error: 'Anthropic returned non-JSON response' }); }
 
+    const summary = data?.content?.[0]?.text?.trim() || '';
     if (!summary) {
-      return res.status(502).json({ error: 'Empty response from Anthropic API' });
+      return res.status(502).json({ error: 'Anthropic returned empty summary' });
     }
 
-    // Cache for 24h — same article shouldn't be re-summarized constantly
     res.setHeader('Cache-Control', 's-maxage=86400, stale-while-revalidate=604800');
     return res.status(200).json({ summary });
 
   } catch (err) {
     const isTimeout = err.name === 'AbortError' || err.name === 'TimeoutError';
     return res.status(isTimeout ? 504 : 500).json({
-      error: isTimeout ? 'Anthropic API timed out (>9s)' : err.message || 'Unknown error',
+      error: isTimeout ? 'Anthropic API timed out (>9s)' : `Fetch error: ${err.message || err.name}`,
     });
   }
 }
