@@ -463,7 +463,7 @@ body{background:var(--bg);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI
 .breaking-strip.hidden{display:none;}
 .breaking-label{background:#fff;color:#dc2626;font-size:9px;font-weight:800;letter-spacing:0.08em;padding:2px 8px;border-radius:0 4px 4px 0;white-space:nowrap;flex-shrink:0;z-index:2;}
 .breaking-ticker{flex:1;overflow:hidden;margin:0 10px;}
-.breaking-ticker-inner{display:inline-flex;gap:40px;animation:ticker-scroll 30s linear infinite;white-space:nowrap;}
+.breaking-ticker-inner{display:inline-flex;gap:60px;animation:ticker-scroll 90s linear infinite;white-space:nowrap;}
 .breaking-ticker-inner:hover{animation-play-state:paused;}
 @keyframes ticker-scroll{0%{transform:translateX(0);}100%{transform:translateX(-50%);}}
 .breaking-item{font-size:11px;color:#fff;font-weight:500;cursor:pointer;display:inline-flex;align-items:center;gap:8px;}
@@ -483,6 +483,7 @@ body{background:var(--bg);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI
 .nav-tab.bloom-tab.active{color:#0369a1;background:#e0f2fe;}
 .nav-tab.pod-tab.active{color:#e11d48;background:#fff1f2;}
 .nav-tab.comedy-tab.active{color:#db2777;background:#fdf2f8;}
+.nav-tab.social-tab.active{color:#0f172a;background:#f1f5f9;}
 .nav-tab:hover:not(.active){color:#475569;}
 .nav-right{display:flex;gap:6px;align-items:center;flex-shrink:0;}
 .search-input{background:#f1f5f9;border:1px solid #e8e8e8;color:#0f172a;border-radius:6px;padding:5px 10px;font-size:12px;width:110px;font-family:inherit;}
@@ -597,6 +598,19 @@ body{background:var(--bg);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI
 .social-handles{display:flex;flex-wrap:wrap;gap:4px;}
 .social-handle{font-size:10px;font-weight:500;color:var(--text2);background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:3px 9px;text-decoration:none;transition:all 0.1s;}
 .social-handle:hover{border-color:currentColor;color:var(--text);transform:translateY(-1px);}
+ 
+/* Social PAGE (full tab) — distinct from the per-category SocialFollows block */
+.social-page-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;gap:12px;flex-wrap:wrap;}
+.social-page-title{font-size:18px;font-weight:800;color:var(--text);letter-spacing:-0.4px;}
+.social-page-sub{font-size:12px;color:var(--text2);margin-top:3px;}
+.social-page-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:14px;}
+.social-cat-block{background:var(--surface);border-radius:10px;border:1px solid var(--border);overflow:hidden;}
+.social-cat-head{display:flex;align-items:center;justify-content:space-between;padding:12px 14px;border-bottom:1px solid var(--border2);}
+.social-cat-plat{padding:10px 14px;border-bottom:1px solid var(--border2);}
+.social-cat-plat:last-child{border-bottom:none;}
+.social-cat-plat-head{display:flex;align-items:center;gap:6px;margin-bottom:8px;}
+.social-cat-plat .social-handles{display:flex;flex-wrap:wrap;gap:5px;}
+.social-cat-plat .social-handle{font-size:11px;padding:4px 10px;border-width:1px;}
  
 /* Today page */
 .today-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;}
@@ -764,6 +778,7 @@ body{background:var(--bg);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI
   .breaking-strip { height: 34px; }
   .breaking-label { font-size: 8px; padding: 2px 6px; }
   .breaking-item { font-size: 10px; }
+  .breaking-ticker-inner { animation-duration: 60s; gap: 40px; }
  
   .bloom-strip { grid-template-columns: 1fr; }
   .bloom-strip-item { border-right: none; border-bottom: 1px solid var(--border2); }
@@ -1319,8 +1334,8 @@ function TopBar({ tab, setTab, search, setSearch, dark, setDark, onCustomize, on
  
   const hasBreaking = breakingItems && breakingItems.length > 0;
   const tickerItems = hasBreaking ? [...breakingItems, ...breakingItems] : [];
-  const ALL_TABS = ['today','general','sports','business','finance','bloom','comedy','podcasts','saved'];
-  const TAB_LABELS = { today:'Today', bloom:'Bloom Energy', podcasts:'Podcasts', saved:'Saved', comedy:'Comedy' };
+  const ALL_TABS = ['today','general','sports','business','finance','bloom','comedy','podcasts','social','saved'];
+  const TAB_LABELS = { today:'Today', bloom:'Bloom Energy', podcasts:'Podcasts', social:'Social', saved:'Saved', comedy:'Comedy' };
  
   return (
     <div className="topbar-wrap">
@@ -1362,7 +1377,7 @@ function TopBar({ tab, setTab, search, setSearch, dark, setDark, onCustomize, on
           <div className="logo">My<span>News</span>Hub</div>
           <div className="nav-tabs">
             {ALL_TABS.map(t => (
-              <button key={t} className={`nav-tab ${tab === t ? 'active' : ''} ${t === 'bloom' ? 'bloom-tab' : ''} ${t === 'podcasts' ? 'pod-tab' : ''} ${t === 'comedy' ? 'comedy-tab' : ''}`} onClick={() => { setTab(t); setSearch(''); }}>
+              <button key={t} className={`nav-tab ${tab === t ? 'active' : ''} ${t === 'bloom' ? 'bloom-tab' : ''} ${t === 'podcasts' ? 'pod-tab' : ''} ${t === 'comedy' ? 'comedy-tab' : ''} ${t === 'social' ? 'social-tab' : ''}`} onClick={() => { setTab(t); setSearch(''); }}>
                 {TAB_LABELS[t] || (t.charAt(0).toUpperCase() + t.slice(1))}
               </button>
             ))}
@@ -1770,6 +1785,64 @@ export default function App() {
     </div>
   );
  
+  // ─── SOCIAL PAGE ────────────────────────────────────────────────────────
+  // One-stop hub showing all your followed handles across every category
+  // and platform. Click any handle to open it on the source platform.
+  // Edit via Customize → Social tab.
+  const SocialPage = () => {
+    const totalAccounts = Object.values(social).reduce(
+      (n, cat) => n + Object.values(cat).reduce((m, arr) => m + (arr?.length || 0), 0),
+      0
+    );
+    return (
+      <div className="page">
+        <div className="social-page-header">
+          <div>
+            <div className="social-page-title">🔗 Social Follows</div>
+            <div className="social-page-sub">{totalAccounts} accounts across {Object.keys(social).length} categories — tap any handle to open on the source platform</div>
+          </div>
+          <button className="page-customize-btn" onClick={() => openCustomize('social', 'general')}>⚙ Edit Social</button>
+        </div>
+        <div className="social-page-grid">
+          {Object.keys(CATS).map(cat => {
+            const cc = CATS[cat];
+            const catSocial = social[cat] || {};
+            const platforms = Object.keys(catSocial).filter(p => catSocial[p] && catSocial[p].length > 0);
+            const total = platforms.reduce((n, p) => n + catSocial[p].length, 0);
+            return (
+              <div key={cat} className="social-cat-block" style={{borderTop:`3px solid ${cc.color}`}}>
+                <div className="social-cat-head">
+                  <span style={{color:cc.color, fontWeight:700, fontSize:'13px'}}>{cc.emoji} {cc.label}</span>
+                  <span style={{fontSize:'10px', color:'var(--text3)'}}>{total} accounts</span>
+                </div>
+                {platforms.length === 0 ? (
+                  <div style={{padding:'20px 14px', fontSize:'11px', color:'var(--text3)', fontStyle:'italic'}}>No accounts yet — add some in Customize</div>
+                ) : platforms.map(p => {
+                  const meta = SOCIAL_META[p];
+                  const handles = catSocial[p];
+                  return (
+                    <div key={p} className="social-cat-plat">
+                      <div className="social-cat-plat-head">
+                        <div className="social-plat-icon" style={{background:meta.color}}>{meta.icon}</div>
+                        <span className="social-plat-label">{meta.label}</span>
+                        <span className="social-plat-count">{handles.length}</span>
+                      </div>
+                      <div className="social-handles">
+                        {handles.map((h, i) => (
+                          <a key={i} className="social-handle" href={socialUrl(p, h)} target="_blank" rel="noreferrer" style={{color:meta.color, borderColor:meta.color + '33'}}>{h}</a>
+                        ))}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    );
+  };
+ 
   // ─── RENDER ─────────────────────────────────────────────────────────────
   return (
     <>
@@ -1779,6 +1852,7 @@ export default function App() {
         {tab === 'today' && <TodayPage/>}
         {NEWS_CATS.includes(tab) && <FeedPage cat={tab}/>}
         {tab === 'podcasts' && <PodcastsPage/>}
+        {tab === 'social' && <SocialPage/>}
         {tab === 'saved' && <SavedPage/>}
         {showPanel && <CustomizePanel feeds={feeds} kw={kw} alerts={alerts} urgent={urgent} social={social} health={health} arts={arts} initialTab={panelInitial.tab} initialCat={panelInitial.cat} onClose={() => setShowPanel(false)} onSave={handleCustomizeSave}/>}
       </div>
