@@ -1,3 +1,19 @@
+// MyNewsHub v14 — Chunk A
+// ─────────────────────────────────────────────────────────────────────────────
+// Changes from v13:
+//  • Storage key bump v13_ → v14_ with one-time migration
+//  • Image extraction: checks media:content, media:thumbnail, enclosure, image/url,
+//    and regex-extracts first <img> from description HTML
+//  • RSS proxy chain: AbortController 8s timeout per proxy, better error surfacing
+//  • AI Summary button: shows "Requires Backend (Chunk B)" tooltip instead of hanging
+//  • Social Follows: restored as curated link-list section on each category page
+//  • Sports scoreboard: live scores for Texans/Rockets/Astros/Braves/UK MBB/UK FB/Clemson FB
+//    via ESPN public JSON, rendered on Today page + Sports page sidebar
+//  • Per-category Customize button inline on each category header
+//  • Trending/Topics/Sources sidebar now works for Comedy + Podcasts pages too
+//  • Source health now includes failure reason (timeout / blocked / empty)
+// ─────────────────────────────────────────────────────────────────────────────
+
 import { useState, useEffect, useCallback, useMemo } from 'react';
 
 // ─── CATEGORIES ───────────────────────────────────────────────────────────────
@@ -165,6 +181,17 @@ const SCORE_TEAMS = [
   { team:'Clemson FB',   sport:'football',   league:'college-football',          match:'Clemson',           emoji:'🏈' },
 ];
 
+// LEAGUES drives the full-league scoreboard view. Each league fetches all today's
+// games (live, scheduled, completed). Favorite teams from SCORE_TEAMS get pinned
+// to the top of their league section.
+const LEAGUES = [
+  { key:'nfl',      label:'NFL',          sport:'football',   league:'nfl',                     emoji:'🏈', accent:'#013369' },
+  { key:'nba',      label:'NBA',          sport:'basketball', league:'nba',                     emoji:'🏀', accent:'#c8102e' },
+  { key:'mlb',      label:'MLB',          sport:'baseball',   league:'mlb',                     emoji:'⚾', accent:'#002d72' },
+  { key:'cfb',      label:'College FB',   sport:'football',   league:'college-football',        emoji:'🏈', accent:'#1d4ed8' },
+  { key:'cbb',      label:'College BB',   sport:'basketball', league:'mens-college-basketball', emoji:'🏀', accent:'#d97706' },
+];
+
 // ─── STORAGE (with v13 → v14 migration) ──────────────────────────────────────
 const SK = 'v14_';
 const OLD_SK = 'v13_';
@@ -177,6 +204,26 @@ const DEFAULT_URGENT = [
   'breaking', 'hurricane', 'earthquake', 'tornado', 'wildfire',
   'explosion', 'evacuation', 'shooting', 'tsunami', 'pandemic',
   'recall', 'outage', 'market crash', 'flash flood', 'state of emergency',
+];
+
+// Finance page market indices — always shown at the top of the Finance page.
+// Yahoo Finance symbols: ^GSPC = S&P 500, ^DJI = Dow, ^IXIC = Nasdaq
+const INDICES = [
+  { sym:'^GSPC', label:'S&P 500',  short:'S&P' },
+  { sym:'^DJI',  label:'Dow Jones', short:'DOW' },
+  { sym:'^IXIC', label:'Nasdaq',    short:'NDQ' },
+];
+
+// Personal watchlist — energy + AI bias matching CB's professional interests.
+// Editable in Customize → Watchlist tab.
+const DEFAULT_WATCHLIST = [
+  { sym:'BE',    name:'Bloom Energy' },
+  { sym:'MPC',   name:'Marathon Petroleum' },
+  { sym:'XOM',   name:'Exxon Mobil' },
+  { sym:'CVX',   name:'Chevron' },
+  { sym:'NVDA',  name:'NVIDIA' },
+  { sym:'MSFT',  name:'Microsoft' },
+  { sym:'GOOGL', name:'Alphabet' },
 ];
 
 function ld(k, d) {
@@ -415,20 +462,29 @@ async function fetchScoreboard(sport, league) {
 }
 
 async function fetchAllScores() {
-  // Fetch each unique sport/league combo once, filter client-side to our teams
-  const combos = [...new Set(SCORE_TEAMS.map(t => `${t.sport}|${t.league}`))];
+  // Fetch full scoreboard for each league. Returns:
+  //   { nfl: [game,game,...], nba: [...], mlb: [...], cfb: [...], cbb: [...] }
+  // Each game keeps the ESPN shape from fetchScoreboard.
   const results = {};
-  await Promise.allSettled(combos.map(async c => {
-    const [sport, league] = c.split('|');
-    const games = await fetchScoreboard(sport, league);
-    SCORE_TEAMS.filter(t => t.sport === sport && t.league === league).forEach(t => {
-      const match = games.find(g =>
-        (g.homeName + ' ' + g.awayName + ' ' + g.short + ' ' + g.name).toLowerCase().includes(t.match.toLowerCase())
-      );
-      results[t.team] = match || null;
+  await Promise.allSettled(LEAGUES.map(async L => {
+    const games = await fetchScoreboard(L.sport, L.league);
+    // Sort: live games first, then scheduled (soonest), then completed (most recent)
+    games.sort((a, b) => {
+      const order = { in: 0, pre: 1, post: 2 };
+      const oa = order[a.state] ?? 3, ob = order[b.state] ?? 3;
+      if (oa !== ob) return oa - ob;
+      return new Date(a.date) - new Date(b.date);
     });
+    results[L.key] = games;
   }));
   return results;
+}
+
+// Returns the SCORE_TEAMS entry if any favorite team is playing in this game
+function favoriteIn(game) {
+  if (!game) return null;
+  const txt = ((game.homeName || '') + ' ' + (game.awayName || '') + ' ' + (game.short || '') + ' ' + (game.name || '')).toLowerCase();
+  return SCORE_TEAMS.find(t => txt.includes(t.match.toLowerCase())) || null;
 }
 
 // ─── SOCIAL URL BUILDERS ─────────────────────────────────────────────────────
@@ -577,23 +633,128 @@ body{background:var(--bg);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI
 .trend-src{font-size:10px;color:var(--text3);}
 
 /* scoreboard */
-.score-block{background:var(--surface);border-radius:10px;border:1px solid var(--border);overflow:hidden;}
-.score-head{padding:10px 14px 8px;border-bottom:1px solid var(--border2);display:flex;align-items:center;justify-content:space-between;}
-.score-title{font-size:10px;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:0.07em;}
-.score-list{padding:4px 0;}
-.score-row{padding:10px 14px;border-bottom:1px solid var(--border2);cursor:pointer;transition:background 0.1s;}
-.score-row:last-child{border-bottom:none;}.score-row:hover{background:var(--bg);}
-.score-team-label{font-size:10px;font-weight:700;color:var(--text2);margin-bottom:5px;display:flex;align-items:center;gap:5px;}
-.score-vs{display:flex;align-items:center;justify-content:space-between;gap:8px;}
-.score-side{display:flex;align-items:center;gap:6px;flex:1;min-width:0;}
-.score-logo{width:18px;height:18px;object-fit:contain;flex-shrink:0;}
-.score-abbr{font-size:11px;font-weight:600;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
-.score-num{font-size:14px;font-weight:800;color:var(--text);flex-shrink:0;min-width:22px;text-align:right;}
-.score-num.winner{color:#16a34a;}
-.score-num.loser{color:var(--text3);}
-.score-status{font-size:9px;color:var(--text3);margin-top:4px;text-transform:uppercase;letter-spacing:0.04em;}
-.score-status.live{color:#dc2626;font-weight:700;}
-.score-none{padding:10px 14px;font-size:10px;color:var(--text3);font-style:italic;text-align:center;}
+/* ─── FINANCE PAGE (Yahoo-light + Bloomberg touches) ─────────────────── */
+.fin-header{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:14px 18px 12px;margin-bottom:14px;border-top:3px solid #1d4ed8;}
+.fin-header-top{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:14px;gap:12px;flex-wrap:wrap;}
+.fin-header-title{font-size:18px;font-weight:800;color:var(--text);letter-spacing:-0.4px;}
+.fin-header-sub{font-size:11px;color:var(--text2);margin-top:3px;display:flex;align-items:center;gap:6px;}
+.fin-status-dot{width:8px;height:8px;border-radius:50%;display:inline-block;}
+.fin-refresh{background:var(--bg);border:1px solid var(--border);color:var(--text2);border-radius:6px;padding:6px 12px;font-size:11px;font-weight:600;cursor:pointer;font-family:inherit;}
+.fin-refresh:hover{border-color:#1d4ed8;color:#1d4ed8;}
+.fin-refresh:disabled{cursor:wait;opacity:0.6;}
+.fin-indices{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;}
+.fin-index{background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:10px 14px;border-left:3px solid var(--border);}
+.fin-index.up{border-left-color:#16a34a;}
+.fin-index.down{border-left-color:#dc2626;}
+.fin-index-label{font-size:10px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:0.06em;margin-bottom:3px;}
+.fin-index-price{font-size:20px;font-weight:800;color:var(--text);font-variant-numeric:tabular-nums;letter-spacing:-0.5px;line-height:1.1;font-family:'SF Mono','Monaco','Cascadia Code','Consolas',monospace;}
+.fin-index-chg{font-size:11px;font-weight:600;margin-top:3px;display:flex;gap:6px;align-items:center;font-variant-numeric:tabular-nums;}
+.fin-index.up .fin-index-chg{color:#16a34a;}
+.fin-index.down .fin-index-chg{color:#dc2626;}
+.fin-index-pct{background:rgba(0,0,0,0.05);border-radius:3px;padding:1px 5px;font-size:10px;}
+.dark .fin-index-pct{background:rgba(255,255,255,0.08);}
+
+.fin-grid{display:grid;grid-template-columns:1fr 280px;gap:16px;align-items:start;}
+.fin-main{display:flex;flex-direction:column;gap:14px;min-width:0;}
+
+.fin-watchlist,.fin-news{background:var(--surface);border:1px solid var(--border);border-radius:10px;overflow:hidden;}
+.fin-section-head{display:flex;justify-content:space-between;align-items:center;padding:12px 16px;border-bottom:1px solid var(--border2);}
+.fin-section-title{font-size:13px;font-weight:800;color:var(--text);letter-spacing:-0.2px;}
+.fin-news{padding:14px;}
+.fin-news .fin-section-head{margin:-14px -14px 10px;border-radius:10px 10px 0 0;background:var(--bg);}
+
+.fin-table{width:100%;border-collapse:collapse;font-variant-numeric:tabular-nums;}
+.fin-table thead th{background:var(--bg);font-size:9px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:0.07em;padding:9px 12px;border-bottom:1px solid var(--border);position:sticky;top:0;}
+.fin-table tbody tr{cursor:pointer;transition:background 0.08s;border-bottom:1px solid var(--border2);}
+.fin-table tbody tr:hover{background:var(--bg);}
+.fin-table tbody tr:last-child{border-bottom:none;}
+.fin-table td{padding:11px 12px;font-size:12px;color:var(--text);}
+.fin-sym{font-weight:800;font-family:'SF Mono','Monaco','Cascadia Code','Consolas',monospace;letter-spacing:-0.3px;color:#1d4ed8;}
+.fin-name{color:var(--text2);font-size:11px;}
+.fin-px{font-family:'SF Mono','Monaco','Cascadia Code','Consolas',monospace;text-align:right;font-weight:600;letter-spacing:-0.2px;}
+.fin-up{color:#16a34a;}
+.fin-down{color:#dc2626;}
+.fin-pct-pill{background:rgba(22,163,74,0.1);border-radius:4px;padding:2px 6px;font-size:11px;font-weight:700;}
+.fin-down .fin-pct-pill{background:rgba(220,38,38,0.1);}
+.fin-empty{padding:30px;text-align:center;color:var(--text3);font-style:italic;font-size:12px;}
+
+@media (max-width: 900px){
+  .fin-grid{grid-template-columns:1fr;}
+  .fin-indices{grid-template-columns:1fr;}
+  .fin-index-price{font-size:18px;}
+}
+@media (max-width: 640px){
+  .fin-table td{padding:9px 8px;font-size:11px;}
+  .fin-table thead th{padding:7px 8px;}
+  .fin-name{display:none;}  /* drop name column on mobile to keep prices visible */
+  .fin-table thead th:nth-child(2){display:none;}
+}
+
+/* ─── MSN-STYLE TODAY HERO ──────────────────────────────────────────── */
+.hero-row{display:grid;grid-template-columns:1fr 320px;gap:16px;margin-bottom:18px;}
+.hero-lead{background:var(--surface);border-radius:12px;border:1px solid var(--border);overflow:hidden;cursor:pointer;transition:box-shadow 0.15s,transform 0.15s;}
+.hero-lead:hover{box-shadow:0 4px 18px rgba(0,0,0,0.08);transform:translateY(-1px);}
+.hero-lead-img{width:100%;aspect-ratio:16/9;background-size:cover;background-position:center;background-color:var(--bg);position:relative;}
+.hero-lead-badge{position:absolute;top:14px;left:14px;color:#fff;font-size:10px;font-weight:700;padding:4px 10px;border-radius:4px;letter-spacing:0.04em;text-transform:uppercase;box-shadow:0 1px 3px rgba(0,0,0,0.2);}
+.hero-lead-text{padding:16px 18px 18px;}
+.hero-lead-title{font-size:22px;font-weight:800;color:var(--text);line-height:1.25;letter-spacing:-0.4px;margin:0 0 8px;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden;}
+.hero-lead-desc{font-size:13px;color:var(--text2);line-height:1.5;margin:0 0 10px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;}
+.hero-lead-meta{display:flex;align-items:center;gap:6px;font-size:11px;color:var(--text3);}
+.hero-lead-source{font-weight:700;color:var(--text2);}
+.hero-side{background:var(--surface);border-radius:12px;border:1px solid var(--border);padding:12px;display:flex;flex-direction:column;gap:0;}
+.hero-side-label{font-size:10px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:0.08em;padding:4px 6px 10px;border-bottom:1px solid var(--border2);margin-bottom:4px;}
+.hero-side-item{display:flex;gap:10px;padding:9px 6px;border-bottom:1px solid var(--border2);cursor:pointer;transition:background 0.1s;}
+.hero-side-item:last-child{border-bottom:none;}
+.hero-side-item:hover{background:var(--bg);}
+.hero-side-thumb{width:60px;height:45px;object-fit:cover;border-radius:5px;flex-shrink:0;}
+.hero-side-body{flex:1;min-width:0;}
+.hero-side-title{font-size:12px;font-weight:600;color:var(--text);line-height:1.35;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;margin-bottom:3px;}
+.hero-side-meta{font-size:10px;color:var(--text3);}
+@media (max-width: 900px){
+  .hero-row{grid-template-columns:1fr;}
+  .hero-lead-title{font-size:18px;}
+}
+@media (max-width: 640px){
+  .hero-lead-img{aspect-ratio:16/10;}
+  .hero-lead-text{padding:12px 14px 14px;}
+  .hero-lead-title{font-size:17px;}
+  .hero-side-thumb{width:54px;height:40px;}
+}
+
+/* ─── SCOREBOARD (rebuilt) ─────────────────────────────────────────── */
+.sb-block{background:var(--surface);border-radius:10px;border:1px solid var(--border);overflow:hidden;}
+.sb-block-head{padding:10px 14px 8px;border-bottom:1px solid var(--border2);display:flex;align-items:center;justify-content:space-between;}
+.sb-block-title{font-size:11px;font-weight:700;color:var(--text);text-transform:uppercase;letter-spacing:0.07em;}
+.sb-block-sub{font-size:9px;color:var(--text3);text-transform:uppercase;letter-spacing:0.06em;}
+.sb-empty{padding:14px;font-size:11px;color:var(--text3);text-align:center;font-style:italic;}
+.sb-league{border-bottom:1px solid var(--border2);}
+.sb-league:last-child{border-bottom:none;}
+.sb-league-head{width:100%;background:none;border:none;display:flex;align-items:center;gap:8px;padding:9px 14px;cursor:pointer;font-family:inherit;text-align:left;font-size:11px;transition:background 0.1s;}
+.sb-league-head:hover{background:var(--bg);}
+.sb-league-meta{margin-left:auto;display:flex;gap:6px;align-items:center;font-size:10px;color:var(--text3);}
+.sb-league-fav{background:#fef3c7;color:#92400e;border-radius:8px;padding:1px 6px;font-weight:700;font-size:9px;}
+.sb-chevron{color:var(--text3);font-size:10px;width:12px;text-align:center;}
+.sb-games{padding:4px 10px 8px;display:flex;flex-direction:column;gap:6px;}
+.sb-game{background:var(--bg);border:1px solid var(--border);border-radius:6px;padding:7px 10px;cursor:pointer;transition:all 0.1s;}
+.sb-game:hover{border-color:#1d4ed8;}
+.sb-game.fav{border-color:#f59e0b;background:#fffbeb;}
+.dark .sb-game.fav{background:rgba(245,158,11,0.08);}
+.sb-game.live{border-color:#dc2626;background:#fef2f2;}
+.dark .sb-game.live{background:rgba(220,38,38,0.1);}
+.sb-game.fav.live{border-color:#dc2626;background:linear-gradient(135deg,#fef2f2,#fffbeb);}
+.sb-game-row{display:flex;align-items:center;justify-content:space-between;gap:6px;padding:1px 0;}
+.sb-side{display:flex;align-items:center;gap:6px;flex:1;min-width:0;}
+.sb-logo{width:16px;height:16px;object-fit:contain;flex-shrink:0;}
+.sb-abbr{font-size:11px;font-weight:600;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.sb-num{font-size:13px;font-weight:800;color:var(--text);flex-shrink:0;min-width:22px;text-align:right;font-variant-numeric:tabular-nums;}
+.sb-num.winner{color:#16a34a;}
+.sb-num.loser{color:var(--text3);font-weight:600;}
+.sb-status{font-size:9px;margin-top:4px;text-transform:uppercase;letter-spacing:0.04em;display:flex;align-items:center;gap:5px;}
+.sb-status.live{color:#dc2626;font-weight:700;}
+.sb-status.final{color:var(--text3);}
+.sb-status.pre{color:#1d4ed8;}
+.sb-fav-star{color:#f59e0b;font-size:10px;}
+.sb-more{padding:6px;text-align:center;font-size:10px;color:var(--text3);font-style:italic;}
 
 /* social follows */
 .social-block{background:var(--surface);border-radius:10px;border:1px solid var(--border);padding:14px 16px;margin-top:14px;}
@@ -1047,54 +1208,95 @@ function TodayItem({ a, cc, onRead }) {
 }
 
 // ─── SCOREBOARD COMPONENT ────────────────────────────────────────────────────
-function Scoreboard({ scores, loading }) {
+// New design: collapsible league sections, all today's games per league,
+// favorite teams pinned to the top of each league with a ★ marker.
+// Live games highlighted red, scheduled in blue, finals in gray.
+function Scoreboard({ scores, loading, compact = false }) {
+  const [expanded, setExpanded] = useState(() => {
+    // Default: NFL + NBA + MLB expanded; college collapsed (less daily relevance)
+    const init = {};
+    LEAGUES.forEach(L => { init[L.key] = ['nfl','nba','mlb'].includes(L.key); });
+    return init;
+  });
+
+  const renderGame = (g, isFav) => {
+    const live = g.state === 'in';
+    const final = g.state === 'post';
+    const h = parseInt(g.homeScore) || 0, a = parseInt(g.awayScore) || 0;
+    const homeWin = final && h > a, awayWin = final && a > h;
+    return (
+      <div key={g.id} className={`sb-game ${isFav ? 'fav' : ''} ${live ? 'live' : ''}`} onClick={() => g.link && window.open(g.link, '_blank')}>
+        <div className="sb-game-row">
+          <div className="sb-side">
+            {g.awayLogo && <img className="sb-logo" src={g.awayLogo} alt="" onError={e => e.target.style.display='none'}/>}
+            <span className="sb-abbr">{g.awayAbbr || g.awayName}</span>
+          </div>
+          <span className={`sb-num ${awayWin ? 'winner' : final ? 'loser' : ''}`}>{g.awayScore || '—'}</span>
+        </div>
+        <div className="sb-game-row">
+          <div className="sb-side">
+            {g.homeLogo && <img className="sb-logo" src={g.homeLogo} alt="" onError={e => e.target.style.display='none'}/>}
+            <span className="sb-abbr">{g.homeAbbr || g.homeName}</span>
+          </div>
+          <span className={`sb-num ${homeWin ? 'winner' : final ? 'loser' : ''}`}>{g.homeScore || '—'}</span>
+        </div>
+        <div className={`sb-status ${live ? 'live' : final ? 'final' : 'pre'}`}>
+          {isFav && <span className="sb-fav-star">★</span>}
+          {live ? '● LIVE · ' : ''}{g.status || fmtDate(g.date)}
+        </div>
+      </div>
+    );
+  };
+
+  if (loading && (!scores || Object.keys(scores).length === 0)) {
+    return <div className="sb-block"><div className="sb-block-head"><span className="sb-block-title">🏆 Scoreboard</span></div><div className="sb-empty">Loading scores...</div></div>;
+  }
+
   return (
-    <div className="score-block">
-      <div className="score-head">
-        <span className="score-title">🏆 My Teams</span>
+    <div className="sb-block">
+      <div className="sb-block-head">
+        <span className="sb-block-title">🏆 Scoreboard</span>
+        <span className="sb-block-sub">Today · ESPN</span>
       </div>
-      <div className="score-list">
-        {loading && Object.keys(scores).length === 0 && (
-          <div className="score-none">Loading scores…</div>
-        )}
-        {SCORE_TEAMS.map(t => {
-          const g = scores[t.team];
-          if (!g) {
-            return (
-              <div key={t.team} className="score-row">
-                <div className="score-team-label">{t.emoji} {t.team}</div>
-                <div className="score-none" style={{padding:0,textAlign:'left'}}>No game scheduled</div>
+      {LEAGUES.map(L => {
+        const games = scores[L.key] || [];
+        // Sort favorites first
+        const sortedGames = [...games].sort((a, b) => {
+          const fa = favoriteIn(a) ? 0 : 1, fb = favoriteIn(b) ? 0 : 1;
+          if (fa !== fb) return fa - fb;
+          return 0;
+        });
+        const favCount = sortedGames.filter(g => favoriteIn(g)).length;
+        const isOpen = expanded[L.key];
+        // In compact mode (home page), only show favorites + max 3 games per league
+        const visibleGames = compact
+          ? sortedGames.filter(g => favoriteIn(g)).concat(sortedGames.filter(g => !favoriteIn(g)).slice(0, 2)).slice(0, 4)
+          : sortedGames;
+        return (
+          <div key={L.key} className="sb-league">
+            <button className="sb-league-head" onClick={() => setExpanded(s => ({...s, [L.key]:!s[L.key]}))}>
+              <span style={{color:L.accent, fontWeight:700}}>{L.emoji} {L.label}</span>
+              <span className="sb-league-meta">
+                {games.length === 0
+                  ? <span style={{color:'var(--text3)', fontStyle:'italic'}}>No games today</span>
+                  : <>
+                      <span>{games.length} {games.length === 1 ? 'game' : 'games'}</span>
+                      {favCount > 0 && <span className="sb-league-fav">★ {favCount}</span>}
+                    </>}
+              </span>
+              <span className="sb-chevron">{isOpen ? '▾' : '▸'}</span>
+            </button>
+            {isOpen && games.length > 0 && (
+              <div className="sb-games">
+                {visibleGames.map(g => renderGame(g, favoriteIn(g)))}
+                {compact && sortedGames.length > visibleGames.length && (
+                  <div className="sb-more">+{sortedGames.length - visibleGames.length} more games</div>
+                )}
               </div>
-            );
-          }
-          const live = g.state === 'in';
-          const final = g.state === 'post';
-          const h = parseInt(g.homeScore) || 0, a = parseInt(g.awayScore) || 0;
-          const homeWin = final && h > a, awayWin = final && a > h;
-          return (
-            <div key={t.team} className="score-row" onClick={() => g.link && window.open(g.link, '_blank')}>
-              <div className="score-team-label">{t.emoji} {t.team}</div>
-              <div className="score-vs">
-                <div className="score-side">
-                  {g.awayLogo && <img className="score-logo" src={g.awayLogo} alt=""/>}
-                  <span className="score-abbr">{g.awayAbbr || g.awayName}</span>
-                </div>
-                <span className={`score-num ${awayWin ? 'winner' : final ? 'loser' : ''}`}>{g.awayScore || '—'}</span>
-              </div>
-              <div className="score-vs" style={{marginTop:3}}>
-                <div className="score-side">
-                  {g.homeLogo && <img className="score-logo" src={g.homeLogo} alt=""/>}
-                  <span className="score-abbr">{g.homeAbbr || g.homeName}</span>
-                </div>
-                <span className={`score-num ${homeWin ? 'winner' : final ? 'loser' : ''}`}>{g.homeScore || '—'}</span>
-              </div>
-              <div className={`score-status ${live ? 'live' : ''}`}>
-                {live ? '● LIVE · ' : ''}{g.status || fmtDate(g.date)}
-              </div>
-            </div>
-          );
-        })}
-      </div>
+            )}
+          </div>
+        );
+      })}
     </div>
   );
 }
@@ -1220,11 +1422,14 @@ function SocialFollows({ cat, social }) {
 const CAT_LABELS = { general:'🌐 General',sports:'🏆 Sports',business:'⚡ Business',finance:'📈 Finance',bloom:'🔋 Bloom',comedy:'😂 Comedy' };
 const PLAT_LABELS = { twitter:'𝕏', linkedin:'in', instagram:'IG', youtube:'▶' };
 
-function CustomizePanel({ feeds, kw, alerts, urgent, social, health, arts, initialTab, initialCat, onClose, onSave }) {
+function CustomizePanel({ feeds, kw, alerts, urgent, social, watchlist, health, arts, initialTab, initialCat, onClose, onSave }) {
   const [lf, setLf] = useState(JSON.parse(JSON.stringify(feeds)));
   const [lk, setLk] = useState(JSON.parse(JSON.stringify(kw)));
   const [la, setLa] = useState([...alerts]);
   const [lu, setLu] = useState([...(urgent || [])]);
+  const [lw, setLw] = useState(JSON.parse(JSON.stringify(watchlist || [])));
+  const [newSym, setNewSym] = useState('');
+  const [newSymName, setNewSymName] = useState('');
   const [ls, setLs] = useState(JSON.parse(JSON.stringify(social)));
   const [secTab, setSecTab] = useState(initialTab || 'keywords'); // keywords | alerts | sources | social
   const [kwTab, setKwTab] = useState(initialCat || 'general');
@@ -1288,9 +1493,9 @@ function CustomizePanel({ feeds, kw, alerts, urgent, social, health, arts, initi
         <div className="cp-head"><span className="cp-title">Customize</span><button className="cp-x" onClick={onClose}>✕</button></div>
         <div className="cp-body">
           <div className="cp-sec-tabs">
-            {['keywords','alerts','sources','social'].map(t => (
+            {['keywords','alerts','sources','social','watchlist'].map(t => (
               <button key={t} className={`cp-sec-tab ${secTab === t ? 'active' : ''}`} onClick={() => setSecTab(t)}>
-                {t === 'keywords' ? 'Keywords' : t === 'alerts' ? 'Alerts' : t === 'sources' ? 'Sources' : 'Social'}
+                {t === 'keywords' ? 'Keywords' : t === 'alerts' ? 'Alerts' : t === 'sources' ? 'Sources' : t === 'social' ? 'Social' : '📈 Watchlist'}
               </button>
             ))}
           </div>
@@ -1401,7 +1606,33 @@ function CustomizePanel({ feeds, kw, alerts, urgent, social, health, arts, initi
             </div>
           )}
 
-          <button className="cp-save" onClick={() => onSave({feeds:lf, kw:lk, alerts:la, urgent:lu, social:ls})}>Save & Refresh</button>
+          {secTab === 'watchlist' && (
+            <div className="cp-sec">
+              <div className="cp-lbl">Watchlist Symbols</div>
+              <div className="cp-desc">Stocks and indices shown on the Finance page. Click any row on the Finance page to open Yahoo Finance for that symbol.</div>
+              {lw.map((w, i) => (
+                <div key={i} className="cp-src-row">
+                  <span style={{fontWeight:700, fontFamily:'monospace', color:'#1d4ed8', fontSize:'12px', minWidth:'50px'}}>{w.sym}</span>
+                  <span className="cp-src-name">{w.name}</span>
+                  <button className="cp-del" onClick={() => setLw(prev => prev.filter((_, j) => j !== i))}>✕</button>
+                </div>
+              ))}
+              {lw.length === 0 && <div style={{fontSize:'11px', color:'var(--text3)', padding:'10px 0'}}>No symbols yet</div>}
+              <div className="cp-add-src" style={{marginTop:'10px'}}>
+                <div className="cp-add-src-title">+ Add symbol</div>
+                <input className="cp-input-sm" placeholder="Symbol (e.g. AAPL)" value={newSym} onChange={e => setNewSym(e.target.value.toUpperCase())}/>
+                <input className="cp-input-sm" placeholder="Name (e.g. Apple Inc)" value={newSymName} onChange={e => setNewSymName(e.target.value)}/>
+                <button className="cp-btn" style={{width:'100%'}} onClick={() => {
+                  if (newSym.trim() && newSymName.trim()) {
+                    setLw(prev => [...prev, {sym: newSym.trim(), name: newSymName.trim()}]);
+                    setNewSym(''); setNewSymName('');
+                  }
+                }}>Add to Watchlist</button>
+              </div>
+            </div>
+          )}
+
+          <button className="cp-save" onClick={() => onSave({feeds:lf, kw:lk, alerts:la, urgent:lu, social:ls, watchlist:lw})}>Save & Refresh</button>
         </div>
       </div>
     </div>
@@ -1524,6 +1755,9 @@ export default function App() {
   const [alerts, setAlerts]     = useState(() => ld('alerts', ['Texans','Astros','Kentucky','Clemson','ERCOT','Bloom Energy','fuel cell','hurricane','earthquake','breaking']));
   const [feeds, setFeeds]       = useState(() => ld('feeds', DEFAULT_FEEDS));
   const [urgent, setUrgent]     = useState(() => ld('urgent', DEFAULT_URGENT));
+  const [watchlist, setWatchlist] = useState(() => ld('watchlist', DEFAULT_WATCHLIST));
+  const [marketData, setMarketData] = useState({});  // { sym: {price,chg,pct} }
+  const [marketLoading, setMarketLoading] = useState(false);
   const [social, setSocial]     = useState(() => ld('social', DEFAULT_SOCIAL));
   const [arts, setArts]         = useState({general:[], sports:[], business:[], finance:[], bloom:[], comedy:[]});
   const [loading, setLoading]   = useState({general:false, sports:false, business:false, finance:false, bloom:false, comedy:false});
@@ -1633,6 +1867,20 @@ export default function App() {
     setScoresLoading(false);
   }, []);
 
+  // Load all market quotes (indices + watchlist) in parallel.
+  // Called when Finance tab opens, and refreshed on the same 2min interval as scores.
+  const loadMarketData = useCallback(async () => {
+    setMarketLoading(true);
+    const allSyms = [...INDICES.map(i => i.sym), ...watchlist.map(w => w.sym)];
+    const results = {};
+    await Promise.allSettled(allSyms.map(async sym => {
+      const q = await fetchQuote(sym);
+      if (q) results[sym] = q;
+    }));
+    setMarketData(prev => ({...prev, ...results}));
+    setMarketLoading(false);
+  }, [watchlist]);
+
   const refreshAll = () => {
     setArts({general:[], sports:[], business:[], finance:[], bloom:[], comedy:[]});
     setLoading({general:false, sports:false, business:false, finance:false, bloom:false, comedy:false});
@@ -1664,12 +1912,13 @@ export default function App() {
     if (catMap[t.label]) setTab(catMap[t.label]);
   };
 
-  const handleCustomizeSave = ({feeds:nf, kw:nk, alerts:na, urgent:nu, social:ns}) => {
+  const handleCustomizeSave = ({feeds:nf, kw:nk, alerts:na, urgent:nu, social:ns, watchlist:nw}) => {
     setFeeds(nf); sv('feeds', nf);
     setKw(nk); sv('kw', nk);
     setAlerts(na); sv('alerts', na);
     if (nu) { setUrgent(nu); sv('urgent', nu); }
     setSocial(ns); sv('social', ns);
+    if (nw) { setWatchlist(nw); sv('watchlist', nw); }
     setShowPanel(false); refreshAll();
   };
 
@@ -1680,7 +1929,8 @@ export default function App() {
 
   const handleTabChange = t => {
     setTab(t); setSearch(''); setActiveKw(null); setActiveSrc(null);
-    if (!['today','saved','podcasts'].includes(t) && !(arts[t] || []).length) loadCat(t);
+    if (!['today','saved','podcasts','social'].includes(t) && !(arts[t] || []).length) loadCat(t);
+    if (t === 'finance') loadMarketData();
   };
 
   const getRelated = (a, cat) => {
@@ -1688,7 +1938,7 @@ export default function App() {
     return (arts[cat] || []).filter(x => x.link !== a.link && matched.some(k => (x.title + (x.desc || '')).toLowerCase().includes(k.toLowerCase()))).slice(0, 4);
   };
 
-  const NEWS_CATS = ['general','sports','business','finance','bloom','comedy'];
+  const NEWS_CATS = ['general','sports','business','bloom','comedy'];  // finance gets custom page
 
   // ─── FEED PAGE ──────────────────────────────────────────────────────────
   const FeedPage = ({cat}) => {
@@ -1730,8 +1980,63 @@ export default function App() {
   };
 
   // ─── TODAY PAGE ─────────────────────────────────────────────────────────
-  const TodayPage = () => (
+  const TodayPage = () => {
+    // MSN-style hero: smart-pick the lead story by recency from across all categories,
+    // then show 5 next-best as a sidebar of secondary headlines.
+    const allRecent = useMemo(() => {
+      const seen = new Set();
+      return Object.entries(arts)
+        .flatMap(([cat, list]) => (list || []).map(a => ({...a, _cat:cat})))
+        .filter(a => a.title && a.link && a.img) // hero needs an image
+        .filter(a => {
+          const k = a.title.slice(0, 60).toLowerCase().replace(/\s+/g,'');
+          if (seen.has(k)) return false; seen.add(k); return true;
+        })
+        .sort((a, b) => new Date(b.pubDate) - new Date(a.pubDate));
+    }, [arts]);
+    const lead = allRecent[0];
+    const sideStories = allRecent.slice(1, 6);
+
+    return (
     <div className="page">
+      {lead && (
+        <div className="hero-row">
+          <article className="hero-lead" onClick={() => onRead(lead)}>
+            <div className="hero-lead-img" style={{backgroundImage:`url(${lead.img})`}}>
+              <div className="hero-lead-badge" style={{background:CATS[lead._cat]?.color || '#1d4ed8'}}>
+                {CATS[lead._cat]?.emoji} {CATS[lead._cat]?.label || 'News'}
+              </div>
+            </div>
+            <div className="hero-lead-text">
+              <h1 className="hero-lead-title">{lead.title}</h1>
+              {lead.desc && <p className="hero-lead-desc">{lead.desc}</p>}
+              <div className="hero-lead-meta">
+                <span className="hero-lead-source">{lead.source}</span>
+                <span className="hero-lead-dot">·</span>
+                <span className="hero-lead-date">{fmtDate(lead.pubDate)}</span>
+              </div>
+            </div>
+          </article>
+          <aside className="hero-side">
+            <div className="hero-side-label">More headlines</div>
+            {sideStories.map((s, i) => (
+              <div key={i} className="hero-side-item" onClick={() => onRead(s)}>
+                {s.img && <img className="hero-side-thumb" src={s.img} loading="lazy" onError={e => e.target.style.display='none'} alt=""/>}
+                <div className="hero-side-body">
+                  <div className="hero-side-title">{s.title}</div>
+                  <div className="hero-side-meta">
+                    <span style={{color:CATS[s._cat]?.color}}>{CATS[s._cat]?.label}</span>
+                    <span> · </span>
+                    <span>{s.source}</span>
+                    <span> · </span>
+                    <span>{fmtDate(s.pubDate)}</span>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </aside>
+        </div>
+      )}
       <div className="today-main">
         <div>
           <div className="today-grid">
@@ -1770,7 +2075,7 @@ export default function App() {
           <SourceFooter feeds={feeds} arts={arts}/>
         </div>
         <div className="sidebar">
-          <Scoreboard scores={scores} loading={scoresLoading}/>
+          <Scoreboard scores={scores} loading={scoresLoading} compact={true}/>
           {/* Top Trending across all cats */}
           <div className="sb-block">
             <div className="sb-head"><span className="sb-title">🔥 Top Trending</span></div>
@@ -1789,7 +2094,8 @@ export default function App() {
         </div>
       </div>
     </div>
-  );
+    );
+  };
 
   // ─── PODCASTS PAGE ──────────────────────────────────────────────────────
   const PodcastsPage = () => {
@@ -1913,6 +2219,140 @@ export default function App() {
     </div>
   );
 
+  // ─── FINANCE PAGE ───────────────────────────────────────────────────────
+  // Yahoo Finance-style layout with subtle Bloomberg touches:
+  //   • Indices header bar (S&P/Dow/Nasdaq) with big % moves
+  //   • Watchlist table with sortable columns and tabular numerals
+  //   • Market status indicator
+  //   • Finance news feed below using existing FeedCard component
+  // All quotes come from /api/quote (Vercel proxy of Yahoo Finance).
+  const FinancePage = () => {
+    const items = sorted('finance');
+    const cc = CATS.finance;
+
+    // US market session detection (Eastern Time)
+    const marketStatus = useMemo(() => {
+      const now = new Date();
+      // Convert to ET regardless of user timezone
+      const et = new Date(now.toLocaleString('en-US', {timeZone: 'America/New_York'}));
+      const day = et.getDay(); // 0=Sun,6=Sat
+      const hr = et.getHours(), min = et.getMinutes();
+      const mins = hr * 60 + min;
+      const isWeekday = day >= 1 && day <= 5;
+      // Regular hours: 9:30 - 16:00 ET
+      if (isWeekday && mins >= 570 && mins < 960) return { state:'open', label:'Markets Open', color:'#16a34a' };
+      // Pre-market: 4:00 - 9:30
+      if (isWeekday && mins >= 240 && mins < 570) return { state:'pre',  label:'Pre-Market',   color:'#d97706' };
+      // After-hours: 16:00 - 20:00
+      if (isWeekday && mins >= 960 && mins < 1200) return { state:'after',label:'After Hours', color:'#d97706' };
+      return { state:'closed', label:'Markets Closed', color:'var(--text3)' };
+    }, []);
+
+    const fmtPrice = (n) => n == null ? '—' : n.toLocaleString('en-US', {minimumFractionDigits:2, maximumFractionDigits:2});
+    const fmtChg = (n) => n == null ? '' : (n >= 0 ? '+' : '') + n.toFixed(2);
+    const fmtPct = (n) => n == null ? '' : (n >= 0 ? '+' : '') + n.toFixed(2) + '%';
+
+    return (
+      <div className="page">
+        {/* Header bar with indices + market status */}
+        <div className="fin-header">
+          <div className="fin-header-top">
+            <div>
+              <div className="fin-header-title">📈 Markets</div>
+              <div className="fin-header-sub">
+                <span className="fin-status-dot" style={{background:marketStatus.color}}/>
+                <span style={{color:marketStatus.color, fontWeight:600}}>{marketStatus.label}</span>
+                <span style={{color:'var(--text3)', marginLeft:8}}>· Quotes via Yahoo Finance · 5min cache</span>
+              </div>
+            </div>
+            <button className="fin-refresh" onClick={loadMarketData} disabled={marketLoading}>
+              {marketLoading ? '⟳ Loading...' : '↺ Refresh quotes'}
+            </button>
+          </div>
+          <div className="fin-indices">
+            {INDICES.map(idx => {
+              const q = marketData[idx.sym];
+              const up = q && q.chg >= 0;
+              return (
+                <div key={idx.sym} className={`fin-index ${q ? (up ? 'up' : 'down') : ''}`}>
+                  <div className="fin-index-label">{idx.label}</div>
+                  <div className="fin-index-price">{q ? fmtPrice(q.price) : '—'}</div>
+                  <div className="fin-index-chg">
+                    {q ? <>
+                      <span>{up ? '▲' : '▼'} {fmtChg(q.chg)}</span>
+                      <span className="fin-index-pct">{fmtPct(q.pct)}</span>
+                    </> : <span style={{color:'var(--text3)'}}>Loading...</span>}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+
+        <div className="fin-grid">
+          {/* LEFT: Watchlist + News */}
+          <div className="fin-main">
+            <section className="fin-watchlist">
+              <div className="fin-section-head">
+                <span className="fin-section-title">⭐ My Watchlist</span>
+                <button className="page-customize-btn" onClick={() => openCustomize('watchlist', 'finance')}>⚙ Edit</button>
+              </div>
+              <table className="fin-table">
+                <thead>
+                  <tr>
+                    <th style={{textAlign:'left'}}>Symbol</th>
+                    <th style={{textAlign:'left'}}>Name</th>
+                    <th style={{textAlign:'right'}}>Price</th>
+                    <th style={{textAlign:'right'}}>Change</th>
+                    <th style={{textAlign:'right'}}>%</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {watchlist.length === 0 && (
+                    <tr><td colSpan={5} className="fin-empty">No symbols yet — add some in Customize</td></tr>
+                  )}
+                  {watchlist.map(w => {
+                    const q = marketData[w.sym];
+                    const up = q && q.chg >= 0;
+                    return (
+                      <tr key={w.sym} className="fin-row" onClick={() => window.open(`https://finance.yahoo.com/quote/${encodeURIComponent(w.sym)}`, '_blank')}>
+                        <td className="fin-sym">{w.sym}</td>
+                        <td className="fin-name">{w.name}</td>
+                        <td className="fin-px">{q ? fmtPrice(q.price) : <em style={{color:'var(--text3)'}}>—</em>}</td>
+                        <td className={`fin-px ${up ? 'fin-up' : q ? 'fin-down' : ''}`}>{q ? fmtChg(q.chg) : ''}</td>
+                        <td className={`fin-px ${up ? 'fin-up' : q ? 'fin-down' : ''}`}>
+                          {q && <span className="fin-pct-pill">{up ? '▲' : '▼'} {fmtPct(q.pct).replace('+','').replace('-','')}</span>}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </section>
+
+            <section className="fin-news">
+              <div className="fin-section-head">
+                <span className="fin-section-title">📰 Finance News</span>
+                <button className="page-customize-btn" onClick={() => openCustomize('sources', 'finance')}>⚙ Sources</button>
+              </div>
+              {loading.finance && !items.length
+                ? <div className="empty-state"><div className="empty-icon">📈</div><div className="empty-msg">Loading Finance...</div></div>
+                : items.length === 0
+                  ? <div className="empty-state"><div className="empty-icon">📭</div><div className="empty-msg">No articles loaded yet</div><button className="refresh-btn" onClick={refreshAll}>Refresh</button></div>
+                  : items.slice(0, 15).map((a, i) => <FeedCard key={i} a={a} cat="finance" isSaved={isSavedFn(a)} onSave={onSave} onRead={onRead} relatedSources={getRelated(a, 'finance')}/>)
+              }
+              <SocialFollows cat="finance" social={social}/>
+              <SourceFooter cat="finance" feeds={feeds} arts={arts}/>
+            </section>
+          </div>
+
+          {/* RIGHT: Sidebar with topics, sources, trending */}
+          <Sidebar cat="finance" arts={arts} kw={kw} health={health} activeKw={activeKw} setActiveKw={k => {setActiveKw(k); setActiveSrc(null);}} activeSource={activeSrc} setActiveSource={s => {setActiveSrc(s); setActiveKw(null);}} onRead={onRead} scores={scores} scoresLoading={scoresLoading} showScoreboard={false}/>
+        </div>
+      </div>
+    );
+  };
+
   // ─── SOCIAL PAGE ────────────────────────────────────────────────────────
   // One-stop hub showing all your followed handles across every category
   // and platform. Click any handle to open it on the source platform.
@@ -1979,10 +2419,11 @@ export default function App() {
         <TopBar tab={tab} setTab={handleTabChange} search={search} setSearch={setSearch} dark={dark} setDark={setDark} onCustomize={() => openCustomize('keywords', 'general')} onRefresh={refreshAll} breakingItems={breakingItems} onTickerClick={handleTickerClick}/>
         {tab === 'today' && <TodayPage/>}
         {NEWS_CATS.includes(tab) && <FeedPage cat={tab}/>}
+        {tab === 'finance' && <FinancePage/>}
         {tab === 'podcasts' && <PodcastsPage/>}
         {tab === 'social' && <SocialPage/>}
         {tab === 'saved' && <SavedPage/>}
-        {showPanel && <CustomizePanel feeds={feeds} kw={kw} alerts={alerts} urgent={urgent} social={social} health={health} arts={arts} initialTab={panelInitial.tab} initialCat={panelInitial.cat} onClose={() => setShowPanel(false)} onSave={handleCustomizeSave}/>}
+        {showPanel && <CustomizePanel feeds={feeds} kw={kw} alerts={alerts} urgent={urgent} social={social} watchlist={watchlist} health={health} arts={arts} initialTab={panelInitial.tab} initialCat={panelInitial.cat} onClose={() => setShowPanel(false)} onSave={handleCustomizeSave}/>}
       </div>
     </>
   );
