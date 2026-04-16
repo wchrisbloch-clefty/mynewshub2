@@ -1,19 +1,3 @@
-// MyNewsHub v14 — Chunk A
-// ─────────────────────────────────────────────────────────────────────────────
-// Changes from v13:
-//  • Storage key bump v13_ → v14_ with one-time migration
-//  • Image extraction: checks media:content, media:thumbnail, enclosure, image/url,
-//    and regex-extracts first <img> from description HTML
-//  • RSS proxy chain: AbortController 8s timeout per proxy, better error surfacing
-//  • AI Summary button: shows "Requires Backend (Chunk B)" tooltip instead of hanging
-//  • Social Follows: restored as curated link-list section on each category page
-//  • Sports scoreboard: live scores for Texans/Rockets/Astros/Braves/UK MBB/UK FB/Clemson FB
-//    via ESPN public JSON, rendered on Today page + Sports page sidebar
-//  • Per-category Customize button inline on each category header
-//  • Trending/Topics/Sources sidebar now works for Comedy + Podcasts pages too
-//  • Source health now includes failure reason (timeout / blocked / empty)
-// ─────────────────────────────────────────────────────────────────────────────
-
 import { useState, useEffect, useCallback, useMemo } from 'react';
 
 // ─── CATEGORIES ───────────────────────────────────────────────────────────────
@@ -395,16 +379,24 @@ function fmtDuration(s) {
 }
 
 // ─── WEATHER ──────────────────────────────────────────────────────────────────
-const HOUSTON = { lat:29.7604, lon:-95.3698 };
+const DEFAULT_WEATHER_CITIES = [
+  { name:'Houston',    lat:29.7604, lon:-95.3698, tz:'America/Chicago',      slug:'Houston+TX' },
+  { name:'Louisville', lat:38.2527, lon:-85.7585, tz:'America/New_York',     slug:'Louisville+KY' },
+];
 const WX_CODES = { 0:'Clear',1:'Mostly Clear',2:'Partly Cloudy',3:'Overcast',45:'Foggy',48:'Icy Fog',51:'Light Drizzle',53:'Drizzle',55:'Heavy Drizzle',61:'Light Rain',63:'Rain',65:'Heavy Rain',71:'Light Snow',73:'Snow',75:'Heavy Snow',80:'Showers',81:'Heavy Showers',95:'Thunderstorm',99:'Severe Storm' };
 const WX_EMOJI = { 0:'☀️',1:'🌤️',2:'⛅',3:'☁️',45:'🌫️',48:'🌫️',51:'🌦️',53:'🌦️',55:'🌧️',61:'🌧️',63:'🌧️',65:'⛈️',71:'🌨️',73:'❄️',75:'❄️',80:'🌦️',81:'🌧️',95:'⛈️',99:'🌪️' };
 
-async function fetchWeather() {
+async function fetchWeatherCity(city) {
   try {
-    const r = await fetchWithTimeout(`https://api.open-meteo.com/v1/forecast?latitude=${HOUSTON.lat}&longitude=${HOUSTON.lon}&current=temperature_2m,weathercode,windspeed_10m&temperature_unit=fahrenheit&windspeed_unit=mph&timezone=America%2FChicago`);
+    const r = await fetchWithTimeout(`https://api.open-meteo.com/v1/forecast?latitude=${city.lat}&longitude=${city.lon}&current=temperature_2m,weathercode,windspeed_10m&temperature_unit=fahrenheit&windspeed_unit=mph&timezone=${encodeURIComponent(city.tz)}`);
     const d = await r.json(); const c = d.current;
-    return { temp:Math.round(c.temperature_2m), code:c.weathercode, wind:Math.round(c.windspeed_10m), desc:WX_CODES[c.weathercode] || 'Unknown', emoji:WX_EMOJI[c.weathercode] || '🌡️' };
+    return { name:city.name, slug:city.slug, temp:Math.round(c.temperature_2m), code:c.weathercode, wind:Math.round(c.windspeed_10m), desc:WX_CODES[c.weathercode] || 'Unknown', emoji:WX_EMOJI[c.weathercode] || '🌡️' };
   } catch { return null; }
+}
+
+async function fetchAllWeather(cities) {
+  const results = await Promise.all(cities.map(c => fetchWeatherCity(c)));
+  return results.filter(Boolean);
 }
 
 async function fetchQuote(sym) {
@@ -508,16 +500,18 @@ const SOCIAL_META = {
 // ─── GLOBAL CSS ───────────────────────────────────────────────────────────────
 const GLOBAL_CSS = `
 *{box-sizing:border-box;margin:0;padding:0;}
-:root{--bg:#f8f9fa;--surface:#fff;--border:#e8e8e8;--border2:#f1f5f9;--text:#0f172a;--text2:#64748b;--text3:#94a3b8;}
-.dark{--bg:#0f172a;--surface:#1e293b;--border:#334155;--border2:#253347;--text:#f1f5f9;--text2:#94a3b8;--text3:#475569;}
-body{background:var(--bg);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;}
+:root{--bg:#f5f6f8;--surface:#fff;--border:#e2e5ea;--border2:#f0f2f5;--text:#0f172a;--text2:#5a6578;--text3:#8d96a5;--shadow-sm:0 1px 3px rgba(15,23,42,0.04);--shadow-md:0 2px 8px rgba(15,23,42,0.06);--shadow-lg:0 4px 16px rgba(15,23,42,0.08);--radius:10px;}
+.dark{--bg:#0f172a;--surface:#1e293b;--border:#334155;--border2:#253347;--text:#f1f5f9;--text2:#94a3b8;--text3:#475569;--shadow-sm:0 1px 3px rgba(0,0,0,0.2);--shadow-md:0 2px 8px rgba(0,0,0,0.25);--shadow-lg:0 4px 16px rgba(0,0,0,0.3);}
+body{background:var(--bg);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','Inter',sans-serif;-webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale;}
 .hub{background:var(--bg);min-height:100vh;}
 
 /* topbar */
 .topbar-wrap{position:sticky;top:0;z-index:300;}
 .utility-strip{background:#0f172a;padding:0 20px;display:flex;align-items:center;height:32px;overflow:hidden;}
 .utility-strip-inner{max-width:1300px;margin:0 auto;width:100%;display:flex;align-items:center;gap:16px;}
-.wx-pill{display:flex;align-items:center;gap:6px;font-size:11px;color:#94a3b8;white-space:nowrap;flex-shrink:0;}
+.wx-pill{display:flex;align-items:center;gap:6px;font-size:11px;color:#94a3b8;white-space:nowrap;flex-shrink:0;padding:2px 8px;border-radius:4px;transition:background 0.12s;cursor:pointer;}
+.wx-pill:hover{background:#1e293b;}
+.wx-city{font-weight:700;color:#cbd5e1;font-size:10px;text-transform:uppercase;letter-spacing:0.04em;}
 .wx-temp{font-weight:600;color:#e2e8f0;}.wx-desc{color:#64748b;}
 .strip-div{width:1px;height:14px;background:#1e293b;flex-shrink:0;}
 .ticker-row{display:flex;gap:16px;align-items:center;overflow-x:auto;scrollbar-width:none;flex:1;}
@@ -538,15 +532,16 @@ body{background:var(--bg);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI
 .breaking-sep{color:rgba(255,255,255,0.4);font-size:10px;}
 .breaking-close{background:none;border:none;color:rgba(255,255,255,0.6);cursor:pointer;font-size:14px;padding:0 12px;flex-shrink:0;line-height:1;}
 .breaking-close:hover{color:#fff;}
-.nav-bar{background:#fff;border-bottom:1px solid #e8e8e8;padding:0 20px;}
-.dark .nav-bar{background:#1e293b;border-color:#334155;}
+.nav-bar{background:#fff;border-bottom:1px solid var(--border);padding:0 20px;box-shadow:0 1px 4px rgba(15,23,42,0.03);}
+.dark .nav-bar{background:#1e293b;border-color:#334155;box-shadow:0 1px 4px rgba(0,0,0,0.15);}
 .nav-bar-inner{max-width:1300px;margin:0 auto;display:flex;align-items:center;gap:10px;height:46px;}
 .logo{font-size:15px;font-weight:800;color:#0f172a;flex-shrink:0;letter-spacing:-0.5px;}
 .dark .logo{color:#f1f5f9;}.logo span{color:#1d4ed8;}
 .nav-tabs{display:flex;gap:2px;flex:1;overflow-x:auto;scrollbar-width:none;border-left:1px solid #e8e8e8;margin-left:8px;padding-left:8px;}
 .dark .nav-tabs{border-color:#334155;}.nav-tabs::-webkit-scrollbar{display:none;}
-.nav-tab{background:transparent;border:none;color:#94a3b8;padding:5px 11px;cursor:pointer;font-size:12px;font-weight:500;white-space:nowrap;font-family:inherit;border-radius:6px;transition:all 0.12s;}
-.nav-tab.active{color:#1d4ed8;background:#eff6ff;}
+.nav-tab{background:transparent;border:none;color:var(--text3);padding:6px 12px;cursor:pointer;font-size:12px;font-weight:500;white-space:nowrap;font-family:inherit;border-radius:6px;transition:all 0.15s;border-bottom:2px solid transparent;}
+.nav-tab.active{color:#1d4ed8;background:#eff6ff;border-bottom-color:#1d4ed8;}
+.nav-tab:hover:not(.active){color:var(--text);background:var(--bg);}
 .nav-tab.bloom-tab.active{color:#0369a1;background:#e0f2fe;}
 .nav-tab.pod-tab.active{color:#e11d48;background:#fff1f2;}
 .nav-tab.comedy-tab.active{color:#db2777;background:#fdf2f8;}
@@ -574,8 +569,8 @@ body{background:var(--bg);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI
 .refresh-btn{background:#1d4ed8;border:none;color:#fff;border-radius:8px;padding:8px 18px;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;}
 
 /* feed card */
-.fc{background:var(--surface);border-radius:10px;border:1px solid var(--border);padding:12px 14px;cursor:pointer;transition:border-color 0.12s,box-shadow 0.12s;display:flex;flex-direction:column;gap:0;}
-.fc:hover{border-color:#bfdbfe;box-shadow:0 1px 8px rgba(29,78,216,0.07);}
+.fc{background:var(--surface);border-radius:var(--radius);border:1px solid var(--border);padding:14px 16px;cursor:pointer;transition:border-color 0.15s,box-shadow 0.2s,transform 0.15s;display:flex;flex-direction:column;gap:0;box-shadow:var(--shadow-sm);}
+.fc:hover{border-color:#bfdbfe;box-shadow:var(--shadow-md);transform:translateY(-1px);}
 .fc.bloom:hover{border-color:#bae6fd;}.fc.comedy:hover{border-color:#fbcfe8;}
 .fc-meta{display:flex;align-items:center;gap:6px;margin-bottom:7px;flex-wrap:wrap;}
 .fc-source{font-size:11px;font-weight:700;letter-spacing:-0.1px;}
@@ -603,7 +598,7 @@ body{background:var(--bg);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI
 
 /* sidebar */
 .sidebar{display:flex;flex-direction:column;gap:10px;min-width:0;}
-.sb-block{background:var(--surface);border-radius:10px;border:1px solid var(--border);overflow:hidden;}
+.sb-block{background:var(--surface);border-radius:var(--radius);border:1px solid var(--border);overflow:hidden;box-shadow:var(--shadow-sm);}
 .sb-head{padding:10px 14px 8px;border-bottom:1px solid var(--border2);display:flex;align-items:center;justify-content:space-between;}
 .sb-title{font-size:10px;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:0.07em;}
 .sb-clear{font-size:10px;color:#1d4ed8;background:none;border:none;cursor:pointer;font-family:inherit;font-weight:500;}
@@ -634,7 +629,7 @@ body{background:var(--bg);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI
 
 /* scoreboard */
 /* ─── FINANCE PAGE (Yahoo-light + Bloomberg touches) ─────────────────── */
-.fin-header{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:14px 18px 12px;margin-bottom:14px;border-top:3px solid #1d4ed8;}
+.fin-header{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:14px 18px 12px;margin-bottom:14px;border-top:3px solid #1d4ed8;box-shadow:var(--shadow-md);}
 .fin-header-top{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:14px;gap:12px;flex-wrap:wrap;}
 .fin-header-title{font-size:18px;font-weight:800;color:var(--text);letter-spacing:-0.4px;}
 .fin-header-sub{font-size:11px;color:var(--text2);margin-top:3px;display:flex;align-items:center;gap:6px;}
@@ -692,16 +687,20 @@ body{background:var(--bg);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI
 
 /* ─── MSN-STYLE TODAY HERO ──────────────────────────────────────────── */
 .hero-row{display:grid;grid-template-columns:1fr 320px;gap:16px;margin-bottom:18px;}
-.hero-lead{background:var(--surface);border-radius:12px;border:1px solid var(--border);overflow:hidden;cursor:pointer;transition:box-shadow 0.15s,transform 0.15s;}
-.hero-lead:hover{box-shadow:0 4px 18px rgba(0,0,0,0.08);transform:translateY(-1px);}
+.hero-lead{background:var(--surface);border-radius:12px;border:1px solid var(--border);overflow:hidden;cursor:pointer;transition:box-shadow 0.2s,transform 0.15s;box-shadow:var(--shadow-md);}
+.hero-lead:hover{box-shadow:var(--shadow-lg);transform:translateY(-2px);}
 .hero-lead-img{width:100%;aspect-ratio:16/9;background-size:cover;background-position:center;background-color:var(--bg);position:relative;}
 .hero-lead-badge{position:absolute;top:14px;left:14px;color:#fff;font-size:10px;font-weight:700;padding:4px 10px;border-radius:4px;letter-spacing:0.04em;text-transform:uppercase;box-shadow:0 1px 3px rgba(0,0,0,0.2);}
+.hero-dots{position:absolute;bottom:14px;left:50%;transform:translateX(-50%);display:flex;gap:6px;}
+.hero-dot{width:10px;height:10px;border-radius:50%;border:2px solid rgba(255,255,255,0.7);background:transparent;cursor:pointer;transition:all 0.2s;padding:0;}
+.hero-dot.active{background:#fff;border-color:#fff;transform:scale(1.15);}
+.hero-dot:hover{border-color:#fff;}
 .hero-lead-text{padding:16px 18px 18px;}
 .hero-lead-title{font-size:22px;font-weight:800;color:var(--text);line-height:1.25;letter-spacing:-0.4px;margin:0 0 8px;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden;}
 .hero-lead-desc{font-size:13px;color:var(--text2);line-height:1.5;margin:0 0 10px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;}
 .hero-lead-meta{display:flex;align-items:center;gap:6px;font-size:11px;color:var(--text3);}
 .hero-lead-source{font-weight:700;color:var(--text2);}
-.hero-side{background:var(--surface);border-radius:12px;border:1px solid var(--border);padding:12px;display:flex;flex-direction:column;gap:0;}
+.hero-side{background:var(--surface);border-radius:12px;border:1px solid var(--border);padding:12px;display:flex;flex-direction:column;gap:0;box-shadow:var(--shadow-sm);}
 .hero-side-label{font-size:10px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:0.08em;padding:4px 6px 10px;border-bottom:1px solid var(--border2);margin-bottom:4px;}
 .hero-side-item{display:flex;gap:10px;padding:9px 6px;border-bottom:1px solid var(--border2);cursor:pointer;transition:background 0.1s;}
 .hero-side-item:last-child{border-bottom:none;}
@@ -722,7 +721,7 @@ body{background:var(--bg);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI
 }
 
 /* ─── SCOREBOARD (rebuilt) ─────────────────────────────────────────── */
-.sb-block{background:var(--surface);border-radius:10px;border:1px solid var(--border);overflow:hidden;}
+.sb-block{background:var(--surface);border-radius:var(--radius);border:1px solid var(--border);overflow:hidden;box-shadow:var(--shadow-sm);}
 .sb-block-head{padding:10px 14px 8px;border-bottom:1px solid var(--border2);display:flex;align-items:center;justify-content:space-between;}
 .sb-block-title{font-size:11px;font-weight:700;color:var(--text);text-transform:uppercase;letter-spacing:0.07em;}
 .sb-block-sub{font-size:9px;color:var(--text3);text-transform:uppercase;letter-spacing:0.06em;}
@@ -776,7 +775,7 @@ body{background:var(--bg);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI
 .social-page-title{font-size:18px;font-weight:800;color:var(--text);letter-spacing:-0.4px;}
 .social-page-sub{font-size:12px;color:var(--text2);margin-top:3px;}
 .social-page-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:14px;}
-.social-cat-block{background:var(--surface);border-radius:10px;border:1px solid var(--border);overflow:hidden;}
+.social-cat-block{background:var(--surface);border-radius:var(--radius);border:1px solid var(--border);overflow:hidden;box-shadow:var(--shadow-sm);}
 .social-cat-head{display:flex;align-items:center;justify-content:space-between;padding:12px 14px;border-bottom:1px solid var(--border2);}
 .social-cat-plat{padding:10px 14px;border-bottom:1px solid var(--border2);}
 .social-cat-plat:last-child{border-bottom:none;}
@@ -786,7 +785,7 @@ body{background:var(--bg);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI
 
 /* Today page */
 .today-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;}
-.today-block{background:var(--surface);border-radius:10px;border:1px solid var(--border);overflow:hidden;}
+.today-block{background:var(--surface);border-radius:var(--radius);border:1px solid var(--border);overflow:hidden;box-shadow:var(--shadow-sm);transition:box-shadow 0.15s;}
 .today-block-head{padding:10px 14px 8px;border-bottom:1px solid var(--border2);display:flex;align-items:center;justify-content:space-between;}
 .today-block-label{font-size:11px;font-weight:700;display:flex;align-items:center;gap:6px;}
 .today-block-count{font-size:9px;color:var(--text3);background:var(--bg);border-radius:8px;padding:1px 6px;border:1px solid var(--border);}
@@ -852,7 +851,7 @@ body{background:var(--bg);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI
 
 /* customize panel */
 .cp-overlay{position:fixed;inset:0;background:rgba(15,23,42,0.5);z-index:600;display:flex;align-items:center;justify-content:center;padding:20px;}
-.cp-panel{background:var(--surface);border-radius:14px;width:100%;max-width:520px;max-height:90vh;overflow-y:auto;box-shadow:0 20px 60px rgba(0,0,0,0.2);}
+.cp-panel{background:var(--surface);border-radius:16px;width:100%;max-width:520px;max-height:90vh;overflow-y:auto;box-shadow:0 24px 64px rgba(0,0,0,0.25),0 0 0 1px rgba(0,0,0,0.05);}
 .cp-head{padding:16px 20px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;position:sticky;top:0;background:var(--surface);z-index:10;}
 .cp-title{font-size:14px;font-weight:700;color:var(--text);}
 .cp-x{background:none;border:none;font-size:18px;cursor:pointer;color:var(--text3);line-height:1;}
@@ -1671,12 +1670,12 @@ function SourceFooter({ cat, feeds, arts }) {
 
 // ─── TOP BAR ─────────────────────────────────────────────────────────────────
 function TopBar({ tab, setTab, search, setSearch, dark, setDark, onCustomize, onRefresh, breakingItems, onTickerClick }) {
-  const [wx, setWx] = useState(null);
+  const [wxList, setWxList] = useState([]);
   const [quotes, setQuotes] = useState({});
   const [showBreaking, setShowBreaking] = useState(true);
 
   useEffect(() => {
-    fetchWeather().then(setWx);
+    fetchAllWeather(DEFAULT_WEATHER_CITIES).then(setWxList);
     TICKERS.forEach(t => fetchQuote(t.sym).then(q => q && setQuotes(prev => ({...prev, [t.sym]:q}))));
     const iv = setInterval(() => { TICKERS.forEach(t => fetchQuote(t.sym).then(q => q && setQuotes(prev => ({...prev, [t.sym]:q})))); }, 300000);
     return () => clearInterval(iv);
@@ -1691,8 +1690,15 @@ function TopBar({ tab, setTab, search, setSearch, dark, setDark, onCustomize, on
     <div className="topbar-wrap">
       <div className="utility-strip">
         <div className="utility-strip-inner">
-          {wx && <div className="wx-pill"><span>{wx.emoji}</span><span className="wx-temp">{wx.temp}°F</span><span className="wx-desc">{wx.desc}</span><span className="wx-desc">· {wx.wind} mph</span></div>}
-          {wx && <div className="strip-div"/>}
+          {wxList.map((wx, i) => (
+            <a key={i} className="wx-pill" href={`https://weather.com/weather/today/l/${encodeURIComponent(wx.slug)}`} target="_blank" rel="noreferrer" style={{textDecoration:'none'}}>
+              <span>{wx.emoji}</span>
+              <span className="wx-city">{wx.name}</span>
+              <span className="wx-temp">{wx.temp}°F</span>
+              <span className="wx-desc">{wx.desc}</span>
+            </a>
+          ))}
+          {wxList.length > 0 && <div className="strip-div"/>}
           <div className="ticker-row">
             {TICKERS.map(t => {
               const q = quotes[t.sym]; const up = q ? q.chg >= 0 : null;
@@ -1994,18 +2000,36 @@ export default function App() {
         })
         .sort((a, b) => new Date(b.pubDate) - new Date(a.pubDate));
     }, [arts]);
-    const lead = allRecent[0];
-    const sideStories = allRecent.slice(1, 6);
+    const heroStories = allRecent.slice(0, 5); // top 5 for carousel
+    const sideStories = allRecent.slice(5, 11); // next 6 for sidebar
+    const [heroIdx, setHeroIdx] = useState(0);
+
+    // Auto-advance every 8s, pause on hover
+    const [paused, setPaused] = useState(false);
+    useEffect(() => {
+      if (paused || heroStories.length <= 1) return;
+      const iv = setInterval(() => setHeroIdx(i => (i + 1) % heroStories.length), 8000);
+      return () => clearInterval(iv);
+    }, [paused, heroStories.length]);
+
+    const lead = heroStories[heroIdx];
 
     return (
     <div className="page">
       {lead && (
-        <div className="hero-row">
+        <div className="hero-row" onMouseEnter={() => setPaused(true)} onMouseLeave={() => setPaused(false)}>
           <article className="hero-lead" onClick={() => onRead(lead)}>
             <div className="hero-lead-img" style={{backgroundImage:`url(${lead.img})`}}>
               <div className="hero-lead-badge" style={{background:CATS[lead._cat]?.color || '#1d4ed8'}}>
                 {CATS[lead._cat]?.emoji} {CATS[lead._cat]?.label || 'News'}
               </div>
+              {heroStories.length > 1 && (
+                <div className="hero-dots">
+                  {heroStories.map((_, i) => (
+                    <button key={i} className={`hero-dot ${i === heroIdx ? 'active' : ''}`} onClick={e => { e.stopPropagation(); setHeroIdx(i); }}/>
+                  ))}
+                </div>
+              )}
             </div>
             <div className="hero-lead-text">
               <h1 className="hero-lead-title">{lead.title}</h1>
@@ -2018,7 +2042,7 @@ export default function App() {
             </div>
           </article>
           <aside className="hero-side">
-            <div className="hero-side-label">More headlines</div>
+            <div className="hero-side-label">Latest headlines</div>
             {sideStories.map((s, i) => (
               <div key={i} className="hero-side-item" onClick={() => onRead(s)}>
                 {s.img && <img className="hero-side-thumb" src={s.img} loading="lazy" onError={e => e.target.style.display='none'} alt=""/>}
@@ -2076,19 +2100,35 @@ export default function App() {
         </div>
         <div className="sidebar">
           <Scoreboard scores={scores} loading={scoresLoading} compact={true}/>
-          {/* Top Trending across all cats */}
+          {/* Top Trending — keyword-boosted: articles matching any tracked keyword rank higher */}
           <div className="sb-block">
-            <div className="sb-head"><span className="sb-title">🔥 Top Trending</span></div>
+            <div className="sb-head"><span className="sb-title">🔥 Top Stories</span></div>
             <div className="trend-list">
-              {Object.values(arts).flat().sort((a, b) => new Date(b.pubDate) - new Date(a.pubDate)).slice(0, 8).map((a, i) => (
-                <div key={i} className="trend-row" onClick={() => onRead(a)}>
-                  <div className="trend-num">{i + 1}</div>
-                  <div className="trend-body">
-                    <div className="trend-title">{a.title}</div>
-                    <div className="trend-src">{a.source} · {fmtDate(a.pubDate)}</div>
-                  </div>
-                </div>
-              ))}
+              {(() => {
+                const allKws = Object.values(kw).flat().map(k => k.toLowerCase());
+                const all = Object.values(arts).flat();
+                const seen = new Set();
+                return all
+                  .filter(a => { const k = a.title.slice(0,60).toLowerCase().replace(/\s+/g,''); if (seen.has(k)) return false; seen.add(k); return true; })
+                  .sort((a, b) => {
+                    const aTxt = (a.title + ' ' + (a.desc || '')).toLowerCase();
+                    const bTxt = (b.title + ' ' + (b.desc || '')).toLowerCase();
+                    const aKw = allKws.filter(k => aTxt.includes(k)).length;
+                    const bKw = allKws.filter(k => bTxt.includes(k)).length;
+                    if (bKw !== aKw) return bKw - aKw;
+                    return new Date(b.pubDate) - new Date(a.pubDate);
+                  })
+                  .slice(0, 8)
+                  .map((a, i) => (
+                    <div key={i} className="trend-row" onClick={() => onRead(a)}>
+                      <div className="trend-num">{i + 1}</div>
+                      <div className="trend-body">
+                        <div className="trend-title">{a.title}</div>
+                        <div className="trend-src">{a.source} · {fmtDate(a.pubDate)}</div>
+                      </div>
+                    </div>
+                  ));
+              })()}
             </div>
           </div>
         </div>
