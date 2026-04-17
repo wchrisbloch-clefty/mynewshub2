@@ -1,3 +1,19 @@
+// MyNewsHub v14 — Chunk A
+// ─────────────────────────────────────────────────────────────────────────────
+// Changes from v13:
+//  • Storage key bump v13_ → v14_ with one-time migration
+//  • Image extraction: checks media:content, media:thumbnail, enclosure, image/url,
+//    and regex-extracts first <img> from description HTML
+//  • RSS proxy chain: AbortController 8s timeout per proxy, better error surfacing
+//  • AI Summary button: shows "Requires Backend (Chunk B)" tooltip instead of hanging
+//  • Social Follows: restored as curated link-list section on each category page
+//  • Sports scoreboard: live scores for Texans/Rockets/Astros/Braves/UK MBB/UK FB/Clemson FB
+//    via ESPN public JSON, rendered on Today page + Sports page sidebar
+//  • Per-category Customize button inline on each category header
+//  • Trending/Topics/Sources sidebar now works for Comedy + Podcasts pages too
+//  • Source health now includes failure reason (timeout / blocked / empty)
+// ─────────────────────────────────────────────────────────────────────────────
+
 import { useState, useEffect, useCallback, useMemo } from 'react';
 
 // ─── CATEGORIES ───────────────────────────────────────────────────────────────
@@ -587,10 +603,26 @@ body{background:var(--bg);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI
 .fc-act{background:none;border:1px solid var(--border);border-radius:5px;padding:3px 9px;font-size:10px;cursor:pointer;color:var(--text3);font-family:inherit;font-weight:500;transition:all 0.1s;display:flex;align-items:center;gap:3px;}
 .fc-act:hover{border-color:#1d4ed8;color:#1d4ed8;}
 .fc-act.saved{border-color:#f59e0b;color:#f59e0b;background:#fffbeb;}
+.fc-act.ai-on{border-color:#7c3aed;color:#7c3aed;background:#f5f3ff;}
+.fc-act.disc-on{border-color:#0ea5e9;color:#0ea5e9;background:#f0f9ff;}
 .fc-act.disabled{opacity:0.5;cursor:not-allowed;}
 .fc-act.disabled:hover{border-color:var(--border);color:var(--text3);}
 .fc-read-link{margin-left:auto;font-size:10px;color:var(--text3);text-decoration:none;font-weight:500;display:flex;align-items:center;gap:3px;}
 .fc-read-link:hover{color:#1d4ed8;}
+.fc-summary{margin-top:10px;background:var(--bg);border:1px solid #ddd6fe;border-radius:8px;padding:10px 12px;}
+.fc-summary-lbl{font-size:9px;font-weight:700;color:#7c3aed;text-transform:uppercase;letter-spacing:0.08em;margin-bottom:5px;}
+.fc-summary-text{font-size:12px;color:var(--text2);line-height:1.6;}
+.fc-disc{margin-top:10px;background:var(--bg);border:1px solid #bae6fd;border-radius:8px;padding:10px 12px;}
+.fc-disc-lbl{font-size:9px;font-weight:700;color:#0284c7;text-transform:uppercase;letter-spacing:0.08em;margin-bottom:8px;}
+.fc-disc-item{display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid var(--border2);text-decoration:none;color:var(--text);font-size:11px;transition:color 0.1s;}
+.fc-disc-item:last-child{border-bottom:none;}
+.fc-disc-item:hover{color:#0284c7;}
+.fc-disc-platform{font-size:9px;font-weight:800;border-radius:3px;padding:2px 6px;color:#fff;flex-shrink:0;text-transform:uppercase;letter-spacing:0.04em;}
+.fc-disc-platform.reddit{background:#ff4500;}
+.fc-disc-platform.hn{background:#ff6600;}
+.fc-disc-sub{font-weight:600;color:var(--text2);flex-shrink:0;}
+.fc-disc-title{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:500;}
+.fc-disc-stats{margin-left:auto;font-size:10px;color:var(--text3);white-space:nowrap;flex-shrink:0;}
 .fc-more{margin-top:8px;display:flex;align-items:center;gap:6px;flex-wrap:wrap;}
 .fc-more-lbl{font-size:10px;color:var(--text3);}
 .fc-more-src{font-size:10px;font-weight:600;border-radius:4px;padding:1px 6px;cursor:pointer;border:1px solid var(--border);color:var(--text2);background:none;font-family:inherit;transition:all 0.1s;}
@@ -925,7 +957,7 @@ body{background:var(--bg);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI
 }
 
 @media (max-width: 900px) {
-  .page-grid, .pod-page { grid-template-columns: 1fr; gap: 12px; }
+  .page-grid, .pod-page, .today-main, .fin-grid { grid-template-columns: 1fr !important; gap: 12px; }
   .today-grid { grid-template-columns: 1fr; }
   .bloom-strip { grid-template-columns: 1fr 1fr; }
   .sidebar { order: 2; }
@@ -933,6 +965,7 @@ body{background:var(--bg);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI
   .nav-bar-inner { gap: 6px; }
   .logo { font-size: 14px; }
   .search-input { width: 90px; }
+  .fin-indices { grid-template-columns: 1fr; }
 }
 
 /* Mobile: compact everything, bigger tap targets */
@@ -947,12 +980,14 @@ body{background:var(--bg);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI
   .ticker-price { font-size: 10px; }
 
   .nav-bar { padding: 0 12px; }
-  .nav-bar-inner { height: 52px; gap: 6px; }
-  .logo { font-size: 13px; }
-  .nav-tabs { border-left: none; margin-left: 0; padding-left: 0; gap: 0; }
-  .nav-tab { padding: 8px 10px; font-size: 11px; min-height: 44px; display: flex; align-items: center; }
+  .nav-bar-inner { height: 52px; gap: 4px; overflow: hidden; }
+  .logo { font-size: 13px; flex-shrink: 0; }
+  .nav-tabs { border-left: none; margin-left: 0; padding-left: 0; gap: 0; overflow-x: auto; -webkit-overflow-scrolling: touch; scroll-snap-type: x proximity; flex: 1; min-width: 0; }
+  .nav-tab { padding: 8px 10px; font-size: 11px; min-height: 44px; display: flex; align-items: center; scroll-snap-align: start; flex-shrink: 0; }
   .search-input { display: none; }
-  .nav-btn, .nav-btn-blue { padding: 8px 10px; min-height: 40px; font-size: 11px; }
+  .nav-btn { padding: 8px 8px; min-height: 40px; font-size: 11px; flex-shrink: 0; }
+  .nav-btn-blue { padding: 8px 10px; min-height: 40px; font-size: 10px; flex-shrink: 0; }
+  .nav-right { gap: 4px; }
 
   .breaking-strip { height: 34px; }
   .breaking-label { font-size: 8px; padding: 2px 6px; }
@@ -970,16 +1005,31 @@ body{background:var(--bg);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI
   .fc-title { font-size: 14px; -webkit-line-clamp: 3; }
   .fc-desc { font-size: 12px; -webkit-line-clamp: 3; }
   .fc-act { padding: 6px 10px; font-size: 11px; min-height: 36px; }
-  .fc-read-link { font-size: 11px; }
+  .fc-actions { flex-wrap: wrap; gap: 6px; }
+  .fc-read-link { font-size: 11px; width: 100%; justify-content: center; margin-left: 0; margin-top: 2px; }
+  .fc-disc-item { flex-wrap: wrap; gap: 4px; }
+  .fc-disc-stats { margin-left: 0; }
 
-  /* Today page cards — compact */
+  /* Today page cards — readable on mobile */
   .today-block-head { padding: 10px 12px 8px; }
-  .today-item { padding: 10px 12px; }
+  .today-item { padding: 10px 12px; min-height: 52px; }
   .today-thumb, .today-thumb-ph { width: 60px; height: 45px; }
-  .today-item-title { font-size: 12px; }
+  .today-item-title { font-size: 13px; }
+  .today-item-src { font-size: 10px; }
+  .today-ai-btn { padding: 6px 10px; font-size: 12px; min-height: 36px; }
+  .today-summary { padding: 4px 12px 10px 12px; }
+
+  /* Social page */
+  .social-page-grid { grid-template-columns: 1fr; }
+  .social-page-header { flex-direction: column; align-items: stretch; }
+
+  /* Scoreboard games */
+  .sb-games { padding: 4px 6px 8px; }
+  .sb-game { padding: 8px; }
+  .sb-league-head { padding: 10px 12px; min-height: 44px; }
 
   /* Sidebar — full width, collapsible feel */
-  .sb-block { border-radius: 8px; }
+  .sb-block { border-radius: 8px; overflow: hidden; }
   .sb-head { padding: 12px; }
   .kw-wrap { padding: 10px 12px; }
   .kw-chip { padding: 5px 12px; font-size: 11px; min-height: 28px; }
@@ -1096,6 +1146,9 @@ function FeedCard({ a, cat, isSaved, onSave, onRead, relatedSources }) {
   const [summary, setSummary] = useState('');
   const [summaryErr, setSummaryErr] = useState('');
   const [loadingSum, setLoadingSum] = useState(false);
+  const [showDisc, setShowDisc] = useState(false);
+  const [disc, setDisc] = useState(null);  // { reddit:[], hn:[] }
+  const [loadingDisc, setLoadingDisc] = useState(false);
   const cc = CATS[cat] || CATS.general;
   const topKw = a.matchedKw?.[0] || null;
 
@@ -1111,6 +1164,45 @@ function FeedCard({ a, cat, isSaved, onSave, onRead, relatedSources }) {
     });
     if (s) setSummary(s); else setSummaryErr(error || 'Summary unavailable');
     setLoadingSum(false);
+  };
+
+  const handleDisc = async (e) => {
+    e.stopPropagation();
+    if (showDisc) { setShowDisc(false); return; }
+    if (disc) { setShowDisc(true); return; }
+    setShowDisc(true); setLoadingDisc(true);
+    const results = { reddit: [], hn: [] };
+    // Search Reddit
+    try {
+      const q = encodeURIComponent(a.title.slice(0, 80));
+      const r = await fetch(`https://www.reddit.com/search.json?q=${q}&sort=relevance&limit=3&t=week`, {signal: AbortSignal.timeout(6000)});
+      if (r.ok) {
+        const d = await r.json();
+        results.reddit = (d?.data?.children || []).filter(c => c.data?.num_comments > 0).slice(0, 3).map(c => ({
+          title: c.data.title,
+          sub: c.data.subreddit_name_prefixed,
+          ups: c.data.ups,
+          comments: c.data.num_comments,
+          url: `https://reddit.com${c.data.permalink}`,
+        }));
+      }
+    } catch {}
+    // Search Hacker News
+    try {
+      const q = encodeURIComponent(a.title.slice(0, 80));
+      const r = await fetch(`https://hn.algolia.com/api/v1/search?query=${q}&tags=story&hitsPerPage=3`, {signal: AbortSignal.timeout(6000)});
+      if (r.ok) {
+        const d = await r.json();
+        results.hn = (d?.hits || []).filter(h => h.num_comments > 0).slice(0, 3).map(h => ({
+          title: h.title,
+          points: h.points,
+          comments: h.num_comments,
+          url: `https://news.ycombinator.com/item?id=${h.objectID}`,
+        }));
+      }
+    } catch {}
+    setDisc(results);
+    setLoadingDisc(false);
   };
 
   return (
@@ -1140,6 +1232,31 @@ function FeedCard({ a, cat, isSaved, onSave, onRead, relatedSources }) {
               : <div className="fc-summary-text">{summary}</div>}
         </div>
       )}
+      {showDisc && (
+        <div className="fc-disc" onClick={e => e.stopPropagation()}>
+          <div className="fc-disc-lbl">💬 What People Are Saying</div>
+          {loadingDisc
+            ? <div style={{fontSize:'11px', color:'var(--text3)', fontStyle:'italic'}}>Searching discussions...</div>
+            : (!disc || (disc.reddit.length === 0 && disc.hn.length === 0))
+              ? <div style={{fontSize:'11px', color:'var(--text3)'}}>No discussions found on Reddit or Hacker News for this story.</div>
+              : <>
+                  {disc.reddit.map((r, i) => (
+                    <a key={`r${i}`} className="fc-disc-item" href={r.url} target="_blank" rel="noreferrer" onClick={e => e.stopPropagation()}>
+                      <span className="fc-disc-platform reddit">Reddit</span>
+                      <span className="fc-disc-sub">{r.sub}</span>
+                      <span className="fc-disc-stats">▲{r.ups} · {r.comments} comments</span>
+                    </a>
+                  ))}
+                  {disc.hn.map((h, i) => (
+                    <a key={`h${i}`} className="fc-disc-item" href={h.url} target="_blank" rel="noreferrer" onClick={e => e.stopPropagation()}>
+                      <span className="fc-disc-platform hn">HN</span>
+                      <span className="fc-disc-title">{h.title}</span>
+                      <span className="fc-disc-stats">{h.points}pts · {h.comments} comments</span>
+                    </a>
+                  ))}
+                </>}
+        </div>
+      )}
       {relatedSources && relatedSources.length > 0 && (
         <div className="fc-more" onClick={e => e.stopPropagation()}>
           <span className="fc-more-lbl">Also covering:</span>
@@ -1155,7 +1272,10 @@ function FeedCard({ a, cat, isSaved, onSave, onRead, relatedSources }) {
         <button className={`fc-act ${showSummary ? 'ai-on' : ''}`} onClick={handleAI} disabled={loadingSum}>
           ✦ {loadingSum ? 'Thinking...' : showSummary ? 'Hide AI' : 'AI Summary'}
         </button>
-        <a className="fc-read-link" href={a.link} target="_blank" rel="noreferrer" onClick={e => { e.stopPropagation(); onRead(a); }}>Read → {a.source}</a>
+        <button className={`fc-act ${showDisc ? 'disc-on' : ''}`} onClick={handleDisc} disabled={loadingDisc}>
+          💬 {loadingDisc ? 'Searching...' : showDisc ? 'Hide' : 'Pulse'}
+        </button>
+        <a className="fc-read-link" href={a.link} target="_blank" rel="noreferrer" onClick={e => { e.stopPropagation(); onRead(a); }}>Read →</a>
       </div>
     </div>
   );
