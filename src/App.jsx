@@ -1,19 +1,3 @@
-// MyNewsHub v14 — Chunk A
-// ─────────────────────────────────────────────────────────────────────────────
-// Changes from v13:
-//  • Storage key bump v13_ → v14_ with one-time migration
-//  • Image extraction: checks media:content, media:thumbnail, enclosure, image/url,
-//    and regex-extracts first <img> from description HTML
-//  • RSS proxy chain: AbortController 8s timeout per proxy, better error surfacing
-//  • AI Summary button: shows "Requires Backend (Chunk B)" tooltip instead of hanging
-//  • Social Follows: restored as curated link-list section on each category page
-//  • Sports scoreboard: live scores for Texans/Rockets/Astros/Braves/UK MBB/UK FB/Clemson FB
-//    via ESPN public JSON, rendered on Today page + Sports page sidebar
-//  • Per-category Customize button inline on each category header
-//  • Trending/Topics/Sources sidebar now works for Comedy + Podcasts pages too
-//  • Source health now includes failure reason (timeout / blocked / empty)
-// ─────────────────────────────────────────────────────────────────────────────
-
 import { useState, useEffect, useCallback, useMemo } from 'react';
 
 // ─── CATEGORIES ───────────────────────────────────────────────────────────────
@@ -616,9 +600,17 @@ body{background:var(--bg);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI
 .fc-act.disabled:hover{border-color:var(--border);color:var(--text3);}
 .fc-read-link{margin-left:auto;font-size:10px;color:var(--text3);text-decoration:none;font-weight:500;display:flex;align-items:center;gap:3px;}
 .fc-read-link:hover{color:#1d4ed8;}
-.fc-summary{margin-top:10px;background:var(--bg);border:1px solid #ddd6fe;border-radius:8px;padding:10px 12px;}
+.fc-summary{background:var(--bg);border:1px solid #ddd6fe;border-radius:8px;padding:10px 12px;}
 .fc-summary-lbl{font-size:9px;font-weight:700;color:#7c3aed;text-transform:uppercase;letter-spacing:0.08em;margin-bottom:5px;}
 .fc-summary-text{font-size:12px;color:var(--text2);line-height:1.6;}
+.fc-ai-panel{margin-top:10px;display:flex;flex-direction:column;gap:8px;}
+.fc-takeaways{background:var(--bg);border:1px solid #a5b4fc;border-radius:8px;padding:12px 14px;}
+.fc-takeaways-lbl{font-size:9px;font-weight:700;color:#4f46e5;text-transform:uppercase;letter-spacing:0.08em;margin-bottom:8px;}
+.takeaways-list{display:flex;flex-direction:column;gap:8px;}
+.takeaway-item{display:flex;gap:8px;align-items:flex-start;font-size:12px;line-height:1.5;color:var(--text2);}
+.takeaway-num{font-size:14px;font-weight:900;color:#4f46e5;min-width:18px;flex-shrink:0;line-height:1.3;}
+.takeaway-head{font-weight:700;color:var(--text);}
+.takeaway-body{font-weight:400;}
 .fc-disc{margin-top:10px;background:var(--bg);border:1px solid #bae6fd;border-radius:8px;padding:10px 12px;}
 .fc-disc-lbl{font-size:9px;font-weight:700;color:#0284c7;text-transform:uppercase;letter-spacing:0.08em;margin-bottom:8px;}
 .fc-disc-item{display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid var(--border2);text-decoration:none;color:var(--text);font-size:11px;transition:color 0.1s;}
@@ -1120,59 +1112,92 @@ const SOURCE_URLS = {
 // Calls our /api/summarize.js Vercel function (which holds the Anthropic API
 // key server-side). Browser → /api/summarize → api.anthropic.com → 2-3 sentence
 // summary. Cached server-side for 24h to avoid re-summarizing the same article.
-async function fetchAISummary({ type, title, content }) {
+async function fetchAISummary({ type, title, content, mode = 'summary' }) {
   try {
     const r = await fetch('/api/summarize', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ type, title, content }),
-      signal: AbortSignal.timeout(12000),
+      body: JSON.stringify({ type, title, content, mode }),
+      signal: AbortSignal.timeout(mode === 'takeaways' ? 18000 : 12000),
     });
     if (!r.ok) {
       const errBody = await r.json().catch(() => ({}));
       const detail = errBody.error || `HTTP ${r.status}`;
-      // Distinguish "backend missing/misconfigured" from "transient fetch failure"
-      // so we can show a useful message to the user.
-      if (r.status === 500 && /ANTHROPIC_API_KEY/i.test(detail)) {
-        return { summary: '', error: 'Backend not configured: add ANTHROPIC_API_KEY in Vercel → Settings → Environment Variables, then redeploy.' };
+      if (r.status === 500 && /API_KEY/i.test(detail)) {
+        return { summary: '', error: 'No AI provider configured. Add GROQ_API_KEY (free) in Vercel env vars.' };
       }
-      if (r.status === 504) {
-        return { summary: '', error: 'Summary timed out — try again in a moment.' };
-      }
-      return { summary: '', error: `Summary unavailable (${detail.slice(0, 100)})` };
+      if (r.status === 504) return { summary: '', error: 'Timed out — try again.' };
+      return { summary: '', error: `Unavailable (${detail.slice(0, 100)})` };
     }
     const data = await r.json();
-    return { summary: data.summary || '', error: '' };
+    return { summary: data.summary || '', error: '', provider: data.provider || '' };
   } catch (err) {
-    return { summary: '', error: err.name === 'TimeoutError' ? 'Summary timed out' : 'Network error reaching /api/summarize' };
+    return { summary: '', error: err.name === 'TimeoutError' ? 'Timed out' : 'Network error' };
   }
+}
+
+// Helper: render Key Takeaways markdown-like output as structured JSX
+function TakeawaysContent({ text }) {
+  if (!text) return null;
+  // Parse lines like "**1. Headline** — Explanation"
+  const lines = text.split('\n').filter(l => l.trim());
+  return (
+    <div className="takeaways-list">
+      {lines.map((line, i) => {
+        const m = line.match(/\*\*(\d+)\.\s*([^*]+)\*\*\s*[—–-]\s*(.*)/);
+        if (m) {
+          return (
+            <div key={i} className="takeaway-item">
+              <span className="takeaway-num">{m[1]}</span>
+              <div>
+                <span className="takeaway-head">{m[2].trim()}</span>
+                <span className="takeaway-body"> — {m[3].trim()}</span>
+              </div>
+            </div>
+          );
+        }
+        // Fallback for non-matching lines
+        return <div key={i} className="takeaway-item"><div style={{fontSize:'12px',color:'var(--text2)',lineHeight:1.55}}>{line.replace(/\*\*/g,'')}</div></div>;
+      })}
+    </div>
+  );
 }
 
 // ─── FEED CARD ───────────────────────────────────────────────────────────────
 function FeedCard({ a, cat, isSaved, onSave, onRead, relatedSources }) {
   const [imgErr, setImgErr] = useState(false);
-  const [showSummary, setShowSummary] = useState(false);
+  // AI state: 'closed' → 'summary' → 'takeaways' → 'closed' (progressive cycle)
+  const [aiState, setAiState] = useState('closed');
   const [summary, setSummary] = useState('');
-  const [summaryErr, setSummaryErr] = useState('');
-  const [loadingSum, setLoadingSum] = useState(false);
+  const [takeaways, setTakeaways] = useState('');
+  const [aiErr, setAiErr] = useState('');
+  const [loadingAI, setLoadingAI] = useState(false);
   const [showDisc, setShowDisc] = useState(false);
-  const [disc, setDisc] = useState(null);  // { reddit:[], hn:[] }
+  const [disc, setDisc] = useState(null);
   const [loadingDisc, setLoadingDisc] = useState(false);
   const cc = CATS[cat] || CATS.general;
   const topKw = a.matchedKw?.[0] || null;
 
   const handleAI = async (e) => {
     e.stopPropagation();
-    if (showSummary) { setShowSummary(false); return; }
-    if (summary || summaryErr) { setShowSummary(true); return; }
-    setShowSummary(true); setLoadingSum(true);
-    const { summary: s, error } = await fetchAISummary({
-      type: 'article',
-      title: a.title,
-      content: a.desc || '',
-    });
-    if (s) setSummary(s); else setSummaryErr(error || 'Summary unavailable');
-    setLoadingSum(false);
+    if (aiState === 'closed') {
+      // First tap: show summary
+      if (summary) { setAiState('summary'); return; }
+      setAiState('summary'); setLoadingAI(true);
+      const { summary: s, error } = await fetchAISummary({ type: 'article', title: a.title, content: a.desc || '', mode: 'summary' });
+      if (s) setSummary(s); else setAiErr(error || 'Unavailable');
+      setLoadingAI(false);
+    } else if (aiState === 'summary') {
+      // Second tap: load takeaways
+      if (takeaways) { setAiState('takeaways'); return; }
+      setAiState('takeaways'); setLoadingAI(true);
+      const { summary: t, error } = await fetchAISummary({ type: 'article', title: a.title, content: a.desc || '', mode: 'takeaways' });
+      if (t) setTakeaways(t); else setAiErr(error || 'Unavailable');
+      setLoadingAI(false);
+    } else {
+      // Third tap: hide
+      setAiState('closed');
+    }
   };
 
   const handleDisc = async (e) => {
@@ -1231,14 +1256,28 @@ function FeedCard({ a, cat, isSaved, onSave, onRead, relatedSources }) {
           {a.desc && <div className="fc-desc">{a.desc}</div>}
         </div>
       </div>
-      {showSummary && (
-        <div className="fc-summary" onClick={e => e.stopPropagation()}>
-          <div className="fc-summary-lbl">✦ AI Summary</div>
-          {loadingSum
-            ? <div style={{fontSize:'11px', color:'var(--text3)', fontStyle:'italic'}}>Generating summary...</div>
-            : summaryErr
-              ? <div style={{fontSize:'11px', color:'#dc2626'}}>{summaryErr}</div>
-              : <div className="fc-summary-text">{summary}</div>}
+      {aiState !== 'closed' && (
+        <div className="fc-ai-panel" onClick={e => e.stopPropagation()}>
+          {/* Summary section (always shown when AI is open) */}
+          <div className="fc-summary">
+            <div className="fc-summary-lbl">✦ AI Summary</div>
+            {loadingAI && !summary
+              ? <div style={{fontSize:'11px', color:'var(--text3)', fontStyle:'italic'}}>Generating summary...</div>
+              : aiErr && !summary
+                ? <div style={{fontSize:'11px', color:'#dc2626'}}>{aiErr}</div>
+                : <div className="fc-summary-text">{summary}</div>}
+          </div>
+          {/* Takeaways section (shown on second tap) */}
+          {aiState === 'takeaways' && (
+            <div className="fc-takeaways">
+              <div className="fc-takeaways-lbl">📋 Key Takeaways</div>
+              {loadingAI && !takeaways
+                ? <div style={{fontSize:'11px', color:'var(--text3)', fontStyle:'italic'}}>Analyzing article...</div>
+                : aiErr && !takeaways
+                  ? <div style={{fontSize:'11px', color:'#dc2626'}}>{aiErr}</div>
+                  : <TakeawaysContent text={takeaways}/>}
+            </div>
+          )}
         </div>
       )}
       {showDisc && (
@@ -1278,8 +1317,8 @@ function FeedCard({ a, cat, isSaved, onSave, onRead, relatedSources }) {
         <button className={`fc-act ${isSaved ? 'saved' : ''}`} onClick={e => { e.stopPropagation(); onSave(a); }}>
           {isSaved ? '★ Saved' : '☆ Save'}
         </button>
-        <button className={`fc-act ${showSummary ? 'ai-on' : ''}`} onClick={handleAI} disabled={loadingSum}>
-          ✦ {loadingSum ? 'Thinking...' : showSummary ? 'Hide AI' : 'AI Summary'}
+        <button className={`fc-act ${aiState !== 'closed' ? 'ai-on' : ''}`} onClick={handleAI} disabled={loadingAI}>
+          ✦ {loadingAI ? 'Thinking...' : aiState === 'closed' ? 'AI Summary' : aiState === 'summary' ? 'Key Takeaways' : 'Hide AI'}
         </button>
         <button className={`fc-act ${showDisc ? 'disc-on' : ''}`} onClick={handleDisc} disabled={loadingDisc}>
           💬 {loadingDisc ? 'Searching...' : showDisc ? 'Hide' : 'Pulse'}
@@ -2315,23 +2354,29 @@ export default function App() {
     const displayEps = activePod ? (podEps[activePod.name] || []).map(e => ({...e, show:activePod.name, host:activePod.host, emoji:activePod.emoji})) : allEps;
 
     const PodCard = ({ep, idx}) => {
-      const [showSum, setShowSum] = useState(false);
+      const [podAiState, setPodAiState] = useState('closed');
       const [podSum, setPodSum] = useState('');
+      const [podTake, setPodTake] = useState('');
       const [podErr, setPodErr] = useState('');
-      const [loadSum, setLoadSum] = useState(false);
+      const [loadPod, setLoadPod] = useState(false);
       const sv2 = isSavedFn({...ep, link:ep.link || ep.show + idx});
 
       const handlePodAI = async () => {
-        if (showSum) { setShowSum(false); return; }
-        if (podSum || podErr) { setShowSum(true); return; }
-        setShowSum(true); setLoadSum(true);
-        const { summary: s, error } = await fetchAISummary({
-          type: 'podcast',
-          title: ep.title,
-          content: ep.desc || '',
-        });
-        if (s) setPodSum(s); else setPodErr(error || 'Summary unavailable');
-        setLoadSum(false);
+        if (podAiState === 'closed') {
+          if (podSum) { setPodAiState('summary'); return; }
+          setPodAiState('summary'); setLoadPod(true);
+          const { summary: s, error } = await fetchAISummary({ type: 'podcast', title: ep.title, content: ep.desc || '', mode: 'summary' });
+          if (s) setPodSum(s); else setPodErr(error || 'Unavailable');
+          setLoadPod(false);
+        } else if (podAiState === 'summary') {
+          if (podTake) { setPodAiState('takeaways'); return; }
+          setPodAiState('takeaways'); setLoadPod(true);
+          const { summary: t, error } = await fetchAISummary({ type: 'podcast', title: ep.title, content: ep.desc || '', mode: 'takeaways' });
+          if (t) setPodTake(t); else setPodErr(error || 'Unavailable');
+          setLoadPod(false);
+        } else {
+          setPodAiState('closed');
+        }
       };
 
       return (
@@ -2345,20 +2390,32 @@ export default function App() {
               {ep.desc && <div className="pod-desc">{ep.desc}</div>}
             </div>
           </div>
-          {showSum && (
-            <div className="pod-summary">
-              <div className="pod-summary-lbl">✦ AI Summary</div>
-              {loadSum
-                ? <div style={{fontSize:'11px', color:'var(--text3)', fontStyle:'italic'}}>Generating summary...</div>
-                : podErr
-                  ? <div style={{fontSize:'11px', color:'#dc2626'}}>{podErr}</div>
-                  : <div>{podSum}</div>}
+          {podAiState !== 'closed' && (
+            <div className="fc-ai-panel" style={{margin:'10px 0 0'}}>
+              <div className="fc-summary">
+                <div className="fc-summary-lbl">✦ AI Summary</div>
+                {loadPod && !podSum
+                  ? <div style={{fontSize:'11px', color:'var(--text3)', fontStyle:'italic'}}>Generating summary...</div>
+                  : podErr && !podSum
+                    ? <div style={{fontSize:'11px', color:'#dc2626'}}>{podErr}</div>
+                    : <div className="fc-summary-text">{podSum}</div>}
+              </div>
+              {podAiState === 'takeaways' && (
+                <div className="fc-takeaways">
+                  <div className="fc-takeaways-lbl">📋 Key Takeaways</div>
+                  {loadPod && !podTake
+                    ? <div style={{fontSize:'11px', color:'var(--text3)', fontStyle:'italic'}}>Analyzing episode...</div>
+                    : podErr && !podTake
+                      ? <div style={{fontSize:'11px', color:'#dc2626'}}>{podErr}</div>
+                      : <TakeawaysContent text={podTake}/>}
+                </div>
+              )}
             </div>
           )}
           <div className="pod-actions">
             <button className="pod-btn" onClick={() => ep.link && window.open(ep.link, '_blank')}>Listen</button>
-            <button className={`pod-btn ${showSum ? 'ai-on' : ''}`} onClick={handlePodAI} disabled={loadSum}>
-              ✦ {loadSum ? 'Thinking...' : showSum ? 'Hide AI' : 'AI Summary'}
+            <button className={`pod-btn ${podAiState !== 'closed' ? 'ai-on' : ''}`} onClick={handlePodAI} disabled={loadPod}>
+              ✦ {loadPod ? 'Thinking...' : podAiState === 'closed' ? 'AI Summary' : podAiState === 'summary' ? 'Key Takeaways' : 'Hide AI'}
             </button>
             <button className={`pod-btn ${sv2 ? 'saved' : ''}`} onClick={() => onSave({...ep, link:ep.link || ep.show + idx, source:ep.show, cat:'podcasts'})}>{sv2 ? '★ Saved' : '☆ Save'}</button>
           </div>
