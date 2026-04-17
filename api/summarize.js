@@ -1,5 +1,15 @@
+// /api/summarize.js — v3
+// Multi-provider AI summary: Groq (free) → Gemini (free) → Claude (paid).
+// Tries each in order; first success wins. All keys are optional — if a key
+// is missing, that provider is skipped silently.
+//
+// Env vars (add in Vercel → Settings → Environment Variables):
+//   GROQ_API_KEY      — free, get from console.groq.com (no credit card)
+//   GOOGLE_AI_KEY     — free, get from aistudio.google.com (no credit card)
+//   ANTHROPIC_API_KEY — paid, get from console.anthropic.com ($5 minimum)
+
 const MAX_INPUT = 3000;
-const TOKENS = { summary: 250, takeaways: 600 };
+const TOKENS = { summary: 250, takeaways: 600, briefing: 400 };
 
 // ── Body parser (Vercel doesn't auto-parse for plain serverless fns) ────
 async function readBody(req) {
@@ -18,6 +28,9 @@ async function readBody(req) {
 // ── Build the prompt ────────────────────────────────────────────────────
 function buildPrompt(type, title, content, mode) {
   const verb = type === 'podcast' ? 'podcast episode' : 'news article';
+  if (mode === 'briefing') {
+    return `You are a sharp morning news briefing writer. Given headlines from multiple news categories, write ONE punchy sentence per category summarizing the single most important story. Be direct, specific, include names and numbers. No filler.\n\nFormat each line as:\nCategory: One sentence summary\n\n${content}`;
+  }
   if (mode === 'takeaways') {
     return `Analyze this ${verb} and extract 3-5 key takeaways. For each takeaway, write a bold short headline followed by a one-sentence explanation. Be specific and factual — include names, numbers, and concrete details. Skip generic observations.\n\nFormat each as:\n**1. [Headline]** — [Explanation]\n**2. [Headline]** — [Explanation]\n(etc.)\n\nTitle: ${title}\n\nContent: ${content}`;
   }
