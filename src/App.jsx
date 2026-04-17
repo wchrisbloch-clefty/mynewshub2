@@ -1,3 +1,19 @@
+// MyNewsHub v14 — Chunk A
+// ─────────────────────────────────────────────────────────────────────────────
+// Changes from v13:
+//  • Storage key bump v13_ → v14_ with one-time migration
+//  • Image extraction: checks media:content, media:thumbnail, enclosure, image/url,
+//    and regex-extracts first <img> from description HTML
+//  • RSS proxy chain: AbortController 8s timeout per proxy, better error surfacing
+//  • AI Summary button: shows "Requires Backend (Chunk B)" tooltip instead of hanging
+//  • Social Follows: restored as curated link-list section on each category page
+//  • Sports scoreboard: live scores for Texans/Rockets/Astros/Braves/UK MBB/UK FB/Clemson FB
+//    via ESPN public JSON, rendered on Today page + Sports page sidebar
+//  • Per-category Customize button inline on each category header
+//  • Trending/Topics/Sources sidebar now works for Comedy + Podcasts pages too
+//  • Source health now includes failure reason (timeout / blocked / empty)
+// ─────────────────────────────────────────────────────────────────────────────
+
 import { useState, useEffect, useCallback, useMemo } from 'react';
 
 // ─── CATEGORIES ───────────────────────────────────────────────────────────────
@@ -527,7 +543,7 @@ body{background:var(--bg);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI
 .breaking-ticker-inner{display:inline-flex;gap:60px;animation:ticker-scroll 90s linear infinite;white-space:nowrap;}
 .breaking-ticker-inner:hover{animation-play-state:paused;}
 @keyframes ticker-scroll{0%{transform:translateX(0);}100%{transform:translateX(-50%);}}
-.breaking-item{font-size:11px;color:#fff;font-weight:500;cursor:pointer;display:inline-flex;align-items:center;gap:8px;}
+.breaking-item{font-size:12px;color:#fff;font-weight:500;cursor:pointer;display:inline-flex;align-items:center;gap:8px;}
 .breaking-item:hover{text-decoration:underline;}
 .breaking-sep{color:rgba(255,255,255,0.4);font-size:10px;}
 .breaking-close{background:none;border:none;color:rgba(255,255,255,0.6);cursor:pointer;font-size:14px;padding:0 12px;flex-shrink:0;line-height:1;}
@@ -713,7 +729,7 @@ body{background:var(--bg);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI
 .hero-lead{background:var(--surface);border-radius:14px;border:1px solid var(--border);overflow:hidden;cursor:pointer;transition:box-shadow 0.2s,transform 0.15s;box-shadow:var(--shadow-md);}
 .hero-lead:hover{box-shadow:var(--shadow-lg);transform:translateY(-2px);}
 .hero-lead:active{transform:scale(0.995);}
-.hero-lead-img{width:100%;aspect-ratio:16/9;background-size:cover;background-position:center;background-color:var(--bg);position:relative;}
+.hero-lead-img{width:100%;aspect-ratio:2.2/1;background-size:cover;background-position:center top;background-color:var(--bg);position:relative;}
 .hero-lead-badge{position:absolute;top:16px;left:16px;color:#fff;font-size:10px;font-weight:800;padding:5px 12px;border-radius:6px;letter-spacing:0.06em;text-transform:uppercase;box-shadow:0 2px 8px rgba(0,0,0,0.25);backdrop-filter:blur(4px);}
 .hero-dots{position:absolute;bottom:16px;left:50%;transform:translateX(-50%);display:flex;gap:8px;}
 .hero-dot{width:10px;height:10px;border-radius:50%;border:2px solid rgba(255,255,255,0.7);background:transparent;cursor:pointer;transition:all 0.2s;padding:0;}
@@ -2062,12 +2078,55 @@ export default function App() {
   // ─── FEED PAGE ──────────────────────────────────────────────────────────
   const FeedPage = ({cat}) => {
     const cc = CATS[cat]; const items = sorted(cat); const isLoading = loading[cat];
+
+    // Category hero: pick the top article with an image as the lead
+    const heroItems = items.filter(a => a.img);
+    const catLead = heroItems[0] || null;
+    const catSide = heroItems.slice(1, 6);
+    // Feed items exclude the hero lead to avoid duplication
+    const feedItems = catLead ? items.filter(a => a.link !== catLead.link) : items;
+
     return (
       <div className="page">
+        {/* Category hero — same structure as Today page hero but filtered to this category */}
+        {catLead && !activeKw && !activeSrc && (
+          <div className="hero-row cat-hero">
+            <article className="hero-lead" style={{borderTop:`3px solid ${cc.color}`}} onClick={() => onRead(catLead)}>
+              <div className="hero-lead-img" style={{backgroundImage:`url(${catLead.img})`}}>
+                <div className="hero-lead-badge" style={{background:cc.color}}>
+                  {cc.emoji} {cc.label}
+                </div>
+              </div>
+              <div className="hero-lead-text">
+                <h1 className="hero-lead-title">{catLead.title}</h1>
+                {catLead.desc && <p className="hero-lead-desc">{catLead.desc}</p>}
+                <div className="hero-lead-meta">
+                  <span className="hero-lead-source">{catLead.source}</span>
+                  <span>·</span>
+                  <span>{fmtDate(catLead.pubDate)}</span>
+                </div>
+              </div>
+            </article>
+            {catSide.length > 0 && (
+              <aside className="hero-side" style={{borderTop:`3px solid ${cc.color}`}}>
+                <div className="hero-side-label">{cc.emoji} Latest in {cc.label}</div>
+                {catSide.map((s, i) => (
+                  <div key={i} className="hero-side-item" onClick={() => onRead(s)}>
+                    {s.img && <img className="hero-side-thumb" src={s.img} loading="lazy" onError={e => e.target.style.display='none'} alt=""/>}
+                    <div className="hero-side-body">
+                      <div className="hero-side-title">{s.title}</div>
+                      <div className="hero-side-meta">{s.source} · {fmtDate(s.pubDate)}</div>
+                    </div>
+                  </div>
+                ))}
+              </aside>
+            )}
+          </div>
+        )}
         <div className="page-grid">
           <div className="feed-col">
             <div className="page-header-row">
-              <span className="page-header">{cc.emoji} {cc.label}{items.length > 0 ? ` — ${items.length} articles` : ''}</span>
+              <span className="page-header">{cc.emoji} {cc.label}{feedItems.length > 0 ? ` — ${feedItems.length} articles` : ''}</span>
               <button className="page-customize-btn" onClick={() => openCustomize('sources', cat)}>⚙ Customize {cc.label}</button>
             </div>
             {(activeKw || activeSrc) && (
@@ -2076,11 +2135,11 @@ export default function App() {
                 {activeSrc && <span style={{background:'var(--bg)', color:'var(--text2)', borderRadius:'20px', padding:'3px 10px', fontSize:'10px', fontWeight:'600', border:'1px solid var(--border)', display:'inline-flex', alignItems:'center', gap:'5px'}}>📰 {activeSrc} <button onClick={() => setActiveSrc(null)} style={{background:'none', border:'none', cursor:'pointer', color:'inherit', fontSize:'12px', padding:0}}>✕</button></span>}
               </div>
             )}
-            {isLoading && !items.length
+            {isLoading && !feedItems.length
               ? <div className="empty-state"><div className="empty-icon">{cc.emoji}</div><div className="empty-msg">Loading {cc.label}...</div></div>
-              : items.length === 0
+              : feedItems.length === 0
                 ? <div className="empty-state"><div className="empty-icon">📭</div><div className="empty-msg">{activeKw || activeSrc ? 'No articles match this filter' : 'No articles loaded yet'}</div><button className="refresh-btn" onClick={refreshAll}>Refresh</button></div>
-                : items.slice(0, 20).map((a, i) => <FeedCard key={i} a={a} cat={cat} isSaved={isSavedFn(a)} onSave={onSave} onRead={onRead} relatedSources={getRelated(a, cat)}/>)
+                : feedItems.slice(0, 20).map((a, i) => <FeedCard key={i} a={a} cat={cat} isSaved={isSavedFn(a)} onSave={onSave} onRead={onRead} relatedSources={getRelated(a, cat)}/>)
             }
             <SocialFollows cat={cat} social={social}/>
             <SourceFooter cat={cat} feeds={feeds} arts={arts}/>
@@ -2180,7 +2239,7 @@ export default function App() {
             {['general','sports','business','finance'].map(cat => {
               const cc = CATS[cat], items = sorted(cat).slice(0, 4), total = (arts[cat] || []).length;
               return (
-                <div key={cat} className="today-block">
+                <div key={cat} className="today-block" style={{borderTop:`3px solid ${cc.color}`}}>
                   <div className="today-block-head">
                     <div className="today-block-label"><span style={{color:cc.color}}>{cc.emoji} {cc.label}</span><span className="today-block-count">{total}</span></div>
                     <button className="today-see-all" style={{color:cc.color}} onClick={() => handleTabChange(cat)}>All →</button>
