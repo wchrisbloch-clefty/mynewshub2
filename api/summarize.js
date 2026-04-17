@@ -1,15 +1,5 @@
-// /api/summarize.js — v3
-// Multi-provider AI summary: Groq (free) → Gemini (free) → Claude (paid).
-// Tries each in order; first success wins. All keys are optional — if a key
-// is missing, that provider is skipped silently.
-//
-// Env vars (add in Vercel → Settings → Environment Variables):
-//   GROQ_API_KEY      — free, get from console.groq.com (no credit card)
-//   GOOGLE_AI_KEY     — free, get from aistudio.google.com (no credit card)
-//   ANTHROPIC_API_KEY — paid, get from console.anthropic.com ($5 minimum)
-
 const MAX_INPUT = 3000;
-const MAX_TOKENS = 250;
+const TOKENS = { summary: 250, takeaways: 600 };
 
 // ── Body parser (Vercel doesn't auto-parse for plain serverless fns) ────
 async function readBody(req) {
@@ -26,13 +16,16 @@ async function readBody(req) {
 }
 
 // ── Build the prompt ────────────────────────────────────────────────────
-function buildPrompt(type, title, content) {
+function buildPrompt(type, title, content, mode) {
   const verb = type === 'podcast' ? 'podcast episode' : 'news article';
+  if (mode === 'takeaways') {
+    return `Analyze this ${verb} and extract 3-5 key takeaways. For each takeaway, write a bold short headline followed by a one-sentence explanation. Be specific and factual — include names, numbers, and concrete details. Skip generic observations.\n\nFormat each as:\n**1. [Headline]** — [Explanation]\n**2. [Headline]** — [Explanation]\n(etc.)\n\nTitle: ${title}\n\nContent: ${content}`;
+  }
   return `Summarize this ${verb} in 2-3 concise sentences. Be direct and factual. Skip filler like "this article discusses" — start with the actual content.\n\nTitle: ${title}\n\nContent: ${content}`;
 }
 
 // ── Provider 1: Groq (Llama 3.3 70B, free, ~700 tok/s) ─────────────────
-async function tryGroq(prompt) {
+async function tryGroq(prompt, maxTokens) {
   const key = process.env.GROQ_API_KEY;
   if (!key) return null;
   try {
@@ -42,7 +35,7 @@ async function tryGroq(prompt) {
       body: JSON.stringify({
         model: 'llama-3.3-70b-versatile',
         messages: [{ role: 'user', content: prompt }],
-        max_tokens: MAX_TOKENS,
+        max_tokens: maxTokens,
         temperature: 0.3,
       }),
       signal: AbortSignal.timeout(8000),
@@ -55,7 +48,7 @@ async function tryGroq(prompt) {
 }
 
 // ── Provider 2: Google Gemini (free 500 req/day) ────────────────────────
-async function tryGemini(prompt) {
+async function tryGemini(prompt, maxTokens) {
   const key = process.env.GOOGLE_AI_KEY;
   if (!key) return null;
   try {
@@ -66,7 +59,7 @@ async function tryGemini(prompt) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           contents: [{ parts: [{ text: prompt }] }],
-          generationConfig: { maxOutputTokens: MAX_TOKENS, temperature: 0.3 },
+          generationConfig: { maxOutputTokens: maxTokens, temperature: 0.3 },
         }),
         signal: AbortSignal.timeout(10000),
       }
@@ -79,7 +72,7 @@ async function tryGemini(prompt) {
 }
 
 // ── Provider 3: Anthropic Claude (paid, highest quality) ────────────────
-async function tryClaude(prompt) {
+async function tryClaude(prompt, maxTokens) {
   const key = process.env.ANTHROPIC_API_KEY;
   if (!key) return null;
   try {
@@ -92,7 +85,7 @@ async function tryClaude(prompt) {
       },
       body: JSON.stringify({
         model: 'claude-sonnet-4-5',
-        max_tokens: MAX_TOKENS,
+        max_tokens: maxTokens,
         messages: [{ role: 'user', content: prompt }],
       }),
       signal: AbortSignal.timeout(9000),
@@ -115,12 +108,15 @@ export default async function handler(req, res) {
   let body;
   try { body = await readBody(req); } catch { return res.status(400).json({ error: 'Bad body' }); }
 
-  const { type = 'article', title = '', content = '' } = body;
+  const { type = 'article', title = '', content = '', mode = 'summary' } = body;
   if (!title || !String(title).trim()) {
     return res.status(400).json({ error: 'title required' });
   }
 
-  const prompt = buildPrompt(type, String(title).slice(0, 500), String(content).slice(0, MAX_INPUT));
+  const validModes = ['summary', 'takeaways'];
+  const m = validModes.includes(mode) ? mode : 'summary';
+  const maxTokens = TOKENS[m] || 250;
+  const prompt = buildPrompt(type, String(title).slice(0, 500), String(content).slice(0, MAX_INPUT), m);
 
   // Try providers in order: Groq (free) → Gemini (free) → Claude (paid)
   const providers = [
@@ -130,7 +126,7 @@ export default async function handler(req, res) {
   ];
 
   for (const p of providers) {
-    const result = await p.fn(prompt);
+    const result = await p.fn(prompt, maxTokens);
     if (result) {
       res.setHeader('Cache-Control', 's-maxage=86400, stale-while-revalidate=604800');
       return res.status(200).json({ summary: result, provider: p.name });
