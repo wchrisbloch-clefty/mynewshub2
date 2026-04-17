@@ -51,6 +51,8 @@ const DEFAULT_FEEDS = {
     { name:'KHOU Houston',      url:'https://www.khou.com/feeds/syndication/rss/news',                          on:true },
     { name:'Click2Houston',     url:'https://www.click2houston.com/rss/news.rss',                               on:true },
     { name:'Chron.com',         url:'https://www.chron.com/rss/feed/News-270.php',                              on:true },
+    { name:'Morning Brew',      url:'https://www.morningbrew.com/feed',                                         on:true },
+    { name:'Morning Wire',      url:'https://feeds.megaphone.fm/BVDWV8747925072',                               on:true },
   ],
   sports: [
     { name:'ESPN NFL',             url:'https://www.espn.com/espn/rss/nfl/news',                                on:true },
@@ -656,7 +658,8 @@ body{background:var(--bg);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI
 .trend-num{font-size:18px;font-weight:900;color:var(--border);min-width:22px;line-height:1;flex-shrink:0;font-variant-numeric:tabular-nums;}
 .trend-body{flex:1;min-width:0;}
 .trend-title{font-size:12px;font-weight:700;color:var(--text);line-height:1.35;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;margin-bottom:3px;letter-spacing:-0.1px;}
-.trend-src{font-size:10px;color:var(--text3);font-variant-numeric:tabular-nums;}
+.trend-src{font-size:10px;color:var(--text3);font-variant-numeric:tabular-nums;display:flex;align-items:center;gap:5px;flex-wrap:wrap;}
+.trend-cat-badge{font-size:8px;font-weight:700;border-radius:8px;padding:1px 6px;letter-spacing:0.02em;text-transform:uppercase;white-space:nowrap;}
 
 /* scoreboard */
 /* ─── FINANCE PAGE (Yahoo-light + Bloomberg touches) ─────────────────── */
@@ -716,6 +719,24 @@ body{background:var(--bg);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI
   .fin-table thead th:nth-child(2){display:none;}
 }
 
+/* ─── MORNING BRIEFING ──────────────────────────────────────────────── */
+.briefing-card{background:var(--surface);border-radius:var(--radius);border:1px solid var(--border);margin-bottom:18px;box-shadow:var(--shadow-sm);overflow:hidden;border-top:3px solid #92400e;}
+.briefing-header{display:flex;align-items:center;justify-content:space-between;padding:14px 18px 12px;border-bottom:1px solid var(--border2);}
+.briefing-left{display:flex;align-items:center;gap:10px;}
+.briefing-icon{font-size:22px;}
+.briefing-title{font-size:15px;font-weight:900;color:var(--text);letter-spacing:-0.3px;}
+.briefing-date{font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:0.06em;margin-top:1px;}
+.briefing-refresh{background:var(--bg);border:1px solid var(--border);color:var(--text2);border-radius:6px;padding:5px 12px;font-size:10px;font-weight:600;cursor:pointer;font-family:inherit;transition:all 0.12s;}
+.briefing-refresh:hover{border-color:#92400e;color:#92400e;}
+.briefing-refresh:disabled{opacity:0.6;cursor:wait;}
+.briefing-items{padding:4px 0;}
+.briefing-item{display:flex;align-items:flex-start;gap:10px;padding:10px 18px;border-bottom:1px solid var(--border2);cursor:pointer;transition:background 0.1s;}
+.briefing-item:last-child{border-bottom:none;}
+.briefing-item:hover{background:var(--bg);}
+.briefing-cat-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0;margin-top:4px;}
+.briefing-cat-label{font-size:10px;font-weight:800;white-space:nowrap;flex-shrink:0;min-width:70px;text-transform:uppercase;letter-spacing:0.02em;}
+.briefing-text{font-size:12px;color:var(--text2);line-height:1.5;flex:1;}
+
 /* ─── MSN-STYLE TODAY HERO ──────────────────────────────────────────── */
 .hero-row{display:grid;grid-template-columns:1fr 340px;gap:18px;margin-bottom:24px;}
 .hero-lead{background:var(--surface);border-radius:14px;border:1px solid var(--border);overflow:hidden;cursor:pointer;transition:box-shadow 0.2s,transform 0.15s;box-shadow:var(--shadow-md);}
@@ -727,6 +748,10 @@ body{background:var(--bg);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI
 .hero-dot{width:10px;height:10px;border-radius:50%;border:2px solid rgba(255,255,255,0.7);background:transparent;cursor:pointer;transition:all 0.2s;padding:0;}
 .hero-dot.active{background:#fff;border-color:#fff;transform:scale(1.2);}
 .hero-dot:hover{border-color:#fff;}
+.hero-arrow{position:absolute;top:50%;transform:translateY(-50%);background:rgba(0,0,0,0.4);color:#fff;border:none;width:36px;height:36px;border-radius:50%;cursor:pointer;font-size:20px;font-weight:300;display:flex;align-items:center;justify-content:center;transition:background 0.15s;backdrop-filter:blur(4px);line-height:1;}
+.hero-arrow:hover{background:rgba(0,0,0,0.6);}
+.hero-prev{left:14px;}
+.hero-next{right:14px;}
 .hero-lead-text{padding:20px 22px 22px;}
 .hero-lead-title{font-size:26px;font-weight:900;color:var(--text);line-height:1.2;letter-spacing:-0.7px;margin:0 0 10px;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden;}
 .hero-lead-desc{font-size:14px;color:var(--text2);line-height:1.55;margin:0 0 12px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;font-weight:400;}
@@ -749,6 +774,9 @@ body{background:var(--bg);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI
   .hero-lead-text{padding:12px 14px 14px;}
   .hero-lead-title{font-size:17px;}
   .hero-side-thumb{width:54px;height:40px;}
+  .hero-arrow{width:32px;height:32px;font-size:18px;}
+  .hero-prev{left:8px;}
+  .hero-next{right:8px;}
 }
 
 /* ─── SCOREBOARD (rebuilt) ─────────────────────────────────────────── */
@@ -1370,6 +1398,93 @@ function TodayItem({ a, cc, onRead }) {
               : sum}
         </div>
       )}
+    </div>
+  );
+}
+
+// ─── MORNING BRIEFING ───────────────────────────────────────────────────────
+// AI-generated one-line summary per category. Uses Groq (free) via /api/summarize.
+// Sits between the hero and category grid on the Today page.
+function MorningBriefing({ arts, onRead }) {
+  const [briefing, setBriefing] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+
+  const dateStr = new Date().toLocaleDateString('en-US', { weekday:'long', month:'long', day:'numeric' });
+  const catOrder = ['general','sports','business','finance','bloom'];
+
+  const generate = async () => {
+    setLoading(true); setError('');
+    // Build headline context from top 3 articles per category
+    const headlines = catOrder.map(cat => {
+      const cc = CATS[cat];
+      const top = (arts[cat] || []).slice(0, 3).map(a => a.title).join(' | ');
+      return `${cc.emoji} ${cc.label}: ${top || 'No articles loaded'}`;
+    }).join('\n');
+
+    const { summary, error: err } = await fetchAISummary({
+      type: 'article',
+      title: `Morning Briefing for ${dateStr}`,
+      content: headlines,
+      mode: 'briefing',
+    });
+
+    // If the backend doesn't support 'briefing' mode, it falls back to 'summary' mode
+    // which still gives us something useful. But ideally we get one-liner per category.
+    if (summary) {
+      // Try to parse structured lines like "General: ..." or just show as-is
+      const lines = summary.split('\n').filter(l => l.trim());
+      const parsed = catOrder.map((cat, i) => {
+        const cc = CATS[cat];
+        const matchLine = lines.find(l => l.toLowerCase().includes(cc.label.toLowerCase()));
+        return { cat, emoji: cc.emoji, label: cc.label, color: cc.color,
+          text: matchLine ? matchLine.replace(/^[^:]+:\s*/, '').replace(/^\*\*[^*]+\*\*\s*[-–—]\s*/, '') : (lines[i] || '').replace(/^[\d.*-]+\s*/, ''),
+          topArticle: (arts[cat] || [])[0],
+        };
+      });
+      setBriefing(parsed);
+    } else {
+      setError(err || 'Could not generate briefing');
+    }
+    setLoading(false);
+  };
+
+  // Auto-generate on first render if articles are loaded
+  useEffect(() => {
+    const totalArts = catOrder.reduce((n, c) => n + (arts[c]?.length || 0), 0);
+    if (totalArts > 10 && !briefing && !loading) generate();
+  }, [arts]);
+
+  return (
+    <div className="briefing-card">
+      <div className="briefing-header">
+        <div className="briefing-left">
+          <span className="briefing-icon">☕</span>
+          <div>
+            <div className="briefing-title">Morning Briefing</div>
+            <div className="briefing-date">{dateStr}</div>
+          </div>
+        </div>
+        <button className="briefing-refresh" onClick={generate} disabled={loading}>
+          {loading ? '⟳ Generating...' : '↺ Refresh'}
+        </button>
+      </div>
+      {error && <div style={{padding:'8px 16px', fontSize:'11px', color:'#dc2626'}}>{error}</div>}
+      {briefing ? (
+        <div className="briefing-items">
+          {briefing.map((b, i) => (
+            <div key={i} className="briefing-item" onClick={() => b.topArticle && onRead(b.topArticle)}>
+              <span className="briefing-cat-dot" style={{background:b.color}}/>
+              <span className="briefing-cat-label" style={{color:b.color}}>{b.emoji} {b.label}</span>
+              <span className="briefing-text">{b.text || 'Loading...'}</span>
+            </div>
+          ))}
+        </div>
+      ) : !loading ? (
+        <div className="briefing-items">
+          <div style={{padding:'12px 16px', fontSize:'11px', color:'var(--text3)', fontStyle:'italic'}}>Loading articles before generating briefing...</div>
+        </div>
+      ) : null}
     </div>
   );
 }
@@ -2200,26 +2315,49 @@ export default function App() {
   const TodayPage = () => {
     // MSN-style hero: smart-pick the lead story by recency from across all categories,
     // then show 5 next-best as a sidebar of secondary headlines.
+    // Hero picks the BIGGEST stories (keyword-boosted, most covered) for editorial weight.
+    // Latest Headlines sidebar stays purely chronological for freshness.
     const allRecent = useMemo(() => {
+      const allKws = Object.values(kw).flat().map(k => k.toLowerCase());
       const seen = new Set();
       return Object.entries(arts)
         .flatMap(([cat, list]) => (list || []).map(a => ({...a, _cat:cat})))
-        .filter(a => a.title && a.link && a.img) // hero needs an image
+        .filter(a => a.title && a.link && a.img)
+        .filter(a => {
+          const k = a.title.slice(0, 60).toLowerCase().replace(/\s+/g,'');
+          if (seen.has(k)) return false; seen.add(k); return true;
+        })
+        .sort((a, b) => {
+          // Boost articles matching tracked keywords (editorial importance)
+          const aTxt = (a.title + ' ' + (a.desc || '')).toLowerCase();
+          const bTxt = (b.title + ' ' + (b.desc || '')).toLowerCase();
+          const aKw = allKws.filter(k => aTxt.includes(k)).length;
+          const bKw = allKws.filter(k => bTxt.includes(k)).length;
+          if (bKw !== aKw) return bKw - aKw;
+          return new Date(b.pubDate) - new Date(a.pubDate);
+        });
+    }, [arts, kw]);
+    // All articles sorted by pure recency for the "Latest" sidebar
+    const latestAll = useMemo(() => {
+      const seen = new Set();
+      return Object.entries(arts)
+        .flatMap(([cat, list]) => (list || []).map(a => ({...a, _cat:cat})))
+        .filter(a => a.title && a.link)
         .filter(a => {
           const k = a.title.slice(0, 60).toLowerCase().replace(/\s+/g,'');
           if (seen.has(k)) return false; seen.add(k); return true;
         })
         .sort((a, b) => new Date(b.pubDate) - new Date(a.pubDate));
     }, [arts]);
-    const heroStories = allRecent.slice(0, 5); // top 5 for carousel
-    const sideStories = allRecent.slice(5, 11); // next 6 for sidebar
+    const heroStories = allRecent.slice(0, 5); // top 5 most important for carousel
+    const sideStories = latestAll.slice(0, 8); // latest 8 by time for sidebar
     const [heroIdx, setHeroIdx] = useState(0);
 
     // Auto-advance every 8s, pause on hover
     const [paused, setPaused] = useState(false);
     useEffect(() => {
       if (paused || heroStories.length <= 1) return;
-      const iv = setInterval(() => setHeroIdx(i => (i + 1) % heroStories.length), 8000);
+      const iv = setInterval(() => setHeroIdx(i => (i + 1) % heroStories.length), 12000);
       return () => clearInterval(iv);
     }, [paused, heroStories.length]);
 
@@ -2235,11 +2373,15 @@ export default function App() {
                 {CATS[lead._cat]?.emoji} {CATS[lead._cat]?.label || 'News'}
               </div>
               {heroStories.length > 1 && (
-                <div className="hero-dots">
-                  {heroStories.map((_, i) => (
-                    <button key={i} className={`hero-dot ${i === heroIdx ? 'active' : ''}`} onClick={e => { e.stopPropagation(); setHeroIdx(i); }}/>
-                  ))}
-                </div>
+                <>
+                  <button className="hero-arrow hero-prev" onClick={e => { e.stopPropagation(); setHeroIdx(i => (i - 1 + heroStories.length) % heroStories.length); }}>‹</button>
+                  <button className="hero-arrow hero-next" onClick={e => { e.stopPropagation(); setHeroIdx(i => (i + 1) % heroStories.length); }}>›</button>
+                  <div className="hero-dots">
+                    {heroStories.map((_, i) => (
+                      <button key={i} className={`hero-dot ${i === heroIdx ? 'active' : ''}`} onClick={e => { e.stopPropagation(); setHeroIdx(i); }}/>
+                    ))}
+                  </div>
+                </>
               )}
             </div>
             <div className="hero-lead-text">
@@ -2272,6 +2414,7 @@ export default function App() {
           </aside>
         </div>
       )}
+      <MorningBriefing arts={arts} onRead={onRead}/>
       <div className="today-main">
         <div>
           <div className="today-grid">
@@ -2310,8 +2453,7 @@ export default function App() {
           <SourceFooter feeds={feeds} arts={arts}/>
         </div>
         <div className="sidebar">
-          <Scoreboard scores={scores} loading={scoresLoading} compact={true}/>
-          {/* Top Trending — keyword-boosted: articles matching any tracked keyword rank higher */}
+          {/* Top Stories — keyword-boosted, most important first */}
           <div className="sb-block">
             <div className="sb-head"><span className="sb-title">🔥 Top Stories</span></div>
             <div className="trend-list">
@@ -2330,18 +2472,25 @@ export default function App() {
                     return new Date(b.pubDate) - new Date(a.pubDate);
                   })
                   .slice(0, 8)
-                  .map((a, i) => (
+                  .map((a, i) => {
+                    const cc = CATS[a.cat] || CATS.general;
+                    return (
                     <div key={i} className="trend-row" onClick={() => onRead(a)}>
                       <div className="trend-num">{i + 1}</div>
                       <div className="trend-body">
                         <div className="trend-title">{a.title}</div>
-                        <div className="trend-src">{a.source} · {fmtDate(a.pubDate)}</div>
+                        <div className="trend-src">
+                          <span className="trend-cat-badge" style={{background:cc.bg, color:cc.color}}>{cc.emoji} {cc.label}</span>
+                          {a.source} · {fmtDate(a.pubDate)}
+                        </div>
                       </div>
                     </div>
-                  ));
+                    );
+                  });
               })()}
             </div>
           </div>
+          <Scoreboard scores={scores} loading={scoresLoading} compact={true}/>
         </div>
       </div>
     </div>
