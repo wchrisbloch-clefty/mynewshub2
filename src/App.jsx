@@ -1,34 +1,3 @@
-// MyNewsHub v17 — Session 3: Editorial polish + Ghost treatment everywhere
-// ─────────────────────────────────────────────────────────────────────────────
-// Builds on v16 mobile foundation. Same desktop+mobile behaviors. Today page
-// is restructured for clear MSN-style hierarchy; Ghost design language extended
-// across feed cards, podcast/social blocks, finance, and right-rail.
-//
-// Changes from v16:
-//  ── Today page restructure (hierarchy = density gradient) ──
-//  • Large hero (single lead story, MSN-style)
-//  • AI Morning Briefing folded BENEATH hero as a tight bold paragraph (no card)
-//  • RightNowStrip — ghost treatment (no border, no surface bg)
-//  • FollowingStrip — compact, single line per entity
-//  • ONE TrendingCarousel (sidebar trending removed on Today — was duplicate)
-//  • Vertical category sections preserved with cleaner ghost block headers
-//  • Today sidebar removed; Today uses single-column main flow
-//
-//  ── Ghost treatment extended ──
-//  • Podcast cards lose all borders/bg at rest
-//  • Social follow blocks borderless, typography-only
-//  • Finance page table + watchlist Ghost-ified
-//  • Section dividers replaced by whitespace (36px) + caps labels
-//
-//  ── Mobile polish ──
-//  • Hero cap 280→240px on mobile
-//  • Verified 44px+ tap targets across action buttons
-//
-//  ── Infra ──
-//  • Storage key v16_ → v17_ with migration from v16/v15/v14
-//  • All v16 features preserved: Following entities, swipe, PTR, auto-hide
-// ─────────────────────────────────────────────────────────────────────────────
-
 import { useState, useEffect, useCallback, useMemo, useRef } from ‘react’;
 
 // ─── CATEGORIES ───────────────────────────────────────────────────────────────
