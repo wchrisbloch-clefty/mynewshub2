@@ -1,32 +1,3 @@
-// MyNewsHub v16 — Session 2 continued: Yahoo Sports-inspired mobile + editorial
-// ─────────────────────────────────────────────────────────────────────────────
-// Builds on v15 ghost design. Desktop visuals unchanged; adds parallel mobile
-// experience activated below 640px, plus editorial improvements on Today.
-//
-// Changes from v15:
-//  ── Mobile overhaul (Yahoo News / Yahoo Sports pattern) ──
-//  • Mobile chip bar replaces squeezed top nav (horizontal-scroll pills)
-//  • Bottom tab bar — thumb-reachable Today / Feed / Saved / More
-//  • Menu sheet for overflow destinations (Finance/Bloom/Comedy/Podcasts/Social)
-//  • Swipe left/right between categories on mobile feed pages
-//  • Pull-to-refresh on feed/today pages
-//  • Auto-hide topbar on scroll down, reveal on scroll up
-//  • Shorter mobile hero (280px max); image-first mobile cards
-//  • 44px tap targets on all interactive elements
-//
-//  ── Editorial (Yahoo Sports “My Teams” insight, generalized) ──
-//  • RightNowStrip on Today: urgent news + favorite-team live scores
-//    + big watchlist moves, unified into one glanceable row
-//  • FollowingStrip on Today: per-entity row (Bloom Energy, Texans, MPC…)
-//    each showing latest matching headline — tap to filter feed by that entity
-//  • Trending moved from sidebar to inline horizontal carousel on Today
-//  • “Last updated” timestamp on feeds (per category)
-//
-//  ── Infra ──
-//  • Storage key v15_ → v16_ with migration from v15/v14
-//  • Custom hooks: useIsMobile, useScrollDirection, useSwipe, usePullToRefresh
-// ─────────────────────────────────────────────────────────────────────────────
-
 import { useState, useEffect, useCallback, useMemo, useRef } from ‘react’;
 
 // ─── CATEGORIES ───────────────────────────────────────────────────────────────
