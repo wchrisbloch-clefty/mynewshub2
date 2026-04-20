@@ -1,33 +1,35 @@
-
-// MyNewsHub v17 — Session 3: Editorial polish + Ghost treatment everywhere
+// MyNewsHub v19 — Session 3 editorial: Yahoo/NBC-style top band + enhanced briefing
 // ─────────────────────────────────────────────────────────────────────────────
-// Builds on v16 mobile foundation. Same desktop+mobile behaviors. Today page
-// is restructured for clear MSN-style hierarchy; Ghost design language extended
-// across feed cards, podcast/social blocks, finance, and right-rail.
+// Builds on v18 Ghost polish. Solves the "feels cluttered without being cluttered"
+// problem by putting 5 secondary headlines ON THE SCREEN with the hero — the
+// newspaper front-page density pattern Yahoo News and NBC News have converged on.
 //
-// Changes from v16:
-//  ── Today page restructure (hierarchy = density gradient) ──
-//  • Large hero (single lead story, MSN-style)
-//  • AI Morning Briefing folded BENEATH hero as a tight bold paragraph (no card)
-//  • RightNowStrip — ghost treatment (no border, no surface bg)
-//  • FollowingStrip — compact, single line per entity
-//  • ONE TrendingCarousel (sidebar trending removed on Today — was duplicate)
-//  • Vertical category sections preserved with cleaner ghost block headers
-//  • Today sidebar removed; Today uses single-column main flow
+// Changes from v18:
+//  ── New: 2-column top band (HeroBand component) ──
+//  • Desktop: Hero LEFT (~60%) + vertical headline stack RIGHT (~40%)
+//  • Mobile: headlines stack below hero
+//  • Gradient overlay on hero image with title sitting ON the photo (editorial)
+//  • Secondary stack: 5 headlines, small thumbnail + source + 2-line title
 //
-//  ── Ghost treatment extended ──
-//  • Podcast cards lose all borders/bg at rest
-//  • Social follow blocks borderless, typography-only
-//  • Finance page table + watchlist Ghost-ified
-//  • Section dividers replaced by whitespace (36px) + caps labels
+//  ── Enhanced MorningBriefingInline ──
+//  • Single AI paragraph (unchanged synthesis quality)
+//  • PLUS 3–5 bullet takeaways parsed from AI output
+//  • Visible timestamp ("Updated Xm ago") with green/amber staleness dot
+//  • Prominent "↻ Refresh Digest" button (was a tiny icon in v18)
 //
-//  ── Mobile polish ──
-//  • Hero cap 280→240px on mobile
-//  • Verified 44px+ tap targets across action buttons
+//  ── Tabbed sidebar (Feed pages only) ──
+//  • New TabbedSidebar: Trending | Latest | Business | Sports
+//  • Same right-rail, now with agency
+//  • Mobile: sidebar content moves to bottom of page (already behavior)
+//
+//  ── Editorial polish ──
+//  • Hero title in serif display font (ui-serif, Georgia fallback)
+//  • Gradient overlay on hero image so title floats on photo
+//  • -0.02em letter-spacing on hero title for editorial weight
+//  • 36px whitespace rhythm between major sections
 //
 //  ── Infra ──
-//  • Storage key v16_ → v17_ with migration from v16/v15/v14
-//  • All v16 features preserved: Following entities, swipe, PTR, auto-hide
+//  • Storage v18_ → v19_ with migration from v18/v17/v16/v15/v14
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
@@ -205,8 +207,8 @@ const LEAGUES = [
   { key:'cbb', label:'College BB',sport:'basketball', league:'mens-college-basketball', emoji:'🏀', accent:'#d97706' },
 ];
 
-const SK = 'v17_';
-const OLD_SKS = ['v16_','v15_','v14_'];
+const SK = 'v19_';
+const OLD_SKS = ['v18_','v17_','v16_','v15_','v14_'];
 
 const DEFAULT_URGENT = [
   'breaking','hurricane','earthquake','tornado','wildfire',
@@ -956,8 +958,7 @@ body{
 /* Discussion panel */
 .fc-disc{margin-top:10px;background:var(--surface2);border-radius:8px;padding:10px 12px;}
 .fc-disc-lbl{font-size:9px;font-weight:700;color:#0284c7;text-transform:uppercase;letter-spacing:0.08em;margin-bottom:8px;}
-.fc-disc-item{display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:1px solid var(--border2);text-decoration:none;color:var(--text);font-size:11px;transition:color 0.1s;}
-.fc-disc-item:last-child{border-bottom:none;}
+.fc-disc-item{display:flex;align-items:center;gap:8px;padding:5px 0;text-decoration:none;color:var(--text);font-size:11px;transition:color 0.1s;}
 .fc-disc-item:hover{color:#0284c7;}
 .fc-disc-platform{font-size:8px;font-weight:800;border-radius:3px;padding:2px 5px;color:#fff;flex-shrink:0;text-transform:uppercase;}
 .fc-disc-platform.reddit{background:#ff4500;}
@@ -1009,12 +1010,11 @@ body{
 .kw-chip:hover{opacity:0.75;}
 .kw-chip.active{border-color:currentColor;}
 
-/* Trend list */
+/* Trend list — v18: Ghost, no dividers */
 .trend-row{
   display:flex;align-items:flex-start;gap:12px;
-  padding:9px 0;border-bottom:1px solid var(--border2);cursor:pointer;transition:opacity 0.12s;
+  padding:8px 0;cursor:pointer;transition:opacity 0.12s;
 }
-.trend-row:last-child{border-bottom:none;}
 .trend-row:hover{opacity:0.7;}
 .trend-num{
   font-size:16px;font-weight:900;color:var(--text4);
@@ -1031,12 +1031,11 @@ body{
   letter-spacing:0.03em;text-transform:uppercase;
 }
 
-/* Source list */
+/* Source list — v18: Ghost, no dividers */
 .src-row{
-  display:flex;align-items:center;gap:8px;padding:7px 0;
-  border-bottom:1px solid var(--border2);cursor:pointer;transition:opacity 0.12s;
+  display:flex;align-items:center;gap:8px;padding:6px 0;
+  cursor:pointer;transition:opacity 0.12s;
 }
-.src-row:last-child{border-bottom:none;}
 .src-row:hover{opacity:0.7;}
 .src-row.active-src{opacity:1;}
 .health-dot{width:6px;height:6px;border-radius:50%;flex-shrink:0;}
@@ -1440,8 +1439,209 @@ body{
 .src-footer-sep{font-size:9px;color:var(--text4);user-select:none;}
 
 /* ═══════════════════════════════════════════
-   v17 ADDITIONS — Ghost editorial polish
+   v19 ADDITIONS — Editorial top band + enhanced briefing + tabbed sidebar
 ═══════════════════════════════════════════ */
+
+/* HERO BAND — Yahoo News / NBC News 2-column top band */
+.hero-band{
+  display:grid;grid-template-columns: 1.5fr 1fr;
+  gap:20px;margin-bottom:36px;
+}
+.hero-band-lead{
+  position:relative;cursor:pointer;
+  border-radius:var(--radius);overflow:hidden;
+  background:var(--surface2);
+  transition:transform 0.2s ease, box-shadow 0.2s ease;
+}
+.hero-band-lead:hover{
+  transform:translateY(-2px);
+  box-shadow:var(--shadow-md);
+}
+.hero-band-img{
+  position:relative;width:100%;
+  aspect-ratio: 16/10;
+  background-size:cover;background-position:center;
+  min-height:360px;
+}
+/* Gradient overlay — dark at bottom so white text has contrast */
+.hero-band-grad{
+  position:absolute;inset:0;pointer-events:none;
+  background: linear-gradient(to top,
+    rgba(0,0,0,0.82) 0%,
+    rgba(0,0,0,0.55) 30%,
+    rgba(0,0,0,0.15) 60%,
+    rgba(0,0,0,0) 100%);
+}
+.hero-band-text-overlay{
+  position:absolute;left:0;right:0;bottom:0;
+  padding: 22px 24px 24px;
+  color:#fff;z-index:2;
+}
+.hero-band-badge{
+  display:inline-block;
+  font-size:10px;font-weight:800;letter-spacing:0.06em;text-transform:uppercase;
+  color:#fff;padding:4px 9px;border-radius:3px;
+  margin-bottom:12px;
+}
+/* EDITORIAL SERIF TITLE — the core polish lever */
+.hero-band-title{
+  font-family: ui-serif, Georgia, 'Times New Roman', 'Source Serif Pro', serif;
+  font-size: 30px;font-weight: 700;line-height: 1.15;
+  letter-spacing: -0.02em;
+  color: #fff;margin: 0 0 10px 0;
+  display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden;
+  text-shadow: 0 1px 3px rgba(0,0,0,0.4);
+}
+.hero-band-desc{
+  font-size:14px;line-height:1.5;
+  color:rgba(255,255,255,0.88);margin:0 0 10px 0;
+  display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;
+  text-shadow: 0 1px 2px rgba(0,0,0,0.5);
+}
+.hero-band-meta{
+  display:flex;align-items:center;gap:6px;
+  font-size:11px;color:rgba(255,255,255,0.85);
+  font-weight:500;
+}
+.hero-band-source{font-weight:700;}
+.hero-band-dots{
+  position:absolute;bottom:14px;right:16px;z-index:3;
+  display:flex;gap:5px;
+}
+.hero-band-dot{
+  width:8px;height:8px;border-radius:50%;border:none;cursor:pointer;
+  background:rgba(255,255,255,0.4);padding:0;
+  transition:background 0.2s;
+  -webkit-tap-highlight-color:transparent;
+}
+.hero-band-dot.active{background:#fff;}
+.hero-band-dot:hover{background:rgba(255,255,255,0.7);}
+
+/* Side rail — 5 secondary headlines */
+.hero-band-side{
+  display:flex;flex-direction:column;
+  gap:2px;
+}
+.hero-band-side-label{
+  font-size:11px;font-weight:700;color:var(--text3);
+  text-transform:uppercase;letter-spacing:0.12em;
+  margin-bottom:12px;padding-bottom:10px;
+  border-bottom:1px solid var(--border);
+}
+.hero-band-side-item{
+  display:flex;gap:12px;align-items:flex-start;
+  padding:12px 0;cursor:pointer;
+  transition:background 0.15s;
+  border-radius:6px;
+}
+.hero-band-side-item:hover{background:var(--surface2);margin:0 -10px;padding:12px 10px;}
+.hero-band-side-thumb{
+  width:72px;height:54px;object-fit:cover;border-radius:5px;flex-shrink:0;
+}
+.hero-band-side-body{flex:1;min-width:0;display:flex;flex-direction:column;gap:4px;}
+.hero-band-side-title{
+  font-size:13px;font-weight:700;color:var(--text);
+  line-height:1.35;letter-spacing:-0.15px;
+  display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden;
+}
+.hero-band-side-meta{
+  font-size:10px;color:var(--text3);
+  display:flex;align-items:center;gap:5px;
+}
+
+/* ENHANCED BRIEFING — bullets, timestamp, prominent button */
+.briefing-inline-label-row{
+  display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;flex:1;min-width:0;
+}
+.briefing-inline-label{
+  font-size:11px;font-weight:700;color:var(--text3);
+  text-transform:uppercase;letter-spacing:0.12em;
+}
+.briefing-inline-date{
+  font-size:11px;color:var(--text3);font-weight:500;
+}
+.briefing-inline-ts{
+  font-size:10px;color:var(--text3);font-weight:500;
+  display:inline-flex;align-items:center;gap:4px;
+  margin-left:auto;
+}
+.briefing-inline-ts-dot{
+  width:5px;height:5px;border-radius:50%;
+  background:var(--green);
+}
+.briefing-inline-ts-dot.stale{background:var(--amber);}
+.briefing-inline-refresh-btn{
+  flex-shrink:0;
+  background:var(--surface2);border:none;
+  color:var(--text);font-size:11px;font-weight:700;
+  padding:7px 12px;border-radius:6px;cursor:pointer;
+  font-family:inherit;transition:background 0.15s,color 0.15s;
+  letter-spacing:0.02em;min-height:32px;
+}
+.briefing-inline-refresh-btn:hover:not(:disabled){
+  background:var(--accent);color:#fff;
+}
+.briefing-inline-refresh-btn:disabled{opacity:0.6;cursor:wait;}
+.briefing-inline-bullets{
+  list-style:none;padding:0;margin:14px 0 0 0;
+  display:flex;flex-direction:column;gap:7px;
+}
+.briefing-inline-bullets li{
+  position:relative;padding-left:16px;
+  font-size:14px;line-height:1.5;color:var(--text2);font-weight:500;
+}
+.briefing-inline-bullets li::before{
+  content:'';position:absolute;left:0;top:8px;
+  width:5px;height:5px;border-radius:50%;
+  background:var(--accent);
+}
+.briefing-inline-bullets li strong{color:var(--text);font-weight:700;}
+
+/* TABBED SIDEBAR — user agency on right rail */
+.sb-tabs{
+  display:flex;gap:0;margin-bottom:14px;
+  border-bottom:1px solid var(--border);
+}
+.sb-tab{
+  background:none;border:none;border-bottom:2px solid transparent;
+  padding:8px 12px;font-size:11px;font-weight:700;
+  color:var(--text3);cursor:pointer;font-family:inherit;
+  text-transform:uppercase;letter-spacing:0.08em;
+  transition:color 0.15s,border-color 0.15s;
+  margin-bottom:-1px; /* align bottom-border with container */
+  min-height:36px;
+  -webkit-tap-highlight-color:transparent;
+}
+.sb-tab:hover{color:var(--text);}
+.sb-tab.active{color:var(--accent);border-bottom-color:var(--accent);}
+
+/* MOBILE overrides for v19 additions */
+@media (max-width:900px){
+  .hero-band{grid-template-columns:1fr;gap:16px;}
+  .hero-band-img{min-height:unset;aspect-ratio:16/10;max-height:380px;}
+  .hero-band-title{font-size:24px;}
+}
+@media (max-width:640px){
+  .hero-band{gap:12px;margin-bottom:24px;}
+  .hero-band-lead{border-radius:10px;}
+  .hero-band-img{aspect-ratio:16/10;max-height:260px;min-height:200px;}
+  .hero-band-text-overlay{padding:16px 14px 16px;}
+  .hero-band-title{font-size:20px;letter-spacing:-0.015em;-webkit-line-clamp:3;}
+  .hero-band-desc{-webkit-line-clamp:2;font-size:13px;}
+  .hero-band-badge{font-size:9px;padding:3px 7px;margin-bottom:8px;}
+  .hero-band-side-label{display:none;} /* redundant under hero on mobile */
+  .hero-band-side-thumb{width:64px;height:48px;}
+  .hero-band-side-title{font-size:13px;-webkit-line-clamp:2;}
+  .hero-band-side-item{padding:10px 0;min-height:52px;}
+  .briefing-inline-head{flex-wrap:wrap;gap:10px;}
+  .briefing-inline-label-row{width:100%;}
+  .briefing-inline-ts{margin-left:auto;}
+  .briefing-inline-refresh-btn{min-height:36px;padding:8px 12px;}
+  .briefing-inline-bullets li{font-size:13px;}
+  .sb-tab{padding:10px 10px;min-height:44px;font-size:10px;}
+}
+
+
 
 /* MORNING BRIEFING INLINE — no card, just typography under hero */
 .briefing-inline{
@@ -1479,7 +1679,7 @@ body{
 }
 
 /* TODAY page — single column, no sidebar, generous whitespace */
-.today-flow{display:block;max-width:920px;margin:0 auto;}
+.today-flow{display:block;max-width:1080px;margin:0 auto;}
 .today-section{margin-bottom:36px;}
 .today-section-head{
   display:flex;align-items:baseline;justify-content:space-between;
@@ -1498,16 +1698,14 @@ body{
 }
 .today-section-link:hover{color:var(--accent);}
 
-/* Ghost feed item — used in Today section lists */
+/* Ghost feed item — used in Today section lists. v18: borderless, gap-based. */
 .gf-item{
   display:flex;gap:14px;align-items:flex-start;
-  padding:14px 0;cursor:pointer;
-  border-bottom:1px solid var(--border2);
+  padding:12px 0;cursor:pointer;
   transition:background 0.15s;
+  border-radius:8px;
 }
-.gf-item:last-child{border-bottom:none;}
-.gf-item:hover{background:var(--surface2);margin:0 -12px;padding:14px 12px;border-radius:8px;border-bottom-color:transparent;}
-.gf-item:hover + .gf-item{border-top-color:transparent;}
+.gf-item:hover{background:var(--surface2);margin:0 -12px;padding:12px;}
 .gf-thumb,.gf-thumb-ph{
   width:80px;height:60px;flex-shrink:0;
   border-radius:6px;background-size:cover;background-position:center;
@@ -1934,7 +2132,7 @@ body{overscroll-behavior-y:contain;}
   .cp-overlay{padding:0;align-items:flex-end;}
   .cp-panel{max-width:100%;max-height:92vh;border-radius:16px 16px 0 0;}
   .cp-cat-tab,.cp-plat-tab{padding:8px 12px;font-size:11px;min-height:36px;}
-  .cp-chip{padding:5px 11px;font-size:11px;min-height:28px;}
+  .cp-chip{padding:7px 12px;font-size:11px;min-height:36px;}
   .cp-input,.cp-input-sm{padding:9px 12px;font-size:13px;min-height:44px;}
   .cp-btn{padding:9px 13px;font-size:12px;min-height:44px;}
   .cp-save{padding:13px;font-size:14px;min-height:48px;}
@@ -2241,15 +2439,33 @@ function MorningBriefing({arts, onRead}) {
   );
 }
 
-// ─── MORNING BRIEFING INLINE (v17) ────────────────────────────────────────────
-// Ghost-treatment briefing — no card, no border, no surface bg. Just a bold
-// label and a single paragraph. Lives directly beneath the hero on Today.
-// Uses the same fetchAISummary pipeline as the original MorningBriefing.
+// ─── MORNING BRIEFING INLINE (v19 enhanced) ──────────────────────────────────
+// Editorial-style briefing: single synthesized paragraph + 3–5 bullet
+// takeaways + "Updated Xm ago" timestamp + visible Refresh Digest button.
+// Parses AI output for bullet markers (- or • or numbered) and splits into
+// paragraph vs. bullets. Ghost treatment — no card, no border, no bg.
 function MorningBriefingInline({arts}) {
-  const [text, setText] = useState('');
+  const [body, setBody]       = useState('');   // main paragraph
+  const [bullets, setBullets] = useState([]);   // array of strings
+  const [ts, setTs]           = useState(null); // timestamp of last gen
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
+  const [error, setError]     = useState('');
   const dateStr = new Date().toLocaleDateString('en-US',{weekday:'long',month:'long',day:'numeric'});
+
+  // Parse AI output: first non-bullet paragraph = body, bullets = takeaways
+  const parseBriefing = (text) => {
+    const lines = text.split('\n').map(l => l.trim()).filter(Boolean);
+    const paragraphs = [];
+    const bulletLines = [];
+    for (const line of lines) {
+      // Match -, •, *, or numbered bullets
+      const m = line.match(/^(?:[-•*]|\d+[.)])\s+(.+)$/);
+      if (m) bulletLines.push(m[1].trim());
+      else paragraphs.push(line);
+    }
+    // Body = joined non-bullet paragraphs (usually just one)
+    return { body: paragraphs.join(' '), bullets: bulletLines.slice(0, 5) };
+  };
 
   const generate = useCallback(async () => {
     setLoading(true); setError('');
@@ -2259,35 +2475,64 @@ function MorningBriefingInline({arts}) {
     const {summary, error:err} = await fetchAISummary({
       type:'article',
       title:`News Overview — ${dateStr}`,
-      content:`Write a single punchy paragraph (3-5 sentences) synthesizing today's biggest stories across all categories. Be direct, informative, and specific — name the actual stories. No bullet points, no category headers. Just one tight paragraph a busy professional would want to read.\n\nHeadlines:\n${lines}`,
+      content:`Write a news digest in TWO PARTS.\n\nPart 1: A single punchy 3-4 sentence paragraph synthesizing the biggest story or theme of the day. Be specific and name the actual stories.\n\nPart 2: A short bullet list of 3-5 OTHER key takeaways a busy professional should know. Use dash markers (-) and keep each bullet to one line.\n\nHeadlines:\n${lines}`,
       mode:'summary',
     });
-    if (summary) setText(summary.trim());
-    else setError(err||'Could not generate briefing');
+    if (summary) {
+      const { body: b, bullets: bs } = parseBriefing(summary.trim());
+      setBody(b);
+      setBullets(bs);
+      setTs(Date.now());
+    } else {
+      setError(err||'Could not generate briefing');
+    }
     setLoading(false);
   }, [arts, dateStr]);
 
   useEffect(() => {
     const total = Object.values(arts).reduce((n,l)=>n+(l?.length||0),0);
-    if (total > 10 && !text && !loading) generate();
+    if (total > 10 && !body && !loading) generate();
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [arts]);
+
+  // Freshness indicator: green <30min, amber older
+  const tsLabel = useMemo(() => {
+    if (!ts) return null;
+    const age = (Date.now() - ts) / 60000;
+    if (age < 1) return { text: 'Just now', stale: false };
+    if (age < 60) return { text: `${Math.floor(age)}m ago`, stale: age >= 30 };
+    return { text: `${Math.floor(age/60)}h ago`, stale: true };
+  }, [ts]);
 
   return (
     <section className="briefing-inline">
       <div className="briefing-inline-head">
-        <span className="briefing-inline-label">☕ The Briefing · {dateStr}</span>
-        <button className="briefing-inline-refresh" onClick={generate} disabled={loading} title="Regenerate">
-          {loading?'…':'↺'}
+        <div className="briefing-inline-label-row">
+          <span className="briefing-inline-label">☕ The Briefing</span>
+          <span className="briefing-inline-date">{dateStr}</span>
+          {tsLabel && (
+            <span className="briefing-inline-ts">
+              <span className={`briefing-inline-ts-dot ${tsLabel.stale?'stale':''}`}/>
+              Updated {tsLabel.text}
+            </span>
+          )}
+        </div>
+        <button className="briefing-inline-refresh-btn" onClick={generate} disabled={loading}>
+          {loading ? 'Generating…' : '↻ Refresh Digest'}
         </button>
       </div>
-      {text
-        ? <p className="briefing-inline-body" dangerouslySetInnerHTML={{__html: text.replace(/\*\*([^*]+)\*\*/g,'<strong>$1</strong>')}}/>
+      {body
+        ? <p className="briefing-inline-body" dangerouslySetInnerHTML={{__html: body.replace(/\*\*([^*]+)\*\*/g,'<strong>$1</strong>')}}/>
         : error
           ? <p className="briefing-inline-empty">{error}</p>
-          : loading
-            ? <p className="briefing-inline-empty">Synthesizing today's headlines…</p>
-            : <p className="briefing-inline-empty">Loading…</p>}
+          : <p className="briefing-inline-empty">{loading?'Synthesizing today\'s headlines…':'Loading briefing…'}</p>}
+      {bullets.length > 0 && (
+        <ul className="briefing-inline-bullets">
+          {bullets.map((b, i) => (
+            <li key={i} dangerouslySetInnerHTML={{__html: b.replace(/\*\*([^*]+)\*\*/g,'<strong>$1</strong>')}}/>
+          ))}
+        </ul>
+      )}
     </section>
   );
 }
@@ -2381,9 +2626,39 @@ function Sidebar({cat, arts, kw, health, activeKw, setActiveKw, activeSource, se
   const srcCounts = {};
   catArts.forEach(a=>{srcCounts[a.source]=(srcCounts[a.source]||0)+1;});
   const sources = [...new Set(catArts.map(a=>a.source))];
-  // Trending for category sidebar: use diversity only for general/today;
-  // for a specific category page, just show that category's top articles
-  const trending = catArts.slice(0,8);
+
+  // v19: tabbed trending — gives users agency to flip between views
+  // without losing access to keyword/source filters below.
+  const [sbTab, setSbTab] = useState('trending');
+  const sbTabs = [
+    { key:'trending', label:'Trending' },
+    { key:'latest',   label:'Latest'   },
+    { key:'business', label:'Business' },
+    { key:'sports',   label:'Sports'   },
+  ];
+  const sbItems = useMemo(() => {
+    if (sbTab === 'trending') {
+      // On Today-like cross-cat usage we'd diversify; on a single cat page,
+      // the relevant "trending" is just that category's top items.
+      return catArts.slice(0, 8).map(a => ({...a, _cat: cat}));
+    }
+    if (sbTab === 'latest') {
+      const seen = new Set();
+      return Object.entries(arts)
+        .flatMap(([c, l]) => (l||[]).map(a => ({...a, _cat: c})))
+        .filter(a => a.title && a.link)
+        .filter(a => {
+          const k = a.title.slice(0,60).toLowerCase().replace(/\s+/g,'');
+          if (seen.has(k)) return false;
+          seen.add(k);
+          return true;
+        })
+        .sort((a,b) => new Date(b.pubDate) - new Date(a.pubDate))
+        .slice(0, 8);
+    }
+    // business / sports — top items from that category
+    return (arts[sbTab]||[]).slice(0, 8).map(a => ({...a, _cat: sbTab}));
+  }, [sbTab, arts, catArts, cat]);
 
   return (
     <div className="sidebar">
@@ -2396,20 +2671,38 @@ function Sidebar({cat, arts, kw, health, activeKw, setActiveKw, activeSource, se
 
       {showScoreboard && <Scoreboard scores={scores} loading={scoresLoading}/>}
 
-      {trending.length > 0 && (
-        <div className="gs-section">
-          <div className="gs-label">{cc.emoji} Trending</div>
-          {trending.map((a,i)=>(
-            <div key={i} className="trend-row" onClick={()=>onRead(a)}>
-              <div className="trend-num">{i+1}</div>
-              <div className="trend-body">
-                <div className="trend-title">{a.title}</div>
-                <div className="trend-src">{a.source} · {fmtDate(a.pubDate)}</div>
-              </div>
-            </div>
+      {/* v19 tabbed trending — replaces the old single "Trending" label/list */}
+      <div className="gs-section">
+        <div className="sb-tabs">
+          {sbTabs.map(t => (
+            <button
+              key={t.key}
+              className={`sb-tab ${sbTab===t.key?'active':''}`}
+              onClick={()=>setSbTab(t.key)}
+            >
+              {t.label}
+            </button>
           ))}
         </div>
-      )}
+        {sbItems.length === 0
+          ? <div style={{padding:'14px 0',fontSize:'11px',color:'var(--text3)'}}>No stories yet</div>
+          : sbItems.map((a, i) => {
+              const acc = CATS[a._cat] || cc;
+              return (
+                <div key={i} className="trend-row" onClick={()=>onRead(a)}>
+                  <div className="trend-num">{i+1}</div>
+                  <div className="trend-body">
+                    <div className="trend-title">{a.title}</div>
+                    <div className="trend-src">
+                      {sbTab !== 'trending' && <span className="trend-cat-badge" style={{background:acc.bg,color:acc.color}}>{acc.emoji} {acc.label}</span>}
+                      {a.source} · {fmtDate(a.pubDate)}
+                    </div>
+                  </div>
+                </div>
+              );
+            })
+        }
+      </div>
 
       {catKws.length > 0 && (
         <div className="gs-section">
@@ -2981,6 +3274,149 @@ function TrendingCarousel({ arts, kw, onRead }) {
   );
 }
 
+// HERO BAND — v19 — Yahoo News / NBC News two-column top band.
+// Desktop: hero left (~60%) with gradient overlay + serif title sitting
+// on the photo, vertical stack of 5 secondary headlines on right (~40%).
+// Mobile: single-column, headlines below hero.
+// Purpose: put 5 headlines on screen WITH the hero so user gets density
+// + snapshot the moment the page opens.
+function HeroBand({ heroStories, heroIdx, setHeroIdx, paused, setPaused, onRead }) {
+  const lead = heroStories[heroIdx];
+  if (!lead) return null;
+  // Secondary headlines = the rest of the ranked set (up to 5)
+  const secondary = heroStories.slice(0, 6).filter((_, i) => i !== heroIdx).slice(0, 5);
+
+  return (
+    <div
+      className="hero-band"
+      onMouseEnter={()=>setPaused(true)}
+      onMouseLeave={()=>setPaused(false)}
+    >
+      {/* LEFT: large lead */}
+      <article className="hero-band-lead" onClick={()=>onRead(lead)}>
+        <div className="hero-band-img" style={{backgroundImage:`url(${lead.img})`}}>
+          <div className="hero-band-grad"/>
+          <div className="hero-band-text-overlay">
+            <div className="hero-band-badge" style={{background:(CATS[lead._cat]?.color||'#1d4ed8')}}>
+              {CATS[lead._cat]?.emoji} {CATS[lead._cat]?.label||'News'}
+            </div>
+            <h1 className="hero-band-title">{lead.title}</h1>
+            {lead.desc && <p className="hero-band-desc">{lead.desc}</p>}
+            <div className="hero-band-meta">
+              <span className="hero-band-source">{lead.source}</span>
+              <span>·</span>
+              <span>{fmtDate(lead.pubDate)}</span>
+            </div>
+          </div>
+          {heroStories.length > 1 && (
+            <div className="hero-band-dots">
+              {heroStories.slice(0,5).map((_,i)=>(
+                <button key={i}
+                  className={`hero-band-dot ${i===heroIdx?'active':''}`}
+                  onClick={e=>{e.stopPropagation();setHeroIdx(i);}}
+                  aria-label={`Story ${i+1}`}
+                />
+              ))}
+            </div>
+          )}
+        </div>
+      </article>
+
+      {/* RIGHT: secondary headline stack */}
+      <aside className="hero-band-side">
+        <div className="hero-band-side-label">More top stories</div>
+        {secondary.map((s, i) => (
+          <div key={i} className="hero-band-side-item" onClick={()=>onRead(s)}>
+            {s.img && (
+              <img
+                className="hero-band-side-thumb"
+                src={s.img}
+                loading="lazy"
+                alt=""
+                onError={e=>{e.target.style.display='none';}}
+              />
+            )}
+            <div className="hero-band-side-body">
+              <div className="hero-band-side-title">{s.title}</div>
+              <div className="hero-band-side-meta">
+                <span style={{color:CATS[s._cat]?.color,fontWeight:700}}>{CATS[s._cat]?.label}</span>
+                <span>·</span>
+                <span>{s.source}</span>
+              </div>
+            </div>
+          </div>
+        ))}
+      </aside>
+    </div>
+  );
+}
+
+// TABBED SIDEBAR — v19 — right-rail on Feed pages with user agency.
+// Tabs: Trending | Latest | Business | Sports. Each tab shows 6 items from
+// the relevant cut of articles. Ghost treatment, same typography as before.
+// Mobile: parent CSS collapses sidebar below content via grid re-flow.
+function TabbedSidebar({ arts, kw, onRead, scores, scoresLoading, showScoreboard }) {
+  const [tab, setTab] = useState('trending');
+  const tabs = [
+    { key:'trending', label:'Trending' },
+    { key:'latest',   label:'Latest'   },
+    { key:'business', label:'Business' },
+    { key:'sports',   label:'Sports'   },
+  ];
+
+  const items = useMemo(() => {
+    if (tab === 'trending') return diverseTrending(arts, kw, 6, 2);
+    if (tab === 'latest') {
+      const seen = new Set();
+      return Object.entries(arts)
+        .flatMap(([c,l])=>(l||[]).map(a=>({...a, cat:c})))
+        .filter(a=>a.title&&a.link)
+        .filter(a=>{const k=a.title.slice(0,60).toLowerCase().replace(/\s+/g,'');if(seen.has(k))return false;seen.add(k);return true;})
+        .sort((a,b)=>new Date(b.pubDate)-new Date(a.pubDate))
+        .slice(0,6);
+    }
+    // business / sports — take top items from that single category
+    return (arts[tab]||[]).slice(0,6).map(a=>({...a, cat:tab}));
+  }, [tab, arts, kw]);
+
+  return (
+    <div className="sidebar">
+      <div className="gs-section">
+        <div className="sb-tabs">
+          {tabs.map(t => (
+            <button
+              key={t.key}
+              className={`sb-tab ${tab===t.key?'active':''}`}
+              onClick={()=>setTab(t.key)}
+            >
+              {t.label}
+            </button>
+          ))}
+        </div>
+        {items.length === 0
+          ? <div style={{padding:'16px 0',fontSize:'11px',color:'var(--text3)'}}>No stories yet</div>
+          : items.map((a, i) => {
+              const cc = CATS[a.cat] || CATS.general;
+              return (
+                <div key={i} className="trend-row" onClick={()=>onRead(a)}>
+                  <div className="trend-num">{i+1}</div>
+                  <div className="trend-body">
+                    <div className="trend-title">{a.title}</div>
+                    <div className="trend-src">
+                      <span className="trend-cat-badge" style={{background:cc.bg,color:cc.color}}>{cc.emoji} {cc.label}</span>
+                      {a.source} · {fmtDate(a.pubDate)}
+                    </div>
+                  </div>
+                </div>
+              );
+            })
+        }
+      </div>
+      {showScoreboard && <Scoreboard scores={scores} loading={scoresLoading} compact={true}/>}
+    </div>
+  );
+}
+
 // Last-updated timestamp for feeds. Shows a green dot if refreshed
 // within the last 10 minutes, amber otherwise. Clickable could trigger
 // refresh (passed via onRefresh prop).
@@ -3480,43 +3916,17 @@ export default function App() {
       <div className="page">
         <div className="today-flow">
 
-          {/* ── HERO — single MSN-style lead, no side rail ── */}
-          {lead && (
-            <article
-              className="hero-lead"
-              style={{marginBottom:'8px'}}
-              onClick={()=>onRead(lead)}
-              onMouseEnter={()=>setPaused(true)}
-              onMouseLeave={()=>setPaused(false)}
-            >
-              <div className="hero-lead-img" style={{backgroundImage:`url(${lead.img})`}}>
-                <div className="hero-lead-badge" style={{background:(CATS[lead._cat]?.color||'#1d4ed8')+'cc'}}>
-                  {CATS[lead._cat]?.emoji} {CATS[lead._cat]?.label||'News'}
-                </div>
-                {heroStories.length>1&&(
-                  <>
-                    <button className="hero-arrow hero-prev" onClick={e=>{e.stopPropagation();setHeroIdx(i=>(i-1+heroStories.length)%heroStories.length);}}>‹</button>
-                    <button className="hero-arrow hero-next" onClick={e=>{e.stopPropagation();setHeroIdx(i=>(i+1)%heroStories.length);}}>›</button>
-                    <div className="hero-dots">
-                      {heroStories.map((_,i)=>(
-                        <button key={i} className={`hero-dot ${i===heroIdx?'active':''}`} onClick={e=>{e.stopPropagation();setHeroIdx(i);}}/>
-                      ))}
-                    </div>
-                  </>
-                )}
-              </div>
-              <div className="hero-lead-text">
-                <h1 className="hero-lead-title">{lead.title}</h1>
-                {lead.desc&&<p className="hero-lead-desc">{lead.desc}</p>}
-                <div className="hero-lead-meta">
-                  <span className="hero-lead-source">{lead.source}</span>
-                  <span>·</span><span>{fmtDate(lead.pubDate)}</span>
-                </div>
-              </div>
-            </article>
-          )}
+          {/* ── v19 HERO BAND — Yahoo/NBC 2-column top band ── */}
+          <HeroBand
+            heroStories={heroStories}
+            heroIdx={heroIdx}
+            setHeroIdx={setHeroIdx}
+            paused={paused}
+            setPaused={setPaused}
+            onRead={onRead}
+          />
 
-          {/* ── AI BRIEFING — folded directly below hero, no card chrome ── */}
+          {/* ── AI BRIEFING — folded directly below hero band, no card chrome ── */}
           <MorningBriefingInline arts={arts}/>
 
           {/* ── RIGHT NOW — slim, ghost-treated ── */}
