@@ -1,29 +1,3 @@
-// MyNewsHub v21 — Session 3 trim: Remove Following entities (low usage, high cost)
-// ─────────────────────────────────────────────────────────────────────────────
-// Builds on v20. The "Following" strip + FollowingStrip component + 8 default
-// entities (Bloom Energy, MPC, XOM, Texans, Astros, UK Hoops, AI Data Centers,
-// ERCOT) was a Yahoo Sports "My Teams" port. In practice it took up horizontal
-// space above the fold on Today without delivering enough signal: the same
-// articles already surface via hero + category sections, and live tickers show
-// in RightNow. Per user: "waste of space and impact." Removed cleanly.
-//
-// Changes from v20:
-// ── Removed ──
-// • FollowingStrip component + all its CSS
-// • DEFAULT_FOLLOWING constant + persisted `following` state
-// • Following-related entity-routing in TodayPage onFilter handler
-// • Comment references to FollowingStrip in loadMarketData useEffect
-//
-// ── Preserved from v20 ──
-// • BriefingPage, category trending strips, bottom topics chips,
-// // //
-MiniScoreboardStrip, Bloomberg accent, tightened breaking filter,
-iPad breakpoint at 1100px, all Ghost/editorial polish
-// ── Infra ──
-// • Storage v20_ → v21_ with migration from v20/v19/v18/v17/v16/v15/v14
-// • Orphaned 'following' localStorage key left in place (harmless; ld will
-// never read it again since it's not in DEFAULT_* initializers)
-// ─────────────────────────────────────────────────────────────────────────────
 import { useState, useEffect, useCallback, useMemo, useRef, Fragment } from 'react';
 // ─── CATEGORIES ───────────────────────────────────────────────────────────────
 const CATS = {
