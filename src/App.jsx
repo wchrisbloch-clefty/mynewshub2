@@ -1,18 +1,52 @@
+// MyNewsHub v22a — Session 4 wave 1: Quick wins, fixes, category restructure
+// ─────────────────────────────────────────────────────────────────────────────
+// Builds on v21. Focused on the painful daily-use issues (chip filter UX,
+// missing mobile weather/ticker, AI summary depth) and a clean nav restructure
+// that drops underused destinations and adds Pop Culture. v22b will follow
+// with the briefing redesign + Today/Briefing merge.
+//
+// Changes from v21:
+//  ── Category restructure ──
+//  • Comedy removed from main nav (still in storage as feeds, easy revival)
+//  • Social removed from main nav
+//  • Pop Culture added (BuzzFeed / EW / Vulture / Vanity Fair RSS sources)
+//  • Finance renamed → Markets (label only; storage key + cat key unchanged)
+//
+//  ── Behavioral fixes ──
+//  • Chip filter UX: tapping a topic chip auto-scrolls feed into view so the
+//    filter result is visible (was: state changed but user couldn't tell)
+//  • Search optimization: search now matches title + desc + source name
+//  • AI summary upgrade: paragraph + 3-5 detailed bullets (was: bullets only)
+//
+//  ── Mobile/iPad ──
+//  • Weather + ticker visible on mobile and iPad (was: desktop-only via
+//    whisper bar). Compact horizontal strip in mobile topbar.
+//
+//  ── UX polish ──
+//  • Right Now + Breaking unified into single live strip on Today
+//  • Sidebar declutter: moved Topics+Sources below Trending tabs
+//
+//  ── Infra ──
+//  • Storage v21_ → v22_ with migration from v21/v20/.../v14
+//  • Comedy storage preserved (key still in DEFAULT_FEEDS); easy to bring back
+// ─────────────────────────────────────────────────────────────────────────────
+
 import { useState, useEffect, useCallback, useMemo, useRef, Fragment } from 'react';
 
 // ─── CATEGORIES ───────────────────────────────────────────────────────────────
 const CATS = {
-  general:  { label:'General',      color:'#1d4ed8', bg:'#eff6ff', emoji:'🌐' },
-  sports:   { label:'Sports',       color:'#d97706', bg:'#fef3c7', emoji:'🏆' },
-  business: { label:'Business',     color:'#16a34a', bg:'#f0fdf4', emoji:'⚡' },
-  finance:  { label:'Finance',      color:'#7c3aed', bg:'#f5f3ff', emoji:'📈' },
-  bloom:    { label:'Bloom Energy', color:'#0369a1', bg:'#e0f2fe', emoji:'🔋' },
-  comedy:   { label:'Comedy',       color:'#db2777', bg:'#fdf2f8', emoji:'😂' },
+  general:    { label:'General',      color:'#1d4ed8', bg:'#eff6ff', emoji:'🌐' },
+  sports:     { label:'Sports',       color:'#d97706', bg:'#fef3c7', emoji:'🏆' },
+  business:   { label:'Business',     color:'#16a34a', bg:'#f0fdf4', emoji:'⚡' },
+  finance:    { label:'Markets',      color:'#7c3aed', bg:'#f5f3ff', emoji:'📈' },
+  bloom:      { label:'Bloom Energy', color:'#0369a1', bg:'#e0f2fe', emoji:'🔋' },
+  popculture: { label:'Pop Culture',  color:'#db2777', bg:'#fdf2f8', emoji:'✨' },
+  comedy:     { label:'Comedy',       color:'#a855f7', bg:'#faf5ff', emoji:'😂' },
 };
 
 // Order for mobile swipe-left/right navigation between categories.
 // Matches the mobile chip bar order so swiping feels like advancing the chips.
-const SWIPE_ORDER = ['today','general','sports','business','finance','bloom','comedy'];
+const SWIPE_ORDER = ['today','general','sports','business','finance','bloom','popculture'];
 
 const TICKERS = [
   { sym:'BE',   label:'Bloom Energy', color:'#60a5fa' },
@@ -31,12 +65,13 @@ const PODCAST_FEEDS = [
 ];
 
 const DEFAULT_KW = {
-  general:  ['Houston','Texas','Trump','Congress','White House','geopolitical','AI','tech','Iran','tariffs'],
-  sports:   ['Texans','Rockets','Astros','Braves','Kentucky','Clemson','NFL','MLB','NBA','CFB','recruiting','transfer portal'],
-  business: ['energy','oil','gas','data center','ERCOT','LNG','power grid','onshoring','AI','infrastructure'],
-  finance:  ['investing','real estate','stock market','interest rates','Fed','inflation','crypto','portfolio'],
-  bloom:    ['Bloom Energy','fuel cell','hydrogen','microgrid','distributed power','data center','onshoring','industrial energy','utility','ERCOT'],
-  comedy:   ['satire','parody','humor','comedy'],
+  general:    ['Houston','Texas','Trump','Congress','White House','geopolitical','AI','tech','Iran','tariffs'],
+  sports:     ['Texans','Rockets','Astros','Braves','Kentucky','Clemson','NFL','MLB','NBA','CFB','recruiting','transfer portal'],
+  business:   ['energy','oil','gas','data center','ERCOT','LNG','power grid','onshoring','AI','infrastructure'],
+  finance:    ['investing','real estate','stock market','interest rates','Fed','inflation','crypto','portfolio'],
+  bloom:      ['Bloom Energy','fuel cell','hydrogen','microgrid','distributed power','data center','onshoring','industrial energy','utility','ERCOT'],
+  popculture: ['celebrity','movie','TV','streaming','Hollywood','pop','music','album','box office','viral','meme','red carpet'],
+  comedy:     ['satire','parody','humor','comedy'],
 };
 
 const DEFAULT_FEEDS = {
@@ -110,6 +145,16 @@ const DEFAULT_FEEDS = {
     { name:'Canary Media',          url:'https://www.canarymedia.com/rss',                                       on:true },
     { name:'Rigzone',               url:'https://www.rigzone.com/news/rss/rigzone_latest.aspx',                   on:true },
   ],
+  popculture: [
+    { name:'Variety',           url:'https://variety.com/feed/',                                  on:true },
+    { name:'Entertainment Weekly', url:'https://ew.com/feed/',                                    on:true },
+    { name:'Vulture',           url:'https://www.vulture.com/rss/index.xml',                      on:true },
+    { name:'Hollywood Reporter',url:'https://www.hollywoodreporter.com/feed/',                    on:true },
+    { name:'Vanity Fair',       url:'https://www.vanityfair.com/feed/rss',                        on:true },
+    { name:'BuzzFeed Celebrity',url:'https://www.buzzfeed.com/celebrity.xml',                     on:true },
+    { name:'Rolling Stone',     url:'https://www.rollingstone.com/feed/',                         on:true },
+    { name:'Pitchfork',         url:'https://pitchfork.com/rss/news/',                            on:true },
+  ],
   comedy: [
     { name:'The Babylon Bee', url:'https://babylonbee.com/feed',  on:true },
     { name:'The Onion',       url:'https://www.theonion.com/rss', on:true },
@@ -147,6 +192,12 @@ const DEFAULT_SOCIAL = {
     instagram: ['@bloomenergy'],
     youtube:   ['bloomenergy'],
   },
+  popculture: {
+    twitter:   ['@Variety','@EW','@Vulture','@THR','@VanityFair','@RollingStone','@pitchfork'],
+    linkedin:  [],
+    instagram: ['@variety','@ew','@vultureinsta','@hollywoodreporter','@vanityfair','@rollingstone'],
+    youtube:   ['Variety','EW','Vulture'],
+  },
   comedy: {
     twitter:   ['@TheBabylonBee','@TheOnion','@ClickHole'],
     linkedin:  [],
@@ -173,8 +224,8 @@ const LEAGUES = [
   { key:'cbb', label:'College BB',sport:'basketball', league:'mens-college-basketball', emoji:'🏀', accent:'#d97706' },
 ];
 
-const SK = 'v21_';
-const OLD_SKS = ['v20_','v19_','v18_','v17_','v16_','v15_','v14_'];
+const SK = 'v22_';
+const OLD_SKS = ['v21_','v20_','v19_','v18_','v17_','v16_','v15_','v14_'];
 
 const DEFAULT_URGENT = [
   'breaking','hurricane','earthquake','tornado','wildfire',
@@ -756,7 +807,8 @@ body{
 .nav-tab.t-business.active{color:#16a34a;border-bottom-color:#16a34a;}
 .nav-tab.t-finance.active{color:#7c3aed;border-bottom-color:#7c3aed;}
 .nav-tab.t-bloom.active{color:#0369a1;border-bottom-color:#0369a1;}
-.nav-tab.t-comedy.active{color:#db2777;border-bottom-color:#db2777;}
+.nav-tab.t-comedy.active{color:#a855f7;border-bottom-color:#a855f7;}
+.nav-tab.t-popculture.active{color:#db2777;border-bottom-color:#db2777;}
 .nav-tab.t-podcasts.active{color:#e11d48;border-bottom-color:#e11d48;}
 .nav-right{display:flex;gap:6px;align-items:center;flex-shrink:0;}
 .search-input{
@@ -930,6 +982,15 @@ body{
   margin-bottom:10px;display:flex;align-items:center;justify-content:space-between;
 }
 .gs-clear{background:none;border:none;color:var(--accent);cursor:pointer;font-size:10px;font-weight:500;font-family:inherit;padding:0;}
+.gs-collapse-btn{
+  background:none;border:none;color:var(--text3);cursor:pointer;
+  font-size:10px;font-weight:700;font-family:inherit;padding:0;
+  text-transform:uppercase;letter-spacing:0.1em;
+  display:inline-flex;align-items:center;gap:6px;
+  flex:1;text-align:left;
+}
+.gs-collapse-btn:hover{color:var(--text);}
+.gs-collapse-chevron{font-size:9px;color:var(--text4);}
 .gs-clear:hover{text-decoration:underline;}
 
 /* Filter active pill */
@@ -1840,6 +1901,32 @@ body{overscroll-behavior-y:contain;}
 .mobile-logo span{color:var(--accent);}
 .mobile-logo-sub{font-size:8px;color:var(--text3);letter-spacing:0.14em;text-transform:uppercase;font-weight:700;margin-top:1px;}
 .mobile-actions{display:flex;gap:4px;align-items:center;}
+
+/* v22: weather + ticker strip — mobile/iPad. Slim 28px horizontal scrollable row. */
+.mobile-strip{
+  display:flex;align-items:center;gap:14px;
+  height:28px;padding:0 12px;
+  border-top:1px solid var(--border2);
+  overflow-x:auto;scrollbar-width:none;
+  -webkit-overflow-scrolling:touch;
+  background:var(--surface2);
+}
+.mobile-strip::-webkit-scrollbar{display:none;}
+.mobile-strip-item{
+  display:inline-flex;align-items:center;gap:5px;
+  font-size:11px;white-space:nowrap;flex-shrink:0;
+  text-decoration:none;color:var(--text2);cursor:pointer;
+  padding:2px 0;
+}
+.mobile-strip-item.wx:active{opacity:0.7;}
+.mobile-strip-item.tk:active{opacity:0.7;}
+.mobile-strip-city{font-weight:700;color:var(--text);font-size:10px;text-transform:uppercase;letter-spacing:0.04em;}
+.mobile-strip-temp{font-weight:700;color:var(--text);font-variant-numeric:tabular-nums;}
+.mobile-strip-sym{font-weight:800;font-size:11px;letter-spacing:-0.2px;font-variant-numeric:tabular-nums;}
+.mobile-strip-chg{font-size:10px;font-weight:700;font-variant-numeric:tabular-nums;color:var(--text3);}
+.mobile-strip-chg.up{color:var(--green);}
+.mobile-strip-chg.down{color:var(--red);}
+.mobile-strip-div{width:1px;height:14px;background:var(--border);flex-shrink:0;}
 .mobile-icon-btn{
   background:none;border:none;width:40px;height:40px;border-radius:8px;
   display:flex;align-items:center;justify-content:center;
@@ -1972,6 +2059,8 @@ body{overscroll-behavior-y:contain;}
   transition:color 0.12s;
 }
 .rn-item:hover{color:var(--text);}
+.rn-item.urgent{color:var(--red);}
+.rn-item.urgent .rn-item-text{font-weight:700;color:var(--red);}
 .rn-item-kind{font-size:13px;}
 .rn-item-text{font-weight:600;}
 .rn-item-val{font-weight:700;font-variant-numeric:tabular-nums;}
@@ -2294,19 +2383,26 @@ function FeedCard({a, cat, isSaved, onSave, onRead, relatedSources}) {
 
   const handleAI = async (e) => {
     e.stopPropagation();
-    if (aiState==='closed') {
-      if (summary) { setAiState('summary'); return; }
-      setAiState('summary'); setLoadingAI(true);
-      const {summary:s,error} = await fetchAISummary({type:'article',title:a.title,content:a.desc||'',mode:'summary'});
-      if (s) setSummary(s); else setAiErr(error||'Unavailable');
-      setLoadingAI(false);
-    } else if (aiState==='summary') {
-      if (takeaways) { setAiState('takeaways'); return; }
-      setAiState('takeaways'); setLoadingAI(true);
-      const {summary:t,error} = await fetchAISummary({type:'article',title:a.title,content:a.desc||'',mode:'takeaways'});
-      if (t) setTakeaways(t); else setAiErr(error||'Unavailable');
-      setLoadingAI(false);
-    } else { setAiState('closed'); }
+    if (aiState !== 'closed') { setAiState('closed'); return; }
+    setAiState('takeaways'); // 'takeaways' state means: show BOTH summary + bullets (v22 unified behavior)
+    // Fetch both in parallel — user gets paragraph + bullets together on single tap
+    const needSummary = !summary;
+    const needTakeaways = !takeaways;
+    if (!needSummary && !needTakeaways) return;
+    setLoadingAI(true);
+    const tasks = [];
+    if (needSummary) tasks.push(fetchAISummary({type:'article',title:a.title,content:a.desc||'',mode:'summary'}).then(r=>({k:'s',...r})));
+    if (needTakeaways) tasks.push(fetchAISummary({type:'article',title:a.title,content:a.desc||'',mode:'takeaways'}).then(r=>({k:'t',...r})));
+    const results = await Promise.all(tasks);
+    for (const r of results) {
+      if (r.summary) {
+        if (r.k==='s') setSummary(r.summary);
+        else setTakeaways(r.summary);
+      } else if (r.error) {
+        setAiErr(r.error);
+      }
+    }
+    setLoadingAI(false);
   };
 
   const handleDisc = async (e) => {
@@ -2418,7 +2514,7 @@ function FeedCard({a, cat, isSaved, onSave, onRead, relatedSources}) {
           {isSaved?'★ Saved':'☆ Save'}
         </button>
         <button className={`fc-act ${aiState!=='closed'?'ai-on':''}`} onClick={handleAI} disabled={loadingAI}>
-          ✦ {loadingAI?'Thinking...':aiState==='closed'?'AI Summary':aiState==='summary'?'Key Takeaways':'Hide AI'}
+          ✦ {loadingAI?'Thinking...':aiState==='closed'?'AI Summary':'Hide AI'}
         </button>
         <button className={`fc-act ${showDisc?'disc-on':''}`} onClick={handleDisc} disabled={loadingDisc}>
           💬 {loadingDisc?'Searching...':showDisc?'Hide':'Pulse'}
@@ -2714,6 +2810,13 @@ function Sidebar({cat, arts, kw, health, activeKw, setActiveKw, activeSource, se
   catArts.forEach(a=>{srcCounts[a.source]=(srcCounts[a.source]||0)+1;});
   const sources = [...new Set(catArts.map(a=>a.source))];
 
+  // v22: Topics + Sources collapse to keep Trending/Latest above the fold.
+  // Auto-expand when a filter is active so user can see what's filtering.
+  const [showTopics, setShowTopics] = useState(false);
+  const [showSources, setShowSources] = useState(false);
+  useEffect(() => { if (activeKw) setShowTopics(true); }, [activeKw]);
+  useEffect(() => { if (activeSource) setShowSources(true); }, [activeSource]);
+
   // v19: tabbed trending — gives users agency to flip between views
   // without losing access to keyword/source filters below.
   const [sbTab, setSbTab] = useState('trending');
@@ -2794,24 +2897,45 @@ function Sidebar({cat, arts, kw, health, activeKw, setActiveKw, activeSource, se
       {catKws.length > 0 && (
         <div className="gs-section">
           <div className="gs-label">
-            Topics
-            {activeKw && <button className="gs-clear" onClick={()=>setActiveKw(null)}>Clear</button>}
+            <button className="gs-collapse-btn" onClick={()=>setShowTopics(s=>!s)}>
+              <span>Topics{activeKw?` · ${activeKw}`:''}</span>
+              <span className="gs-collapse-chevron">{showTopics?'▾':'▸'}</span>
+            </button>
+            {activeKw && showTopics && <button className="gs-clear" onClick={()=>setActiveKw(null)}>Clear</button>}
           </div>
-          <div className="kw-chips">
-            {catKws.map((k,i)=>(
-              <span key={i} className={`kw-chip ${activeKw===k?'active':''}`} style={{background:cc.bg,color:cc.color}} onClick={()=>setActiveKw(activeKw===k?null:k)}>{k}</span>
-            ))}
-          </div>
+          {showTopics && (
+            <div className="kw-chips">
+              {catKws.map((k,i)=>(
+                <span key={i}
+                  className={`kw-chip ${activeKw===k?'active':''}`}
+                  style={{background:cc.bg,color:cc.color}}
+                  onClick={()=>{
+                    setActiveKw(activeKw===k?null:k);
+                    // v22: scroll feed into view so user can SEE the filter applied.
+                    // The chip lighting up alone gave no visible feedback.
+                    setTimeout(()=>{
+                      const feed = document.querySelector('.feed-col');
+                      if (feed) feed.scrollIntoView({behavior:'smooth', block:'start'});
+                    }, 50);
+                  }}>
+                  {k}
+                </span>
+              ))}
+            </div>
+          )}
         </div>
       )}
 
       {sources.length > 0 && (
         <div className="gs-section">
           <div className="gs-label">
-            Sources
-            {activeSource && <button className="gs-clear" onClick={()=>setActiveSource(null)}>Clear</button>}
+            <button className="gs-collapse-btn" onClick={()=>setShowSources(s=>!s)}>
+              <span>Sources{activeSource?` · ${activeSource}`:` · ${sources.length}`}</span>
+              <span className="gs-collapse-chevron">{showSources?'▾':'▸'}</span>
+            </button>
+            {activeSource && showSources && <button className="gs-clear" onClick={()=>setActiveSource(null)}>Clear</button>}
           </div>
-          {sources.map((name,i)=>{
+          {showSources && sources.map((name,i)=>{
             const h=health[name];
             const cls=h==='green'?'h-green':h==='yellow'?'h-yellow':h==='red'?'h-red':'h-gray';
             return (
@@ -2893,7 +3017,7 @@ function SourceFooter({cat, feeds, arts}) {
 }
 
 // ─── CUSTOMIZE PANEL ──────────────────────────────────────────────────────────
-const CAT_LABELS = {general:'🌐 General',sports:'🏆 Sports',business:'⚡ Business',finance:'📈 Finance',bloom:'🔋 Bloom',comedy:'😂 Comedy'};
+const CAT_LABELS = {general:'🌐 General',sports:'🏆 Sports',business:'⚡ Business',finance:'📈 Markets',bloom:'🔋 Bloom',popculture:'✨ Pop Culture',comedy:'😂 Comedy'};
 const PLAT_LABELS = {twitter:'𝕏',linkedin:'in',instagram:'IG',youtube:'▶'};
 
 function CustomizePanel({feeds, kw, alerts, urgent, social, watchlist, health, arts, initialTab, initialCat, onClose, onSave}) {
@@ -3110,12 +3234,8 @@ function CustomizePanel({feeds, kw, alerts, urgent, social, watchlist, health, a
 // destinations a mobile user actually uses for quick check-ins.
 function MenuSheet({ tab, onTabChange, onClose, onCustomize, onRefresh, dark, setDark }) {
   const items = [
-    { key:'briefing', emoji:'☕', label:'The Briefing' },
-    { key:'finance',  emoji:'📈', label:'Finance' },
-    { key:'bloom',    emoji:'🔋', label:'Bloom Energy' },
-    { key:'comedy',   emoji:'😂', label:'Comedy' },
-    { key:'podcasts', emoji:'🎙️', label:'Podcasts' },
-    { key:'social',   emoji:'🔗', label:'Social' },
+    { key:'briefing',   emoji:'☕', label:'The Briefing' },
+    { key:'podcasts',   emoji:'🎙️', label:'Podcasts' },
   ];
   return (
     <div className="menu-sheet-overlay" onClick={onClose}>
@@ -3157,7 +3277,7 @@ function MenuSheet({ tab, onTabChange, onClose, onCustomize, onRefresh, dark, se
 // already on one (mirrors Yahoo Sports "Following" behavior — tapping doesn't
 // throw you off your current context). Hidden on desktop via CSS.
 function BottomTabBar({ tab, onTabChange, onMenuOpen, savedCount, lastFeedTab }) {
-  const inFeed = ['general','sports','business','finance','bloom','comedy'].includes(tab);
+  const inFeed = ['general','sports','business','finance','bloom','popculture','comedy'].includes(tab);
   const feedTarget = inFeed ? tab : (lastFeedTab || 'general');
   const tabs = [
     { key:'today',  emoji:'🏠', label:'Today',  active: tab === 'today' },
@@ -3251,11 +3371,11 @@ function RightNowStrip({ breakingItems, scores, marketData, watchlist, onOpen, o
     <div className="rn-strip">
       <span className="rn-label">
         <span className="rn-pulse"/>
-        Right Now
+        Breaking & Right Now
       </span>
       <div className="rn-items">
         {items.map((it, i) => (
-          <span key={it.key} className="rn-item" onClick={() => {
+          <span key={it.key} className={`rn-item ${it.kind==='urgent'?'urgent':''}`} onClick={() => {
             if (it.article) onOpen(it.article);
             else if (it.link) window.open(it.link, '_blank');
           }}>
@@ -3531,20 +3651,20 @@ function TopBar({tab, setTab, search, setSearch, dark, setDark,
   const hasBreaking = breakingItems&&breakingItems.length>0;
   const tickerItems = hasBreaking?[...breakingItems,...breakingItems]:[];
 
-  const ALL_TABS = ['today','briefing','general','sports','business','finance','bloom','comedy','podcasts','social','saved'];
-  const TAB_LABELS = {today:'Today',briefing:'Briefing',bloom:'Bloom Energy',podcasts:'Podcasts',social:'Social',saved:'Saved',comedy:'Comedy'};
-  const TAB_CLASS  = {general:'t-general',sports:'t-sports',business:'t-business',finance:'t-finance',bloom:'t-bloom',comedy:'t-comedy',podcasts:'t-podcasts'};
+  const ALL_TABS = ['today','briefing','general','sports','business','finance','bloom','popculture','podcasts','saved'];
+  const TAB_LABELS = {today:'Today',briefing:'Briefing',bloom:'Bloom Energy',finance:'Markets',popculture:'Pop Culture',podcasts:'Podcasts',saved:'Saved'};
+  const TAB_CLASS  = {general:'t-general',sports:'t-sports',business:'t-business',finance:'t-finance',bloom:'t-bloom',popculture:'t-popculture',podcasts:'t-podcasts'};
 
   // Mobile chip bar: primary news categories only. Secondary destinations
-  // (Finance, Bloom, Comedy, Podcasts, Social) live in the More sheet.
+  // (Bloom, Podcasts, Briefing) live in the More sheet.
   const MOBILE_CHIPS = [
-    { key:'today',    label:'Today',    color:'var(--text)' },
-    { key:'general',  label:'General',  color:CATS.general.color },
-    { key:'sports',   label:'Sports',   color:CATS.sports.color },
-    { key:'business', label:'Business', color:CATS.business.color },
-    { key:'finance',  label:'Finance',  color:CATS.finance.color },
-    { key:'bloom',    label:'Energy',   color:CATS.bloom.color },
-    { key:'comedy',   label:'Comedy',   color:CATS.comedy.color },
+    { key:'today',      label:'Today',      color:'var(--text)' },
+    { key:'general',    label:'General',    color:CATS.general.color },
+    { key:'sports',     label:'Sports',     color:CATS.sports.color },
+    { key:'business',   label:'Business',   color:CATS.business.color },
+    { key:'finance',    label:'Markets',    color:CATS.finance.color },
+    { key:'bloom',      label:'Energy',     color:CATS.bloom.color },
+    { key:'popculture', label:'Pop Culture',color:CATS.popculture.color },
   ];
 
   // Keep the active chip scrolled into view when tab changes (swipe or tap)
@@ -3588,8 +3708,10 @@ function TopBar({tab, setTab, search, setSearch, dark, setDark,
         </div>
       </div>
 
-      {/* ━━━ Breaking (both layouts) ━━━ */}
-      {hasBreaking && showBreaking && (
+      {/* ━━━ Breaking (both layouts). v22: hidden on Today since RightNowStrip
+            already surfaces urgent items there — keeps breaking ticker available
+            on every other page where RightNow doesn't render. ━━━ */}
+      {hasBreaking && showBreaking && tab !== 'today' && (
         <div className="breaking-bar">
           <div className="breaking-label">BREAKING</div>
           <div className="breaking-ticker">
@@ -3642,6 +3764,31 @@ function TopBar({tab, setTab, search, setSearch, dark, setDark,
             <button className="mobile-icon-btn" onClick={onRefresh} title="Refresh">↺</button>
           </div>
         </div>
+
+        {/* v22: weather + ticker strip on mobile/iPad (was: desktop-only via whisper bar).
+            Compact 24px-tall horizontal scroll row with weather pills + tickers. */}
+        <div className="mobile-strip">
+          {wxList.map((wx,i)=>(
+            <a key={`wx${i}`} className="mobile-strip-item wx" href={`https://weather.com/weather/today/l/${encodeURIComponent(wx.slug)}`} target="_blank" rel="noreferrer">
+              <span>{wx.emoji}</span>
+              <span className="mobile-strip-city">{wx.name}</span>
+              <span className="mobile-strip-temp">{wx.temp}°</span>
+            </a>
+          ))}
+          {wxList.length>0 && <span className="mobile-strip-div"/>}
+          {TICKERS.map(t=>{
+            const q=quotes[t.sym]; const up=q?q.chg>=0:null;
+            return (
+              <span key={t.sym} className="mobile-strip-item tk" onClick={()=>onTickerClick&&onTickerClick(t)}>
+                <span className="mobile-strip-sym" style={{color:t.color}}>{t.sym}</span>
+                {q
+                  ? <span className={`mobile-strip-chg ${up?'up':'down'}`}>{up?'▲':'▼'}{Math.abs(q.pct).toFixed(1)}%</span>
+                  : <span className="mobile-strip-chg">—</span>}
+              </span>
+            );
+          })}
+        </div>
+
         {mobileSearchOpen && (
           <div className="mobile-search open">
             <input
@@ -3686,8 +3833,8 @@ export default function App() {
   const [marketData, setMarketData] = useState({});
   const [marketLoading, setMarketLoading] = useState(false);
   const [social, setSocial]     = useState(()=>ld('social',DEFAULT_SOCIAL));
-  const [arts, setArts]         = useState({general:[],sports:[],business:[],finance:[],bloom:[],comedy:[]});
-  const [loading, setLoading]   = useState({general:false,sports:false,business:false,finance:false,bloom:false,comedy:false});
+  const [arts, setArts]         = useState({general:[],sports:[],business:[],finance:[],bloom:[],popculture:[],comedy:[]});
+  const [loading, setLoading]   = useState({general:false,sports:false,business:false,finance:false,bloom:false,popculture:false,comedy:false});
   const [health, setHealth]     = useState({});
   const [podEps, setPodEps]     = useState({});
   const [podLoading, setPodLoading] = useState({});
@@ -3746,7 +3893,7 @@ export default function App() {
 
   const specificCatKeys = useMemo(()=>{
     const keys=new Set();
-    ['sports','business','finance','bloom','comedy'].forEach(c=>{
+    ['sports','business','finance','bloom','popculture','comedy'].forEach(c=>{
       (arts[c]||[]).forEach(a=>{if(a.link)keys.add(a.link);if(a.title)keys.add(a.title.slice(0,60).toLowerCase().replace(/\s+/g,''));});
     });
     return keys;
@@ -3754,7 +3901,7 @@ export default function App() {
 
   const sorted = useCallback((cat)=>{
     let arr=arts[cat]||[];
-    if(search) arr=arr.filter(a=>(a.title+(a.desc||'')).toLowerCase().includes(search));
+    if(search) arr=arr.filter(a=>(a.title+' '+(a.desc||'')+' '+(a.source||'')).toLowerCase().includes(search));
     if(activeKw) arr=arr.filter(a=>(a.title+(a.desc||'')).toLowerCase().includes(activeKw.toLowerCase()));
     if(activeSrc) arr=arr.filter(a=>a.source===activeSrc);
     arr=dedupe(arr);
@@ -3807,8 +3954,8 @@ export default function App() {
   },[watchlist]);
 
   const refreshAll = useCallback(async ()=>{
-    setArts({general:[],sports:[],business:[],finance:[],bloom:[],comedy:[]});
-    setLoading({general:false,sports:false,business:false,finance:false,bloom:false,comedy:false});
+    setArts({general:[],sports:[],business:[],finance:[],bloom:[],popculture:[],comedy:[]});
+    setLoading({general:false,sports:false,business:false,finance:false,bloom:false,popculture:false,comedy:false});
     setHealth({});setPodEps({});setPodLoading({});
     // Small delay to let the UI render the cleared state, then fan out
     await new Promise(r => setTimeout(r, 80));
@@ -3858,7 +4005,7 @@ export default function App() {
     setTab(t);setSearch('');setActiveKw(null);setActiveSrc(null);
     setMobileSearchOpen(false);
     // Remember last-viewed news category so the bottom "Feed" tab returns here
-    const CAT_TABS = ['general','sports','business','finance','bloom','comedy'];
+    const CAT_TABS = ['general','sports','business','finance','bloom','popculture','comedy'];
     if (CAT_TABS.includes(t)) setLastFeedTab(t);
     if(!['today','saved','podcasts','social'].includes(t)&&!(arts[t]||[]).length)loadCat(t);
     if(t==='finance')loadMarketData();
@@ -3890,7 +4037,7 @@ export default function App() {
     return(arts[cat]||[]).filter(x=>x.link!==a.link&&matched.some(k=>(x.title+(x.desc||'')).toLowerCase().includes(k.toLowerCase()))).slice(0,4);
   };
 
-  const NEWS_CATS = ['general','sports','business','bloom','comedy'];
+  const NEWS_CATS = ['general','sports','business','bloom','popculture','comedy'];
 
   // ─── FEED PAGE ─────────────────────────────────────────────────────────
   const FeedPage = ({cat}) => {
@@ -4123,7 +4270,7 @@ export default function App() {
     const lead=heroStories[heroIdx];
 
     // Per-category top items for the section list (3 each — generous Ghost density)
-    const sectionCats = ['general','sports','business','finance','bloom'];
+    const sectionCats = ['general','sports','business','finance','bloom','popculture'];
 
     return (
       <div className="page">
@@ -4221,19 +4368,20 @@ export default function App() {
       const sv2=isSavedFn({...ep,link:ep.link||ep.show+idx});
 
       const handlePodAI = async () => {
-        if(podAiState==='closed'){
-          if(podSum){setPodAiState('summary');return;}
-          setPodAiState('summary');setLoadPod(true);
-          const{summary:s,error}=await fetchAISummary({type:'podcast',title:ep.title,content:ep.desc||'',mode:'summary'});
-          if(s)setPodSum(s);else setPodErr(error||'Unavailable');
-          setLoadPod(false);
-        }else if(podAiState==='summary'){
-          if(podTake){setPodAiState('takeaways');return;}
-          setPodAiState('takeaways');setLoadPod(true);
-          const{summary:t,error}=await fetchAISummary({type:'podcast',title:ep.title,content:ep.desc||'',mode:'takeaways'});
-          if(t)setPodTake(t);else setPodErr(error||'Unavailable');
-          setLoadPod(false);
-        }else{setPodAiState('closed');}
+        if (podAiState !== 'closed') { setPodAiState('closed'); return; }
+        setPodAiState('takeaways');
+        const needSum = !podSum, needTake = !podTake;
+        if (!needSum && !needTake) return;
+        setLoadPod(true);
+        const tasks = [];
+        if (needSum) tasks.push(fetchAISummary({type:'podcast',title:ep.title,content:ep.desc||'',mode:'summary'}).then(r=>({k:'s',...r})));
+        if (needTake) tasks.push(fetchAISummary({type:'podcast',title:ep.title,content:ep.desc||'',mode:'takeaways'}).then(r=>({k:'t',...r})));
+        const results = await Promise.all(tasks);
+        for (const r of results) {
+          if (r.summary) { if (r.k==='s') setPodSum(r.summary); else setPodTake(r.summary); }
+          else if (r.error) setPodErr(r.error);
+        }
+        setLoadPod(false);
       };
 
       return (
@@ -4268,7 +4416,7 @@ export default function App() {
           <div className="pod-actions">
             <button className="pod-btn" onClick={()=>ep.link&&window.open(ep.link,'_blank')}>Listen</button>
             <button className={`pod-btn ${podAiState!=='closed'?'ai-on':''}`} onClick={handlePodAI} disabled={loadPod}>
-              ✦ {loadPod?'Thinking…':podAiState==='closed'?'AI Summary':podAiState==='summary'?'Key Takeaways':'Hide AI'}
+              ✦ {loadPod?'Thinking…':podAiState==='closed'?'AI Summary':'Hide AI'}
             </button>
             <button className={`pod-btn ${sv2?'saved':''}`} onClick={()=>onSave({...ep,link:ep.link||ep.show+idx,source:ep.show,cat:'podcasts'})}>{sv2?'★ Saved':'☆ Save'}</button>
           </div>
