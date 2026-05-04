@@ -1,34 +1,41 @@
-// MyNewsHub v22a — Session 4 wave 1: Quick wins, fixes, category restructure
+// MyNewsHub v22b — Session 4 wave 2: Briefing rebuild + Today/Briefing merge + Markets/Bloomberg + MSN polish
 // ─────────────────────────────────────────────────────────────────────────────
-// Builds on v21. Focused on the painful daily-use issues (chip filter UX,
-// missing mobile weather/ticker, AI summary depth) and a clean nav restructure
-// that drops underused destinations and adds Pop Culture. v22b will follow
-// with the briefing redesign + Today/Briefing merge.
+// Builds on v22a. The briefing was a single AI paragraph synthesizing 12
+// random headlines (2 per cat). v22b rebuilds it on a real methodology:
+// Tier 1 = priority briefing sources (Axios + Morning Brew + Morning Wire +
+// Bloomberg) → Tier 2 = per-category top 3-5 deduped fresh headlines
+// (excluding Comedy) → Tier 3 = time-aware auto-refresh (>90min stale).
+// Briefing now renders as the top section of Today, not a separate page.
 //
-// Changes from v21:
-//  ── Category restructure ──
-//  • Comedy removed from main nav (still in storage as feeds, easy revival)
-//  • Social removed from main nav
-//  • Pop Culture added (BuzzFeed / EW / Vulture / Vanity Fair RSS sources)
-//  • Finance renamed → Markets (label only; storage key + cat key unchanged)
+// Changes from v22a:
+//  ── Briefing methodology ──
+//  • New BRIEFING_PRIORITY_SOURCES = ['Axios','Morning Brew','Morning Wire','Bloomberg']
+//  • MorningBriefingInline rewrite: pulls Tier 1 articles first, then Tier 2
+//    deduped per-cat (excluding Comedy), sends structured input to AI
+//  • Time-aware: useEffect checks ts age on mount; auto-regenerates if >90min
 //
-//  ── Behavioral fixes ──
-//  • Chip filter UX: tapping a topic chip auto-scrolls feed into view so the
-//    filter result is visible (was: state changed but user couldn't tell)
-//  • Search optimization: search now matches title + desc + source name
-//  • AI summary upgrade: paragraph + 3-5 detailed bullets (was: bullets only)
+//  ── Bloomberg added to General feeds ──
+//  • Bloomberg Markets RSS added so Tier 1 has Bloomberg coverage
 //
-//  ── Mobile/iPad ──
-//  • Weather + ticker visible on mobile and iPad (was: desktop-only via
-//    whisper bar). Compact horizontal strip in mobile topbar.
+//  ── Today + Briefing merge ──
+//  • Today page now opens with MorningBriefingInline as its top section
+//  • Standalone BriefingPage routing removed; component code preserved
+//  • 'briefing' tab in nav redirects to 'today'
 //
-//  ── UX polish ──
-//  • Right Now + Breaking unified into single live strip on Today
-//  • Sidebar declutter: moved Topics+Sources below Trending tabs
+//  ── Today MSN polish ──
+//  • HeroBand: bigger title, tighter secondary stack, brighter category badges
+//  • Today section headers: stronger hierarchy with accent bars
+//
+//  ── Markets page Bloomberg-style treatment ──
+//  • Bloomberg orange (#fa7800) accent throughout
+//  • Tighter table rows, denser typography, monospace numerics
+//  • Index cards: wider, flatter, more terminal-like
+//  • Status row with live ticker styling
+//  • CSS-only: no functional or data changes
 //
 //  ── Infra ──
-//  • Storage v21_ → v22_ with migration from v21/v20/.../v14
-//  • Comedy storage preserved (key still in DEFAULT_FEEDS); easy to bring back
+//  • Storage v22_ → v22b_? — keeping v22_ since data shape unchanged.
+//    No migration needed.
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { useState, useEffect, useCallback, useMemo, useRef, Fragment } from 'react';
@@ -92,6 +99,7 @@ const DEFAULT_FEEDS = {
     { name:'Chron.com',         url:'https://www.chron.com/rss/feed/News-270.php',                              on:true },
     { name:'Morning Brew',      url:'https://www.morningbrew.com/feed',                                         on:true },
     { name:'Morning Wire',      url:'https://feeds.megaphone.fm/BVDWV8747925072',                               on:true },
+    { name:'Bloomberg',         url:'https://feeds.bloomberg.com/markets/news.rss',                              on:true },
   ],
   sports: [
     { name:'ESPN NFL',             url:'https://www.espn.com/espn/rss/nfl/news',                                on:true },
@@ -226,6 +234,15 @@ const LEAGUES = [
 
 const SK = 'v22_';
 const OLD_SKS = ['v21_','v20_','v19_','v18_','v17_','v16_','v15_','v14_'];
+
+// v22b: Briefing 3-tier methodology constants.
+// Tier 1: priority briefing sources — articles from these get pulled first
+// and labeled as "anchor" content for the AI synthesis.
+// Tier 2: per-category top headlines, deduped against Tier 1.
+// Tier 3: time-aware refresh — auto-regenerate if briefing is >90min stale.
+const BRIEFING_PRIORITY_SOURCES = ['Axios','Morning Brew','Morning Wire','Bloomberg'];
+const BRIEFING_EXCLUDE_CATS = ['comedy']; // satire dilutes professional briefing voice
+const BRIEFING_STALE_MS = 90 * 60 * 1000; // 90 minutes
 
 const DEFAULT_URGENT = [
   'breaking','hurricane','earthquake','tornado','wildfire',
@@ -630,6 +647,7 @@ const SOURCE_URLS = {
   'NY Post':'https://nypost.com','The Hill':'https://thehill.com',
   'TechCrunch':'https://techcrunch.com','Washington Times':'https://www.washingtontimes.com',
   'The Guardian US':'https://www.theguardian.com/us','Axios':'https://www.axios.com',
+  'Bloomberg':'https://www.bloomberg.com/markets',
   'Breitbart':'https://www.breitbart.com','KHOU Houston':'https://www.khou.com',
   'Click2Houston':'https://www.click2houston.com','Chron.com':'https://www.chron.com',
   'ESPN NFL':'https://www.espn.com/nfl','ESPN NBA':'https://www.espn.com/nba',
@@ -1248,51 +1266,102 @@ body{
 /* ═══════════════════════════════════════════
    FINANCE PAGE
 ═══════════════════════════════════════════ */
+/* v22b: MARKETS (Bloomberg-style) — orange accent, denser tables, monospace
+   numerics throughout, terminal-like layout. CSS-only, no functional changes. */
 .fin-header{
-  background:var(--surface);border:1px solid var(--border);border-radius:12px;
-  padding:14px 18px 12px;margin-bottom:14px;box-shadow:var(--shadow-sm);
+  background:var(--surface);border:1px solid var(--border);
+  /* Bloomberg-style: square corners, orange top accent */
+  border-radius:0;
+  border-top:3px solid #fa7800;
+  padding:14px 18px 12px;margin-bottom:12px;box-shadow:none;
 }
 .fin-header-top{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:14px;gap:12px;flex-wrap:wrap;}
-.fin-header-title{font-size:17px;font-weight:800;color:var(--text);letter-spacing:-0.4px;}
-.fin-header-sub{font-size:11px;color:var(--text2);margin-top:3px;display:flex;align-items:center;gap:6px;}
+.fin-header-title{
+  font-size:20px;font-weight:900;color:var(--text);letter-spacing:-0.5px;
+  /* Bloomberg terminal-like header */
+  text-transform:none;
+}
+.fin-header-sub{font-size:11px;color:var(--text2);margin-top:4px;display:flex;align-items:center;gap:6px;font-variant-numeric:tabular-nums;}
 .fin-status-dot{width:7px;height:7px;border-radius:50%;display:inline-block;}
 .fin-refresh{
-  background:var(--surface2);border:1px solid var(--border);color:var(--text2);
-  border-radius:6px;padding:5px 11px;font-size:11px;font-weight:600;cursor:pointer;font-family:inherit;
+  background:transparent;border:1px solid var(--border);color:var(--text2);
+  border-radius:0;padding:5px 12px;font-size:10px;font-weight:700;cursor:pointer;font-family:inherit;
+  text-transform:uppercase;letter-spacing:0.06em;
   transition:all 0.12s;
 }
-.fin-refresh:hover{border-color:var(--accent);color:var(--accent);}
+.fin-refresh:hover{border-color:#fa7800;color:#fa7800;}
 .fin-refresh:disabled{cursor:wait;opacity:0.6;}
-.fin-indices{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;}
-.fin-index{background:var(--surface2);border-radius:8px;padding:10px 14px;border-left:3px solid var(--border);}
-.fin-index.up{border-left-color:var(--green);}
-.fin-index.down{border-left-color:var(--red);}
-.fin-index-label{font-size:10px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:0.06em;margin-bottom:3px;}
-.fin-index-price{font-size:20px;font-weight:800;color:var(--text);font-variant-numeric:tabular-nums;letter-spacing:-0.5px;line-height:1.1;font-family:'SF Mono','Cascadia Code','Consolas',monospace;}
-.fin-index-chg{font-size:11px;font-weight:600;margin-top:3px;display:flex;gap:5px;align-items:center;font-variant-numeric:tabular-nums;}
-.fin-index.up .fin-index-chg{color:var(--green);}
-.fin-index.down .fin-index-chg{color:var(--red);}
-.fin-index-pct{background:rgba(0,0,0,0.05);border-radius:3px;padding:1px 5px;font-size:10px;}
-.dark .fin-index-pct{background:rgba(255,255,255,0.07);}
-.fin-grid{display:grid;grid-template-columns:1fr 280px;gap:16px;align-items:start;}
-.fin-main{display:flex;flex-direction:column;gap:14px;min-width:0;}
-.fin-watchlist,.fin-news{background:var(--surface);border:1px solid var(--border);border-radius:10px;overflow:hidden;}
-.fin-section-head{display:flex;justify-content:space-between;align-items:center;padding:11px 16px;border-bottom:1px solid var(--border2);}
-.fin-section-title{font-size:13px;font-weight:800;color:var(--text);letter-spacing:-0.2px;}
-.fin-news{padding:14px;}
-.fin-news .fin-section-head{margin:-14px -14px 10px;border-radius:10px 10px 0 0;background:var(--surface2);}
+.fin-indices{display:grid;grid-template-columns:repeat(3,1fr);gap:1px;background:var(--border);}
+.fin-index{
+  /* Bloomberg-style flat tile with bottom accent bar */
+  background:var(--surface);border-radius:0;padding:12px 16px;
+  border-left:none;
+  border-bottom:3px solid var(--border);
+}
+.fin-index.up{border-bottom-color:#16a34a;}
+.fin-index.down{border-bottom-color:#dc2626;}
+.fin-index-label{font-size:10px;font-weight:800;color:var(--text3);text-transform:uppercase;letter-spacing:0.1em;margin-bottom:4px;}
+.fin-index-price{
+  font-size:22px;font-weight:700;color:var(--text);
+  font-variant-numeric:tabular-nums;letter-spacing:-0.5px;line-height:1.05;
+  font-family:'SF Mono','Cascadia Code','Consolas',monospace;
+}
+.fin-index-chg{font-size:11px;font-weight:700;margin-top:4px;display:flex;gap:6px;align-items:center;font-variant-numeric:tabular-nums;}
+.fin-index.up .fin-index-chg{color:#16a34a;}
+.fin-index.down .fin-index-chg{color:#dc2626;}
+.fin-index-pct{
+  background:transparent;border:1px solid currentColor;
+  border-radius:0;padding:1px 6px;font-size:10px;font-weight:800;
+  letter-spacing:0.02em;
+}
+.dark .fin-index-pct{background:transparent;}
+.fin-grid{display:grid;grid-template-columns:1fr 280px;gap:12px;align-items:start;}
+.fin-main{display:flex;flex-direction:column;gap:12px;min-width:0;}
+.fin-watchlist,.fin-news{
+  background:var(--surface);border:1px solid var(--border);
+  /* Bloomberg-style: square corners */
+  border-radius:0;overflow:hidden;
+}
+.fin-section-head{
+  display:flex;justify-content:space-between;align-items:center;
+  padding:9px 14px;
+  /* Bloomberg-style: dark header bar */
+  background:var(--bg);border-bottom:1px solid var(--border);
+}
+.fin-section-title{
+  font-size:11px;font-weight:800;color:var(--text);letter-spacing:0.06em;
+  text-transform:uppercase;
+}
+.fin-news{padding:0;}
+.fin-news .fin-section-head{margin:0;border-radius:0;background:var(--bg);}
+.fin-news > *:not(.fin-section-head){padding:0 14px;}
+.fin-news > *:not(.fin-section-head):first-of-type{padding-top:14px;}
+.fin-news > *:not(.fin-section-head):last-of-type{padding-bottom:14px;}
 .fin-table{width:100%;border-collapse:collapse;font-variant-numeric:tabular-nums;}
-.fin-table thead th{background:var(--surface2);font-size:9px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:0.07em;padding:9px 12px;border-bottom:1px solid var(--border);}
+.fin-table thead th{
+  background:var(--bg);
+  font-size:9px;font-weight:800;color:var(--text3);
+  text-transform:uppercase;letter-spacing:0.08em;
+  padding:7px 12px;border-bottom:1px solid var(--border);
+}
 .fin-table tbody tr{cursor:pointer;transition:background 0.08s;border-bottom:1px solid var(--border2);}
 .fin-table tbody tr:hover{background:var(--surface2);}
 .fin-table tbody tr:last-child{border-bottom:none;}
-.fin-table td{padding:10px 12px;font-size:12px;color:var(--text);}
-.fin-sym{font-weight:800;font-family:'SF Mono','Cascadia Code','Consolas',monospace;letter-spacing:-0.3px;color:var(--accent);}
-.fin-name{color:var(--text2);font-size:11px;}
-.fin-px{font-family:'SF Mono','Cascadia Code','Consolas',monospace;text-align:right;font-weight:600;letter-spacing:-0.2px;}
-.fin-up{color:var(--green);}
-.fin-down{color:var(--red);}
-.fin-pct-pill{background:rgba(22,163,74,0.1);border-radius:4px;padding:2px 5px;font-size:11px;font-weight:700;}
+.fin-table td{
+  /* Bloomberg-style: tighter rows for terminal density */
+  padding:7px 12px;font-size:12px;color:var(--text);
+}
+.fin-sym{font-weight:800;font-family:'SF Mono','Cascadia Code','Consolas',monospace;letter-spacing:-0.3px;color:#fa7800;}
+.fin-name{color:var(--text2);font-size:11px;font-weight:500;}
+.fin-px{font-family:'SF Mono','Cascadia Code','Consolas',monospace;text-align:right;font-weight:700;letter-spacing:-0.2px;}
+.fin-up{color:#16a34a;}
+.fin-down{color:#dc2626;}
+.fin-pct-pill{
+  /* Bloomberg-style: square monospace pct badges */
+  background:rgba(22,163,74,0.1);border-radius:0;padding:2px 6px;
+  font-size:10px;font-weight:800;font-family:'SF Mono','Cascadia Code','Consolas',monospace;
+  letter-spacing:0.02em;
+}
 .fin-down .fin-pct-pill{background:rgba(220,38,38,0.1);}
 .fin-empty{padding:28px;text-align:center;color:var(--text3);font-style:italic;font-size:12px;}
 
@@ -1622,24 +1691,27 @@ body{
 }
 .hero-band-badge{
   display:inline-block;
-  font-size:10px;font-weight:800;letter-spacing:0.06em;text-transform:uppercase;
-  color:#fff;padding:4px 9px;border-radius:3px;
-  margin-bottom:12px;
+  /* v22b MSN polish: brighter, more punch */
+  font-size:11px;font-weight:900;letter-spacing:0.08em;text-transform:uppercase;
+  color:#fff;padding:5px 11px;border-radius:3px;
+  margin-bottom:14px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.25);
 }
 /* EDITORIAL SERIF TITLE — the core polish lever */
 .hero-band-title{
   font-family: ui-serif, Georgia, 'Times New Roman', 'Source Serif Pro', serif;
-  font-size: 30px;font-weight: 700;line-height: 1.15;
-  letter-spacing: -0.02em;
-  color: #fff;margin: 0 0 10px 0;
+  /* v22b MSN polish: bigger hero, more weight, more presence */
+  font-size: 36px;font-weight: 800;line-height: 1.12;
+  letter-spacing: -0.025em;
+  color: #fff;margin: 0 0 12px 0;
   display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden;
-  text-shadow: 0 1px 3px rgba(0,0,0,0.4);
+  text-shadow: 0 2px 8px rgba(0,0,0,0.5);
 }
 .hero-band-desc{
-  font-size:14px;line-height:1.5;
-  color:rgba(255,255,255,0.88);margin:0 0 10px 0;
+  font-size:15px;line-height:1.5;
+  color:rgba(255,255,255,0.92);margin:0 0 12px 0;
   display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;
-  text-shadow: 0 1px 2px rgba(0,0,0,0.5);
+  text-shadow: 0 1px 3px rgba(0,0,0,0.5);
 }
 .hero-band-meta{
   display:flex;align-items:center;gap:6px;
@@ -1673,18 +1745,22 @@ body{
 }
 .hero-band-side-item{
   display:flex;gap:12px;align-items:flex-start;
-  padding:12px 0;cursor:pointer;
+  /* v22b MSN polish: tighter rows, more density */
+  padding:10px 0;cursor:pointer;
   transition:background 0.15s;
   border-radius:6px;
+  border-bottom:1px solid var(--border2);
 }
-.hero-band-side-item:hover{background:var(--surface2);margin:0 -10px;padding:12px 10px;}
+.hero-band-side-item:last-child{border-bottom:none;}
+.hero-band-side-item:hover{background:var(--surface2);margin:0 -10px;padding:10px 10px;}
 .hero-band-side-thumb{
-  width:72px;height:54px;object-fit:cover;border-radius:5px;flex-shrink:0;
+  /* v22b MSN polish: slightly bigger thumbs for more visual punch */
+  width:80px;height:60px;object-fit:cover;border-radius:5px;flex-shrink:0;
 }
 .hero-band-side-body{flex:1;min-width:0;display:flex;flex-direction:column;gap:4px;}
 .hero-band-side-title{
-  font-size:13px;font-weight:700;color:var(--text);
-  line-height:1.35;letter-spacing:-0.15px;
+  font-size:14px;font-weight:700;color:var(--text);
+  line-height:1.32;letter-spacing:-0.2px;
   display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden;
 }
 .hero-band-side-meta{
@@ -1762,7 +1838,7 @@ body{
 @media (max-width:900px){
   .hero-band{grid-template-columns:1fr;gap:16px;}
   .hero-band-img{min-height:unset;aspect-ratio:16/10;max-height:380px;}
-  .hero-band-title{font-size:24px;}
+  .hero-band-title{font-size:28px;font-weight:800;}
 }
 @media (max-width:640px){
   .hero-band{gap:12px;margin-bottom:24px;}
@@ -1788,19 +1864,29 @@ body{
 
 /* MORNING BRIEFING INLINE — no card, just typography under hero */
 .briefing-inline{
-  margin: 24px 0 32px;
-  padding: 0;
+  /* v22b: Now the top section of Today. Gets a stronger frame with a left
+     accent bar to read like Morning Brew / Axios feature article. */
+  margin: 0 0 32px;
+  padding: 20px 24px;
   border: none;
-  background: transparent;
+  border-left: 4px solid var(--accent);
+  background: var(--surface);
+  border-radius: 0 var(--radius) var(--radius) 0;
 }
 .briefing-inline-head{
   display:flex;align-items:center;justify-content:space-between;
   margin-bottom:10px;
 }
 .briefing-inline-label{
-  font-size:11px;font-weight:700;color:var(--text3);
-  text-transform:uppercase;letter-spacing:0.12em;
+  font-size:12px;font-weight:800;color:var(--text);
+  text-transform:uppercase;letter-spacing:0.1em;
 }
+.briefing-inline-sources{
+  font-size:10px;color:var(--text3);font-weight:500;
+  margin: 0 0 14px 0;
+  letter-spacing:0.02em;
+}
+.briefing-inline-sources strong{color:var(--text2);font-weight:700;}
 .briefing-inline-refresh{
   background:none;border:none;color:var(--text3);
   font-size:14px;cursor:pointer;padding:4px 8px;border-radius:6px;
@@ -1810,10 +1896,10 @@ body{
 .briefing-inline-refresh:hover:not(:disabled){color:var(--accent);background:var(--surface2);}
 .briefing-inline-refresh:disabled{opacity:0.5;cursor:wait;}
 .briefing-inline-body{
-  font-size:17px;line-height:1.6;color:var(--text);
+  /* v22b: bumped readability — better leading, brighter text */
+  font-size:17px;line-height:1.62;color:var(--text);
   font-weight:400;letter-spacing:-0.2px;
   margin:0;
-  /* Editorial weight: looks like a newspaper lede paragraph */
   font-family: ui-serif, Georgia, 'Times New Roman', serif;
 }
 .briefing-inline-body strong{font-weight:700;color:var(--text);}
@@ -2652,13 +2738,69 @@ function MorningBriefingInline({arts}) {
 
   const generate = useCallback(async () => {
     setLoading(true); setError('');
-    const lines = Object.entries(arts).flatMap(([cat, list]) =>
-      (list||[]).slice(0,2).map(a => `${CATS[cat]?.emoji||''} ${a.title}`)
-    ).join('\n');
+
+    // ── TIER 1: Priority briefing sources (Axios, Morning Brew, Morning Wire, Bloomberg) ──
+    // Pull the latest 1-2 articles from each priority source. These are
+    // labeled as "anchor" content for the AI synthesis.
+    const allArts = Object.values(arts).flat();
+    const tier1 = [];
+    const tier1Keys = new Set(); // dedup keys for Tier 2 to filter against
+    BRIEFING_PRIORITY_SOURCES.forEach(srcName => {
+      const matches = allArts
+        .filter(a => a.source === srcName)
+        .sort((a,b) => new Date(b.pubDate) - new Date(a.pubDate))
+        .slice(0, 2);
+      matches.forEach(a => {
+        tier1.push({...a, _priority: srcName});
+        const key = a.title.slice(0,60).toLowerCase().replace(/\s+/g,'');
+        tier1Keys.add(key);
+      });
+    });
+
+    // ── TIER 2: Per-category top headlines (excluding Comedy + dedup against Tier 1) ──
+    const tier2 = {};
+    Object.entries(arts).forEach(([cat, list]) => {
+      if (BRIEFING_EXCLUDE_CATS.includes(cat)) return;
+      const headlines = (list || [])
+        .filter(a => {
+          const key = a.title.slice(0,60).toLowerCase().replace(/\s+/g,'');
+          return !tier1Keys.has(key);
+        })
+        .sort((a,b) => new Date(b.pubDate) - new Date(a.pubDate))
+        .slice(0, 5)
+        .map(a => a.title);
+      if (headlines.length > 0) tier2[cat] = headlines;
+    });
+
+    // Build the structured AI prompt
+    const tier1Block = tier1.length > 0
+      ? `PRIORITY BRIEFINGS (today's authoritative summaries from Axios, Morning Brew, Morning Wire, Bloomberg):\n${tier1.map(a => `• [${a.source}] ${a.title}`).join('\n')}`
+      : '';
+    const tier2Block = Object.entries(tier2).map(([cat, hl]) =>
+      `${CATS[cat]?.label || cat.toUpperCase()}:\n${hl.map(t => `• ${t}`).join('\n')}`
+    ).join('\n\n');
+
+    const prompt = `You are synthesizing a smart professional briefing in the style of Morning Brew + Axios + Bloomberg 5 Things — punchy, specific, no fluff. A busy executive checks this multiple times a day.
+
+${tier1Block}
+
+FRESH HEADLINES BY CATEGORY:
+${tier2Block}
+
+OUTPUT FORMAT:
+1. A punchy 3-4 sentence opening paragraph synthesizing the day's biggest story or theme. Be specific and name the actual stories. Lead with what changed today, not what's ongoing.
+2. 5-7 bullet takeaways covering the most important news across the categories above. Each bullet must:
+   - Start with a dash marker (-)
+   - Be one specific sentence (no fluff)
+   - Name the actual story/people/companies
+   - Cover different categories (don't pile up bullets in one area)
+   - Reference Tier 1 priority briefings where relevant
+Output ONLY the paragraph followed by the bullets. No headers, no labels, no closing remarks.`;
+
     const {summary, error:err} = await fetchAISummary({
       type:'article',
-      title:`News Overview — ${dateStr}`,
-      content:`Write a news digest in TWO PARTS.\n\nPart 1: A single punchy 3-4 sentence paragraph synthesizing the biggest story or theme of the day. Be specific and name the actual stories.\n\nPart 2: A short bullet list of 3-5 OTHER key takeaways a busy professional should know. Use dash markers (-) and keep each bullet to one line.\n\nHeadlines:\n${lines}`,
+      title:`News Briefing — ${dateStr}`,
+      content: prompt,
       mode:'summary',
     });
     if (summary) {
@@ -2672,11 +2814,31 @@ function MorningBriefingInline({arts}) {
     setLoading(false);
   }, [arts, dateStr]);
 
+  // Initial generation when feeds load (>10 articles total)
   useEffect(() => {
     const total = Object.values(arts).reduce((n,l)=>n+(l?.length||0),0);
     if (total > 10 && !body && !loading) generate();
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [arts]);
+
+  // ── TIER 3: time-aware auto-refresh ──
+  // If briefing exists but is older than BRIEFING_STALE_MS (90min), regenerate.
+  // Re-checks every 5 minutes so a user who leaves the tab open mid-morning
+  // gets a fresh briefing by midday without manual refresh.
+  useEffect(() => {
+    if (!ts || loading) return;
+    const checkStale = () => {
+      const age = Date.now() - ts;
+      if (age > BRIEFING_STALE_MS) {
+        const total = Object.values(arts).reduce((n,l)=>n+(l?.length||0),0);
+        if (total > 10) generate();
+      }
+    };
+    checkStale(); // check immediately on mount/ts-change
+    const iv = setInterval(checkStale, 5 * 60 * 1000); // every 5 min
+    return () => clearInterval(iv);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ts]);
 
   // Freshness indicator: green <30min, amber older
   const tsLabel = useMemo(() => {
@@ -2701,8 +2863,11 @@ function MorningBriefingInline({arts}) {
           )}
         </div>
         <button className="briefing-inline-refresh-btn" onClick={generate} disabled={loading}>
-          {loading ? 'Generating…' : '↻ Refresh Digest'}
+          {loading ? 'Generating…' : '↻ Refresh'}
         </button>
+      </div>
+      <div className="briefing-inline-sources">
+        Sourced from <strong>{BRIEFING_PRIORITY_SOURCES.join(', ')}</strong> + per-category top headlines
       </div>
       {body
         ? <p className="briefing-inline-body" dangerouslySetInnerHTML={{__html: body.replace(/\*\*([^*]+)\*\*/g,'<strong>$1</strong>')}}/>
@@ -3234,7 +3399,6 @@ function CustomizePanel({feeds, kw, alerts, urgent, social, watchlist, health, a
 // destinations a mobile user actually uses for quick check-ins.
 function MenuSheet({ tab, onTabChange, onClose, onCustomize, onRefresh, dark, setDark }) {
   const items = [
-    { key:'briefing',   emoji:'☕', label:'The Briefing' },
     { key:'podcasts',   emoji:'🎙️', label:'Podcasts' },
   ];
   return (
@@ -3651,8 +3815,8 @@ function TopBar({tab, setTab, search, setSearch, dark, setDark,
   const hasBreaking = breakingItems&&breakingItems.length>0;
   const tickerItems = hasBreaking?[...breakingItems,...breakingItems]:[];
 
-  const ALL_TABS = ['today','briefing','general','sports','business','finance','bloom','popculture','podcasts','saved'];
-  const TAB_LABELS = {today:'Today',briefing:'Briefing',bloom:'Bloom Energy',finance:'Markets',popculture:'Pop Culture',podcasts:'Podcasts',saved:'Saved'};
+  const ALL_TABS = ['today','general','sports','business','finance','bloom','popculture','podcasts','saved'];
+  const TAB_LABELS = {today:'Today',bloom:'Bloom Energy',finance:'Markets',popculture:'Pop Culture',podcasts:'Podcasts',saved:'Saved'};
   const TAB_CLASS  = {general:'t-general',sports:'t-sports',business:'t-business',finance:'t-finance',bloom:'t-bloom',popculture:'t-popculture',podcasts:'t-podcasts'};
 
   // Mobile chip bar: primary news categories only. Secondary destinations
@@ -4002,6 +4166,8 @@ export default function App() {
   };
 
   const handleTabChange = t=>{
+    // v22b: briefing is now part of Today, no longer a separate page
+    if (t === 'briefing') t = 'today';
     setTab(t);setSearch('');setActiveKw(null);setActiveSrc(null);
     setMobileSearchOpen(false);
     // Remember last-viewed news category so the bottom "Feed" tab returns here
@@ -4276,6 +4442,11 @@ export default function App() {
       <div className="page">
         <div className="today-flow">
 
+          {/* ── v22b BRIEFING — top section of Today (was: standalone BriefingPage).
+                Briefing-first because that's what the user opens Today for in
+                the morning. Hero + sections come after for deeper exploration. ── */}
+          <MorningBriefingInline arts={arts}/>
+
           {/* ── v19 HERO BAND — Yahoo/NBC 2-column top band ── */}
           <HeroBand
             heroStories={heroStories}
@@ -4285,8 +4456,6 @@ export default function App() {
             setPaused={setPaused}
             onRead={onRead}
           />
-
-          {/* v20: MorningBriefingInline removed from Today — lives on BriefingPage now */}
 
           {/* ── RIGHT NOW — slim, ghost-treated ── */}
           <RightNowStrip
@@ -4664,7 +4833,8 @@ export default function App() {
         {isMobile && <PtrIndicator distance={ptrDistance} threshold={70} refreshing={refreshing}/>}
 
         {tab==='today'&&<TodayPage/>}
-        {tab==='briefing'&&<BriefingPage/>}
+        {/* v22b: BriefingPage routing removed — briefing now renders as top section of Today.
+            'briefing' tab redirects to Today below in handleTabChange. */}
         {NEWS_CATS.includes(tab)&&<FeedPage cat={tab}/>}
         {tab==='finance'&&<FinancePage/>}
         {tab==='podcasts'&&<PodcastsPage/>}
