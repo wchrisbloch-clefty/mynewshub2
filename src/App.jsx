@@ -1,44 +1,39 @@
-// MyNewsHub v25a — Session 7 wave 1: Foundation cleanup + pill bar + typography unification
+// MyNewsHub v25b — Session 7 wave 2: Google News grid + sidebar simplification + Business Bloomberg + accents
 // ─────────────────────────────────────────────────────────────────────────────
-// Builds on v24a. First wave of the unified-design ship. v25b will follow
-// with the Google News grid + per-vertical accents on top of this foundation.
+// Builds on v25a. Completes the unified-design system. v25a established the
+// foundation (NBC sans typography, modern pill bar, ~225 lines orphan cleanup);
+// v25b adds the Google News grid pattern, per-vertical accents, simpler sidebar,
+// and brings Business in line with Markets' Bloomberg treatment.
 //
-// Why split: the cleanup + typography + pill-bar work alone is a meaningful
-// improvement (modern topbar, no editorial-serif fighting bold-sans, ~225
-// lines of orphan code gone). Shipping this checkpoint means the visual
-// rebuild in v25b lands on a clean foundation.
+// Changes from v25a:
 //
-// Changes from v24a:
+//  ── Google News grid (.gn-grid) ──
+//  • New universal layout class for "list of articles" views
+//  • Lead card (large with image, full-width) + 3-column equal grid below
+//  • Applied to: General homepage, Sports article feed (below score strip),
+//    Markets news section, Pop Culture, Bloom Energy
+//  • Cards in the grid are unified .fc cards — same structure everywhere
 //
-//  ── Typography (global) ──
-//  • All editorial-serif (ui-serif Georgia) replaced with NBC sans stack
-//    'Inter', 'Helvetica Neue', system-ui, sans-serif
-//  • Body font upgraded to Inter-first
-//  • Hero, briefing, sports-hero, briefing-teaser now consistent sans-serif
+//  ── Per-vertical accents (thin layer, not full replacement) ──
+//  • General: neutral (homepage baseline, no extra accent)
+//  • Sports: dark navy score strip + purple sport tabs preserved (signature)
+//  • Markets: orange Bloomberg accent preserved + extended to Business
+//  • Pop Culture: pink #db2777 top-border on cards, slightly bigger images
+//  • Briefing: left-bar Morning Brew style (kept from v22b)
+//  • Bloom Energy: blue #0369a1 light accent
 //
-//  ── Topbar modernization ──
-//  • Whisper bar deleted (cramped 30px black band with tiny text)
-//  • Replaced with .pill-bar — bigger pill cards (~46px), all 9 data points
-//    (3 weather + 3 indices + 3 tickers) horizontally scrollable
-//  • Color-coded change pills (green up / red down)
-//  • Mobile pill-bar denser; replaces v22a mobile-strip stopgap
-//  • TopBar now fetches indices in addition to tickers (fuller coverage)
+//  ── Sidebar simplification ──
+//  • Tabbed sidebar (Trending|Latest|Business|Sports) → single trending column
+//  • Topics + Sources collapsible kept from v22a
+//  • Less visual noise, one clear job per rail
 //
-//  ── Cleanup ──
-//  • TodayPage component DELETED (118 lines, was orphan after v24a)
-//  • SocialPage component + routing DELETED (50 lines, orphan since v22a)
-//  • MorningBriefing v1 component DELETED (53 lines, replaced by Inline in v19)
-//  • Storage migration chain trimmed: v24/v23/v22 only (was 10 keys deep)
+//  ── Business Bloomberg styling ──
+//  • Business page now uses same orange #fa7800 accent + dense card treatment
+//    as Markets
+//  • Cards stay unified .fc structure but with Bloomberg-style top accent
 //
-//  ── Net effect ──
-//  • File size: 5837 → 5678 lines (-159 net, -225 deleted)
-//  • Architecturally cleaner foundation for v25b grid + accents
-//
-// Deferred to v25b:
-//  • Google News grid pattern (.gn-grid class, lead + 3-col grid)
-//  • Per-vertical accents on top of unified base
-//  • Sidebar simplification (drop 4-tab mess, single trending column)
-//  • Business page Bloomberg styling
+//  ── Storage ──
+//  • Storage v25a_ → v25b_, migration from v25a/v24/v23/v22
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { useState, useEffect, useCallback, useMemo, useRef, Fragment } from 'react';
@@ -254,11 +249,8 @@ const LEAGUES = [
   { key:'cbb', label:'College BB',sport:'basketball', league:'mens-college-basketball', emoji:'🏀', accent:'#d97706' },
 ];
 
-const SK = 'v25a_';
-// v25a: Trimmed migration chain. Anyone with storage older than v22 gets fresh
-// defaults. Most users will be on v22+ from recent ships; the long chain was
-// adding minor load overhead and hadn't been useful in months.
-const OLD_SKS = ['v24_','v23_','v22_'];
+const SK = 'v25b_';
+const OLD_SKS = ['v25a_','v24_','v23_','v22_'];
 
 // v22b: Briefing 3-tier methodology constants.
 // Tier 1: priority briefing sources — articles from these get pulled first
@@ -1561,6 +1553,125 @@ body{
 .src-footer-sep{font-size:9px;color:var(--text4);user-select:none;}
 
 /* ═══════════════════════════════════════════
+   v25b ADDITIONS — Google News grid + per-vertical accents + Business Bloomberg
+═══════════════════════════════════════════ */
+
+/* GOOGLE NEWS GRID — universal "list of articles" layout pattern.
+   Lead card (full-width, large image) + 3-column equal grid below.
+   Used on General homepage, Sports article feed, Markets news, Pop Culture,
+   Bloom Energy. Cards inside use the unified .fc class. */
+.gn-grid{
+  display:flex;flex-direction:column;gap:24px;
+  margin-bottom:32px;
+}
+.gn-lead{
+  display:grid;grid-template-columns: 1.6fr 1fr;gap:24px;
+  cursor:pointer;
+  padding-bottom:24px;border-bottom:1px solid var(--border);
+  transition:opacity 0.15s;
+}
+.gn-lead:hover{opacity:0.92;}
+.gn-lead-img{
+  width:100%;aspect-ratio:16/10;
+  background-size:cover;background-position:center;
+  border-radius:8px;background-color:var(--surface2);
+  position:relative;
+}
+.gn-lead-text{display:flex;flex-direction:column;justify-content:center;}
+.gn-lead-title{
+  /* NBC bold-display feel */
+  font-size:30px;font-weight:900;line-height:1.12;
+  letter-spacing:-0.7px;color:var(--text);margin:0 0 12px;
+  display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden;
+}
+.gn-lead-desc{
+  font-size:15px;line-height:1.5;color:var(--text2);
+  margin:0 0 12px;
+  display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden;
+}
+.gn-lead-meta{
+  font-size:11px;color:var(--text3);
+  display:flex;align-items:center;gap:6px;
+}
+.gn-lead-source{
+  font-weight:800;color:var(--text2);
+  text-transform:uppercase;letter-spacing:0.06em;font-size:10px;
+}
+
+/* Grid of equal cards below the lead */
+.gn-row{
+  display:grid;grid-template-columns:repeat(3, 1fr);gap:20px;
+}
+.gn-card{
+  display:flex;flex-direction:column;gap:10px;cursor:pointer;
+  transition:opacity 0.12s;
+}
+.gn-card:hover{opacity:0.9;}
+.gn-card-img{
+  width:100%;aspect-ratio:16/10;
+  background-size:cover;background-position:center;
+  border-radius:6px;background-color:var(--surface2);
+}
+.gn-card-img-ph{
+  width:100%;aspect-ratio:16/10;
+  background:var(--surface2);border-radius:6px;
+}
+.gn-card-title{
+  font-size:15px;font-weight:800;line-height:1.28;
+  letter-spacing:-0.3px;color:var(--text);margin:0;
+  display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden;
+}
+.gn-card-meta{
+  font-size:10px;color:var(--text3);
+  display:flex;gap:5px;align-items:center;
+}
+.gn-card-source{
+  font-weight:800;color:var(--text2);
+  text-transform:uppercase;letter-spacing:0.05em;font-size:9px;
+}
+
+/* Per-vertical card top-border accents */
+.gn-card.popculture{border-top:3px solid #db2777;padding-top:8px;}
+.gn-card.business{border-top:3px solid #fa7800;padding-top:8px;}
+.gn-card.finance{border-top:3px solid #fa7800;padding-top:8px;}
+
+/* Sources powering this page footer (replaces old SourceFooter on grids) */
+.gn-sources{
+  margin-top:32px;padding-top:20px;
+  border-top:1px solid var(--border);
+  font-size:11px;color:var(--text3);
+  text-align:center;line-height:1.6;
+}
+.gn-sources-label{
+  font-weight:800;color:var(--text2);
+  text-transform:uppercase;letter-spacing:0.08em;font-size:10px;
+  margin-right:8px;
+}
+
+/* Mobile: collapse to 1 column */
+@media (max-width:900px){
+  .gn-lead{grid-template-columns:1fr;gap:14px;}
+  .gn-lead-title{font-size:24px;}
+  .gn-row{grid-template-columns:repeat(2, 1fr);gap:14px;}
+  .gn-card-title{font-size:14px;}
+}
+@media (max-width:640px){
+  .gn-lead{padding-bottom:18px;}
+  .gn-lead-title{font-size:22px;-webkit-line-clamp:3;}
+  .gn-lead-desc{-webkit-line-clamp:2;font-size:14px;}
+  .gn-row{grid-template-columns:1fr;gap:18px;}
+  .gn-card{flex-direction:row;gap:12px;}
+  .gn-card-img,.gn-card-img-ph{width:120px;height:80px;aspect-ratio:auto;flex-shrink:0;}
+  .gn-card-title{-webkit-line-clamp:3;}
+}
+
+/* BUSINESS PAGE Bloomberg-style — orange accent + dense feel.
+   v25b: matches Markets treatment, applied via .business class on page/cards. */
+.fc.business{
+  border-top:3px solid #fa7800;
+}
+
+/* ═══════════════════════════════════════════
    v24a ADDITIONS — General homepage briefing teaser + cross-cat sections
 ═══════════════════════════════════════════ */
 
@@ -2221,23 +2332,7 @@ body{
 }
 .briefing-inline-bullets li strong{color:var(--text);font-weight:700;}
 
-/* TABBED SIDEBAR — user agency on right rail */
-.sb-tabs{
-  display:flex;gap:0;margin-bottom:14px;
-  border-bottom:1px solid var(--border);
-}
-.sb-tab{
-  background:none;border:none;border-bottom:2px solid transparent;
-  padding:8px 12px;font-size:11px;font-weight:700;
-  color:var(--text3);cursor:pointer;font-family:inherit;
-  text-transform:uppercase;letter-spacing:0.08em;
-  transition:color 0.15s,border-color 0.15s;
-  margin-bottom:-1px; /* align bottom-border with container */
-  min-height:36px;
-  -webkit-tap-highlight-color:transparent;
-}
-.sb-tab:hover{color:var(--text);}
-.sb-tab.active{color:var(--accent);border-bottom-color:var(--accent);}
+/* v25b: TABBED SIDEBAR CSS removed — single trending column now (see Sidebar component) */
 
 /* MOBILE overrides for v19 additions */
 @media (max-width:900px){
@@ -2262,7 +2357,6 @@ body{
   .briefing-inline-ts{margin-left:auto;}
   .briefing-inline-refresh-btn{min-height:36px;padding:8px 12px;}
   .briefing-inline-bullets li{font-size:13px;}
-  .sb-tab{padding:10px 10px;min-height:44px;font-size:10px;}
 }
 
 
@@ -3495,38 +3589,11 @@ function Sidebar({cat, arts, kw, health, activeKw, setActiveKw, activeSource, se
   useEffect(() => { if (activeKw) setShowTopics(true); }, [activeKw]);
   useEffect(() => { if (activeSource) setShowSources(true); }, [activeSource]);
 
-  // v19: tabbed trending — gives users agency to flip between views
-  // without losing access to keyword/source filters below.
-  const [sbTab, setSbTab] = useState('trending');
-  const sbTabs = [
-    { key:'trending', label:'Trending' },
-    { key:'latest',   label:'Latest'   },
-    { key:'business', label:'Business' },
-    { key:'sports',   label:'Sports'   },
-  ];
-  const sbItems = useMemo(() => {
-    if (sbTab === 'trending') {
-      // On Today-like cross-cat usage we'd diversify; on a single cat page,
-      // the relevant "trending" is just that category's top items.
-      return catArts.slice(0, 8).map(a => ({...a, _cat: cat}));
-    }
-    if (sbTab === 'latest') {
-      const seen = new Set();
-      return Object.entries(arts)
-        .flatMap(([c, l]) => (l||[]).map(a => ({...a, _cat: c})))
-        .filter(a => a.title && a.link)
-        .filter(a => {
-          const k = a.title.slice(0,60).toLowerCase().replace(/\s+/g,'');
-          if (seen.has(k)) return false;
-          seen.add(k);
-          return true;
-        })
-        .sort((a,b) => new Date(b.pubDate) - new Date(a.pubDate))
-        .slice(0, 8);
-    }
-    // business / sports — top items from that category
-    return (arts[sbTab]||[]).slice(0, 8).map(a => ({...a, _cat: sbTab}));
-  }, [sbTab, arts, catArts, cat]);
+  // v25b: Simplified — single category-scoped trending column.
+  // Old 4-tab mess (Trending|Latest|Business|Sports) removed; users have
+  // dedicated category pages for those views. Sidebar's job is to surface
+  // what's hot in the CURRENT category.
+  const sbItems = useMemo(() => catArts.slice(0, 8).map(a => ({...a, _cat: cat})), [catArts, cat]);
 
   return (
     <div className="sidebar">
@@ -3539,36 +3606,24 @@ function Sidebar({cat, arts, kw, health, activeKw, setActiveKw, activeSource, se
 
       {showScoreboard && <Scoreboard scores={scores} loading={scoresLoading}/>}
 
-      {/* v19 tabbed trending — replaces the old single "Trending" label/list */}
+      {/* v25b: single trending column scoped to this category */}
       <div className="gs-section">
-        <div className="sb-tabs">
-          {sbTabs.map(t => (
-            <button
-              key={t.key}
-              className={`sb-tab ${sbTab===t.key?'active':''}`}
-              onClick={()=>setSbTab(t.key)}
-            >
-              {t.label}
-            </button>
-          ))}
+        <div className="gs-label" style={{color:cc.color}}>
+          🔥 Trending in {cc.label}
         </div>
         {sbItems.length === 0
           ? <div style={{padding:'14px 0',fontSize:'11px',color:'var(--text3)'}}>No stories yet</div>
-          : sbItems.map((a, i) => {
-              const acc = CATS[a._cat] || cc;
-              return (
-                <div key={i} className="trend-row" onClick={()=>onRead(a)}>
-                  <div className="trend-num">{i+1}</div>
-                  <div className="trend-body">
-                    <div className="trend-title">{a.title}</div>
-                    <div className="trend-src">
-                      {sbTab !== 'trending' && <span className="trend-cat-badge" style={{background:acc.bg,color:acc.color}}>{acc.emoji} {acc.label}</span>}
-                      {a.source} · {fmtDate(a.pubDate)}
-                    </div>
+          : sbItems.map((a, i) => (
+              <div key={i} className="trend-row" onClick={()=>onRead(a)}>
+                <div className="trend-num">{i+1}</div>
+                <div className="trend-body">
+                  <div className="trend-title">{a.title}</div>
+                  <div className="trend-src">
+                    {a.source} · {fmtDate(a.pubDate)}
                   </div>
                 </div>
-              );
-            })
+              </div>
+            ))
         }
       </div>
 
@@ -4345,71 +4400,6 @@ function HeroBand({ heroStories, heroIdx, setHeroIdx, paused, setPaused, onRead 
   );
 }
 
-// TABBED SIDEBAR — v19 — right-rail on Feed pages with user agency.
-// Tabs: Trending | Latest | Business | Sports. Each tab shows 6 items from
-// the relevant cut of articles. Ghost treatment, same typography as before.
-// Mobile: parent CSS collapses sidebar below content via grid re-flow.
-function TabbedSidebar({ arts, kw, onRead, scores, scoresLoading, showScoreboard }) {
-  const [tab, setTab] = useState('trending');
-  const tabs = [
-    { key:'trending', label:'Trending' },
-    { key:'latest',   label:'Latest'   },
-    { key:'business', label:'Business' },
-    { key:'sports',   label:'Sports'   },
-  ];
-
-  const items = useMemo(() => {
-    if (tab === 'trending') return diverseTrending(arts, kw, 6, 2);
-    if (tab === 'latest') {
-      const seen = new Set();
-      return Object.entries(arts)
-        .flatMap(([c,l])=>(l||[]).map(a=>({...a, cat:c})))
-        .filter(a=>a.title&&a.link)
-        .filter(a=>{const k=a.title.slice(0,60).toLowerCase().replace(/\s+/g,'');if(seen.has(k))return false;seen.add(k);return true;})
-        .sort((a,b)=>new Date(b.pubDate)-new Date(a.pubDate))
-        .slice(0,6);
-    }
-    // business / sports — take top items from that single category
-    return (arts[tab]||[]).slice(0,6).map(a=>({...a, cat:tab}));
-  }, [tab, arts, kw]);
-
-  return (
-    <div className="sidebar">
-      <div className="gs-section">
-        <div className="sb-tabs">
-          {tabs.map(t => (
-            <button
-              key={t.key}
-              className={`sb-tab ${tab===t.key?'active':''}`}
-              onClick={()=>setTab(t.key)}
-            >
-              {t.label}
-            </button>
-          ))}
-        </div>
-        {items.length === 0
-          ? <div style={{padding:'16px 0',fontSize:'11px',color:'var(--text3)'}}>No stories yet</div>
-          : items.map((a, i) => {
-              const cc = CATS[a.cat] || CATS.general;
-              return (
-                <div key={i} className="trend-row" onClick={()=>onRead(a)}>
-                  <div className="trend-num">{i+1}</div>
-                  <div className="trend-body">
-                    <div className="trend-title">{a.title}</div>
-                    <div className="trend-src">
-                      <span className="trend-cat-badge" style={{background:cc.bg,color:cc.color}}>{cc.emoji} {cc.label}</span>
-                      {a.source} · {fmtDate(a.pubDate)}
-                    </div>
-                  </div>
-                </div>
-              );
-            })
-        }
-      </div>
-      {showScoreboard && <Scoreboard scores={scores} loading={scoresLoading} compact={true}/>}
-    </div>
-  );
-}
 
 // Last-updated timestamp for feeds. Shows a green dot if refreshed
 // within the last 10 minutes, amber otherwise. Clickable could trigger
@@ -4995,7 +4985,7 @@ export default function App() {
           </div>
         )}
 
-        {/* ── HERO + FEED (Yahoo dense card style) ── */}
+        {/* ── HERO + FEED (Yahoo lead + Google News grid below) ── */}
         <div className="page-grid">
           <div className="feed-col">
             {lead && (
@@ -5015,11 +5005,33 @@ export default function App() {
               </article>
             )}
 
+            {/* v25b: Google News grid for the next 6 stories (the visual punch),
+                then FeedCard list for the rest (deeper read). */}
+            {feedItems.length > 0 && !activeTeam && (
+              <div className="gn-row" style={{marginBottom:'24px'}}>
+                {feedItems.slice(0, 6).filter(a=>a.img).slice(0, 3).concat(
+                  feedItems.slice(0, 6).filter(a=>!a.img)
+                ).slice(0, 3).map((a, i) => (
+                  <article key={i} className="gn-card" onClick={()=>onRead(a)}>
+                    {a.img
+                      ? <div className="gn-card-img" style={{backgroundImage:`url(${a.img})`}}/>
+                      : <div className="gn-card-img-ph"/>}
+                    <h3 className="gn-card-title">{a.title}</h3>
+                    <div className="gn-card-meta">
+                      <span className="gn-card-source" style={{color:cc.color}}>{a.source}</span>
+                      <span>·</span><span>{fmtDate(a.pubDate)}</span>
+                      {a._favScore > 0 && <span style={{marginLeft:'4px',color:'#f59e0b',fontWeight:800}}>★</span>}
+                    </div>
+                  </article>
+                ))}
+              </div>
+            )}
+
             {isLoading && !feedItems.length
               ? <div className="empty-state"><div className="empty-icon">🏆</div><div className="empty-msg">Loading sports…</div></div>
               : feedItems.length === 0
                 ? <div className="empty-state"><div className="empty-icon">📭</div><div className="empty-msg">{activeTeam?'No stories about this team yet':'No articles loaded yet'}</div><button className="refresh-btn" onClick={refreshAll}>Refresh</button></div>
-                : feedItems.slice(0, 25).map((a, i) => (
+                : feedItems.slice(activeTeam?0:3, 25).map((a, i) => (
                     <FeedCard key={i} a={a} cat="sports" isSaved={isSavedFn(a)} onSave={onSave} onRead={onRead} relatedSources={getRelated(a,'sports')}/>
                   ))
             }
@@ -5075,35 +5087,38 @@ export default function App() {
         {isHome && !activeKw && !activeSrc && (
           <BriefingTeaser arts={arts} onOpenFull={() => handleTabChange('briefing')}/>
         )}
-        {catLead && !activeKw && !activeSrc && (
-          <div className="hero-row">
-            <article className="hero-lead" style={{borderTop:`3px solid ${cc.color}`}} onClick={()=>onRead(catLead)}>
-              <div className="hero-lead-img" style={{backgroundImage:`url(${catLead.img})`}}>
-                <div className="hero-lead-badge">{cc.emoji} {cc.label}</div>
-              </div>
-              <div className="hero-lead-text">
-                <h1 className="hero-lead-title">{catLead.title}</h1>
-                {catLead.desc&&<p className="hero-lead-desc">{catLead.desc}</p>}
-                <div className="hero-lead-meta">
-                  <span className="hero-lead-source">{catLead.source}</span>
+
+        {/* v25b: Google News grid — lead card + 3-col grid below.
+            Used when not filtered (filtered views fall through to FeedCard stack). */}
+        {!activeKw && !activeSrc && catLead && (
+          <div className="gn-grid">
+            <article className="gn-lead" onClick={()=>onRead(catLead)}>
+              <div className="gn-lead-img" style={{backgroundImage:`url(${catLead.img})`}}/>
+              <div className="gn-lead-text">
+                <h1 className="gn-lead-title">{catLead.title}</h1>
+                {catLead.desc&&<p className="gn-lead-desc">{catLead.desc}</p>}
+                <div className="gn-lead-meta">
+                  <span className="gn-lead-source" style={{color:cc.color}}>{catLead.source}</span>
                   <span>·</span><span>{fmtDate(catLead.pubDate)}</span>
                 </div>
               </div>
             </article>
-            {catSide.length>0&&(
-              <aside className="hero-side" style={{borderTop:`3px solid ${cc.color}`}}>
-                <div className="hero-side-label">{cc.emoji} Latest in {cc.label}</div>
-                {catSide.map((s,i)=>(
-                  <div key={i} className="hero-side-item" onClick={()=>onRead(s)}>
-                    {s.img&&<img className="hero-side-thumb" src={s.img} loading="lazy" onError={e=>e.target.style.display='none'} alt=""/>}
-                    <div className="hero-side-body">
-                      <div className="hero-side-title">{s.title}</div>
-                      <div className="hero-side-meta">{s.source} · {fmtDate(s.pubDate)}</div>
-                    </div>
+            <div className="gn-row">
+              {feedItems.slice(0, 6).filter(a=>a.img).slice(0, 3).concat(
+                feedItems.slice(0, 6).filter(a=>!a.img)
+              ).slice(0, 3).map((a, i) => (
+                <article key={i} className={`gn-card ${cat}`} onClick={()=>onRead(a)}>
+                  {a.img
+                    ? <div className="gn-card-img" style={{backgroundImage:`url(${a.img})`}}/>
+                    : <div className="gn-card-img-ph"/>}
+                  <h3 className="gn-card-title">{a.title}</h3>
+                  <div className="gn-card-meta">
+                    <span className="gn-card-source" style={{color:cc.color}}>{a.source}</span>
+                    <span>·</span><span>{fmtDate(a.pubDate)}</span>
                   </div>
-                ))}
-              </aside>
-            )}
+                </article>
+              ))}
+            </div>
           </div>
         )}
 
@@ -5148,7 +5163,7 @@ export default function App() {
               ?<div className="empty-state"><div className="empty-icon">{cc.emoji}</div><div className="empty-msg">Loading {cc.label}…</div></div>
               :feedItems.length===0
                 ?<div className="empty-state"><div className="empty-icon">📭</div><div className="empty-msg">{activeKw||activeSrc?'No articles match this filter':'No articles loaded yet'}</div><button className="refresh-btn" onClick={refreshAll}>Refresh</button></div>
-                :feedItems.slice(0,20).map((a,i)=><FeedCard key={i} a={a} cat={cat} isSaved={isSavedFn(a)} onSave={onSave} onRead={onRead} relatedSources={getRelated(a,cat)}/>)
+                :feedItems.slice(activeKw||activeSrc?0:3,20).map((a,i)=><FeedCard key={i} a={a} cat={cat} isSaved={isSavedFn(a)} onSave={onSave} onRead={onRead} relatedSources={getRelated(a,cat)}/>)
             }
 
             {/* v20: Topics chips mirrored at bottom of feed — mid-scroll filter access */}
@@ -5578,14 +5593,35 @@ export default function App() {
             </section>
             <section className="fin-news">
               <div className="fin-section-head">
-                <span className="fin-section-title">📰 Finance News</span>
+                <span className="fin-section-title">📰 Markets News</span>
                 <button className="page-customize-btn" onClick={()=>openCustomize('sources','finance')}>⚙ Sources</button>
               </div>
               {loading.finance&&!items.length
-                ?<div className="empty-state"><div className="empty-icon">📈</div><div className="empty-msg">Loading Finance…</div></div>
+                ?<div className="empty-state"><div className="empty-icon">📈</div><div className="empty-msg">Loading Markets…</div></div>
                 :items.length===0
                   ?<div className="empty-state"><div className="empty-icon">📭</div><div className="empty-msg">No articles loaded yet</div><button className="refresh-btn" onClick={refreshAll}>Refresh</button></div>
-                  :items.slice(0,15).map((a,i)=><FeedCard key={i} a={a} cat="finance" isSaved={isSavedFn(a)} onSave={onSave} onRead={onRead} relatedSources={getRelated(a,'finance')}/>)
+                  :<>
+                    {/* v25b: gn-grid 3-col for first 3 visual cards */}
+                    <div className="gn-row" style={{padding:'14px 14px 0'}}>
+                      {items.slice(0, 6).filter(a=>a.img).slice(0, 3).concat(
+                        items.slice(0, 6).filter(a=>!a.img)
+                      ).slice(0, 3).map((a, i) => (
+                        <article key={i} className="gn-card finance" onClick={()=>onRead(a)}>
+                          {a.img
+                            ? <div className="gn-card-img" style={{backgroundImage:`url(${a.img})`}}/>
+                            : <div className="gn-card-img-ph"/>}
+                          <h3 className="gn-card-title">{a.title}</h3>
+                          <div className="gn-card-meta">
+                            <span className="gn-card-source" style={{color:'#fa7800'}}>{a.source}</span>
+                            <span>·</span><span>{fmtDate(a.pubDate)}</span>
+                          </div>
+                        </article>
+                      ))}
+                    </div>
+                    {items.slice(3, 15).map((a, i) => (
+                      <FeedCard key={i} a={a} cat="finance" isSaved={isSavedFn(a)} onSave={onSave} onRead={onRead} relatedSources={getRelated(a,'finance')}/>
+                    ))}
+                  </>
               }
               <SocialFollows cat="finance" social={social}/>
               <SourceFooter cat="finance" feeds={feeds} arts={arts}/>
