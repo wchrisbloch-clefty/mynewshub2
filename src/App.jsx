@@ -1,37 +1,42 @@
-// MyNewsHub v23 — Session 5: Yahoo Sports vertical rebuild
+// MyNewsHub v24a — Session 6 wave 1: General as homepage, Today removed, Briefing restored
 // ─────────────────────────────────────────────────────────────────────────────
-// Builds on v22b. Sports page rebuilt to match Yahoo Sports' news-first layout
-// pattern: dark scoreboard strip at top, sport tabs below, favorite team pills
-// with external links, then stories feed prioritized by favorites.
+// Builds on v23. Information architecture rebuild. Today was a confused tab —
+// part briefing, part synthesis, part category preview. Splitting cleanly:
+//   • General becomes the homepage (default landing). Gets a briefing teaser
+//     at top (compact: paragraph + 3 bullets + "View full briefing →" link),
+//     then absorbs Today's "from each other category" cross-cat sections.
+//   • Briefing comes back as its own dedicated full-read page (Morning Brew
+//     style with explicit list of source articles used in synthesis).
+//   • Today as a tab is removed entirely. Component code preserved as orphan.
 //
-// Changes from v22b:
-//  ── Sports page rebuild ──
-//  • SportsScoreStrip component — horizontal scrolling score tiles, all 5
-//    leagues, favorites pinned + starred, click → ESPN game page
-//  • Sport tabs (All / NFL / NBA / MLB / CFB / CBB) filter scoreboard +
-//    stories feed + breaking simultaneously
-//  • Favorite team pills below sport tabs — click pill = filter feed to that
-//    team. Mini "ESPN" / "Team" buttons open external team pages.
-//  • Stories feed prioritized: favorite-team articles float to top, then
-//    chronological. Sport tab filters the kw-match used for prioritization.
-//  • Yahoo-style sports feed cards — dense layout, team color slash accent,
-//    breaking treatment for urgent items
-//  • SCORE_TEAMS now extended with espnUrl + teamUrl per team
+// Changes from v23:
+//  ── Architecture ──
+//  • Default opening tab: 'today' → 'general'
+//  • Today tab removed from desktop nav, mobile chips, swipe order
+//  • Briefing tab restored to desktop nav AND deep-linked from General teaser
+//  • New BriefingTeaser component on General — compact preview that opens
+//    full BriefingPage on click
+//  • General page rewrites: briefing teaser + cross-cat sections + General feed
 //
-//  ── Customize panel ──
-//  • New "Sports Teams" tab in Customize — add/edit/remove favorite teams
-//    with their match terms, ESPN URL, team URL, sport, league
-//  • teams persisted under 'teams' storage key (separate from SCORE_TEAMS
-//    which becomes the default seed)
+//  ── Nav order (per user) ──
+//  • Desktop: General · Business · Markets · Bloom · Sports · Pop Culture · Briefing · Podcasts · Saved
+//  • Mobile: General · Business · Markets · Energy · Sports · Pop Culture
+//  • Swipe: general · business · finance · bloom · sports · popculture
 //
-//  ── Visual ──
-//  • Yahoo Sports purple accent #6001d2 for sport tabs
-//  • Dark navy #0c1c2c scoreboard strip background (Yahoo's signature)
-//  • Sports cards get team color left-border when matching favorite
+//  ── Preserved ──
+//  • Yahoo Sports vertical (v23) — untouched
+//  • Markets Bloomberg styling (v22b) — untouched
+//  • Briefing 3-tier methodology (v22b) — untouched, now also fully visible on dedicated page
+//  • All RSS sources, AI summaries, breaking ticker, scoreboard, etc.
+//
+//  ── Deferred to v24b ──
+//  • Google News grid + NBC fonts (visual rebuild of General)
+//  • Modernized weather/ticker topbar
+//  • Business page Bloomberg styling
+//  • Simplified trending sidebar
 //
 //  ── Infra ──
-//  • Storage v22_ → v23_ with migration from v22/v21/.../v14
-//  • New 'teams' storage key seeds from SCORE_TEAMS on first load
+//  • Storage v23_ → v24_ with migration from v23/v22/.../v14
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { useState, useEffect, useCallback, useMemo, useRef, Fragment } from 'react';
@@ -49,7 +54,9 @@ const CATS = {
 
 // Order for mobile swipe-left/right navigation between categories.
 // Matches the mobile chip bar order so swiping feels like advancing the chips.
-const SWIPE_ORDER = ['today','general','sports','business','finance','bloom','popculture'];
+// v24a: Swipe order matches the mobile chip bar order. Today is removed;
+// General is the home position so swipes start from there.
+const SWIPE_ORDER = ['general','business','finance','bloom','sports','popculture'];
 
 const TICKERS = [
   { sym:'BE',   label:'Bloom Energy', color:'#60a5fa' },
@@ -245,8 +252,8 @@ const LEAGUES = [
   { key:'cbb', label:'College BB',sport:'basketball', league:'mens-college-basketball', emoji:'🏀', accent:'#d97706' },
 ];
 
-const SK = 'v23_';
-const OLD_SKS = ['v22_','v21_','v20_','v19_','v18_','v17_','v16_','v15_','v14_'];
+const SK = 'v24_';
+const OLD_SKS = ['v23_','v22_','v21_','v20_','v19_','v18_','v17_','v16_','v15_','v14_'];
 
 // v22b: Briefing 3-tier methodology constants.
 // Tier 1: priority briefing sources — articles from these get pulled first
@@ -1530,6 +1537,131 @@ body{
 .src-footer-sep{font-size:9px;color:var(--text4);user-select:none;}
 
 /* ═══════════════════════════════════════════
+   v24a ADDITIONS — General homepage briefing teaser + cross-cat sections
+═══════════════════════════════════════════ */
+
+/* BRIEFING TEASER on General homepage — compact preview that opens full BriefingPage */
+.briefing-teaser{
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-left: 4px solid var(--accent);
+  border-radius: 0 var(--radius) var(--radius) 0;
+  padding: 18px 22px;
+  margin-bottom: 28px;
+}
+.briefing-teaser-head{
+  display:flex;align-items:center;justify-content:space-between;
+  margin-bottom: 10px;flex-wrap:wrap;gap:8px;
+}
+.briefing-teaser-label-row{
+  display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;flex:1;min-width:0;
+}
+.briefing-teaser-label{
+  font-size: 12px;font-weight: 800;color: var(--text);
+  text-transform: uppercase;letter-spacing: 0.1em;
+}
+.briefing-teaser-date{
+  font-size: 11px;color: var(--text3);font-weight: 500;
+}
+.briefing-teaser-ts{
+  font-size: 10px;color: var(--text3);font-weight: 500;
+  font-style: italic;
+}
+.briefing-teaser-cta{
+  background: var(--accent);border: none;color: #fff;
+  padding: 7px 14px;border-radius: 6px;
+  font-size: 11px;font-weight: 700;cursor: pointer;
+  font-family: inherit;letter-spacing: 0.02em;
+  transition: opacity 0.15s;
+}
+.briefing-teaser-cta:hover{opacity: 0.88;}
+.briefing-teaser-body{
+  font-size: 16px;line-height: 1.55;color: var(--text);
+  font-weight: 400;letter-spacing: -0.15px;
+  margin: 0;
+  font-family: ui-serif, Georgia, 'Times New Roman', serif;
+}
+.briefing-teaser-body strong{font-weight: 700;}
+.briefing-teaser-empty{
+  font-size: 13px;color: var(--text3);font-style: italic;margin: 0;
+}
+.briefing-teaser-bullets{
+  list-style: none;padding: 0;margin: 12px 0 0 0;
+  display: flex;flex-direction: column;gap: 6px;
+}
+.briefing-teaser-bullets li{
+  position: relative;padding-left: 16px;
+  font-size: 13px;line-height: 1.5;color: var(--text2);font-weight: 500;
+}
+.briefing-teaser-bullets li::before{
+  content: '';position: absolute;left: 0;top: 7px;
+  width: 5px;height: 5px;border-radius: 50%;
+  background: var(--accent);
+}
+.briefing-teaser-bullets li strong{color: var(--text);font-weight: 700;}
+.briefing-teaser-footer{
+  display:flex;align-items:center;justify-content:space-between;
+  margin-top: 14px;padding-top: 12px;
+  border-top: 1px solid var(--border2);
+  flex-wrap:wrap;gap:8px;
+}
+.briefing-teaser-sources{
+  font-size: 10px;color: var(--text3);font-weight: 500;
+}
+.briefing-teaser-sources strong{color: var(--text2);font-weight: 700;}
+.briefing-teaser-cta-link{
+  background: none;border: none;color: var(--accent);
+  font-size: 11px;font-weight: 700;cursor: pointer;
+  font-family: inherit;padding: 0;
+}
+.briefing-teaser-cta-link:hover{text-decoration: underline;}
+
+/* CROSS-CATEGORY SECTIONS on General homepage */
+.other-cat-sections{
+  margin-top: 36px;
+}
+.other-cat-divider{
+  display:flex;align-items:center;justify-content:center;
+  margin: 24px 0 28px;padding: 0;position:relative;
+}
+.other-cat-divider::before{
+  content: '';position: absolute;left: 0;right: 0;top: 50%;
+  height: 1px;background: var(--border);
+}
+.other-cat-divider span{
+  background: var(--bg);padding: 0 16px;position: relative;
+  font-size: 11px;font-weight: 800;color: var(--text3);
+  text-transform: uppercase;letter-spacing: 0.12em;
+}
+.other-cat-section{
+  margin-bottom: 28px;
+}
+.other-cat-head{
+  display:flex;align-items:baseline;justify-content:space-between;
+  margin-bottom: 12px;
+}
+.other-cat-label{
+  font-size: 12px;font-weight: 800;
+  text-transform: uppercase;letter-spacing: 0.08em;
+}
+.other-cat-link{
+  background: none;border: none;color: var(--text3);
+  font-size: 11px;font-weight: 600;cursor: pointer;font-family: inherit;
+  padding: 0;transition: color 0.15s;
+}
+.other-cat-link:hover{color: var(--accent);}
+
+/* Mobile briefing teaser */
+@media (max-width:640px){
+  .briefing-teaser{padding: 14px 16px;margin-bottom: 20px;border-radius: 0 8px 8px 0;}
+  .briefing-teaser-body{font-size: 15px;line-height: 1.5;}
+  .briefing-teaser-bullets li{font-size: 12px;}
+  .briefing-teaser-cta{padding: 8px 14px;font-size: 11px;min-height: 36px;}
+  .briefing-teaser-footer{flex-direction: column;align-items: flex-start;gap: 6px;}
+  .other-cat-divider span{font-size: 10px;padding: 0 12px;}
+}
+
+/* ═══════════════════════════════════════════
    v23 ADDITIONS — Yahoo Sports vertical
 ═══════════════════════════════════════════ */
 
@@ -1778,6 +1910,11 @@ body{
 .briefing-sources-label{
   font-size: 11px;font-weight: 700;color: var(--text3);
   text-transform: uppercase;letter-spacing: 0.12em;
+}
+.briefing-sources-meta{
+  font-size: 10px;font-weight: 500;color: var(--text3);
+  letter-spacing: 0.02em;
+  text-align: right;
 }
 
 /* TRENDING IN [CATEGORY] — Feed page editorial strip */
@@ -3129,6 +3266,159 @@ Output ONLY the paragraph followed by the bullets. No headers, no labels, no clo
   );
 }
 
+// BRIEFING TEASER — v24a — compact preview of the morning briefing for use
+// on the General homepage. Shares the same 3-tier methodology as the full
+// MorningBriefingInline (Tier 1 priority sources + Tier 2 deduped per-cat),
+// but renders only:
+//   • The synthesized paragraph (if available)
+//   • Up to 3 bullets (vs 5-7 in full)
+//   • "View full briefing →" CTA that opens the dedicated BriefingPage
+// Generates its own copy independently from the full briefing — they auto-
+// share state via the same fetchAISummary cache when the prompt matches.
+// Time-aware: regenerates if >90min stale, like the full version.
+function BriefingTeaser({arts, onOpenFull}) {
+  const [body, setBody]       = useState('');
+  const [bullets, setBullets] = useState([]);
+  const [ts, setTs]           = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError]     = useState('');
+  const dateStr = new Date().toLocaleDateString('en-US',{weekday:'long',month:'long',day:'numeric'});
+
+  const parseBriefing = (text) => {
+    const lines = text.split('\n').map(l => l.trim()).filter(Boolean);
+    const paragraphs = [];
+    const bulletLines = [];
+    for (const line of lines) {
+      const m = line.match(/^(?:[-•*]|\d+[.)])\s+(.+)$/);
+      if (m) bulletLines.push(m[1].trim());
+      else paragraphs.push(line);
+    }
+    return { body: paragraphs.join(' '), bullets: bulletLines.slice(0, 3) };
+  };
+
+  const generate = useCallback(async () => {
+    setLoading(true); setError('');
+    const allArts = Object.values(arts).flat();
+    const tier1 = [];
+    const tier1Keys = new Set();
+    BRIEFING_PRIORITY_SOURCES.forEach(srcName => {
+      allArts
+        .filter(a => a.source === srcName)
+        .sort((a,b) => new Date(b.pubDate) - new Date(a.pubDate))
+        .slice(0, 2)
+        .forEach(a => {
+          tier1.push(a);
+          tier1Keys.add(a.title.slice(0,60).toLowerCase().replace(/\s+/g,''));
+        });
+    });
+    const tier2 = {};
+    Object.entries(arts).forEach(([cat, list]) => {
+      if (BRIEFING_EXCLUDE_CATS.includes(cat)) return;
+      const headlines = (list||[])
+        .filter(a => !tier1Keys.has(a.title.slice(0,60).toLowerCase().replace(/\s+/g,'')))
+        .sort((a,b) => new Date(b.pubDate) - new Date(a.pubDate))
+        .slice(0, 5)
+        .map(a => a.title);
+      if (headlines.length > 0) tier2[cat] = headlines;
+    });
+    const tier1Block = tier1.length > 0
+      ? `PRIORITY BRIEFINGS:\n${tier1.map(a => `• [${a.source}] ${a.title}`).join('\n')}`
+      : '';
+    const tier2Block = Object.entries(tier2).map(([cat, hl]) =>
+      `${CATS[cat]?.label || cat.toUpperCase()}:\n${hl.map(t => `• ${t}`).join('\n')}`
+    ).join('\n\n');
+
+    const prompt = `Synthesize a punchy 3-sentence opening + 3 specific bullet takeaways for a busy executive's morning briefing. Style: Morning Brew + Axios + Bloomberg 5 Things. Be specific and name actual stories.
+
+${tier1Block}
+
+FRESH HEADLINES BY CATEGORY:
+${tier2Block}
+
+OUTPUT: 3-sentence paragraph followed by exactly 3 bullets (- markers). No headers.`;
+
+    const {summary, error:err} = await fetchAISummary({
+      type:'article',
+      title:`Briefing Teaser — ${dateStr}`,
+      content: prompt,
+      mode:'summary',
+    });
+    if (summary) {
+      const { body: b, bullets: bs } = parseBriefing(summary.trim());
+      setBody(b);
+      setBullets(bs);
+      setTs(Date.now());
+    } else {
+      setError(err || 'Could not generate briefing');
+    }
+    setLoading(false);
+  }, [arts, dateStr]);
+
+  useEffect(() => {
+    const total = Object.values(arts).reduce((n,l)=>n+(l?.length||0),0);
+    if (total > 10 && !body && !loading) generate();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [arts]);
+
+  // Time-aware refresh
+  useEffect(() => {
+    if (!ts || loading) return;
+    const checkStale = () => {
+      if (Date.now() - ts > BRIEFING_STALE_MS) {
+        const total = Object.values(arts).reduce((n,l)=>n+(l?.length||0),0);
+        if (total > 10) generate();
+      }
+    };
+    checkStale();
+    const iv = setInterval(checkStale, 5 * 60 * 1000);
+    return () => clearInterval(iv);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ts]);
+
+  const tsLabel = useMemo(() => {
+    if (!ts) return null;
+    const age = (Date.now() - ts) / 60000;
+    if (age < 1) return 'Just now';
+    if (age < 60) return `${Math.floor(age)}m ago`;
+    return `${Math.floor(age/60)}h ago`;
+  }, [ts]);
+
+  return (
+    <section className="briefing-teaser">
+      <div className="briefing-teaser-head">
+        <div className="briefing-teaser-label-row">
+          <span className="briefing-teaser-label">☕ Today's Briefing</span>
+          <span className="briefing-teaser-date">{dateStr}</span>
+          {tsLabel && <span className="briefing-teaser-ts">Updated {tsLabel}</span>}
+        </div>
+        <button className="briefing-teaser-cta" onClick={onOpenFull}>
+          View full briefing →
+        </button>
+      </div>
+      {body
+        ? <p className="briefing-teaser-body" dangerouslySetInnerHTML={{__html: body.replace(/\*\*([^*]+)\*\*/g,'<strong>$1</strong>')}}/>
+        : error
+          ? <p className="briefing-teaser-empty">{error}</p>
+          : <p className="briefing-teaser-empty">{loading ? 'Synthesizing today\'s headlines…' : 'Loading briefing…'}</p>}
+      {bullets.length > 0 && (
+        <ul className="briefing-teaser-bullets">
+          {bullets.map((b, i) => (
+            <li key={i} dangerouslySetInnerHTML={{__html: b.replace(/\*\*([^*]+)\*\*/g,'<strong>$1</strong>')}}/>
+          ))}
+        </ul>
+      )}
+      <div className="briefing-teaser-footer">
+        <span className="briefing-teaser-sources">
+          Sourced from <strong>{BRIEFING_PRIORITY_SOURCES.join(' · ')}</strong> + per-category headlines
+        </span>
+        <button className="briefing-teaser-cta-link" onClick={onOpenFull}>
+          See sources →
+        </button>
+      </div>
+    </section>
+  );
+}
+
 // ─── SCOREBOARD ───────────────────────────────────────────────────────────────
 function Scoreboard({scores, loading, compact=false}) {
   const [expanded, setExpanded] = useState(() => {
@@ -3701,6 +3991,7 @@ function CustomizePanel({feeds, kw, alerts, urgent, social, watchlist, teams, he
 // destinations a mobile user actually uses for quick check-ins.
 function MenuSheet({ tab, onTabChange, onClose, onCustomize, onRefresh, dark, setDark }) {
   const items = [
+    { key:'briefing',   emoji:'☕', label:'The Briefing' },
     { key:'podcasts',   emoji:'🎙️', label:'Podcasts' },
   ];
   return (
@@ -3743,11 +4034,14 @@ function MenuSheet({ tab, onTabChange, onClose, onCustomize, onRefresh, dark, se
 // already on one (mirrors Yahoo Sports "Following" behavior — tapping doesn't
 // throw you off your current context). Hidden on desktop via CSS.
 function BottomTabBar({ tab, onTabChange, onMenuOpen, savedCount, lastFeedTab }) {
-  const inFeed = ['general','sports','business','finance','bloom','popculture','comedy'].includes(tab);
-  const feedTarget = inFeed ? tab : (lastFeedTab || 'general');
+  // v24a: 'Home' tab routes to General (the new homepage). 'Feed' still
+  // routes to last-visited category. If user is already on General, both
+  // tabs visually highlight 'Home' so the chip-bar is the way to navigate.
+  const inOtherFeed = ['sports','business','finance','bloom','popculture','comedy'].includes(tab);
+  const feedTarget = inOtherFeed ? tab : (lastFeedTab && lastFeedTab !== 'general' ? lastFeedTab : 'sports');
   const tabs = [
-    { key:'today',  emoji:'🏠', label:'Today',  active: tab === 'today' },
-    { key:'feed',   emoji:'📰', label:'Feed',   active: inFeed, target: feedTarget },
+    { key:'home',   emoji:'🏠', label:'Home',   active: tab === 'general', target:'general' },
+    { key:'feed',   emoji:'📰', label:'Feed',   active: inOtherFeed, target: feedTarget },
     { key:'saved',  emoji:'★',  label:savedCount>0?`Saved (${savedCount})`:'Saved', active: tab === 'saved' },
     { key:'menu',   emoji:'☰',  label:'More',   isMenu: true },
   ];
@@ -4178,19 +4472,19 @@ function TopBar({tab, setTab, search, setSearch, dark, setDark,
   const hasBreaking = breakingItems&&breakingItems.length>0;
   const tickerItems = hasBreaking?[...breakingItems,...breakingItems]:[];
 
-  const ALL_TABS = ['today','general','sports','business','finance','bloom','popculture','podcasts','saved'];
-  const TAB_LABELS = {today:'Today',bloom:'Bloom Energy',finance:'Markets',popculture:'Pop Culture',podcasts:'Podcasts',saved:'Saved'};
+  // v24a: Desktop nav per user: General · Business · Markets · Bloom · Sports · Pop Culture · Briefing · Podcasts · Saved
+  const ALL_TABS = ['general','business','finance','bloom','sports','popculture','briefing','podcasts','saved'];
+  const TAB_LABELS = {bloom:'Bloom Energy',finance:'Markets',popculture:'Pop Culture',podcasts:'Podcasts',saved:'Saved',briefing:'Briefing'};
   const TAB_CLASS  = {general:'t-general',sports:'t-sports',business:'t-business',finance:'t-finance',bloom:'t-bloom',popculture:'t-popculture',podcasts:'t-podcasts'};
 
-  // Mobile chip bar: primary news categories only. Secondary destinations
-  // (Bloom, Podcasts, Briefing) live in the More sheet.
+  // v24a Mobile chip bar per user: General · Business · Markets · Energy · Sports · Pop Culture
+  // Briefing lives in the More menu; surfaced via teaser on General page.
   const MOBILE_CHIPS = [
-    { key:'today',      label:'Today',      color:'var(--text)' },
     { key:'general',    label:'General',    color:CATS.general.color },
-    { key:'sports',     label:'Sports',     color:CATS.sports.color },
     { key:'business',   label:'Business',   color:CATS.business.color },
     { key:'finance',    label:'Markets',    color:CATS.finance.color },
     { key:'bloom',      label:'Energy',     color:CATS.bloom.color },
+    { key:'sports',     label:'Sports',     color:CATS.sports.color },
     { key:'popculture', label:'Pop Culture',color:CATS.popculture.color },
   ];
 
@@ -4347,7 +4641,7 @@ function TopBar({tab, setTab, search, setSearch, dark, setDark,
 
 // ─── MAIN APP ─────────────────────────────────────────────────────────────────
 export default function App() {
-  const [tab, setTab]           = useState('today');
+  const [tab, setTab]           = useState('general');
   const [search, setSearch]     = useState('');
   const [dark, setDark]         = useState(()=>ld('dark',false));
   const [saved, setSaved]       = useState(()=>ld('saved',[]));
@@ -4535,8 +4829,7 @@ export default function App() {
   };
 
   const handleTabChange = t=>{
-    // v22b: briefing is now part of Today, no longer a separate page
-    if (t === 'briefing') t = 'today';
+    // v24a: 'briefing' is a dedicated page again. No redirect needed.
     setTab(t);setSearch('');setActiveKw(null);setActiveSrc(null);
     setMobileSearchOpen(false);
     // Remember last-viewed news category so the bottom "Feed" tab returns here
@@ -4761,9 +5054,11 @@ export default function App() {
     const catSide=heroItems.slice(1,6);
     const feedItems=catLead?items.filter(a=>a.link!==catLead.link):items;
 
+    // v24a: General is now the homepage — gets briefing teaser + cross-cat
+    // sections at top (the role Today used to have)
+    const isHome = cat === 'general';
+
     // v20: Trending scoped to THIS category only (not global).
-    // diverseTrending already dedupes + sorts by recency+keyword boost;
-    // passing a single-cat arts obj keeps it category-native.
     const catTrending = useMemo(
       () => diverseTrending({[cat]: arts[cat]||[]}, kw, 6, 6),
       [arts, kw, cat]
@@ -4772,8 +5067,24 @@ export default function App() {
     // v20: Topic chips at bottom of feed — mirrors sidebar for mid-scroll access
     const catKws = kw[cat] || [];
 
+    // v24a: For General homepage, build "From Other Categories" sections
+    // Top 3 articles from each non-General category, surfaced inline
+    const otherCatSections = useMemo(() => {
+      if (!isHome) return [];
+      const otherCats = ['business','finance','bloom','sports','popculture'];
+      return otherCats.map(c => ({
+        cat: c,
+        cc: CATS[c],
+        items: (arts[c] || []).slice(0, 3),
+      })).filter(s => s.items.length > 0);
+    }, [isHome, arts]);
+
     return (
       <div className="page">
+        {/* v24a: Briefing teaser at top of General homepage */}
+        {isHome && !activeKw && !activeSrc && (
+          <BriefingTeaser arts={arts} onOpenFull={() => handleTabChange('briefing')}/>
+        )}
         {catLead && !activeKw && !activeSrc && (
           <div className="hero-row">
             <article className="hero-lead" style={{borderTop:`3px solid ${cc.color}`}} onClick={()=>onRead(catLead)}>
@@ -4867,6 +5178,43 @@ export default function App() {
               </div>
             )}
 
+            {/* v24a: General homepage absorbs Today's "from each category" role.
+                3 stories from each other category, with See all links. */}
+            {isHome && !activeKw && !activeSrc && otherCatSections.length > 0 && (
+              <div className="other-cat-sections">
+                <div className="other-cat-divider">
+                  <span>Across MyNewsHub</span>
+                </div>
+                {otherCatSections.map(section => (
+                  <section key={section.cat} className="other-cat-section">
+                    <div className="other-cat-head">
+                      <span className="other-cat-label" style={{color:section.cc.color}}>
+                        {section.cc.emoji} {section.cc.label}
+                      </span>
+                      <button className="other-cat-link" onClick={()=>handleTabChange(section.cat)}>
+                        See all in {section.cc.label} →
+                      </button>
+                    </div>
+                    {section.items.map((a, i) => (
+                      <div key={i} className="gf-item" onClick={()=>onRead(a)}>
+                        {a.img
+                          ? <div className="gf-thumb" style={{backgroundImage:`url(${a.img})`}}/>
+                          : <div className="gf-thumb-ph"/>}
+                        <div className="gf-body">
+                          <div className="gf-title">{a.title}</div>
+                          <div className="gf-meta">
+                            <span>{a.source}</span>
+                            <span>·</span>
+                            <span>{fmtDate(a.pubDate)}</span>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </section>
+                ))}
+              </div>
+            )}
+
             <SocialFollows cat={cat} social={social}/>
             <SourceFooter cat={cat} feeds={feeds} arts={arts}/>
           </div>
@@ -4884,69 +5232,136 @@ export default function App() {
   // Full-page dedicated digest. Uses the same enhanced MorningBriefingInline
   // as before, plus a list of the source headlines that fed the AI and a
   // Customize link so users can adjust feeds driving the digest.
+  // ─── BRIEFING PAGE (v24a rewrite) ──────────────────────────────────────
+  // Morning Brew-style full read. Renders the same MorningBriefingInline
+  // synthesis at top, then explicitly shows the 3-tier source methodology:
+  //   Tier 1 — Priority briefing sources (Axios, Morning Brew, Morning Wire,
+  //            Bloomberg) with their actual headlines used in the synthesis
+  //   Tier 2 — Per-category top headlines (deduped against Tier 1, excluding
+  //            Comedy) that fed the AI
+  // This makes the briefing transparent: users can see WHAT went in and click
+  // through to any source article. Solves the v22b complaint of "what sources?"
   const BriefingPage = () => {
-    // Top headlines going into the briefing: mirror what MorningBriefingInline
-    // sends to the AI (first 2 per cat). Display them here so users see the
-    // raw input behind the synthesis.
-    const sourceHeadlines = useMemo(() => {
+    // Tier 1: priority briefing sources, latest 2 each
+    const tier1 = useMemo(() => {
+      const allArts = Object.values(arts).flat();
       const out = [];
-      Object.entries(arts).forEach(([cat, list]) => {
-        (list || []).slice(0, 2).forEach(a => {
-          if (a.title && a.link) out.push({ ...a, _cat: cat });
+      const seen = new Set();
+      BRIEFING_PRIORITY_SOURCES.forEach(srcName => {
+        const matches = allArts
+          .filter(a => a.source === srcName)
+          .sort((a,b) => new Date(b.pubDate) - new Date(a.pubDate))
+          .slice(0, 2);
+        matches.forEach(a => {
+          out.push({...a, _priority: srcName});
+          seen.add(a.title.slice(0,60).toLowerCase().replace(/\s+/g,''));
         });
       });
-      return out;
+      return { items: out, seen };
     }, [arts]);
+
+    // Tier 2: per-category top 5, excluding Comedy + dedup against Tier 1
+    const tier2 = useMemo(() => {
+      const out = {};
+      Object.entries(arts).forEach(([cat, list]) => {
+        if (BRIEFING_EXCLUDE_CATS.includes(cat)) return;
+        const headlines = (list || [])
+          .filter(a => {
+            const key = a.title.slice(0,60).toLowerCase().replace(/\s+/g,'');
+            return !tier1.seen.has(key);
+          })
+          .sort((a,b) => new Date(b.pubDate) - new Date(a.pubDate))
+          .slice(0, 5);
+        if (headlines.length > 0) out[cat] = headlines;
+      });
+      return out;
+    }, [arts, tier1.seen]);
 
     return (
       <div className="page">
-        <div className="today-flow">
+        <div className="today-flow" style={{maxWidth:'780px'}}>
           <header className="briefing-page-head">
             <h1 className="briefing-page-title">The Briefing</h1>
             <p className="briefing-page-sub">
-              An AI-synthesized summary of today's top stories across every feed.
-              Tap Refresh Digest to regenerate from the latest articles.
+              A daily synthesis in the spirit of Morning Brew, Axios, and Bloomberg 5 Things —
+              built from priority briefing sources plus the top headlines across every category.
+              Auto-refreshes every 90 minutes.
             </p>
           </header>
 
-          {/* The enhanced briefing (paragraph + bullets + timestamp + refresh btn) */}
+          {/* The synthesized briefing itself (paragraph + bullets) */}
           <MorningBriefingInline arts={arts}/>
 
-          {/* Source headlines used for the synthesis */}
+          {/* Tier 1 — Priority briefings */}
           <section className="briefing-sources">
             <div className="briefing-sources-head">
-              <span className="briefing-sources-label">Sources used</span>
-              <button className="today-section-link" onClick={()=>openCustomize('sources','general')}>
-                Customize feeds →
-              </button>
+              <span className="briefing-sources-label">Priority briefings</span>
+              <span className="briefing-sources-meta">
+                {tier1.items.length} articles from {BRIEFING_PRIORITY_SOURCES.join(' · ')}
+              </span>
             </div>
-            {sourceHeadlines.length === 0
+            {tier1.items.length === 0
               ? <div style={{padding:'14px 0',fontSize:'12px',color:'var(--text3)'}}>
-                  No articles loaded yet. The briefing will populate as feeds arrive.
+                  Priority briefing sources haven't loaded yet. Make sure {BRIEFING_PRIORITY_SOURCES.join(', ')} are enabled in your General feeds.
                 </div>
-              : sourceHeadlines.map((a, i) => {
-                  const cc = CATS[a._cat] || CATS.general;
-                  return (
-                    <div key={i} className="gf-item" onClick={()=>onRead(a)}>
-                      {a.img
-                        ? <div className="gf-thumb" style={{backgroundImage:`url(${a.img})`}}/>
-                        : <div className="gf-thumb-ph"/>}
-                      <div className="gf-body">
-                        <div className="gf-title">{a.title}</div>
-                        <div className="gf-meta">
-                          <span className="gf-meta-cat" style={{color:cc.color}}>
-                            {cc.emoji} {cc.label}
-                          </span>
-                          <span>·</span>
-                          <span>{a.source}</span>
-                          <span>·</span>
-                          <span>{fmtDate(a.pubDate)}</span>
-                        </div>
+              : tier1.items.map((a, i) => (
+                  <div key={`t1-${i}`} className="gf-item" onClick={()=>onRead(a)}>
+                    {a.img
+                      ? <div className="gf-thumb" style={{backgroundImage:`url(${a.img})`}}/>
+                      : <div className="gf-thumb-ph"/>}
+                    <div className="gf-body">
+                      <div className="gf-title">{a.title}</div>
+                      <div className="gf-meta">
+                        <span className="gf-meta-cat" style={{color:'var(--accent)',fontWeight:800}}>
+                          ★ {a.source}
+                        </span>
+                        <span>·</span>
+                        <span>{fmtDate(a.pubDate)}</span>
                       </div>
                     </div>
-                  );
-                })}
+                  </div>
+                ))}
           </section>
+
+          {/* Tier 2 — Per-category top headlines */}
+          {Object.entries(tier2).map(([cat, headlines]) => {
+            const cc = CATS[cat] || CATS.general;
+            return (
+              <section key={cat} className="briefing-sources">
+                <div className="briefing-sources-head">
+                  <span className="briefing-sources-label" style={{color:cc.color}}>
+                    {cc.emoji} {cc.label}
+                  </span>
+                  <button className="today-section-link" onClick={()=>handleTabChange(cat)}>
+                    See all in {cc.label} →
+                  </button>
+                </div>
+                {headlines.map((a, i) => (
+                  <div key={`${cat}-${i}`} className="gf-item" onClick={()=>onRead(a)}>
+                    {a.img
+                      ? <div className="gf-thumb" style={{backgroundImage:`url(${a.img})`}}/>
+                      : <div className="gf-thumb-ph"/>}
+                    <div className="gf-body">
+                      <div className="gf-title">{a.title}</div>
+                      <div className="gf-meta">
+                        <span>{a.source}</span>
+                        <span>·</span>
+                        <span>{fmtDate(a.pubDate)}</span>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </section>
+            );
+          })}
+
+          <div style={{textAlign:'center',padding:'32px 0 16px',fontSize:'11px',color:'var(--text3)'}}>
+            Customize the briefing input by adding sources to General feeds.
+            <br/>
+            <button className="today-section-link" style={{marginTop:'8px'}} onClick={()=>openCustomize('sources','general')}>
+              Customize feeds →
+            </button>
+          </div>
         </div>
       </div>
     );
@@ -5380,9 +5795,9 @@ export default function App() {
         {/* Pull-to-refresh indicator (mobile, touch-only) */}
         {isMobile && <PtrIndicator distance={ptrDistance} threshold={70} refreshing={refreshing}/>}
 
-        {tab==='today'&&<TodayPage/>}
-        {/* v22b: BriefingPage routing removed — briefing now renders as top section of Today.
-            'briefing' tab redirects to Today below in handleTabChange. */}
+        {/* v24a: Today removed (its content folded into General page).
+            BriefingPage restored as a dedicated full-read destination. */}
+        {tab==='briefing'&&<BriefingPage/>}
         {tab==='sports'&&<SportsPage/>}
         {NEWS_CATS.filter(c=>c!=='sports').includes(tab)&&<FeedPage cat={tab}/>}
         {tab==='finance'&&<FinancePage/>}
