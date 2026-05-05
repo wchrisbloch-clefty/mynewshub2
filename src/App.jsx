@@ -1,42 +1,44 @@
-// MyNewsHub v24a — Session 6 wave 1: General as homepage, Today removed, Briefing restored
+// MyNewsHub v25a — Session 7 wave 1: Foundation cleanup + pill bar + typography unification
 // ─────────────────────────────────────────────────────────────────────────────
-// Builds on v23. Information architecture rebuild. Today was a confused tab —
-// part briefing, part synthesis, part category preview. Splitting cleanly:
-//   • General becomes the homepage (default landing). Gets a briefing teaser
-//     at top (compact: paragraph + 3 bullets + "View full briefing →" link),
-//     then absorbs Today's "from each other category" cross-cat sections.
-//   • Briefing comes back as its own dedicated full-read page (Morning Brew
-//     style with explicit list of source articles used in synthesis).
-//   • Today as a tab is removed entirely. Component code preserved as orphan.
+// Builds on v24a. First wave of the unified-design ship. v25b will follow
+// with the Google News grid + per-vertical accents on top of this foundation.
 //
-// Changes from v23:
-//  ── Architecture ──
-//  • Default opening tab: 'today' → 'general'
-//  • Today tab removed from desktop nav, mobile chips, swipe order
-//  • Briefing tab restored to desktop nav AND deep-linked from General teaser
-//  • New BriefingTeaser component on General — compact preview that opens
-//    full BriefingPage on click
-//  • General page rewrites: briefing teaser + cross-cat sections + General feed
+// Why split: the cleanup + typography + pill-bar work alone is a meaningful
+// improvement (modern topbar, no editorial-serif fighting bold-sans, ~225
+// lines of orphan code gone). Shipping this checkpoint means the visual
+// rebuild in v25b lands on a clean foundation.
 //
-//  ── Nav order (per user) ──
-//  • Desktop: General · Business · Markets · Bloom · Sports · Pop Culture · Briefing · Podcasts · Saved
-//  • Mobile: General · Business · Markets · Energy · Sports · Pop Culture
-//  • Swipe: general · business · finance · bloom · sports · popculture
+// Changes from v24a:
 //
-//  ── Preserved ──
-//  • Yahoo Sports vertical (v23) — untouched
-//  • Markets Bloomberg styling (v22b) — untouched
-//  • Briefing 3-tier methodology (v22b) — untouched, now also fully visible on dedicated page
-//  • All RSS sources, AI summaries, breaking ticker, scoreboard, etc.
+//  ── Typography (global) ──
+//  • All editorial-serif (ui-serif Georgia) replaced with NBC sans stack
+//    'Inter', 'Helvetica Neue', system-ui, sans-serif
+//  • Body font upgraded to Inter-first
+//  • Hero, briefing, sports-hero, briefing-teaser now consistent sans-serif
 //
-//  ── Deferred to v24b ──
-//  • Google News grid + NBC fonts (visual rebuild of General)
-//  • Modernized weather/ticker topbar
+//  ── Topbar modernization ──
+//  • Whisper bar deleted (cramped 30px black band with tiny text)
+//  • Replaced with .pill-bar — bigger pill cards (~46px), all 9 data points
+//    (3 weather + 3 indices + 3 tickers) horizontally scrollable
+//  • Color-coded change pills (green up / red down)
+//  • Mobile pill-bar denser; replaces v22a mobile-strip stopgap
+//  • TopBar now fetches indices in addition to tickers (fuller coverage)
+//
+//  ── Cleanup ──
+//  • TodayPage component DELETED (118 lines, was orphan after v24a)
+//  • SocialPage component + routing DELETED (50 lines, orphan since v22a)
+//  • MorningBriefing v1 component DELETED (53 lines, replaced by Inline in v19)
+//  • Storage migration chain trimmed: v24/v23/v22 only (was 10 keys deep)
+//
+//  ── Net effect ──
+//  • File size: 5837 → 5678 lines (-159 net, -225 deleted)
+//  • Architecturally cleaner foundation for v25b grid + accents
+//
+// Deferred to v25b:
+//  • Google News grid pattern (.gn-grid class, lead + 3-col grid)
+//  • Per-vertical accents on top of unified base
+//  • Sidebar simplification (drop 4-tab mess, single trending column)
 //  • Business page Bloomberg styling
-//  • Simplified trending sidebar
-//
-//  ── Infra ──
-//  • Storage v23_ → v24_ with migration from v23/v22/.../v14
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { useState, useEffect, useCallback, useMemo, useRef, Fragment } from 'react';
@@ -252,8 +254,11 @@ const LEAGUES = [
   { key:'cbb', label:'College BB',sport:'basketball', league:'mens-college-basketball', emoji:'🏀', accent:'#d97706' },
 ];
 
-const SK = 'v24_';
-const OLD_SKS = ['v23_','v22_','v21_','v20_','v19_','v18_','v17_','v16_','v15_','v14_'];
+const SK = 'v25a_';
+// v25a: Trimmed migration chain. Anyone with storage older than v22 gets fresh
+// defaults. Most users will be on v22+ from recent ships; the long chain was
+// adding minor load overhead and hadn't been useful in months.
+const OLD_SKS = ['v24_','v23_','v22_'];
 
 // v22b: Briefing 3-tier methodology constants.
 // Tier 1: priority briefing sources — articles from these get pulled first
@@ -736,7 +741,9 @@ const GLOBAL_CSS = `
 
 body{
   background:var(--bg);
-  font-family:-apple-system,BlinkMacSystemFont,'Inter','Segoe UI',sans-serif;
+  /* v25: NBC-style typography. Inter first for cleaner sans-serif look,
+     Helvetica Neue for macOS, then system fallbacks. */
+  font-family:'Inter','Helvetica Neue',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
   -webkit-font-smoothing:antialiased;color:var(--text);
   font-size:15px;line-height:1.5;
 }
@@ -749,43 +756,60 @@ body{
 ═══════════════════════════════════════════ */
 .topbar-wrap{position:sticky;top:0;z-index:300;}
 
-.whisper-bar{
-  background:rgba(15,15,26,0.92);
-  backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);
-  border-bottom:1px solid rgba(255,255,255,0.04);
-  height:30px;padding:0 24px;
-  display:flex;align-items:center;overflow:hidden;
+/* v25: PILL BAR — replaces whisper bar.
+   Bigger pills (~46px tall), bigger numerics, color-coded change indicators.
+   Horizontal scrollable on narrow viewports. Single source of truth for
+   weather/indices/tickers across desktop and mobile. */
+.pill-bar{
+  background:var(--surface);
+  border-bottom:1px solid var(--border);
+  padding:0;
 }
-.whisper-inner{
+.pill-bar-inner{
   max-width:1400px;margin:0 auto;width:100%;
-  display:flex;align-items:center;gap:16px;
+  display:flex;gap:0;
+  overflow-x:auto;scrollbar-width:none;
+  -webkit-overflow-scrolling:touch;
 }
-.wx-pill{
-  display:flex;align-items:center;gap:6px;
-  font-size:11px;color:rgba(200,200,220,0.55);
-  white-space:nowrap;flex-shrink:0;padding:2px 8px;
-  border-radius:4px;text-decoration:none;transition:color 0.15s;
+.pill-bar-inner::-webkit-scrollbar{display:none;}
+.pill{
+  display:flex;align-items:center;gap:10px;
+  flex-shrink:0;padding:8px 16px;
+  border-right:1px solid var(--border2);
+  text-decoration:none;color:var(--text);
+  cursor:pointer;
+  transition:background 0.12s;
+  min-width:140px;
 }
-.wx-pill:hover{color:rgba(200,200,220,0.85);}
-.wx-city{font-weight:600;color:rgba(220,220,240,0.75);font-size:10px;text-transform:uppercase;letter-spacing:0.05em;}
-.wx-temp{font-weight:600;color:rgba(230,230,250,0.8);font-variant-numeric:tabular-nums;}
-.wx-desc{color:rgba(160,160,180,0.45);}
-.whisper-div{width:1px;height:12px;background:rgba(255,255,255,0.08);flex-shrink:0;}
-.ticker-row{display:flex;gap:4px;align-items:center;overflow-x:auto;scrollbar-width:none;flex:1;}
-.ticker-row::-webkit-scrollbar{display:none;}
-.ticker-item{
-  display:flex;align-items:center;gap:5px;cursor:pointer;white-space:nowrap;
-  padding:2px 8px;border-radius:4px;transition:background 0.12s;flex-shrink:0;
+.pill:hover{background:var(--surface2);}
+.pill-icon{font-size:18px;flex-shrink:0;}
+.pill-body{display:flex;flex-direction:column;line-height:1.15;flex:1;min-width:0;}
+.pill-label{
+  font-size:10px;font-weight:800;color:var(--text3);
+  text-transform:uppercase;letter-spacing:0.06em;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
 }
-.ticker-item:hover{background:rgba(255,255,255,0.05);}
-.ticker-sym{font-size:11px;font-weight:700;font-variant-numeric:tabular-nums;letter-spacing:-0.1px;}
-.ticker-price{font-size:11px;color:rgba(180,180,200,0.6);font-variant-numeric:tabular-nums;}
-.ticker-chg{font-size:10px;font-weight:600;font-variant-numeric:tabular-nums;}
-.ticker-up{color:#4ade80;}.ticker-down{color:#f87171;}
+.pill-value{
+  font-size:14px;font-weight:800;color:var(--text);
+  font-variant-numeric:tabular-nums;letter-spacing:-0.2px;
+  margin-top:2px;
+  font-family:'SF Mono','Cascadia Code','Consolas',monospace;
+}
+.pill-sub{font-size:10px;font-weight:500;color:var(--text3);font-family:inherit;letter-spacing:0;}
+.pill-chg{
+  font-size:10px;font-weight:700;font-variant-numeric:tabular-nums;
+  padding:2px 6px;border-radius:3px;flex-shrink:0;
+  font-family:'SF Mono','Cascadia Code','Consolas',monospace;
+}
+.pill-chg.up{color:#16a34a;background:rgba(22,163,74,0.1);}
+.pill-chg.down{color:#dc2626;background:rgba(220,38,38,0.1);}
+
+/* Old whisper-bar selectors kept as no-ops in case any external CSS still references */
+.whisper-bar,.whisper-inner,.wx-pill,.ticker-row,.ticker-item{display:none;}
 
 /* ═══════════════════════════════════════════
    BREAKING BANNER — inline, not bolted-on
-   Slides in below whisper bar, same visual
+   Slides in below pill bar, same visual
    language as the topbar, not a separate slab
 ═══════════════════════════════════════════ */
 .breaking-bar{
@@ -1579,7 +1603,7 @@ body{
   font-size: 16px;line-height: 1.55;color: var(--text);
   font-weight: 400;letter-spacing: -0.15px;
   margin: 0;
-  font-family: ui-serif, Georgia, 'Times New Roman', serif;
+  font-family: 'Inter', 'Helvetica Neue', system-ui, sans-serif;
 }
 .briefing-teaser-body strong{font-weight: 700;}
 .briefing-teaser-empty{
@@ -1894,7 +1918,7 @@ body{
   border-bottom:1px solid var(--border2);
 }
 .briefing-page-title{
-  font-family: ui-serif, Georgia, 'Times New Roman', serif;
+  font-family: 'Inter', 'Helvetica Neue', system-ui, sans-serif;
   font-size: 34px;font-weight: 700;letter-spacing: -0.02em;
   color: var(--text);margin: 0 0 8px 0;line-height: 1.1;
 }
@@ -2080,7 +2104,7 @@ body{
 }
 /* EDITORIAL SERIF TITLE — the core polish lever */
 .hero-band-title{
-  font-family: ui-serif, Georgia, 'Times New Roman', 'Source Serif Pro', serif;
+  font-family: 'Inter', 'Helvetica Neue', system-ui, sans-serif;
   /* v22b MSN polish: bigger hero, more weight, more presence */
   font-size: 36px;font-weight: 800;line-height: 1.12;
   letter-spacing: -0.025em;
@@ -2281,7 +2305,7 @@ body{
   font-size:17px;line-height:1.62;color:var(--text);
   font-weight:400;letter-spacing:-0.2px;
   margin:0;
-  font-family: ui-serif, Georgia, 'Times New Roman', serif;
+  font-family: 'Inter', 'Helvetica Neue', system-ui, sans-serif;
 }
 .briefing-inline-body strong{font-weight:700;color:var(--text);}
 .briefing-inline-empty{
@@ -2681,11 +2705,19 @@ body{overscroll-behavior-y:contain;}
    MOBILE (≤640px) — Yahoo pattern
 ═══════════════════════════════════════════ */
 @media (max-width:640px){
-  /* Swap desktop topbar for mobile topbar + bottom tabs */
+  /* Swap desktop topbar for mobile topbar + bottom tabs.
+     v25: Pill bar stays visible on mobile (replaces the v22a mobile-strip). */
   .whisper-bar{display:none;}
   .nav-bar{display:none;}
   .mobile-top{display:block;}
   .bottom-tabs{display:block;}
+  /* v25: pill-bar denser on mobile so 4-5 pills are visible at once */
+  .pill-bar{padding:0;}
+  .pill{min-width:120px;padding:6px 12px;gap:8px;}
+  .pill-icon{font-size:16px;}
+  .pill-label{font-size:9px;}
+  .pill-value{font-size:13px;}
+  .pill-chg{font-size:9px;padding:1px 5px;}
   /* Reserve space so content isn't hidden behind bottom tabs */
   body{padding-bottom:calc(56px + env(safe-area-inset-bottom, 0));}
 
@@ -3035,59 +3067,6 @@ function TodayItem({a, cc, onRead}) {
   );
 }
 
-// ─── MORNING BRIEFING (single overview paragraph) ─────────────────────────────
-function MorningBriefing({arts, onRead}) {
-  const [text, setText] = useState('');
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
-
-  const dateStr = new Date().toLocaleDateString('en-US',{weekday:'long',month:'long',day:'numeric'});
-
-  const generate = async () => {
-    setLoading(true); setError('');
-    // Build a dense context: top 2 headlines per category, unlabelled — let AI synthesize freely
-    const lines = Object.entries(arts).flatMap(([cat, list]) =>
-      (list||[]).slice(0,2).map(a => `${CATS[cat]?.emoji||''} ${a.title}`)
-    ).join('\n');
-
-    const {summary, error:err} = await fetchAISummary({
-      type:'article',
-      title:`News Overview — ${dateStr}`,
-      content:`Write a single punchy paragraph (3-5 sentences) synthesizing today's biggest stories across all categories. Be direct, informative, and specific — name the actual stories. No bullet points, no category headers. Just one tight paragraph a busy professional would want to read.\n\nHeadlines:\n${lines}`,
-      mode:'summary',
-    });
-    if (summary) setText(summary.trim());
-    else setError(err||'Could not generate briefing');
-    setLoading(false);
-  };
-
-  useEffect(() => {
-    const total = Object.values(arts).reduce((n,l)=>n+(l?.length||0),0);
-    if (total > 10 && !text && !loading) generate();
-  }, [arts]);
-
-  return (
-    <div className="briefing">
-      <div className="briefing-head">
-        <div className="briefing-left">
-          <span className="briefing-icon">☕</span>
-          <div>
-            <div className="briefing-title">Today's Briefing</div>
-            <div className="briefing-date">{dateStr}</div>
-          </div>
-        </div>
-        <button className="briefing-refresh" onClick={generate} disabled={loading}>
-          {loading?'Generating…':'↺ Refresh'}
-        </button>
-      </div>
-      {error && <div className="briefing-err">{error}</div>}
-      {text
-        ? <div className="briefing-body"><p className="briefing-overview" dangerouslySetInnerHTML={{__html: text.replace(/\*\*([^*]+)\*\*/g,'<strong>$1</strong>')}}/></div>
-        : !loading ? <div className="briefing-loading">Loading articles before generating briefing…</div>
-        : <div className="briefing-loading">Writing overview…</div>}
-    </div>
-  );
-}
 
 // ─── MORNING BRIEFING INLINE (v19 enhanced) ──────────────────────────────────
 // Editorial-style briefing: single synthesized paragraph + 3–5 bullet
@@ -4464,8 +4443,13 @@ function TopBar({tab, setTab, search, setSearch, dark, setDark,
 
   useEffect(()=>{
     fetchAllWeather(DEFAULT_WEATHER_CITIES).then(setWxList);
-    TICKERS.forEach(t=>fetchQuote(t.sym).then(q=>q&&setQuotes(prev=>({...prev,[t.sym]:q}))));
-    const iv=setInterval(()=>{TICKERS.forEach(t=>fetchQuote(t.sym).then(q=>q&&setQuotes(prev=>({...prev,[t.sym]:q}))));},300000);
+    // v25: also fetch indices (S&P, DOW, Nasdaq) for the pill bar
+    const allSyms = [...TICKERS.map(t=>t.sym), ...INDICES.map(i=>i.sym)];
+    const fetchAll = () => allSyms.forEach(sym =>
+      fetchQuote(sym).then(q=>q&&setQuotes(prev=>({...prev,[sym]:q})))
+    );
+    fetchAll();
+    const iv=setInterval(fetchAll, 300000);
     return ()=>clearInterval(iv);
   },[]);
 
@@ -4500,32 +4484,58 @@ function TopBar({tab, setTab, search, setSearch, dark, setDark,
 
   return (
     <div className={`topbar-wrap ${hidden?'hidden':''}`}>
-      {/* ━━━ DESKTOP: whisper bar ━━━ */}
-      <div className="whisper-bar">
-        <div className="whisper-inner">
+      {/* v25: Pill bar — replaces the cramped whisper bar. Bigger pills with
+          color-coded change indicators. Horizontal scroll on narrow viewports.
+          Shows weather + indices + tickers in priority order. */}
+      <div className="pill-bar">
+        <div className="pill-bar-inner">
           {wxList.map((wx,i)=>(
-            <a key={i} className="wx-pill" href={`https://weather.com/weather/today/l/${encodeURIComponent(wx.slug)}`} target="_blank" rel="noreferrer">
-              <span>{wx.emoji}</span>
-              <span className="wx-city">{wx.name}</span>
-              <span className="wx-temp">{wx.temp}°</span>
-              <span className="wx-desc">{wx.desc}</span>
+            <a key={`wx-${i}`} className="pill pill-wx"
+               href={`https://weather.com/weather/today/l/${encodeURIComponent(wx.slug)}`}
+               target="_blank" rel="noreferrer">
+              <span className="pill-icon">{wx.emoji}</span>
+              <div className="pill-body">
+                <div className="pill-label">{wx.name}</div>
+                <div className="pill-value">{wx.temp}°<span className="pill-sub"> {wx.desc}</span></div>
+              </div>
             </a>
           ))}
-          {wxList.length>0&&<div className="whisper-div"/>}
-          <div className="ticker-row">
-            {TICKERS.map(t=>{
-              const q=quotes[t.sym]; const up=q?q.chg>=0:null;
-              return (
-                <div key={t.sym} className="ticker-item" onClick={()=>onTickerClick&&onTickerClick(t)}>
-                  <span className="ticker-sym" style={{color:t.color}}>{t.sym}</span>
-                  {q
-                    ? <><span className="ticker-price">${q.price.toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2})}</span>
-                        <span className={`ticker-chg ${up?'ticker-up':'ticker-down'}`}>{up?'▲':'▼'} {Math.abs(q.pct).toFixed(2)}%</span></>
-                    : <span className="ticker-price"> — </span>}
+          {INDICES.map(idx=>{
+            const q=quotes[idx.sym]; const up=q?q.chg>=0:null;
+            return (
+              <div key={idx.sym} className="pill pill-idx" onClick={()=>q&&window.open(`https://finance.yahoo.com/quote/${encodeURIComponent(idx.sym)}`,'_blank')}>
+                <div className="pill-body">
+                  <div className="pill-label">{idx.short}</div>
+                  <div className="pill-value">
+                    {q ? q.price.toLocaleString('en-US',{maximumFractionDigits:0}) : '—'}
+                  </div>
                 </div>
-              );
-            })}
-          </div>
+                {q && (
+                  <span className={`pill-chg ${up?'up':'down'}`}>
+                    {up?'▲':'▼'} {Math.abs(q.pct).toFixed(2)}%
+                  </span>
+                )}
+              </div>
+            );
+          })}
+          {TICKERS.map(t=>{
+            const q=quotes[t.sym]; const up=q?q.chg>=0:null;
+            return (
+              <div key={t.sym} className="pill pill-tk" onClick={()=>onTickerClick&&onTickerClick(t)}>
+                <div className="pill-body">
+                  <div className="pill-label" style={{color:t.color}}>{t.sym}</div>
+                  <div className="pill-value">
+                    {q ? `$${q.price.toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2})}` : '—'}
+                  </div>
+                </div>
+                {q && (
+                  <span className={`pill-chg ${up?'up':'down'}`}>
+                    {up?'▲':'▼'} {Math.abs(q.pct).toFixed(2)}%
+                  </span>
+                )}
+              </div>
+            );
+          })}
         </div>
       </div>
 
@@ -4586,29 +4596,9 @@ function TopBar({tab, setTab, search, setSearch, dark, setDark,
           </div>
         </div>
 
-        {/* v22: weather + ticker strip on mobile/iPad (was: desktop-only via whisper bar).
-            Compact 24px-tall horizontal scroll row with weather pills + tickers. */}
-        <div className="mobile-strip">
-          {wxList.map((wx,i)=>(
-            <a key={`wx${i}`} className="mobile-strip-item wx" href={`https://weather.com/weather/today/l/${encodeURIComponent(wx.slug)}`} target="_blank" rel="noreferrer">
-              <span>{wx.emoji}</span>
-              <span className="mobile-strip-city">{wx.name}</span>
-              <span className="mobile-strip-temp">{wx.temp}°</span>
-            </a>
-          ))}
-          {wxList.length>0 && <span className="mobile-strip-div"/>}
-          {TICKERS.map(t=>{
-            const q=quotes[t.sym]; const up=q?q.chg>=0:null;
-            return (
-              <span key={t.sym} className="mobile-strip-item tk" onClick={()=>onTickerClick&&onTickerClick(t)}>
-                <span className="mobile-strip-sym" style={{color:t.color}}>{t.sym}</span>
-                {q
-                  ? <span className={`mobile-strip-chg ${up?'up':'down'}`}>{up?'▲':'▼'}{Math.abs(q.pct).toFixed(1)}%</span>
-                  : <span className="mobile-strip-chg">—</span>}
-              </span>
-            );
-          })}
-        </div>
+        {/* v25: mobile-strip removed — pill-bar above the nav adapts to mobile
+            via responsive CSS. Single horizontal scroll source for weather +
+            tickers + indices on all viewports. */}
 
         {mobileSearchOpen && (
           <div className="mobile-search open">
@@ -5367,124 +5357,6 @@ export default function App() {
     );
   };
 
-  // ─── TODAY PAGE ────────────────────────────────────────────────────────
-  const TodayPage = () => {
-    const allRecent = useMemo(()=>{
-      const allKws=Object.values(kw).flat().map(k=>k.toLowerCase());
-      const seen=new Set();
-      return Object.entries(arts)
-        .flatMap(([cat,list])=>(list||[]).map(a=>({...a,_cat:cat})))
-        .filter(a=>a.title&&a.link&&a.img)
-        .filter(a=>{const k=a.title.slice(0,60).toLowerCase().replace(/\s+/g,'');if(seen.has(k))return false;seen.add(k);return true;})
-        .sort((a,b)=>{
-          const aTxt=(a.title+' '+(a.desc||'')).toLowerCase();
-          const bTxt=(b.title+' '+(b.desc||'')).toLowerCase();
-          const aKw=allKws.filter(k=>aTxt.includes(k)).length;
-          const bKw=allKws.filter(k=>bTxt.includes(k)).length;
-          if(bKw!==aKw)return bKw-aKw;
-          return new Date(b.pubDate)-new Date(a.pubDate);
-        });
-    },[arts,kw]);
-
-    const heroStories=allRecent.slice(0,5);
-    const [heroIdx,setHeroIdx]=useState(0);
-    const [paused,setPaused]=useState(false);
-
-    useEffect(()=>{
-      if(paused||heroStories.length<=1)return;
-      const iv=setInterval(()=>setHeroIdx(i=>(i+1)%heroStories.length),12000);
-      return ()=>clearInterval(iv);
-    },[paused,heroStories.length]);
-
-    const lead=heroStories[heroIdx];
-
-    // Per-category top items for the section list (3 each — generous Ghost density)
-    const sectionCats = ['general','sports','business','finance','bloom','popculture'];
-
-    return (
-      <div className="page">
-        <div className="today-flow">
-
-          {/* ── v22b BRIEFING — top section of Today (was: standalone BriefingPage).
-                Briefing-first because that's what the user opens Today for in
-                the morning. Hero + sections come after for deeper exploration. ── */}
-          <MorningBriefingInline arts={arts}/>
-
-          {/* ── v19 HERO BAND — Yahoo/NBC 2-column top band ── */}
-          <HeroBand
-            heroStories={heroStories}
-            heroIdx={heroIdx}
-            setHeroIdx={setHeroIdx}
-            paused={paused}
-            setPaused={setPaused}
-            onRead={onRead}
-          />
-
-          {/* ── RIGHT NOW — slim, ghost-treated ── */}
-          <RightNowStrip
-            breakingItems={breakingItems}
-            scores={scores}
-            marketData={marketData}
-            watchlist={watchlist}
-            onOpen={onRead}
-            onNavigate={handleTabChange}
-          />
-
-          {/* v21: FollowingStrip removed — cleared above-fold clutter */}
-
-          {/* ── TRENDING — single carousel, the only one on the page ── */}
-          <TrendingCarousel arts={arts} kw={kw} onRead={onRead}/>
-
-          {/* ── CATEGORY SECTIONS — vertical, Ghost ── */}
-          {sectionCats.map(cat => {
-            const cc = CATS[cat];
-            const items = sorted(cat).slice(0, 3);
-            const total = (arts[cat]||[]).length;
-            return (
-              <Fragment key={cat}>
-                {/* v20: live scoreboard strip immediately above the Sports section */}
-                {cat === 'sports' && <MiniScoreboardStrip scores={scores} onOpen={onRead}/>}
-                <section className="today-section">
-                  <div className="today-section-head">
-                    <span className="today-section-label">
-                      <span className="today-section-cat">{cc.emoji} {cc.label}</span>
-                      {total > 0 && <span style={{color:'var(--text4)'}}>· {total}</span>}
-                    </span>
-                    <button className="today-section-link" onClick={()=>handleTabChange(cat)}>
-                      See all →
-                    </button>
-                  </div>
-                  {/* v20: Bloomberg-style 2px accent bar anchors the section visually */}
-                  <div className="today-section-accent" style={{background:cc.color}}/>
-                  {loading[cat]
-                    ? <div style={{padding:'14px 0',fontSize:'12px',color:'var(--text3)'}}>Loading…</div>
-                    : items.length === 0
-                      ? <div style={{padding:'14px 0',fontSize:'12px',color:'var(--text3)'}}>No articles yet</div>
-                      : items.map((a, i) => (
-                          <div key={i} className="gf-item" onClick={()=>onRead(a)}>
-                            {a.img
-                              ? <div className="gf-thumb" style={{backgroundImage:`url(${a.img})`}}/>
-                              : <div className="gf-thumb-ph"/>}
-                            <div className="gf-body">
-                              <div className="gf-title">{a.title}</div>
-                              <div className="gf-meta">
-                                <span className="gf-meta-cat" style={{color:cc.color}}>{a.source}</span>
-                                <span>·</span>
-                                <span>{fmtDate(a.pubDate)}</span>
-                              </div>
-                            </div>
-                          </div>
-                        ))}
-                </section>
-              </Fragment>
-            );
-          })}
-
-          <SourceFooter feeds={feeds} arts={arts}/>
-        </div>
-      </div>
-    );
-  };
 
   // ─── PODCASTS PAGE ─────────────────────────────────────────────────────
   const PodcastsPage = () => {
@@ -5728,56 +5600,6 @@ export default function App() {
     );
   };
 
-  // ─── SOCIAL PAGE ───────────────────────────────────────────────────────
-  const SocialPage = () => {
-    const totalAccounts=Object.values(social).reduce((n,cat)=>n+Object.values(cat).reduce((m,arr)=>m+(arr?.length||0),0),0);
-    return (
-      <div className="page">
-        <div className="social-page-header">
-          <div>
-            <div className="social-page-title">🔗 Social Follows</div>
-            <div className="social-page-sub">{totalAccounts} accounts across {Object.keys(social).length} categories — tap any handle to open</div>
-          </div>
-          <button className="page-customize-btn" onClick={()=>openCustomize('social','general')}>⚙ Edit Social</button>
-        </div>
-        <div className="social-page-grid">
-          {Object.keys(CATS).map(cat=>{
-            const cc=CATS[cat];
-            const catSocial=social[cat]||{};
-            const platforms=Object.keys(catSocial).filter(p=>catSocial[p]&&catSocial[p].length>0);
-            const total=platforms.reduce((n,p)=>n+catSocial[p].length,0);
-            return (
-              <div key={cat} className="social-cat-block" style={{borderTop:`3px solid ${cc.color}`}}>
-                <div className="social-cat-head">
-                  <span style={{color:cc.color,fontWeight:700,fontSize:'13px'}}>{cc.emoji} {cc.label}</span>
-                  <span style={{fontSize:'10px',color:'var(--text3)'}}>{total} accounts</span>
-                </div>
-                {platforms.length===0
-                  ?<div style={{padding:'16px 14px',fontSize:'11px',color:'var(--text3)',fontStyle:'italic'}}>No accounts yet — add some in Customize</div>
-                  :platforms.map(p=>{
-                    const meta=SOCIAL_META[p];const handles=catSocial[p];
-                    return (
-                      <div key={p} className="social-cat-plat">
-                        <div className="social-cat-plat-head">
-                          <div className="social-plat-icon" style={{background:meta.color}}>{meta.icon}</div>
-                          <span className="social-plat-label">{meta.label}</span>
-                          <span className="social-plat-count">{handles.length}</span>
-                        </div>
-                        <div className="social-handles">
-                          {handles.map((h,i)=>(
-                            <a key={i} className="social-handle" href={socialUrl(p,h)} target="_blank" rel="noreferrer" style={{color:meta.color,borderColor:meta.color+'33'}}>{h}</a>
-                          ))}
-                        </div>
-                      </div>
-                    );
-                  })}
-              </div>
-            );
-          })}
-        </div>
-      </div>
-    );
-  };
 
   // ─── RENDER ────────────────────────────────────────────────────────────
   return (
@@ -5802,7 +5624,6 @@ export default function App() {
         {NEWS_CATS.filter(c=>c!=='sports').includes(tab)&&<FeedPage cat={tab}/>}
         {tab==='finance'&&<FinancePage/>}
         {tab==='podcasts'&&<PodcastsPage/>}
-        {tab==='social'&&<SocialPage/>}
         {tab==='saved'&&<SavedPage/>}
 
         {/* Mobile overflow menu sheet */}
