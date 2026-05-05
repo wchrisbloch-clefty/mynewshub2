@@ -1,41 +1,37 @@
-// MyNewsHub v22b — Session 4 wave 2: Briefing rebuild + Today/Briefing merge + Markets/Bloomberg + MSN polish
+// MyNewsHub v23 — Session 5: Yahoo Sports vertical rebuild
 // ─────────────────────────────────────────────────────────────────────────────
-// Builds on v22a. The briefing was a single AI paragraph synthesizing 12
-// random headlines (2 per cat). v22b rebuilds it on a real methodology:
-// Tier 1 = priority briefing sources (Axios + Morning Brew + Morning Wire +
-// Bloomberg) → Tier 2 = per-category top 3-5 deduped fresh headlines
-// (excluding Comedy) → Tier 3 = time-aware auto-refresh (>90min stale).
-// Briefing now renders as the top section of Today, not a separate page.
+// Builds on v22b. Sports page rebuilt to match Yahoo Sports' news-first layout
+// pattern: dark scoreboard strip at top, sport tabs below, favorite team pills
+// with external links, then stories feed prioritized by favorites.
 //
-// Changes from v22a:
-//  ── Briefing methodology ──
-//  • New BRIEFING_PRIORITY_SOURCES = ['Axios','Morning Brew','Morning Wire','Bloomberg']
-//  • MorningBriefingInline rewrite: pulls Tier 1 articles first, then Tier 2
-//    deduped per-cat (excluding Comedy), sends structured input to AI
-//  • Time-aware: useEffect checks ts age on mount; auto-regenerates if >90min
+// Changes from v22b:
+//  ── Sports page rebuild ──
+//  • SportsScoreStrip component — horizontal scrolling score tiles, all 5
+//    leagues, favorites pinned + starred, click → ESPN game page
+//  • Sport tabs (All / NFL / NBA / MLB / CFB / CBB) filter scoreboard +
+//    stories feed + breaking simultaneously
+//  • Favorite team pills below sport tabs — click pill = filter feed to that
+//    team. Mini "ESPN" / "Team" buttons open external team pages.
+//  • Stories feed prioritized: favorite-team articles float to top, then
+//    chronological. Sport tab filters the kw-match used for prioritization.
+//  • Yahoo-style sports feed cards — dense layout, team color slash accent,
+//    breaking treatment for urgent items
+//  • SCORE_TEAMS now extended with espnUrl + teamUrl per team
 //
-//  ── Bloomberg added to General feeds ──
-//  • Bloomberg Markets RSS added so Tier 1 has Bloomberg coverage
+//  ── Customize panel ──
+//  • New "Sports Teams" tab in Customize — add/edit/remove favorite teams
+//    with their match terms, ESPN URL, team URL, sport, league
+//  • teams persisted under 'teams' storage key (separate from SCORE_TEAMS
+//    which becomes the default seed)
 //
-//  ── Today + Briefing merge ──
-//  • Today page now opens with MorningBriefingInline as its top section
-//  • Standalone BriefingPage routing removed; component code preserved
-//  • 'briefing' tab in nav redirects to 'today'
-//
-//  ── Today MSN polish ──
-//  • HeroBand: bigger title, tighter secondary stack, brighter category badges
-//  • Today section headers: stronger hierarchy with accent bars
-//
-//  ── Markets page Bloomberg-style treatment ──
-//  • Bloomberg orange (#fa7800) accent throughout
-//  • Tighter table rows, denser typography, monospace numerics
-//  • Index cards: wider, flatter, more terminal-like
-//  • Status row with live ticker styling
-//  • CSS-only: no functional or data changes
+//  ── Visual ──
+//  • Yahoo Sports purple accent #6001d2 for sport tabs
+//  • Dark navy #0c1c2c scoreboard strip background (Yahoo's signature)
+//  • Sports cards get team color left-border when matching favorite
 //
 //  ── Infra ──
-//  • Storage v22_ → v22b_? — keeping v22_ since data shape unchanged.
-//    No migration needed.
+//  • Storage v22_ → v23_ with migration from v22/v21/.../v14
+//  • New 'teams' storage key seeds from SCORE_TEAMS on first load
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { useState, useEffect, useCallback, useMemo, useRef, Fragment } from 'react';
@@ -214,14 +210,31 @@ const DEFAULT_SOCIAL = {
   },
 };
 
+// v23: Each team now has an espnUrl + teamUrl so the favorite-team pills can
+// expose external links. Users can edit/extend this list via the Customize
+// panel "Sports Teams" tab; the array below is the default seed.
 const SCORE_TEAMS = [
-  { team:'Texans',       sport:'football',   league:'nfl',                       match:'Houston Texans',    emoji:'🏈' },
-  { team:'Rockets',      sport:'basketball', league:'nba',                       match:'Houston Rockets',   emoji:'🏀' },
-  { team:'Astros',       sport:'baseball',   league:'mlb',                       match:'Houston Astros',    emoji:'⚾' },
-  { team:'Braves',       sport:'baseball',   league:'mlb',                       match:'Atlanta Braves',    emoji:'⚾' },
-  { team:'UK Basketball',sport:'basketball', league:'mens-college-basketball',   match:'Kentucky',          emoji:'🏀' },
-  { team:'UK Football',  sport:'football',   league:'college-football',          match:'Kentucky',          emoji:'🏈' },
-  { team:'Clemson FB',   sport:'football',   league:'college-football',          match:'Clemson',           emoji:'🏈' },
+  { team:'Texans',        sport:'football',   league:'nfl',                       match:'Houston Texans',    emoji:'🏈',
+    espnUrl:'https://www.espn.com/nfl/team/_/name/hou/houston-texans',
+    teamUrl:'https://www.houstontexans.com/' },
+  { team:'Rockets',       sport:'basketball', league:'nba',                       match:'Houston Rockets',   emoji:'🏀',
+    espnUrl:'https://www.espn.com/nba/team/_/name/hou/houston-rockets',
+    teamUrl:'https://www.nba.com/rockets/' },
+  { team:'Astros',        sport:'baseball',   league:'mlb',                       match:'Houston Astros',    emoji:'⚾',
+    espnUrl:'https://www.espn.com/mlb/team/_/name/hou/houston-astros',
+    teamUrl:'https://www.mlb.com/astros' },
+  { team:'Braves',        sport:'baseball',   league:'mlb',                       match:'Atlanta Braves',    emoji:'⚾',
+    espnUrl:'https://www.espn.com/mlb/team/_/name/atl/atlanta-braves',
+    teamUrl:'https://www.mlb.com/braves' },
+  { team:'UK Basketball', sport:'basketball', league:'mens-college-basketball',   match:'Kentucky',          emoji:'🏀',
+    espnUrl:'https://www.espn.com/mens-college-basketball/team/_/id/96/kentucky-wildcats',
+    teamUrl:'https://ukathletics.com/sports/mens-basketball/' },
+  { team:'UK Football',   sport:'football',   league:'college-football',          match:'Kentucky',          emoji:'🏈',
+    espnUrl:'https://www.espn.com/college-football/team/_/id/96/kentucky-wildcats',
+    teamUrl:'https://ukathletics.com/sports/football/' },
+  { team:'Clemson FB',    sport:'football',   league:'college-football',          match:'Clemson',           emoji:'🏈',
+    espnUrl:'https://www.espn.com/college-football/team/_/id/228/clemson-tigers',
+    teamUrl:'https://clemsontigers.com/sports/football/' },
 ];
 
 const LEAGUES = [
@@ -232,8 +245,8 @@ const LEAGUES = [
   { key:'cbb', label:'College BB',sport:'basketball', league:'mens-college-basketball', emoji:'🏀', accent:'#d97706' },
 ];
 
-const SK = 'v22_';
-const OLD_SKS = ['v21_','v20_','v19_','v18_','v17_','v16_','v15_','v14_'];
+const SK = 'v23_';
+const OLD_SKS = ['v22_','v21_','v20_','v19_','v18_','v17_','v16_','v15_','v14_'];
 
 // v22b: Briefing 3-tier methodology constants.
 // Tier 1: priority briefing sources — articles from these get pulled first
@@ -452,6 +465,15 @@ function favoriteIn(game) {
   if (!game) return null;
   const txt=((game.homeName||'')+' '+(game.awayName||'')+' '+(game.short||'')+' '+(game.name||'')).toLowerCase();
   return SCORE_TEAMS.find(t=>txt.includes(t.match.toLowerCase()))||null;
+}
+
+// v23: parameterized variant accepting any team list (typically the user's
+// customized `teams` state). Used by SportsScoreStrip + SportsPage for
+// favorite detection that respects the user's customization.
+function favoriteInList(game, list) {
+  if (!game || !Array.isArray(list)) return null;
+  const txt=((game.homeName||'')+' '+(game.awayName||'')+' '+(game.short||'')+' '+(game.name||'')).toLowerCase();
+  return list.find(t=>txt.includes((t.match||'').toLowerCase()))||null;
 }
 
 // ─── SOCIAL HELPERS ───────────────────────────────────────────────────────────
@@ -1506,6 +1528,228 @@ body{
 .src-footer-link{font-size:10px;color:var(--text3);text-decoration:none;padding:2px 7px;border-radius:4px;transition:color 0.1s,background 0.1s;font-weight:500;white-space:nowrap;}
 .src-footer-link:hover{color:var(--text);background:var(--surface2);}
 .src-footer-sep{font-size:9px;color:var(--text4);user-select:none;}
+
+/* ═══════════════════════════════════════════
+   v23 ADDITIONS — Yahoo Sports vertical
+═══════════════════════════════════════════ */
+
+/* SPORTS PAGE outer */
+.sports-page{padding-top:0;}
+
+/* SCOREBOARD STRIP — Yahoo Sports' signature dark navy bar */
+.sports-score-strip{
+  background:#0c1c2c;
+  margin:-28px -24px 18px;
+  padding:14px 24px;
+  border-top:1px solid #1a2c3e;
+  border-bottom:1px solid #1a2c3e;
+}
+.sports-score-strip.empty{padding:18px 24px;text-align:center;}
+.sports-score-strip-empty{color:rgba(255,255,255,0.5);font-size:11px;font-style:italic;letter-spacing:0.04em;}
+.sports-score-strip-inner{
+  display:flex;gap:8px;
+  overflow-x:auto;scrollbar-width:none;
+  -webkit-overflow-scrolling:touch;
+  scroll-snap-type:x mandatory;
+  padding-bottom:2px;
+}
+.sports-score-strip-inner::-webkit-scrollbar{display:none;}
+.sst-tile{
+  position:relative;
+  flex-shrink:0;scroll-snap-align:start;
+  background:#162635;border:1px solid #243446;
+  border-radius:6px;padding:10px 14px;
+  min-width:130px;cursor:pointer;
+  transition:border-color 0.15s, transform 0.1s;
+}
+.sst-tile:hover{border-color:#3b5168;transform:translateY(-1px);}
+.sst-tile.live{border-color:#ef4444;background:#2a1f1f;}
+.sst-tile.fav{border-color:#f59e0b;background:#221c10;}
+.sst-tile.fav.live{border-color:#ef4444;}
+.sst-fav-star{
+  position:absolute;top:6px;right:8px;
+  color:#fbbf24;font-size:10px;
+}
+.sst-row{
+  display:flex;justify-content:space-between;align-items:center;
+  font-size:12px;color:rgba(255,255,255,0.85);
+  font-variant-numeric:tabular-nums;padding:1px 0;
+}
+.sst-team{font-weight:600;letter-spacing:-0.2px;}
+.sst-team.win{color:#fff;font-weight:800;}
+.sst-team.loss{color:rgba(255,255,255,0.5);}
+.sst-score{font-weight:800;font-size:13px;color:#fff;min-width:24px;text-align:right;}
+.sst-score.win{color:#22c55e;}
+.sst-score.loss{color:rgba(255,255,255,0.4);}
+.sst-status{
+  font-size:9px;color:rgba(255,255,255,0.55);
+  text-transform:uppercase;letter-spacing:0.05em;
+  margin-top:4px;display:flex;align-items:center;gap:4px;
+}
+.sst-status.live{color:#ef4444;font-weight:700;}
+.sst-status.final{color:rgba(255,255,255,0.45);}
+.sst-status.pre{color:#60a5fa;}
+.sst-live-dot{
+  width:5px;height:5px;border-radius:50%;background:#ef4444;
+  animation:pulse-badge 1.4s ease-in-out infinite;
+}
+
+/* SPORT TABS — Yahoo Sports purple accent */
+.sport-tabs{
+  display:flex;gap:0;
+  border-bottom:1px solid var(--border);
+  margin-bottom:14px;
+  overflow-x:auto;scrollbar-width:none;
+}
+.sport-tabs::-webkit-scrollbar{display:none;}
+.sport-tab{
+  background:none;border:none;border-bottom:2px solid transparent;
+  padding:10px 16px;font-size:13px;font-weight:700;
+  color:var(--text3);cursor:pointer;font-family:inherit;
+  white-space:nowrap;flex-shrink:0;
+  transition:color 0.15s,border-color 0.15s;
+  margin-bottom:-1px;
+  display:inline-flex;align-items:center;gap:6px;
+  -webkit-tap-highlight-color:transparent;
+}
+.sport-tab:hover{color:var(--text);}
+.sport-tab.active{color:#6001d2;border-bottom-color:#6001d2;}
+.sport-tab-emoji{font-size:13px;}
+
+/* TEAM PILLS row */
+.team-pills-row{
+  display:flex;align-items:center;gap:10px;
+  margin-bottom:18px;flex-wrap:wrap;
+}
+.team-pills-label{
+  font-size:10px;font-weight:800;color:var(--text3);
+  text-transform:uppercase;letter-spacing:0.1em;
+  flex-shrink:0;
+}
+.team-pills{
+  display:flex;gap:8px;flex-wrap:wrap;flex:1;
+}
+.team-pill-group{
+  display:inline-flex;align-items:stretch;
+  border:1px solid var(--border);border-radius:20px;
+  overflow:hidden;background:var(--surface);
+  transition:border-color 0.15s;
+}
+.team-pill-group:hover{border-color:#6001d2;}
+.team-pill-group.active{border-color:#6001d2;background:#f5edff;}
+.dark .team-pill-group.active{background:#2a1d4a;}
+.team-pill{
+  background:none;border:none;cursor:pointer;font-family:inherit;
+  display:inline-flex;align-items:center;gap:5px;
+  padding:5px 11px;font-size:11px;font-weight:700;color:var(--text);
+  -webkit-tap-highlight-color:transparent;
+}
+.team-pill-group.active .team-pill{color:#6001d2;}
+.team-pill-emoji{font-size:14px;}
+.team-pill-name{letter-spacing:-0.1px;}
+.team-pill-link{
+  text-decoration:none;color:var(--text3);
+  padding:5px 9px;font-size:10px;font-weight:700;
+  border-left:1px solid var(--border);
+  display:inline-flex;align-items:center;
+  letter-spacing:0.04em;
+  transition:color 0.12s, background 0.12s;
+}
+.team-pill-link:hover{color:#6001d2;background:var(--surface2);}
+.team-pills-edit{
+  background:none;border:1px dashed var(--border);
+  border-radius:20px;padding:5px 12px;
+  font-size:10px;font-weight:700;color:var(--text3);
+  cursor:pointer;font-family:inherit;
+  transition:all 0.15s;
+}
+.team-pills-edit:hover{border-color:#6001d2;color:#6001d2;border-style:solid;}
+
+/* ACTIVE TEAM NOTICE */
+.active-team-notice{
+  display:flex;align-items:center;justify-content:space-between;
+  background:#f5edff;border:1px solid #ddd0ff;
+  border-radius:8px;padding:8px 14px;margin-bottom:18px;
+  font-size:12px;color:#6001d2;
+}
+.dark .active-team-notice{background:#2a1d4a;border-color:#3a2d5a;}
+.active-team-notice strong{color:#3f0080;font-weight:800;}
+.dark .active-team-notice strong{color:#c4a5ff;}
+.active-team-notice button{
+  background:none;border:none;color:#6001d2;cursor:pointer;
+  font-size:11px;font-weight:700;font-family:inherit;
+}
+
+/* SPORTS HERO — Yahoo dense lead with image */
+.sports-hero{
+  display:grid;grid-template-columns: 1.6fr 1fr;gap:20px;
+  margin-bottom:24px;cursor:pointer;
+  border-bottom:1px solid var(--border);padding-bottom:24px;
+  transition:opacity 0.15s;
+}
+.sports-hero:hover{opacity:0.92;}
+.sports-hero-img{
+  width:100%;aspect-ratio:16/10;
+  background-size:cover;background-position:center;
+  border-radius:8px;background-color:var(--surface2);
+  position:relative;
+}
+.sports-hero-fav{
+  position:absolute;top:12px;left:12px;
+  background:#fbbf24;color:#7c2d12;
+  font-size:10px;font-weight:900;letter-spacing:0.1em;
+  padding:4px 10px;border-radius:3px;
+  box-shadow:0 2px 8px rgba(0,0,0,0.2);
+}
+.sports-hero-text{display:flex;flex-direction:column;justify-content:center;}
+.sports-hero-title{
+  font-size:26px;font-weight:900;line-height:1.18;
+  letter-spacing:-0.5px;color:var(--text);margin:0 0 10px 0;
+  display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden;
+}
+.sports-hero-desc{
+  font-size:14px;line-height:1.5;color:var(--text2);
+  margin:0 0 10px 0;
+  display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden;
+}
+.sports-hero-meta{
+  font-size:11px;color:var(--text3);
+  display:flex;align-items:center;gap:6px;
+}
+.sports-hero-source{font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:0.04em;font-size:10px;}
+
+/* CUSTOMIZE — Teams section */
+.cp-team-row{
+  border:1px solid var(--border);border-radius:8px;
+  padding:10px 12px;margin-bottom:8px;
+  background:var(--surface);
+}
+.cp-team-row-head{
+  display:flex;align-items:center;gap:8px;margin-bottom:6px;
+}
+.cp-team-row-body{
+  display:flex;flex-direction:column;gap:3px;line-height:1.4;
+}
+
+/* Mobile sports adjustments */
+@media (max-width:900px){
+  .sports-hero{grid-template-columns:1fr;gap:14px;}
+  .sports-hero-title{font-size:22px;}
+  .team-pills-row{gap:8px;}
+}
+@media (max-width:640px){
+  .sports-score-strip{margin:-12px -12px 14px;padding:12px;}
+  .sst-tile{min-width:118px;padding:9px 11px;}
+  .sport-tab{padding:10px 12px;font-size:12px;min-height:44px;}
+  .team-pill-group{border-radius:18px;}
+  .team-pill{padding:7px 12px;font-size:11px;min-height:36px;}
+  .team-pill-link{padding:7px 9px;min-height:36px;}
+  .sports-hero{margin-bottom:18px;padding-bottom:18px;}
+  .sports-hero-img{aspect-ratio:16/10;max-height:240px;}
+  .sports-hero-title{font-size:20px;-webkit-line-clamp:3;}
+  .sports-hero-desc{-webkit-line-clamp:2;font-size:13px;}
+  .active-team-notice{font-size:11px;padding:7px 12px;}
+}
 
 /* ═══════════════════════════════════════════
    v20 ADDITIONS — Briefing page + category trending + live scoreboard
@@ -3185,7 +3429,7 @@ function SourceFooter({cat, feeds, arts}) {
 const CAT_LABELS = {general:'🌐 General',sports:'🏆 Sports',business:'⚡ Business',finance:'📈 Markets',bloom:'🔋 Bloom',popculture:'✨ Pop Culture',comedy:'😂 Comedy'};
 const PLAT_LABELS = {twitter:'𝕏',linkedin:'in',instagram:'IG',youtube:'▶'};
 
-function CustomizePanel({feeds, kw, alerts, urgent, social, watchlist, health, arts, initialTab, initialCat, onClose, onSave}) {
+function CustomizePanel({feeds, kw, alerts, urgent, social, watchlist, teams, health, arts, initialTab, initialCat, onClose, onSave}) {
   const [lf, setLf] = useState(JSON.parse(JSON.stringify(feeds)));
   const [lk, setLk] = useState(JSON.parse(JSON.stringify(kw)));
   const [la, setLa] = useState([...alerts]);
@@ -3194,6 +3438,9 @@ function CustomizePanel({feeds, kw, alerts, urgent, social, watchlist, health, a
   const [newSym, setNewSym] = useState('');
   const [newSymName, setNewSymName] = useState('');
   const [ls, setLs] = useState(JSON.parse(JSON.stringify(social)));
+  // v23: editable favorite teams
+  const [lt, setLt] = useState(JSON.parse(JSON.stringify(teams||[])));
+  const [newTeam, setNewTeam] = useState({team:'',match:'',sport:'football',league:'nfl',emoji:'🏈',espnUrl:'',teamUrl:''});
   const [secTab, setSecTab] = useState(initialTab||'keywords');
   const [kwTab, setKwTab] = useState(initialCat||'general');
   const [srcTab, setSrcTab] = useState(initialCat||'general');
@@ -3246,9 +3493,9 @@ function CustomizePanel({feeds, kw, alerts, urgent, social, watchlist, health, a
         <div className="cp-head"><span className="cp-title">Customize</span><button className="cp-x" onClick={onClose}>✕</button></div>
         <div className="cp-body">
           <div className="cp-sec-tabs">
-            {['keywords','alerts','sources','social','watchlist'].map(t=>(
+            {['keywords','alerts','sources','social','watchlist','teams'].map(t=>(
               <button key={t} className={`cp-sec-tab ${secTab===t?'active':''}`} onClick={()=>setSecTab(t)}>
-                {t==='keywords'?'Keywords':t==='alerts'?'Alerts':t==='sources'?'Sources':t==='social'?'Social':'📈 Watchlist'}
+                {t==='keywords'?'Keywords':t==='alerts'?'Alerts':t==='sources'?'Sources':t==='social'?'Social':t==='watchlist'?'📈 Watchlist':'🏆 Teams'}
               </button>
             ))}
           </div>
@@ -3383,7 +3630,62 @@ function CustomizePanel({feeds, kw, alerts, urgent, social, watchlist, health, a
             </div>
           )}
 
-          <button className="cp-save" onClick={()=>onSave({feeds:lf,kw:lk,alerts:la,urgent:lu,social:ls,watchlist:lw})}>Save & Refresh</button>
+          {secTab==='teams' && (
+            <div className="cp-sec">
+              <div className="cp-lbl">Favorite Teams</div>
+              <div className="cp-desc">Teams shown as pills on the Sports page. Match terms are used to filter articles. ESPN/Team URLs power the external links on each pill.</div>
+              {lt.map((t,i)=>(
+                <div key={i} className="cp-team-row">
+                  <div className="cp-team-row-head">
+                    <span style={{fontSize:'18px'}}>{t.emoji}</span>
+                    <strong style={{fontSize:'12px',color:'var(--text)',flex:1}}>{t.team}</strong>
+                    <span style={{fontSize:'10px',color:'var(--text3)'}}>{(t.sport||'').toUpperCase()} · {(t.league||'').toUpperCase()}</span>
+                    <button className="cp-del" onClick={()=>setLt(prev=>prev.filter((_,j)=>j!==i))}>✕</button>
+                  </div>
+                  <div className="cp-team-row-body">
+                    <div style={{fontSize:'10px',color:'var(--text3)'}}>Match: <span style={{color:'var(--text2)'}}>{t.match||'(none)'}</span></div>
+                    {t.espnUrl && <div style={{fontSize:'10px',color:'var(--text3)'}}>ESPN: <a href={t.espnUrl} target="_blank" rel="noreferrer" style={{color:'var(--accent)'}}>{t.espnUrl.length>50?t.espnUrl.slice(0,50)+'…':t.espnUrl}</a></div>}
+                    {t.teamUrl && <div style={{fontSize:'10px',color:'var(--text3)'}}>Team: <a href={t.teamUrl} target="_blank" rel="noreferrer" style={{color:'var(--accent)'}}>{t.teamUrl.length>50?t.teamUrl.slice(0,50)+'…':t.teamUrl}</a></div>}
+                  </div>
+                </div>
+              ))}
+              {lt.length===0 && <div style={{fontSize:'11px',color:'var(--text3)',padding:'10px 0'}}>No teams yet</div>}
+              <div className="cp-add-src" style={{marginTop:'14px'}}>
+                <div className="cp-add-src-title">+ Add team</div>
+                <input className="cp-input-sm" placeholder="Display name (e.g. Houston Texans)" value={newTeam.team} onChange={e=>setNewTeam(t=>({...t,team:e.target.value}))}/>
+                <input className="cp-input-sm" placeholder="Match term used to find articles (e.g. Houston Texans)" value={newTeam.match} onChange={e=>setNewTeam(t=>({...t,match:e.target.value}))}/>
+                <div style={{display:'flex',gap:'6px'}}>
+                  <select className="cp-input-sm" style={{flex:1}} value={newTeam.sport} onChange={e=>setNewTeam(t=>({...t,sport:e.target.value}))}>
+                    <option value="football">Football</option>
+                    <option value="basketball">Basketball</option>
+                    <option value="baseball">Baseball</option>
+                    <option value="hockey">Hockey</option>
+                    <option value="soccer">Soccer</option>
+                  </select>
+                  <select className="cp-input-sm" style={{flex:1}} value={newTeam.league} onChange={e=>setNewTeam(t=>({...t,league:e.target.value}))}>
+                    <option value="nfl">NFL</option>
+                    <option value="nba">NBA</option>
+                    <option value="mlb">MLB</option>
+                    <option value="nhl">NHL</option>
+                    <option value="college-football">College Football</option>
+                    <option value="mens-college-basketball">College Basketball</option>
+                    <option value="womens-college-basketball">Women's College Basketball</option>
+                  </select>
+                  <input className="cp-input-sm" style={{width:'60px'}} placeholder="🏈" value={newTeam.emoji} onChange={e=>setNewTeam(t=>({...t,emoji:e.target.value}))}/>
+                </div>
+                <input className="cp-input-sm" placeholder="ESPN URL (optional)" value={newTeam.espnUrl} onChange={e=>setNewTeam(t=>({...t,espnUrl:e.target.value}))}/>
+                <input className="cp-input-sm" placeholder="Official team URL (optional)" value={newTeam.teamUrl} onChange={e=>setNewTeam(t=>({...t,teamUrl:e.target.value}))}/>
+                <button className="cp-btn" style={{width:'100%'}} onClick={()=>{
+                  if (newTeam.team.trim() && newTeam.match.trim()) {
+                    setLt(prev=>[...prev, {...newTeam, team:newTeam.team.trim(), match:newTeam.match.trim()}]);
+                    setNewTeam({team:'',match:'',sport:'football',league:'nfl',emoji:'🏈',espnUrl:'',teamUrl:''});
+                  }
+                }}>Add Team</button>
+              </div>
+            </div>
+          )}
+
+          <button className="cp-save" onClick={()=>onSave({feeds:lf,kw:lk,alerts:la,urgent:lu,social:ls,watchlist:lw,teams:lt})}>Save & Refresh</button>
         </div>
       </div>
     </div>
@@ -3625,6 +3927,67 @@ function MiniScoreboardStrip({ scores, onOpen }) {
               </span>
               <span className="mini-sb-status">{g.status}</span>
             </span>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+// SPORTS SCORE STRIP — v23 — Yahoo Sports' signature dark-navy horizontal
+// score tile strip. Sits at the top of SportsPage. Each tile shows a game
+// (live → recent → upcoming priority). Favorites starred + pinned first.
+// Click any tile → opens ESPN game page.
+function SportsScoreStrip({ scores, teams }) {
+  const tiles = useMemo(() => {
+    const all = Object.values(scores || {}).flat();
+    if (!all.length) return [];
+    const isLive = g => g.state === 'in';
+    const isFav  = g => !!favoriteInList(g, teams);
+    // Sort: favorite-live > favorite-other > live > recent finals > upcoming
+    const sortKey = g => {
+      const fav = isFav(g) ? 0 : 1;
+      const live = isLive(g) ? 0 : g.state === 'post' ? 1 : 2;
+      return fav * 10 + live;
+    };
+    return [...all].sort((a, b) => sortKey(a) - sortKey(b)).slice(0, 12);
+  }, [scores, teams]);
+
+  if (tiles.length === 0) return (
+    <div className="sports-score-strip empty">
+      <span className="sports-score-strip-empty">No games today across selected leagues</span>
+    </div>
+  );
+
+  return (
+    <div className="sports-score-strip">
+      <div className="sports-score-strip-inner">
+        {tiles.map(g => {
+          const live = g.state === 'in';
+          const final = g.state === 'post';
+          const fav = favoriteInList(g, teams);
+          const home = g.homeAbbr || g.homeName || 'HOME';
+          const away = g.awayAbbr || g.awayName || 'AWAY';
+          const h = parseInt(g.homeScore)||0, a = parseInt(g.awayScore)||0;
+          const homeWin = final && h>a, awayWin = final && a>h;
+          return (
+            <div key={g.id}
+              className={`sst-tile ${live?'live':''} ${fav?'fav':''}`}
+              onClick={()=>g.link && window.open(g.link, '_blank')}>
+              {fav && <span className="sst-fav-star">★</span>}
+              <div className="sst-row">
+                <span className={`sst-team ${awayWin?'win':final?'loss':''}`}>{away}</span>
+                <span className={`sst-score ${awayWin?'win':final?'loss':''}`}>{g.awayScore || '—'}</span>
+              </div>
+              <div className="sst-row">
+                <span className={`sst-team ${homeWin?'win':final?'loss':''}`}>{home}</span>
+                <span className={`sst-score ${homeWin?'win':final?'loss':''}`}>{g.homeScore || '—'}</span>
+              </div>
+              <div className={`sst-status ${live?'live':final?'final':'pre'}`}>
+                {live && <span className="sst-live-dot"/>}
+                {g.status || (final?'FINAL':fmtDate(g.date))}
+              </div>
+            </div>
           );
         })}
       </div>
@@ -3994,6 +4357,8 @@ export default function App() {
   const [feeds, setFeeds]       = useState(()=>ld('feeds',DEFAULT_FEEDS));
   const [urgent, setUrgent]     = useState(()=>ld('urgent',DEFAULT_URGENT));
   const [watchlist, setWatchlist]= useState(()=>ld('watchlist',DEFAULT_WATCHLIST));
+  // v23: customizable favorite teams. Defaults to SCORE_TEAMS; user can add/remove via Customize.
+  const [teams, setTeams]       = useState(()=>ld('teams', SCORE_TEAMS));
   const [marketData, setMarketData] = useState({});
   const [marketLoading, setMarketLoading] = useState(false);
   const [social, setSocial]     = useState(()=>ld('social',DEFAULT_SOCIAL));
@@ -4151,13 +4516,17 @@ export default function App() {
     if(catMap[t.label])setTab(catMap[t.label]);
   };
 
-  const handleCustomizeSave = ({feeds:nf,kw:nk,alerts:na,urgent:nu,social:ns,watchlist:nw})=>{
+  // v23: persist teams whenever they change
+  useEffect(()=>{sv('teams',teams);},[teams]);
+
+  const handleCustomizeSave = ({feeds:nf,kw:nk,alerts:na,urgent:nu,social:ns,watchlist:nw,teams:nt})=>{
     setFeeds(nf);sv('feeds',nf);
     setKw(nk);sv('kw',nk);
     setAlerts(na);sv('alerts',na);
     if(nu){setUrgent(nu);sv('urgent',nu);}
     setSocial(ns);sv('social',ns);
     if(nw){setWatchlist(nw);sv('watchlist',nw);}
+    if(nt){setTeams(nt);sv('teams',nt);} // v23
     setShowPanel(false);refreshAll();
   };
 
@@ -4206,6 +4575,185 @@ export default function App() {
   const NEWS_CATS = ['general','sports','business','bloom','popculture','comedy'];
 
   // ─── FEED PAGE ─────────────────────────────────────────────────────────
+  // ─── SPORTS PAGE (v23) — Yahoo Sports rebuild ──────────────────────────
+  // News-first sports vertical: dark scoreboard strip top, sport tabs (All/NFL/
+  // NBA/MLB/CFB/CBB), favorite team pills with external links, then prioritized
+  // stories feed. Yahoo Sports' actual layout pattern.
+  const SportsPage = () => {
+    const [sportTab, setSportTab] = useState('all'); // 'all' | 'nfl' | 'nba' | 'mlb' | 'cfb' | 'cbb'
+    const [activeTeam, setActiveTeam] = useState(null); // team obj when filter pill tapped
+
+    const cc = CATS.sports;
+    const allItems = sorted('sports');
+    const isLoading = loading.sports;
+
+    // Filter scoreboard by sport tab
+    const visibleScores = useMemo(() => {
+      if (sportTab === 'all') return scores;
+      const leagueKey = sportTab; // already aligned with LEAGUES[].key
+      return { [leagueKey]: scores[leagueKey] || [] };
+    }, [scores, sportTab]);
+
+    // Filter teams by sport tab — pill rail respects tab
+    const visibleTeams = useMemo(() => {
+      if (sportTab === 'all') return teams;
+      const leagueKey = sportTab;
+      const L = LEAGUES.find(x => x.key === leagueKey);
+      if (!L) return teams;
+      return teams.filter(t => t.sport === L.sport && t.league === L.league);
+    }, [teams, sportTab]);
+
+    // Filter+sort stories: optionally team-locked, optionally sport-locked.
+    // Favorites float to top: any item mentioning ANY team in `teams` gets
+    // boosted unless a specific team filter is active.
+    const sportItems = useMemo(() => {
+      let items = allItems;
+      if (activeTeam) {
+        const m = (activeTeam.match || '').toLowerCase();
+        items = items.filter(a => (a.title + ' ' + (a.desc||'')).toLowerCase().includes(m));
+      } else if (sportTab !== 'all') {
+        // Sport-tab filter: keep articles mentioning any team in this sport,
+        // OR keep any article from sport-specific kw (broad fallback).
+        const teamsInSport = visibleTeams.map(t => (t.match||'').toLowerCase());
+        const sportKws = sportTab === 'nfl' ? ['nfl']
+                       : sportTab === 'nba' ? ['nba']
+                       : sportTab === 'mlb' ? ['mlb']
+                       : sportTab === 'cfb' ? ['cfb','college football']
+                       : sportTab === 'cbb' ? ['cbb','college basketball']
+                       : [];
+        items = items.filter(a => {
+          const t = (a.title + ' ' + (a.desc||'')).toLowerCase();
+          return teamsInSport.some(m => m && t.includes(m)) || sportKws.some(k => t.includes(k));
+        });
+      }
+      // Favorite-team prioritization: bubble articles mentioning user's teams to top
+      const favMatches = teams.map(t => (t.match||'').toLowerCase()).filter(Boolean);
+      const scored = items.map(a => {
+        const t = (a.title + ' ' + (a.desc||'')).toLowerCase();
+        const favHits = favMatches.filter(m => t.includes(m)).length;
+        return { ...a, _favScore: favHits };
+      });
+      scored.sort((a, b) => {
+        if (b._favScore !== a._favScore) return b._favScore - a._favScore;
+        return new Date(b.pubDate) - new Date(a.pubDate);
+      });
+      return scored;
+    }, [allItems, activeTeam, sportTab, teams, visibleTeams]);
+
+    // Hero = first article with image
+    const heroItems = sportItems.filter(a => a.img);
+    const lead = heroItems[0] || null;
+    const feedItems = lead ? sportItems.filter(a => a.link !== lead.link) : sportItems;
+
+    const SPORT_TABS = [
+      { key:'all', label:'All' },
+      { key:'nfl', label:'NFL', emoji:'🏈' },
+      { key:'nba', label:'NBA', emoji:'🏀' },
+      { key:'mlb', label:'MLB', emoji:'⚾' },
+      { key:'cfb', label:'College FB', emoji:'🏈' },
+      { key:'cbb', label:'College BB', emoji:'🏀' },
+    ];
+
+    return (
+      <div className="page sports-page">
+        {/* ── SCOREBOARD STRIP — dark navy Yahoo Sports look ── */}
+        <SportsScoreStrip scores={visibleScores} teams={teams}/>
+
+        {/* ── SPORT TABS — Yahoo purple accent ── */}
+        <div className="sport-tabs">
+          {SPORT_TABS.map(t => (
+            <button key={t.key}
+              className={`sport-tab ${sportTab===t.key?'active':''}`}
+              onClick={()=>{setSportTab(t.key); setActiveTeam(null);}}>
+              {t.emoji && <span className="sport-tab-emoji">{t.emoji}</span>}
+              {t.label}
+            </button>
+          ))}
+        </div>
+
+        {/* ── FAVORITE TEAM PILLS — pill is feed filter, side links go external ── */}
+        {visibleTeams.length > 0 && (
+          <div className="team-pills-row">
+            <span className="team-pills-label">My Teams</span>
+            <div className="team-pills">
+              {visibleTeams.map(t => {
+                const isActive = activeTeam?.team === t.team;
+                return (
+                  <span key={t.team} className={`team-pill-group ${isActive?'active':''}`}>
+                    <button className="team-pill"
+                      onClick={()=>setActiveTeam(isActive ? null : t)}
+                      title={`Filter to ${t.team}`}>
+                      <span className="team-pill-emoji">{t.emoji}</span>
+                      <span className="team-pill-name">{t.team}</span>
+                    </button>
+                    {t.espnUrl && (
+                      <a className="team-pill-link" href={t.espnUrl} target="_blank" rel="noreferrer" title="Open on ESPN">
+                        ESPN
+                      </a>
+                    )}
+                    {t.teamUrl && (
+                      <a className="team-pill-link" href={t.teamUrl} target="_blank" rel="noreferrer" title="Open team site">
+                        Team
+                      </a>
+                    )}
+                  </span>
+                );
+              })}
+              <button className="team-pills-edit" onClick={()=>openCustomize('teams','sports')}>⚙ Edit</button>
+            </div>
+          </div>
+        )}
+
+        {/* ── ACTIVE FILTER NOTICE ── */}
+        {activeTeam && (
+          <div className="active-team-notice">
+            <span>Showing stories about <strong>{activeTeam.emoji} {activeTeam.team}</strong></span>
+            <button onClick={()=>setActiveTeam(null)}>Clear ✕</button>
+          </div>
+        )}
+
+        {/* ── HERO + FEED (Yahoo dense card style) ── */}
+        <div className="page-grid">
+          <div className="feed-col">
+            {lead && (
+              <article className="sports-hero" onClick={()=>onRead(lead)}>
+                <div className="sports-hero-img" style={{backgroundImage:`url(${lead.img})`}}>
+                  {lead._favScore > 0 && <span className="sports-hero-fav">★ MY TEAMS</span>}
+                </div>
+                <div className="sports-hero-text">
+                  <h1 className="sports-hero-title">{lead.title}</h1>
+                  {lead.desc && <p className="sports-hero-desc">{lead.desc}</p>}
+                  <div className="sports-hero-meta">
+                    <span className="sports-hero-source">{lead.source}</span>
+                    <span>·</span>
+                    <span>{fmtDate(lead.pubDate)}</span>
+                  </div>
+                </div>
+              </article>
+            )}
+
+            {isLoading && !feedItems.length
+              ? <div className="empty-state"><div className="empty-icon">🏆</div><div className="empty-msg">Loading sports…</div></div>
+              : feedItems.length === 0
+                ? <div className="empty-state"><div className="empty-icon">📭</div><div className="empty-msg">{activeTeam?'No stories about this team yet':'No articles loaded yet'}</div><button className="refresh-btn" onClick={refreshAll}>Refresh</button></div>
+                : feedItems.slice(0, 25).map((a, i) => (
+                    <FeedCard key={i} a={a} cat="sports" isSaved={isSavedFn(a)} onSave={onSave} onRead={onRead} relatedSources={getRelated(a,'sports')}/>
+                  ))
+            }
+
+            <SourceFooter cat="sports" feeds={feeds} arts={arts}/>
+          </div>
+
+          <Sidebar cat="sports" arts={arts} kw={kw} health={health}
+            activeKw={activeKw} setActiveKw={k=>{setActiveKw(k);setActiveSrc(null);}}
+            activeSource={activeSrc} setActiveSource={s=>{setActiveSrc(s);setActiveKw(null);}}
+            onRead={onRead} scores={scores} scoresLoading={scoresLoading}
+            showScoreboard={false}/>
+        </div>
+      </div>
+    );
+  };
+
   const FeedPage = ({cat}) => {
     const cc=CATS[cat]; const items=sorted(cat); const isLoading=loading[cat];
     const heroItems=items.filter(a=>a.img);
@@ -4835,7 +5383,8 @@ export default function App() {
         {tab==='today'&&<TodayPage/>}
         {/* v22b: BriefingPage routing removed — briefing now renders as top section of Today.
             'briefing' tab redirects to Today below in handleTabChange. */}
-        {NEWS_CATS.includes(tab)&&<FeedPage cat={tab}/>}
+        {tab==='sports'&&<SportsPage/>}
+        {NEWS_CATS.filter(c=>c!=='sports').includes(tab)&&<FeedPage cat={tab}/>}
         {tab==='finance'&&<FinancePage/>}
         {tab==='podcasts'&&<PodcastsPage/>}
         {tab==='social'&&<SocialPage/>}
@@ -4864,7 +5413,7 @@ export default function App() {
         />
 
         {showPanel&&<CustomizePanel feeds={feeds} kw={kw} alerts={alerts} urgent={urgent}
-          social={social} watchlist={watchlist} health={health} arts={arts}
+          social={social} watchlist={watchlist} teams={teams} health={health} arts={arts}
           initialTab={panelInitial.tab} initialCat={panelInitial.cat}
           onClose={()=>setShowPanel(false)} onSave={handleCustomizeSave}/>}
       </div>
