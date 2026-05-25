@@ -1,4 +1,4 @@
-// MyNewsHub v25b — Session 7 wave 2: Google News grid + sidebar simplification + Business Bloomberg + accents
+// MyNewsHub v26 — AI unified panel + search rebuild + General hero layout + gap fixes (read state, clustering, velocity trending, share, paywall, keyboard shortcuts, PWA, stats)
 // ─────────────────────────────────────────────────────────────────────────────
 // Builds on v25a. Completes the unified-design system. v25a established the
 // foundation (NBC sans typography, modern pill bar, ~225 lines orphan cleanup);
@@ -44,7 +44,7 @@ const CATS = {
   sports:     { label:'Sports',       color:'#d97706', bg:'#fef3c7', emoji:'🏆' },
   business:   { label:'Business',     color:'#16a34a', bg:'#f0fdf4', emoji:'⚡' },
   finance:    { label:'Markets',      color:'#7c3aed', bg:'#f5f3ff', emoji:'📈' },
-  bloom:      { label:'Bloom Energy', color:'#0369a1', bg:'#e0f2fe', emoji:'🔋' },
+  bloom:      { label:'Energy',       color:'#0369a1', bg:'#e0f2fe', emoji:'🔋' },
   popculture: { label:'Pop Culture',  color:'#db2777', bg:'#fdf2f8', emoji:'✨' },
   comedy:     { label:'Comedy',       color:'#a855f7', bg:'#faf5ff', emoji:'😂' },
 };
@@ -69,6 +69,11 @@ const PODCAST_FEEDS = [
   { name:'Morning Wire',         host:'Daily Wire',        url:'https://feeds.megaphone.fm/BVDWV8747925072', emoji:'☀️' },
   { name:'All-In Podcast',       host:'Chamath & Besties', url:'https://allinchamathjason.libsyn.com/rss',   emoji:'💰' },
   { name:'Flagrant',             host:'Andrew Schulz',     url:'https://feeds.megaphone.fm/APPI6857213837',  emoji:'🔥' },
+  { name:'NPR Politics',         host:'NPR',               url:'https://feeds.npr.org/510310/podcast.xml',   emoji:'📻' },
+  { name:'Marketplace',          host:'APM',               url:'https://feeds.publicradio.org/public_feeds/marketplace-pm/rss/rss', emoji:'📈' },
+  { name:'Freakonomics Radio',   host:'Stephen Dubner',    url:'https://feeds.simplecast.com/Y8lFbOT4',      emoji:'🎓' },
+  { name:'Masters of Scale',     host:'Reid Hoffman',      url:'https://feeds.simplecast.com/3NwB90JG',      emoji:'🚀' },
+  { name:'Acquired',             host:'Ben & David',       url:'https://feeds.simplecast.com/jeNJI0r9',      emoji:'💡' },
 ];
 
 const DEFAULT_KW = {
@@ -102,6 +107,8 @@ const DEFAULT_FEEDS = {
     { name:'Bloomberg',         url:'https://feeds.bloomberg.com/markets/news.rss',                              on:true },
   ],
   sports: [
+    { name:'The Ringer',           url:'https://www.theringer.com/rss/index.xml',                              on:true },
+    { name:'Athlon Sports',        url:'https://athlonsports.com/feed',                                        on:true },
     { name:'ESPN NFL',             url:'https://www.espn.com/espn/rss/nfl/news',                                on:true },
     { name:'ESPN NBA',             url:'https://www.espn.com/espn/rss/nba/news',                                on:true },
     { name:'ESPN MLB',             url:'https://www.espn.com/espn/rss/mlb/news',                                on:true },
@@ -249,8 +256,15 @@ const LEAGUES = [
   { key:'cbb', label:'College BB',sport:'basketball', league:'mens-college-basketball', emoji:'🏀', accent:'#d97706' },
 ];
 
-const SK = 'v25b_';
-const OLD_SKS = ['v25a_','v24_','v23_','v22_'];
+const SK = 'v26_';
+const OLD_SKS = ['v25b_','v25a_','v24_','v23_'];
+
+// Domains known to require subscriptions — articles get a lock badge
+const PAYWALL_DOMAINS = new Set([
+  'wsj.com','ft.com','bloomberg.com','economist.com','nytimes.com',
+  'washingtonpost.com','theathletic.com','barrons.com','hbr.org',
+  'businessinsider.com','foreignpolicy.com','thetimes.co.uk',
+]);
 
 // v22b: Briefing 3-tier methodology constants.
 // Tier 1: priority briefing sources — articles from these get pulled first
@@ -683,6 +697,7 @@ const SOURCE_URLS = {
   'CBS Sports MLB':'https://www.cbssports.com/mlb','CBS Sports CFB':'https://www.cbssports.com/college-football',
   'CBS Sports CBB':'https://www.cbssports.com/college-basketball',
   'Pro Football Talk':'https://profootballtalk.nbcsports.com','Bleacher Report':'https://bleacherreport.com',
+  'The Ringer':'https://www.theringer.com','Athlon Sports':'https://athlonsports.com',
   '247Sports':'https://247sports.com','Kentucky Sports Radio':'https://kentuckysportsradio.com',
   'On3 Recruiting':'https://www.on3.com','The Spun':'https://thespun.com',
   'Reuters Business':'https://www.reuters.com/business','CNBC Energy':'https://www.cnbc.com/energy',
@@ -697,6 +712,157 @@ const SOURCE_URLS = {
   'CNBC Finance':'https://www.cnbc.com','The Babylon Bee':'https://babylonbee.com',
   'The Onion':'https://www.theonion.com',
 };
+
+// ─── PAYWALL DETECTOR ────────────────────────────────────────────────────────
+function isPaywalled(link) {
+  if (!link) return false;
+  try {
+    const host = new URL(link).hostname.replace('www.','');
+    return PAYWALL_DOMAINS.has(host);
+  } catch { return false; }
+}
+
+// ─── WEB SEARCH FALLBACK (DuckDuckGo Instant Answer) ─────────────────────────
+async function fetchWebSearch(query) {
+  try {
+    const r = await fetchWithTimeout(`https://api.duckduckgo.com/?q=${encodeURIComponent(query)}&format=json&no_redirect=1&no_html=1`, 6000);
+    if (r.ok) {
+      const d = await r.json();
+      const results = [];
+      if (d.AbstractText && d.AbstractURL) {
+        results.push({ title: d.Heading || query, desc: d.AbstractText, link: d.AbstractURL, source: d.AbstractSource || 'Web' });
+      }
+      (d.RelatedTopics || []).slice(0, 5).forEach(t => {
+        if (t.Text && t.FirstURL) {
+          results.push({ title: t.Text.split(' - ')[0] || t.Text, desc: t.Text, link: t.FirstURL, source: 'DuckDuckGo' });
+        }
+      });
+      if (results.length > 0) return results;
+    }
+  } catch {}
+  return [];
+}
+
+// Source recommendations based on search query
+function suggestSourcesForQuery(query) {
+  const q = query.toLowerCase();
+  const out = [];
+  if (/ercot|grid|texas energy|permian/.test(q)) {
+    out.push({ name: 'EnergyWire', url: 'https://www.eenews.net/sections/energywire/feed/', cat: 'business' });
+    out.push({ name: 'ERCOT Insider', url: 'https://www.ercotinsider.com/feed', cat: 'business' });
+  }
+  if (/data center|hyperscale|ai infra/.test(q)) {
+    out.push({ name: 'Data Center Frontier', url: 'https://www.datacenterfrontier.com/rss', cat: 'business' });
+  }
+  if (/midstream|pipeline/.test(q)) {
+    out.push({ name: 'Pipeline & Gas Journal', url: 'https://pgjonline.com/rss', cat: 'business' });
+  }
+  if (/macro|fed|rates|treasuries/.test(q)) {
+    out.push({ name: 'WSJ Real Time Econ', url: 'https://feeds.a.dj.com/rss/RSSEconomy.xml', cat: 'finance' });
+  }
+  if (/recruiting|nil|transfer portal/.test(q)) {
+    out.push({ name: 'On3 NIL', url: 'https://www.on3.com/nil/feed/', cat: 'sports' });
+  }
+  return out;
+}
+
+// v26: Dynamic "Why It Matters" — built from user's keyword config + teams.
+// Returns relevance lines specific to the article. Returns [] when not relevant.
+function whyItMatters(article, userKw, userTeams) {
+  const title = (article.title || '').toLowerCase();
+  const desc = (article.desc || '').toLowerCase();
+  const text = title + ' ' + desc;
+  const lines = [];
+
+  // Check user's own keywords for direct relevance
+  const allUserKws = Object.values(userKw || {}).flat();
+  const matchedKws = allUserKws.filter(k => k && text.includes(k.toLowerCase()));
+  if (matchedKws.length > 0) {
+    lines.push(`Matches your tracked topics: ${matchedKws.slice(0, 3).join(', ')}.`);
+  }
+
+  // Check favorite teams
+  const favTeams = (userTeams || []).filter(t => t.match && text.includes((t.match || '').toLowerCase()));
+  if (favTeams.length > 0) {
+    lines.push(`Your team${favTeams.length > 1 ? 's' : ''}: ${favTeams.map(t => t.emoji + ' ' + t.team).join(', ')}.`);
+  }
+
+  // Energy / BD pipeline signals
+  if (/ercot|grid|peaker|gas|lng|permian|fuel cell|hydrogen|microgrid|distributed power/.test(text)) {
+    lines.push('Direct read on energy BD pipeline — watch for RFP signals in 30-60 days.');
+  }
+  if (/data center|hyperscale|ai infra|nvidia|onshoring/.test(text)) {
+    lines.push('Energy + AI intersection — high-conviction growth zone.');
+  }
+
+  // Macro signals
+  if (/fed|interest rates|yield|treasur|inflation|powell/.test(text)) {
+    lines.push('Macro signal — rate path affects both dividend strategy and real estate.');
+  }
+
+  // Houston / Texas local
+  if (/houston|harris county/.test(text) && !favTeams.length) {
+    lines.push('Local impact — may affect business or community.');
+  }
+
+  // AI / tech disruption
+  if (/\bai\b|chatgpt|openai|anthropic|claude|gemini|llm|artificial intelligence/.test(text)) {
+    lines.push('AI / disruption angle — flag for business opportunities filter.');
+  }
+
+  return lines.slice(0, 2); // cap at 2 lines to keep the callout tight
+}
+
+// ─── STORY CLUSTERING ─────────────────────────────────────────────────────────
+// Groups articles covering the same story. Uses bigram Jaccard similarity on
+// titles (threshold 0.28) within a 6-hour window. Returns articles with a
+// `_clusterSize` and `_clusterSources` so the card can show "3 sources covering this".
+function clusterStories(articles) {
+  function bigrams(str) {
+    const words = str.toLowerCase().replace(/[^a-z0-9 ]/g, '').split(/\s+/).filter(w => w.length > 2);
+    const bg = new Set();
+    for (let i = 0; i < words.length - 1; i++) bg.add(words[i] + '_' + words[i+1]);
+    return bg;
+  }
+  function jaccard(a, b) {
+    if (!a.size || !b.size) return 0;
+    let inter = 0;
+    for (const k of a) if (b.has(k)) inter++;
+    return inter / (a.size + b.size - inter);
+  }
+
+  const sixHoursMs = 6 * 60 * 60 * 1000;
+  const clustered = new Set();
+  const result = [];
+
+  for (let i = 0; i < articles.length; i++) {
+    if (clustered.has(i)) continue;
+    const a = articles[i];
+    const bgA = bigrams(a.title);
+    const cluster = [a];
+    const clusterSources = new Set([a.source]);
+
+    for (let j = i + 1; j < articles.length; j++) {
+      if (clustered.has(j)) continue;
+      const b = articles[j];
+      const timeDiff = Math.abs(new Date(a.pubDate) - new Date(b.pubDate));
+      if (timeDiff > sixHoursMs) continue;
+      if (jaccard(bgA, bigrams(b.title)) >= 0.28) {
+        clustered.add(j);
+        cluster.push(b);
+        clusterSources.add(b.source);
+      }
+    }
+
+    clustered.add(i);
+    result.push({
+      ...a,
+      _clusterSize: cluster.length,
+      _clusterSources: [...clusterSources].slice(0, 5),
+    });
+  }
+  return result;
+}
 
 // ─── GLOBAL CSS ───────────────────────────────────────────────────────────────
 // Ghost design principles:
@@ -2925,28 +3091,164 @@ body{overscroll-behavior-y:contain;}
 @media (hover:none){
   button,a,.src-row,.trend-row,.today-item,.fc,.pod-card{-webkit-tap-highlight-color:rgba(29,78,216,0.08);}
 }
+
+/* ═══════════════════════════════════════════
+   v26 ADDITIONS
+═══════════════════════════════════════════ */
+
+/* Ghost card: fixed padding always (no layout jump on hover) */
+.fc{padding:20px 14px;margin:0 -14px;}
+.fc:hover{background:var(--surface2);}
+
+/* Already-read state — muted but still visible */
+.fc-read{opacity:0.6;}
+.fc-read .fc-title{color:var(--text2);}
+
+/* Breaking news: title gets extra weight + size */
+.fc-title-breaking{font-size:20px!important;font-weight:900!important;color:var(--text)!important;}
+
+/* Paywall badge */
+.fc-paywall-badge{font-size:11px;cursor:default;flex-shrink:0;}
+
+/* Cluster badge — "N sources" indicator */
+.fc-cluster-badge{
+  font-size:9px;font-weight:700;color:#7c3aed;background:#f5f3ff;
+  border-radius:4px;padding:2px 7px;letter-spacing:0.04em;cursor:default;
+}
+.dark .fc-cluster-badge{background:#2d1f5a;color:#a78bfa;}
+
+/* Category placeholder image with gradient */
+.gn-card-img-ph{
+  display:flex;align-items:center;justify-content:center;
+  font-size:22px;
+}
+
+/* v26: Why It Matters — gold callout under AI panel */
+.fc-why{background:linear-gradient(135deg,#fbf5e8 0%,#f9eed2 100%);border-left:3px solid #b8893d;border-radius:0 8px 8px 0;padding:10px 12px;margin-top:8px;}
+.dark .fc-why{background:linear-gradient(135deg,#2a1f0a 0%,#1f1505 100%);}
+.fc-why-lbl{font-size:9px;font-weight:700;color:#b8893d;text-transform:uppercase;letter-spacing:0.08em;margin-bottom:6px;}
+.fc-why-line{font-size:12px;line-height:1.45;color:#5a4a1f;margin-bottom:4px;}
+.dark .fc-why-line{color:#d4b878;}
+.fc-why-line:last-child{margin-bottom:0;}
+
+/* v26: General homepage 2-col hero (lead left, briefing right) */
+.home-hero-row{display:grid;grid-template-columns:1.7fr 1fr;gap:24px;margin-bottom:32px;padding-bottom:24px;border-bottom:1px solid var(--border);}
+.home-hero-side .briefing-teaser{margin-bottom:0;height:100%;}
+.gn-lead-solo{cursor:pointer;transition:opacity 0.15s;}
+.gn-lead-solo:hover{opacity:0.92;}
+.gn-lead-solo .gn-lead-img{border-radius:8px;margin-bottom:14px;}
+.gn-lead-solo .gn-lead-title{font-size:26px;font-weight:900;line-height:1.15;letter-spacing:-0.6px;color:var(--text);margin:0 0 10px;max-width:720px;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden;}
+.gn-lead-solo .gn-lead-desc{font-size:14px;line-height:1.5;color:var(--text2);margin:0 0 10px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;}
+.gn-lead-solo .gn-lead-meta{font-size:11px;color:var(--text3);display:flex;align-items:center;gap:6px;}
+@media (max-width:900px){.home-hero-row{grid-template-columns:1fr;gap:14px;}.gn-lead-solo .gn-lead-title{font-size:22px;}}
+@media (max-width:640px){.home-hero-row{margin-bottom:20px;padding-bottom:18px;}.gn-lead-solo .gn-lead-title{font-size:20px;-webkit-line-clamp:3;}}
+
+/* v26: Sticky filter pill */
+.sticky-filter{position:sticky;top:96px;z-index:5;background:var(--bg);padding:8px 0;border-bottom:1px solid var(--border2);}
+@media (max-width:640px){.sticky-filter{top:88px;}}
+
+/* v26: Web search fallback + source recommendations */
+.web-fallback{margin-top:20px;}
+.web-result{display:block;padding:12px 14px;border:1px solid var(--border);border-radius:8px;margin-bottom:8px;text-decoration:none;color:inherit;transition:border-color 0.12s;}
+.web-result:hover{border-color:var(--accent);background:var(--surface2);}
+.web-result-title{font-size:14px;font-weight:700;color:var(--text);margin-bottom:4px;}
+.web-result-desc{font-size:12px;color:var(--text2);line-height:1.45;margin-bottom:6px;}
+.web-result-src{font-size:10px;color:var(--accent);font-weight:600;text-transform:uppercase;letter-spacing:0.05em;}
+.source-recs{margin-top:20px;padding:14px;background:linear-gradient(135deg,#fbf5e8 0%,#f9eed2 100%);border-left:3px solid #b8893d;border-radius:0 8px 8px 0;}
+.dark .source-recs{background:linear-gradient(135deg,#2a1f0a 0%,#1f1505 100%);}
+.source-rec-list{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px;}
+.source-rec-btn{background:#fff;color:#b8893d;border:1px solid #b8893d;padding:6px 12px;border-radius:6px;font-size:11px;font-weight:700;cursor:pointer;font-family:inherit;}
+.source-rec-btn:hover{background:#b8893d;color:#fff;}
+.dark .source-rec-btn{background:transparent;color:#d4b878;border-color:#d4b878;}
+
+/* v26: Reading stats panel */
+.stats-panel{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:20px 24px;margin-bottom:28px;}
+.stats-head{font-size:11px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:0.1em;margin-bottom:14px;}
+.stats-grid{display:flex;gap:24px;margin-bottom:16px;flex-wrap:wrap;}
+.stat-block{text-align:center;min-width:60px;}
+.stat-num{font-size:28px;font-weight:900;color:var(--text);letter-spacing:-1px;font-variant-numeric:tabular-nums;}
+.stat-label{font-size:10px;color:var(--text3);font-weight:600;text-transform:uppercase;letter-spacing:0.06em;margin-top:2px;}
+.stats-sub-label{font-size:10px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:0.08em;margin-bottom:8px;}
+.stats-sources{margin-bottom:14px;}
+.stats-source-row{display:flex;align-items:center;gap:8px;margin-bottom:6px;}
+.stats-source-name{font-size:12px;font-weight:600;color:var(--text2);width:120px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;flex-shrink:0;}
+.stats-source-bar{height:4px;background:var(--accent);border-radius:2px;opacity:0.6;min-width:4px;transition:width 0.3s;}
+.stats-source-cnt{font-size:11px;color:var(--text3);font-variant-numeric:tabular-nums;margin-left:4px;}
+.stats-cats{}
+.stats-cat-chips{display:flex;gap:6px;flex-wrap:wrap;}
+.stats-cat-chip{font-size:11px;font-weight:600;border-radius:12px;padding:3px 10px;}
+
+/* v26: Business + Finance card terminal-feel source label */
+.gn-card.business .gn-card-source,.gn-card.finance .gn-card-source{
+  font-family:'SF Mono','Cascadia Code','Consolas',monospace;letter-spacing:0;font-size:9px;
+}
+
+/* Dark mode: warmer dark (less blue-cold IDE feel) */
+.dark{
+  --bg:#141414;--surface:#1c1c1c;--surface2:#242424;
+  --border:#2e2e2e;--border2:#222222;
+  --text:#f0f0f0;--text2:#a0a0a0;--text3:#585858;--text4:#303030;
+  --shadow-sm:0 1px 3px rgba(0,0,0,0.4);
+  --shadow-md:0 4px 16px rgba(0,0,0,0.5);
+  --shadow-lg:0 8px 32px rgba(0,0,0,0.6);
+}
+
+/* Skeleton loading shimmer for feed cards */
+@keyframes shimmer{0%{background-position:-200% 0;}100%{background-position:200% 0;}}
+.fc-skeleton{padding:20px 14px;border-bottom:1px solid var(--border2);}
+.fc-skeleton-line{height:14px;border-radius:4px;background:linear-gradient(90deg,var(--surface2) 25%,var(--border) 50%,var(--surface2) 75%);background-size:200% 100%;animation:shimmer 1.4s infinite;margin-bottom:8px;}
+.fc-skeleton-title{height:18px;width:80%;border-radius:4px;background:linear-gradient(90deg,var(--surface2) 25%,var(--border) 50%,var(--surface2) 75%);background-size:200% 100%;animation:shimmer 1.4s infinite;margin-bottom:10px;}
+
+/* Keyboard hint */
+kbd{display:inline-block;padding:1px 5px;border:1px solid var(--border);border-radius:3px;font-family:inherit;font-size:10px;color:var(--text3);background:var(--surface2);}
 `;
 
-// ─── DIVERSITY-AWARE TRENDING ─────────────────────────────────────────────────
-// Returns up to `limit` articles with at most `maxPerCat` from each category.
-// This fixes the "all sports" sidebar bug when sports is heavily loaded.
+
+// ─── DIVERSITY-AWARE TRENDING (velocity-scored) ───────────────────────────────
+// Scores articles by keyword match + publication velocity (articles-per-topic in
+// last 1h vs last 3h ratio). A topic with 3 articles in the last hour is hotter
+// than one with 10 spread across the day. Caps per-category to avoid Sports domination.
 function diverseTrending(arts, kw, limit = 8, maxPerCat = 2) {
   const allKws = Object.values(kw).flat().map(k => k.toLowerCase());
   const all = Object.values(arts).flat();
+  const now = Date.now();
+  const oneHour = 60 * 60 * 1000;
+  const threeHours = 3 * oneHour;
+
+  // Build topic velocity: for each keyword, count articles in 1h vs 3h
+  const kwVelocity = {};
+  for (const k of allKws) {
+    const recent1h = all.filter(a => {
+      const age = now - new Date(a.pubDate).getTime();
+      return age < oneHour && (a.title + ' ' + (a.desc||'')).toLowerCase().includes(k);
+    }).length;
+    const recent3h = all.filter(a => {
+      const age = now - new Date(a.pubDate).getTime();
+      return age < threeHours && (a.title + ' ' + (a.desc||'')).toLowerCase().includes(k);
+    }).length;
+    kwVelocity[k] = recent3h > 0 ? (recent1h / recent3h) : 0;
+  }
+
   const seen = new Set();
   const deduped = all.filter(a => {
     const k = a.title.slice(0,60).toLowerCase().replace(/\s+/g,'');
     if (seen.has(k)) return false; seen.add(k); return true;
   });
+
   deduped.sort((a,b) => {
     const aTxt=(a.title+' '+(a.desc||'')).toLowerCase();
     const bTxt=(b.title+' '+(b.desc||'')).toLowerCase();
-    const aKw=allKws.filter(k=>aTxt.includes(k)).length;
-    const bKw=allKws.filter(k=>bTxt.includes(k)).length;
-    if (bKw!==aKw) return bKw-aKw;
-    return new Date(b.pubDate)-new Date(a.pubDate);
+    const aKws = allKws.filter(k=>aTxt.includes(k));
+    const bKws = allKws.filter(k=>bTxt.includes(k));
+    // Velocity bonus: sum velocity scores of matched keywords
+    const aVel = aKws.reduce((s,k) => s + (kwVelocity[k]||0), 0);
+    const bVel = bKws.reduce((s,k) => s + (kwVelocity[k]||0), 0);
+    const aScore = aKws.length * 2 + aVel;
+    const bScore = bKws.length * 2 + bVel;
+    if (bScore !== aScore) return bScore - aScore;
+    return new Date(b.pubDate) - new Date(a.pubDate);
   });
-  // Enforce per-category cap
+
   const catCounts = {};
   const result = [];
   for (const a of deduped) {
@@ -2961,7 +3263,7 @@ function diverseTrending(arts, kw, limit = 8, maxPerCat = 2) {
 }
 
 // ─── FEED CARD ────────────────────────────────────────────────────────────────
-function FeedCard({a, cat, isSaved, onSave, onRead, relatedSources}) {
+function FeedCard({a, cat, isSaved, onSave, onRead, relatedSources, isRead, userKw, userTeams}) {
   const [imgErr, setImgErr] = useState(false);
   const [aiState, setAiState] = useState('closed');
   const [summary, setSummary] = useState('');
@@ -2973,12 +3275,15 @@ function FeedCard({a, cat, isSaved, onSave, onRead, relatedSources}) {
   const [loadingDisc, setLoadingDisc] = useState(false);
   const cc = CATS[cat]||CATS.general;
   const topKw = a.matchedKw?.[0]||null;
+  const paywall = isPaywalled(a.link);
+  const readMins = a.desc ? Math.max(1, Math.round(a.desc.split(/\s+/).length / 220)) : null;
+  const clusterCount = a._clusterSize > 1 ? a._clusterSize : 0;
+  const whyLines = whyItMatters(a, userKw, userTeams);
 
   const handleAI = async (e) => {
     e.stopPropagation();
     if (aiState !== 'closed') { setAiState('closed'); return; }
-    setAiState('takeaways'); // 'takeaways' state means: show BOTH summary + bullets (v22 unified behavior)
-    // Fetch both in parallel — user gets paragraph + bullets together on single tap
+    setAiState('open');
     const needSummary = !summary;
     const needTakeaways = !takeaways;
     if (!needSummary && !needTakeaways) return;
@@ -2996,6 +3301,19 @@ function FeedCard({a, cat, isSaved, onSave, onRead, relatedSources}) {
       }
     }
     setLoadingAI(false);
+  };
+
+  const handleShare = async (e) => {
+    e.stopPropagation();
+    if (navigator.share) {
+      try {
+        await navigator.share({ title: a.title, url: a.link });
+      } catch {}
+    } else {
+      try { await navigator.clipboard.writeText(a.link); } catch {}
+      // simple fallback: open the link directly
+      window.open(a.link, '_blank');
+    }
   };
 
   const handleDisc = async (e) => {
@@ -3031,40 +3349,55 @@ function FeedCard({a, cat, isSaved, onSave, onRead, relatedSources}) {
   };
 
   return (
-    <div className={`fc ${cat}`} onClick={() => onRead(a)}>
+    <div className={`fc ${cat}${isRead?' fc-read':''}`} onClick={() => onRead(a)}>
       <div className="fc-meta">
         <span className="fc-source" style={{color:cc.color}}>{a.source}</span>
+        {paywall && <span className="fc-paywall-badge" title="Subscription may be required">🔒</span>}
         {a.isAlert && <span className="fc-alert-badge">● BREAKING</span>}
         {topKw && <span className="fc-topic" style={{background:cc.bg,color:cc.color}}>{topKw}</span>}
+        {clusterCount > 1 && (
+          <span className="fc-cluster-badge" title={`Also covered by: ${a._clusterSources?.join(', ')}`}>
+            {clusterCount} sources
+          </span>
+        )}
         <span className="fc-date">{fmtDate(a.pubDate)}</span>
       </div>
       <div className="fc-body">
         {a.img && !imgErr
           ? <img className="fc-thumb" src={a.img} loading="lazy" onError={()=>setImgErr(true)} alt=""/>
-          : <div className="fc-thumb-ph" style={{background:cc.bg}}>{cc.emoji}</div>}
+          : <div className="fc-thumb-ph" style={{background:`linear-gradient(135deg,${cc.bg},${cc.bg}cc)`}}>
+              <span style={{fontSize:'22px'}}>{cc.emoji}</span>
+            </div>}
         <div className="fc-text">
-          <div className="fc-title">{a.title}</div>
+          <div className={`fc-title${a.isAlert?' fc-title-breaking':''}`}>{a.title}</div>
           {a.desc && <div className="fc-desc">{a.desc}</div>}
         </div>
       </div>
       {aiState!=='closed' && (
         <div className="fc-ai-panel" onClick={e=>e.stopPropagation()}>
+          {/* What actually happened */}
           <div className="fc-summary">
-            <div className="fc-summary-lbl">✦ AI Summary</div>
+            <div className="fc-summary-lbl">✦ What Happened</div>
             {loadingAI && !summary
               ? <div style={{fontSize:'11px',color:'var(--text3)',fontStyle:'italic'}}>Generating summary...</div>
               : aiErr && !summary
                 ? <div style={{fontSize:'11px',color:'var(--red)'}}>{aiErr}</div>
                 : <div className="fc-summary-text">{summary}</div>}
           </div>
-          {aiState==='takeaways' && (
-            <div className="fc-takeaways">
-              <div className="fc-takeaways-lbl">📋 Key Takeaways</div>
-              {loadingAI && !takeaways
-                ? <div style={{fontSize:'11px',color:'var(--text3)',fontStyle:'italic'}}>Analyzing article...</div>
-                : aiErr && !takeaways
-                  ? <div style={{fontSize:'11px',color:'var(--red)'}}>{aiErr}</div>
-                  : <TakeawaysContent text={takeaways}/>}
+          {/* Key points (3 bullets) */}
+          <div className="fc-takeaways">
+            <div className="fc-takeaways-lbl">📋 Key Points</div>
+            {loadingAI && !takeaways
+              ? <div style={{fontSize:'11px',color:'var(--text3)',fontStyle:'italic'}}>Analyzing article...</div>
+              : aiErr && !takeaways
+                ? <div style={{fontSize:'11px',color:'var(--red)'}}>{aiErr}</div>
+                : <TakeawaysContent text={takeaways}/>}
+          </div>
+          {/* Why It Matters — only renders if relevant */}
+          {whyLines.length > 0 && (
+            <div className="fc-why">
+              <div className="fc-why-lbl">★ Why It Matters</div>
+              {whyLines.map((line, i) => <div key={i} className="fc-why-line">{line}</div>)}
             </div>
           )}
         </div>
@@ -3112,7 +3445,14 @@ function FeedCard({a, cat, isSaved, onSave, onRead, relatedSources}) {
         <button className={`fc-act ${showDisc?'disc-on':''}`} onClick={handleDisc} disabled={loadingDisc}>
           💬 {loadingDisc?'Searching...':showDisc?'Hide':'Pulse'}
         </button>
-        <a className="fc-read-link" href={a.link} target="_blank" rel="noreferrer" onClick={e=>{e.stopPropagation();onRead(a);}}>Read →</a>
+        {navigator.share !== undefined && (
+          <button className="fc-act" onClick={handleShare} title="Share article">
+            ↗ Share
+          </button>
+        )}
+        <a className="fc-read-link" href={a.link} target="_blank" rel="noreferrer" onClick={e=>{e.stopPropagation();onRead(a);}}>
+          {readMins ? `${readMins} min · ` : ''}Read →
+        </a>
       </div>
     </div>
   );
@@ -3589,11 +3929,14 @@ function Sidebar({cat, arts, kw, health, activeKw, setActiveKw, activeSource, se
   useEffect(() => { if (activeKw) setShowTopics(true); }, [activeKw]);
   useEffect(() => { if (activeSource) setShowSources(true); }, [activeSource]);
 
-  // v25b: Simplified — single category-scoped trending column.
-  // Old 4-tab mess (Trending|Latest|Business|Sports) removed; users have
-  // dedicated category pages for those views. Sidebar's job is to surface
-  // what's hot in the CURRENT category.
-  const sbItems = useMemo(() => catArts.slice(0, 8).map(a => ({...a, _cat: cat})), [catArts, cat]);
+  // v26: Sidebar trending now respects activeKw + activeSource filters
+  // so clicking a topic chip actually filters the trending list too.
+  const sbItems = useMemo(() => {
+    let items = catArts;
+    if (activeKw) items = items.filter(a => (a.title + ' ' + (a.desc||'')).toLowerCase().includes(activeKw.toLowerCase()));
+    if (activeSource) items = items.filter(a => a.source === activeSource);
+    return items.slice(0, 8).map(a => ({...a, _cat: cat}));
+  }, [catArts, cat, activeKw, activeSource]);
 
   return (
     <div className="sidebar">
@@ -3606,10 +3949,10 @@ function Sidebar({cat, arts, kw, health, activeKw, setActiveKw, activeSource, se
 
       {showScoreboard && <Scoreboard scores={scores} loading={scoresLoading}/>}
 
-      {/* v25b: single trending column scoped to this category */}
+      {/* v26: single trending column — label updates when filter active */}
       <div className="gs-section">
         <div className="gs-label" style={{color:cc.color}}>
-          🔥 Trending in {cc.label}
+          🔥 {activeKw ? `${activeKw} in ${cc.label}` : activeSource ? `${activeSource}` : `Trending in ${cc.label}`}
         </div>
         {sbItems.length === 0
           ? <div style={{padding:'14px 0',fontSize:'11px',color:'var(--text3)'}}>No stories yet</div>
@@ -4626,6 +4969,10 @@ export default function App() {
   const [dark, setDark]         = useState(()=>ld('dark',false));
   const [saved, setSaved]       = useState(()=>ld('saved',[]));
   const [clicks, setClicks]     = useState(()=>ld('clicks',{}));
+  const [readLinks, setReadLinks] = useState(()=>new Set(ld('readLinks',[])));
+  const [webResults, setWebResults] = useState([]);
+  const [webLoading, setWebLoading] = useState(false);
+  const [sourceRecs, setSourceRecs] = useState([]);
   const [kw, setKw]             = useState(()=>ld('kw',DEFAULT_KW));
   const [alerts, setAlerts]     = useState(()=>ld('alerts',['Texans','Astros','Kentucky','Clemson','ERCOT','Bloom Energy','fuel cell','hurricane','earthquake','breaking']));
   const [feeds, setFeeds]       = useState(()=>ld('feeds',DEFAULT_FEEDS));
@@ -4661,6 +5008,7 @@ export default function App() {
   useEffect(()=>{sv('dark',dark);document.body.className=dark?'dark':'';},[dark]);
   useEffect(()=>{sv('saved',saved);},[saved]);
   useEffect(()=>{sv('clicks',clicks);},[clicks]);
+  useEffect(()=>{sv('readLinks',[...readLinks]);},[readLinks]);
 
   // v20: whole-word urgent match + 6h recency window + cap 8.
   // Whole-word prevents "killed" matching "killed it" or "killing" substrings.
@@ -4780,9 +5128,17 @@ export default function App() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   },[]);
 
-  const onRead  = a=>{setClicks(c=>({...c,[a.source]:(c[a.source]||0)+1}));window.open(a.link,'_blank');};
-  const onSave  = a=>setSaved(s=>s.some(x=>x.link===a.link)?s.filter(x=>x.link!==a.link):[...s,a]);
+  const onRead  = a=>{
+    setClicks(c=>({...c,[a.source]:(c[a.source]||0)+1}));
+    if (a.link) setReadLinks(s=>{const n=new Set(s);n.add(a.link);return n;});
+    window.open(a.link,'_blank');
+  };
+  const onSave  = a=>{
+    const wasSaved = saved.some(x=>x.link===a.link);
+    setSaved(s=>wasSaved?s.filter(x=>x.link!==a.link):[...s,{...a,savedAt:Date.now()}]);
+  };
   const isSavedFn = a=>saved.some(s=>s.link===a.link);
+  const isReadFn = a=>a.link&&readLinks.has(a.link);
 
   const handleTickerClick = t=>{
     setSearch(t.label.toLowerCase());
@@ -4792,6 +5148,42 @@ export default function App() {
 
   // v23: persist teams whenever they change
   useEffect(()=>{sv('teams',teams);},[teams]);
+
+  // v26: Global search — when search text is present, query all categories
+  // When internal results are thin (<3), fetch DuckDuckGo web fallback
+  useEffect(() => {
+    if (!search || search.length < 3) {
+      setWebResults([]); setSourceRecs([]); return;
+    }
+    const internalCount = Object.values(arts).flat().filter(a =>
+      (a.title + ' ' + (a.desc||'')).toLowerCase().includes(search)
+    ).length;
+    setSourceRecs(suggestSourcesForQuery(search));
+    if (internalCount < 3) {
+      setWebLoading(true);
+      fetchWebSearch(search).then(r => { setWebResults(r); setWebLoading(false); });
+    } else {
+      setWebResults([]);
+    }
+  }, [search, arts]);
+
+  // Keyboard shortcuts: J/K navigate articles, B bookmark, / focus search, Escape clear
+  useEffect(() => {
+    const handler = (e) => {
+      const tag = document.activeElement?.tagName?.toLowerCase();
+      if (tag === 'input' || tag === 'textarea') return;
+      if (e.key === '/') {
+        e.preventDefault();
+        const inp = document.querySelector('.search-input, .mobile-search-input');
+        if (inp) inp.focus();
+      }
+      if (e.key === 'Escape') {
+        setSearch(''); setActiveKw(null); setActiveSrc(null);
+      }
+    };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, []);
 
   const handleCustomizeSave = ({feeds:nf,kw:nk,alerts:na,urgent:nu,social:ns,watchlist:nw,teams:nt})=>{
     setFeeds(nf);sv('feeds',nf);
@@ -4844,6 +5236,22 @@ export default function App() {
     const matched=kwMatch(a,cat);if(!matched.length)return[];
     return(arts[cat]||[]).filter(x=>x.link!==a.link&&matched.some(k=>(x.title+(x.desc||'')).toLowerCase().includes(k.toLowerCase()))).slice(0,4);
   };
+
+  // Reading stats derived from clicks + readLinks
+  const readingStats = useMemo(() => {
+    const total = readLinks.size;
+    const topSources = Object.entries(clicks)
+      .sort((a,b) => b[1]-a[1]).slice(0, 5)
+      .map(([src, cnt]) => ({ src, cnt }));
+    const catCounts = {};
+    Object.values(arts).flat().forEach(a => {
+      if (a.link && readLinks.has(a.link)) {
+        catCounts[a.cat] = (catCounts[a.cat]||0) + 1;
+      }
+    });
+    const topCats = Object.entries(catCounts).sort((a,b)=>b[1]-a[1]).slice(0,3);
+    return { total, topSources, topCats };
+  }, [clicks, readLinks, arts]);
 
   const NEWS_CATS = ['general','sports','business','bloom','popculture','comedy'];
 
@@ -4929,6 +5337,12 @@ export default function App() {
 
     return (
       <div className="page sports-page">
+        {/* v26: Last updated stamp */}
+        {lastUpdated.sports && (
+          <div style={{padding:'8px 0',display:'flex',justifyContent:'flex-end'}}>
+            <LastUpdated timestamp={lastUpdated.sports} onRefresh={() => loadCat('sports')}/>
+          </div>
+        )}
         {/* ── SCOREBOARD STRIP — dark navy Yahoo Sports look ── */}
         <SportsScoreStrip scores={visibleScores} teams={teams}/>
 
@@ -5032,7 +5446,7 @@ export default function App() {
               : feedItems.length === 0
                 ? <div className="empty-state"><div className="empty-icon">📭</div><div className="empty-msg">{activeTeam?'No stories about this team yet':'No articles loaded yet'}</div><button className="refresh-btn" onClick={refreshAll}>Refresh</button></div>
                 : feedItems.slice(activeTeam?0:3, 25).map((a, i) => (
-                    <FeedCard key={i} a={a} cat="sports" isSaved={isSavedFn(a)} onSave={onSave} onRead={onRead} relatedSources={getRelated(a,'sports')}/>
+                    <FeedCard key={i} a={a} cat="sports" isSaved={isSavedFn(a)} onSave={onSave} onRead={onRead} relatedSources={getRelated(a,'sports')} isRead={isReadFn(a)} userKw={kw} userTeams={teams}/>
                   ))
             }
 
@@ -5050,27 +5464,18 @@ export default function App() {
   };
 
   const FeedPage = ({cat}) => {
-    const cc=CATS[cat]; const items=sorted(cat); const isLoading=loading[cat];
+    const cc=CATS[cat];
+    // Apply story clustering before sorting so cluster metadata is available
+    const rawItems=sorted(cat);
+    const items=useMemo(()=>clusterStories(rawItems),[rawItems]);
+    const isLoading=loading[cat];
     const heroItems=items.filter(a=>a.img);
     const catLead=heroItems[0]||null;
-    const catSide=heroItems.slice(1,6);
     const feedItems=catLead?items.filter(a=>a.link!==catLead.link):items;
 
-    // v24a: General is now the homepage — gets briefing teaser + cross-cat
-    // sections at top (the role Today used to have)
     const isHome = cat === 'general';
-
-    // v20: Trending scoped to THIS category only (not global).
-    const catTrending = useMemo(
-      () => diverseTrending({[cat]: arts[cat]||[]}, kw, 6, 6),
-      [arts, kw, cat]
-    );
-
-    // v20: Topic chips at bottom of feed — mirrors sidebar for mid-scroll access
     const catKws = kw[cat] || [];
 
-    // v24a: For General homepage, build "From Other Categories" sections
-    // Top 3 articles from each non-General category, surfaced inline
     const otherCatSections = useMemo(() => {
       if (!isHome) return [];
       const otherCats = ['business','finance','bloom','sports','popculture'];
@@ -5083,14 +5488,34 @@ export default function App() {
 
     return (
       <div className="page">
-        {/* v24a: Briefing teaser at top of General homepage */}
-        {isHome && !activeKw && !activeSrc && (
-          <BriefingTeaser arts={arts} onOpenFull={() => handleTabChange('briefing')}/>
+        {/* v26: General gets 2-col hero (lead | briefing). Other cats: briefing above if no lead. */}
+        {isHome && !activeKw && !activeSrc && catLead ? (
+          <div className="home-hero-row">
+            <div className="home-hero-main">
+              <article className="gn-lead-solo" onClick={()=>onRead(catLead)}>
+                <div className="gn-lead-img" style={{backgroundImage:`url(${catLead.img})`,aspectRatio:'16/10'}}/>
+                <div className="gn-lead-text">
+                  <h1 className="gn-lead-title">{catLead.title}</h1>
+                  {catLead.desc&&<p className="gn-lead-desc">{catLead.desc}</p>}
+                  <div className="gn-lead-meta">
+                    <span className="gn-lead-source" style={{color:cc.color}}>{catLead.source}</span>
+                    <span>·</span><span>{fmtDate(catLead.pubDate)}</span>
+                  </div>
+                </div>
+              </article>
+            </div>
+            <div className="home-hero-side">
+              <BriefingTeaser arts={arts} onOpenFull={() => handleTabChange('briefing')}/>
+            </div>
+          </div>
+        ) : (
+          isHome && !activeKw && !activeSrc && (
+            <BriefingTeaser arts={arts} onOpenFull={() => handleTabChange('briefing')}/>
+          )
         )}
 
-        {/* v25b: Google News grid — lead card + 3-col grid below.
-            Used when not filtered (filtered views fall through to FeedCard stack). */}
-        {!activeKw && !activeSrc && catLead && (
+        {/* Google News grid (non-General categories keep full-width grid) */}
+        {!activeKw && !activeSrc && catLead && !isHome && (
           <div className="gn-grid">
             <article className="gn-lead" onClick={()=>onRead(catLead)}>
               <div className="gn-lead-img" style={{backgroundImage:`url(${catLead.img})`}}/>
@@ -5110,7 +5535,7 @@ export default function App() {
                 <article key={i} className={`gn-card ${cat}`} onClick={()=>onRead(a)}>
                   {a.img
                     ? <div className="gn-card-img" style={{backgroundImage:`url(${a.img})`}}/>
-                    : <div className="gn-card-img-ph"/>}
+                    : <div className="gn-card-img-ph" style={{background:`linear-gradient(135deg,${cc.bg},${cc.bg}cc)`}}><span style={{fontSize:'20px'}}>{cc.emoji}</span></div>}
                   <h3 className="gn-card-title">{a.title}</h3>
                   <div className="gn-card-meta">
                     <span className="gn-card-source" style={{color:cc.color}}>{a.source}</span>
@@ -5122,27 +5547,7 @@ export default function App() {
           </div>
         )}
 
-        {/* v20: Trending in [Category] — between hero and Latest feed */}
-        {!activeKw && !activeSrc && catTrending.length >= 3 && (
-          <section className="cat-trending">
-            <div className="cat-trending-head">
-              <span className="cat-trending-label" style={{color:cc.color}}>
-                🔥 Trending in {cc.label}
-              </span>
-            </div>
-            <div className="cat-trending-row">
-              {catTrending.map((a, i) => (
-                <div key={i} className="cat-trending-card" onClick={()=>onRead(a)}>
-                  <div className="cat-trending-num" style={{color:cc.color}}>{i+1}</div>
-                  <div className="cat-trending-body">
-                    <div className="cat-trending-title">{a.title}</div>
-                    <div className="cat-trending-meta">{a.source} · {fmtDate(a.pubDate)}</div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </section>
-        )}
+        {/* Trending removed from FeedPage — sidebar handles it (no duplication) */}
 
         <div className="page-grid">
           <div className="feed-col">
@@ -5154,7 +5559,7 @@ export default function App() {
               <button className="page-customize-btn" onClick={()=>openCustomize('sources',cat)}>⚙ Customize</button>
             </div>
             {(activeKw||activeSrc)&&(
-              <div style={{display:'flex',gap:'6px',flexWrap:'wrap',marginBottom:'12px'}}>
+              <div className="sticky-filter" style={{display:'flex',gap:'6px',flexWrap:'wrap',marginBottom:'12px'}}>
                 {activeKw&&<span style={{background:cc.bg,color:cc.color,borderRadius:'20px',padding:'3px 10px',fontSize:'10px',fontWeight:'600',display:'inline-flex',alignItems:'center',gap:'5px'}}>🔍 {activeKw}<button onClick={()=>setActiveKw(null)} style={{background:'none',border:'none',cursor:'pointer',color:'inherit',fontSize:'12px',padding:0}}>✕</button></span>}
                 {activeSrc&&<span style={{background:'var(--surface2)',color:'var(--text2)',borderRadius:'20px',padding:'3px 10px',fontSize:'10px',fontWeight:'600',border:'1px solid var(--border)',display:'inline-flex',alignItems:'center',gap:'5px'}}>📰 {activeSrc}<button onClick={()=>setActiveSrc(null)} style={{background:'none',border:'none',cursor:'pointer',color:'inherit',fontSize:'12px',padding:0}}>✕</button></span>}
               </div>
@@ -5162,9 +5567,48 @@ export default function App() {
             {isLoading&&!feedItems.length
               ?<div className="empty-state"><div className="empty-icon">{cc.emoji}</div><div className="empty-msg">Loading {cc.label}…</div></div>
               :feedItems.length===0
-                ?<div className="empty-state"><div className="empty-icon">📭</div><div className="empty-msg">{activeKw||activeSrc?'No articles match this filter':'No articles loaded yet'}</div><button className="refresh-btn" onClick={refreshAll}>Refresh</button></div>
-                :feedItems.slice(activeKw||activeSrc?0:3,20).map((a,i)=><FeedCard key={i} a={a} cat={cat} isSaved={isSavedFn(a)} onSave={onSave} onRead={onRead} relatedSources={getRelated(a,cat)}/>)
+                ?<div className="empty-state"><div className="empty-icon">📭</div><div className="empty-msg">{activeKw||activeSrc?'No articles match this filter':search?`No internal results for "${search}"`:'No articles loaded yet'}</div><button className="refresh-btn" onClick={refreshAll}>Refresh</button></div>
+                :feedItems.slice(activeKw||activeSrc||search?0:3,20).map((a,i)=><FeedCard key={i} a={a} cat={cat} isSaved={isSavedFn(a)} onSave={onSave} onRead={onRead} relatedSources={getRelated(a,cat)} isRead={isReadFn(a)} userKw={kw} userTeams={teams}/>)
             }
+
+            {/* v26: Web search fallback when searching with thin internal results */}
+            {search && (webResults.length > 0 || webLoading) && (
+              <div className="web-fallback">
+                <div className="rail-label" style={{margin:'24px 0 12px'}}>🌐 From the web</div>
+                {webLoading && <div style={{fontSize:'12px',color:'var(--text3)',fontStyle:'italic',padding:'10px 0'}}>Searching the web…</div>}
+                {webResults.map((r,i) => (
+                  <a key={i} className="web-result" href={r.link} target="_blank" rel="noreferrer">
+                    <div className="web-result-title">{r.title}</div>
+                    {r.desc && <div className="web-result-desc">{r.desc.slice(0, 160)}</div>}
+                    <div className="web-result-src">{r.source}</div>
+                  </a>
+                ))}
+              </div>
+            )}
+
+            {/* v26: Source recommendations when searching */}
+            {search && sourceRecs.length > 0 && (
+              <div className="source-recs">
+                <div className="rail-label" style={{margin:'20px 0 10px'}}>💡 Add a source for "{search}"</div>
+                <div className="source-rec-list">
+                  {sourceRecs.map((s,i) => (
+                    <button key={i} className="source-rec-btn" onClick={()=>{
+                      setFeeds(prev => {
+                        const next = JSON.parse(JSON.stringify(prev));
+                        if (!next[s.cat]) next[s.cat] = [];
+                        if (!next[s.cat].some(f => f.url === s.url)) {
+                          next[s.cat].push({name: s.name, url: s.url, on: true});
+                        }
+                        sv('feeds', next);
+                        return next;
+                      });
+                    }}>
+                      + Add {s.name}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
 
             {/* v20: Topics chips mirrored at bottom of feed — mid-scroll filter access */}
             {catKws.length > 0 && !activeKw && (
@@ -5501,9 +5945,54 @@ export default function App() {
 
   const SavedPage = () => (
     <div className="page">
+      {/* Reading stats panel */}
+      {(readingStats.total > 0 || readingStats.topSources.length > 0) && (
+        <div className="stats-panel">
+          <div className="stats-head">📊 Your Reading Stats</div>
+          <div className="stats-grid">
+            <div className="stat-block">
+              <div className="stat-num">{readingStats.total}</div>
+              <div className="stat-label">Articles read</div>
+            </div>
+            <div className="stat-block">
+              <div className="stat-num">{saved.length}</div>
+              <div className="stat-label">Saved</div>
+            </div>
+            {readingStats.topSources.slice(0,1).map(s => (
+              <div key={s.src} className="stat-block">
+                <div className="stat-num">{s.cnt}</div>
+                <div className="stat-label">from {s.src}</div>
+              </div>
+            ))}
+          </div>
+          {readingStats.topSources.length > 0 && (
+            <div className="stats-sources">
+              <div className="stats-sub-label">Top sources</div>
+              {readingStats.topSources.map(s => (
+                <div key={s.src} className="stats-source-row">
+                  <span className="stats-source-name">{s.src}</span>
+                  <span className="stats-source-bar" style={{width:`${Math.min(100,(s.cnt/readingStats.topSources[0].cnt)*100)}%`}}/>
+                  <span className="stats-source-cnt">{s.cnt}</span>
+                </div>
+              ))}
+            </div>
+          )}
+          {readingStats.topCats.length > 0 && (
+            <div className="stats-cats">
+              <div className="stats-sub-label">Top categories</div>
+              <div className="stats-cat-chips">
+                {readingStats.topCats.map(([c,cnt]) => {
+                  const cc=CATS[c]||CATS.general;
+                  return <span key={c} className="stats-cat-chip" style={{background:cc.bg,color:cc.color}}>{cc.emoji} {cc.label} ({cnt})</span>;
+                })}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
       {saved.length===0
         ?<div className="empty-state" style={{paddingTop:'80px'}}><div className="empty-icon">☆</div><div className="empty-msg">No saved items yet<br/><span style={{fontSize:'11px',color:'var(--text3)'}}>Tap Save on any article or episode</span></div></div>
-        :<div className="page-grid"><div className="feed-col"><span className="page-header" style={{marginBottom:'24px',display:'block'}}>Saved — {saved.length} items</span>{saved.map((a,i)=><FeedCard key={i} a={a} cat={a.cat||'general'} isSaved={true} onSave={onSave} onRead={onRead}/>)}</div></div>
+        :<div className="page-grid"><div className="feed-col"><span className="page-header" style={{marginBottom:'24px',display:'block'}}>Saved — {saved.length} items</span>{saved.map((a,i)=><FeedCard key={i} a={a} cat={a.cat||'general'} isSaved={true} onSave={onSave} onRead={onRead} isRead={isReadFn(a)} userKw={kw} userTeams={teams}/>)}</div></div>
       }
     </div>
   );
@@ -5538,9 +6027,12 @@ export default function App() {
                 <span style={{color:'var(--text3)',marginLeft:8}}>· Quotes via Yahoo Finance · 5min cache</span>
               </div>
             </div>
-            <button className="fin-refresh" onClick={loadMarketData} disabled={marketLoading}>
-              {marketLoading?'⟳ Loading…':'↺ Refresh'}
-            </button>
+            <div style={{display:'flex',alignItems:'center',gap:'12px'}}>
+              {lastUpdated.finance && <LastUpdated timestamp={lastUpdated.finance} onRefresh={() => loadCat('finance')}/>}
+              <button className="fin-refresh" onClick={loadMarketData} disabled={marketLoading}>
+                {marketLoading?'⟳ Loading…':'↺ Refresh'}
+              </button>
+            </div>
           </div>
           <div className="fin-indices">
             {INDICES.map(idx=>{
@@ -5619,7 +6111,7 @@ export default function App() {
                       ))}
                     </div>
                     {items.slice(3, 15).map((a, i) => (
-                      <FeedCard key={i} a={a} cat="finance" isSaved={isSavedFn(a)} onSave={onSave} onRead={onRead} relatedSources={getRelated(a,'finance')}/>
+                      <FeedCard key={i} a={a} cat="finance" isSaved={isSavedFn(a)} onSave={onSave} onRead={onRead} relatedSources={getRelated(a,'finance')} isRead={isReadFn(a)} userKw={kw} userTeams={teams}/>
                     ))}
                   </>
               }
