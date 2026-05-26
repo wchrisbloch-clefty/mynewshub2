@@ -874,36 +874,47 @@ function clusterStories(articles) {
 //   • Sidebar: no card boxes — section label + list only
 //   • Scoreboard keeps structural box (it IS a widget, not editorial content)
 const GLOBAL_CSS = `
+/* TIME Magazine + BBC News editorial typography — Playfair Display for serif headlines */
+@import url('https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,700;0,900;1,700&family=Inter:wght@300;400;500;600;700;800;900&display=swap');
+
 *{box-sizing:border-box;margin:0;padding:0;}
 :root{
-  --bg:#f9fafb;--surface:#ffffff;--surface2:#f3f4f6;
-  --border:#e5e7eb;--border2:#f3f4f6;
-  --text:#111827;--text2:#374151;--text3:#9ca3af;--text4:#d1d5db;
-  --accent:#1d4ed8;--accent-bg:#eff6ff;
-  --red:#dc2626;--green:#16a34a;--amber:#d97706;
-  --radius:12px;--radius-sm:8px;
-  --shadow-sm:0 1px 3px rgba(0,0,0,0.05);
-  --shadow-md:0 4px 16px rgba(0,0,0,0.08);
-  --shadow-lg:0 8px 32px rgba(0,0,0,0.12);
+  /* Editorial type scale — TIME/BBC north star */
+  --font-serif:'Playfair Display',Georgia,'Times New Roman',serif;
+  --font-sans:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,sans-serif;
+
+  /* BBC News / TIME palette — warm newsprint white, deep navy, crimson */
+  --bg:#f8f7f4;--surface:#ffffff;--surface2:#f2f0ec;
+  --border:#d6d3ce;--border2:#e8e5e0;
+  --text:#1a1a1a;--text2:#3d3a36;--text3:#7c7870;--text4:#c0bdb8;
+  /* TIME crimson as primary accent — authoritative, editorial */
+  --accent:#c41d25;--accent-bg:#fdf2f2;
+  --navy:#0a1628;--navy-light:#1d2d4a;
+  --red:#c41d25;--green:#1a6b2a;--amber:#b45309;
+  --radius:6px;--radius-sm:3px;
+  --shadow-sm:0 1px 4px rgba(0,0,0,0.06);
+  --shadow-md:0 4px 20px rgba(0,0,0,0.09);
+  --shadow-lg:0 8px 40px rgba(0,0,0,0.13);
 }
 .dark{
-  --bg:#0f0f1a;--surface:#18182a;--surface2:#222235;
-  --border:#2d2d45;--border2:#1c1c30;
-  --text:#f0f0f8;--text2:#a8a8c0;--text3:#5c5c78;--text4:#2e2e48;
-  --accent:#60a5fa;--accent-bg:#1e2d4a;
-  --red:#f87171;--green:#4ade80;--amber:#fbbf24;
-  --shadow-sm:0 1px 3px rgba(0,0,0,0.3);
-  --shadow-md:0 4px 16px rgba(0,0,0,0.4);
-  --shadow-lg:0 8px 32px rgba(0,0,0,0.5);
+  /* Warm dark — BBC dark mode feel, not cold blue IDE */
+  --bg:#141210;--surface:#1e1c1a;--surface2:#272422;
+  --border:#2e2b28;--border2:#222020;
+  --text:#f0ede8;--text2:#a8a39d;--text3:#5e5a55;--text4:#303030;
+  --accent:#e8454d;--accent-bg:#2a1518;
+  --navy:#0f1624;--navy-light:#1a2340;
+  --red:#e8454d;--green:#4ade80;--amber:#fbbf24;
+  --shadow-sm:0 1px 4px rgba(0,0,0,0.4);
+  --shadow-md:0 4px 20px rgba(0,0,0,0.5);
+  --shadow-lg:0 8px 40px rgba(0,0,0,0.6);
 }
 
 body{
   background:var(--bg);
-  /* v25: NBC-style typography. Inter first for cleaner sans-serif look,
-     Helvetica Neue for macOS, then system fallbacks. */
-  font-family:'Inter','Helvetica Neue',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
-  -webkit-font-smoothing:antialiased;color:var(--text);
-  font-size:15px;line-height:1.5;
+  font-family:var(--font-sans);
+  -webkit-font-smoothing:antialiased;
+  -moz-osx-font-smoothing:grayscale;
+  color:var(--text);font-size:15px;line-height:1.5;
 }
 .hub{background:var(--bg);min-height:100vh;}
 
@@ -914,13 +925,15 @@ body{
 ═══════════════════════════════════════════ */
 .topbar-wrap{position:sticky;top:0;z-index:300;}
 
-/* v25: PILL BAR — replaces whisper bar.
-   Bigger pills (~46px tall), bigger numerics, color-coded change indicators.
-   Horizontal scrollable on narrow viewports. Single source of truth for
-   weather/indices/tickers across desktop and mobile. */
+/* ═══════════════════════════════════════════
+   PILL BAR — editorial data strip
+   BBC-clean: navy background, high-contrast data
+   Weather shown prominently; indices + tickers scroll
+═══════════════════════════════════════════ */
 .pill-bar{
-  background:var(--surface);
-  border-bottom:1px solid var(--border);
+  /* Deep navy strip — BBC data bar DNA */
+  background:var(--navy);
+  border-bottom:none;
   padding:0;
 }
 .pill-bar-inner{
@@ -931,131 +944,151 @@ body{
 }
 .pill-bar-inner::-webkit-scrollbar{display:none;}
 .pill{
-  display:flex;align-items:center;gap:10px;
-  flex-shrink:0;padding:8px 16px;
-  border-right:1px solid var(--border2);
-  text-decoration:none;color:var(--text);
+  display:flex;align-items:center;gap:8px;
+  flex-shrink:0;padding:8px 18px;
+  border-right:1px solid rgba(255,255,255,0.08);
+  text-decoration:none;color:rgba(255,255,255,0.9);
   cursor:pointer;
   transition:background 0.12s;
-  min-width:140px;
+  min-width:130px;
 }
-.pill:hover{background:var(--surface2);}
-.pill-icon{font-size:18px;flex-shrink:0;}
-.pill-body{display:flex;flex-direction:column;line-height:1.15;flex:1;min-width:0;}
+.pill:hover{background:rgba(255,255,255,0.06);}
+/* Weather pills: slightly warmer feel */
+.pill-wx{min-width:150px;}
+.pill-icon{font-size:16px;flex-shrink:0;}
+.pill-body{display:flex;flex-direction:column;line-height:1.2;flex:1;min-width:0;}
 .pill-label{
-  font-size:10px;font-weight:800;color:var(--text3);
-  text-transform:uppercase;letter-spacing:0.06em;
+  font-family:var(--font-sans);
+  font-size:9px;font-weight:700;color:rgba(255,255,255,0.5);
+  text-transform:uppercase;letter-spacing:0.1em;
   white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
 }
 .pill-value{
-  font-size:14px;font-weight:800;color:var(--text);
+  font-family:var(--font-sans);
+  font-size:14px;font-weight:700;color:#fff;
   font-variant-numeric:tabular-nums;letter-spacing:-0.2px;
-  margin-top:2px;
-  font-family:'SF Mono','Cascadia Code','Consolas',monospace;
+  margin-top:1px;
 }
-.pill-sub{font-size:10px;font-weight:500;color:var(--text3);font-family:inherit;letter-spacing:0;}
+.pill-sub{font-size:10px;font-weight:400;color:rgba(255,255,255,0.6);letter-spacing:0;}
 .pill-chg{
+  font-family:var(--font-sans);
   font-size:10px;font-weight:700;font-variant-numeric:tabular-nums;
-  padding:2px 6px;border-radius:3px;flex-shrink:0;
-  font-family:'SF Mono','Cascadia Code','Consolas',monospace;
+  padding:2px 7px;border-radius:2px;flex-shrink:0;
 }
-.pill-chg.up{color:#16a34a;background:rgba(22,163,74,0.1);}
-.pill-chg.down{color:#dc2626;background:rgba(220,38,38,0.1);}
+/* Editorial: green/red on dark navy pops clearly */
+.pill-chg.up{color:#4ade80;background:rgba(74,222,128,0.12);}
+.pill-chg.down{color:#f87171;background:rgba(248,113,113,0.12);}
 
 /* Old whisper-bar selectors kept as no-ops in case any external CSS still references */
 .whisper-bar,.whisper-inner,.wx-pill,.ticker-row,.ticker-item{display:none;}
 
 /* ═══════════════════════════════════════════
-   BREAKING BANNER — inline, not bolted-on
-   Slides in below pill bar, same visual
-   language as the topbar, not a separate slab
+   BREAKING BANNER — TIME-style urgent alert strip
+   Solid crimson, bold label, smooth scrolling ticker
 ═══════════════════════════════════════════ */
 .breaking-bar{
-  background:rgba(185,28,28,0.92);
-  backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);
-  height:26px;display:flex;align-items:center;overflow:hidden;
-  border-bottom:1px solid rgba(0,0,0,0.1);
+  background:var(--accent);
+  height:28px;display:flex;align-items:center;overflow:hidden;
+  border-bottom:1px solid rgba(0,0,0,0.15);
 }
 .breaking-bar.hidden{display:none;}
 .breaking-label{
-  background:rgba(255,255,255,0.15);backdrop-filter:blur(4px);
-  color:#fff;font-size:8px;font-weight:800;letter-spacing:0.12em;
-  padding:2px 10px;white-space:nowrap;flex-shrink:0;border-right:1px solid rgba(255,255,255,0.15);
+  /* TIME-style: white ALL-CAPS label on solid red */
+  background:rgba(0,0,0,0.2);
+  color:#fff;font-size:8px;font-weight:900;letter-spacing:0.2em;
+  padding:0 14px;white-space:nowrap;flex-shrink:0;
+  border-right:1px solid rgba(255,255,255,0.15);height:100%;
+  display:flex;align-items:center;font-family:var(--font-sans);
 }
-.breaking-ticker{flex:1;overflow:hidden;margin:0 10px;}
+.breaking-ticker{flex:1;overflow:hidden;margin:0 12px;}
 .breaking-ticker-inner{
-  display:inline-flex;gap:56px;
-  animation:ticker-scroll 90s linear infinite;white-space:nowrap;
+  display:inline-flex;gap:60px;
+  animation:ticker-scroll 80s linear infinite;white-space:nowrap;
 }
 .breaking-ticker-inner:hover{animation-play-state:paused;}
 @keyframes ticker-scroll{0%{transform:translateX(0);}100%{transform:translateX(-50%);}}
 .breaking-item{
-  font-size:11px;color:rgba(255,255,255,0.9);font-weight:500;
+  font-family:var(--font-sans);
+  font-size:11px;color:rgba(255,255,255,0.95);font-weight:600;
   cursor:pointer;display:inline-flex;align-items:center;gap:8px;
 }
-.breaking-item:hover{color:#fff;}
-.breaking-sep{color:rgba(255,255,255,0.3);font-size:9px;}
+.breaking-item:hover{color:#fff;text-decoration:underline;}
+.breaking-sep{color:rgba(255,255,255,0.4);font-size:9px;}
 .breaking-close{
-  background:none;border:none;color:rgba(255,255,255,0.5);
-  cursor:pointer;font-size:13px;padding:0 12px;flex-shrink:0;line-height:1;
+  background:none;border:none;color:rgba(255,255,255,0.6);
+  cursor:pointer;font-size:14px;padding:0 14px;flex-shrink:0;line-height:1;
 }
 .breaking-close:hover{color:#fff;}
 
 /* ═══════════════════════════════════════════
-   NAV BAR
+   NAV BAR — TIME Magazine editorial masthead
+   Red top rule + serif logo + BBC-clean section tabs
 ═══════════════════════════════════════════ */
 .nav-bar{
   background:var(--surface);
+  /* TIME: bold crimson top rule — the definitive editorial signal */
+  border-top:3px solid var(--accent);
   border-bottom:1px solid var(--border);
-  padding:0 24px;
+  padding:0;
 }
 .nav-bar-inner{
   max-width:1400px;margin:0 auto;
-  display:flex;align-items:center;gap:12px;height:50px;
+  display:flex;align-items:center;gap:0;
+  height:54px;padding:0 24px;
 }
-.logo-wrap{flex-shrink:0;line-height:1;}
-.logo{font-size:19px;font-weight:900;color:var(--text);letter-spacing:-1px;}
+.logo-wrap{flex-shrink:0;line-height:1;padding-right:20px;border-right:1px solid var(--border);}
+/* Playfair Display for logo — TIME-magazine DNA */
+.logo{
+  font-family:var(--font-serif);font-size:20px;font-weight:900;
+  color:var(--text);letter-spacing:-0.5px;line-height:1;
+}
 .logo span{color:var(--accent);}
-.logo-tag{font-size:7.5px;color:var(--text3);letter-spacing:0.14em;text-transform:uppercase;font-weight:600;}
+.logo-tag{
+  font-family:var(--font-sans);font-size:7px;color:var(--text3);
+  letter-spacing:0.18em;text-transform:uppercase;font-weight:600;margin-top:2px;
+}
+/* BBC-clean section tabs: no box, strong underline on active */
 .nav-tabs{
   display:flex;gap:0;flex:1;overflow-x:auto;scrollbar-width:none;
-  margin-left:14px;padding-left:14px;border-left:1px solid var(--border);
+  margin-left:0;padding-left:0;
 }
 .nav-tabs::-webkit-scrollbar{display:none;}
 .nav-tab{
   background:transparent;border:none;color:var(--text3);
-  padding:10px 13px;cursor:pointer;font-size:13px;font-weight:600;
-  white-space:nowrap;font-family:inherit;border-bottom:2px solid transparent;
-  transition:color 0.12s,border-color 0.12s;letter-spacing:-0.1px;
+  padding:0 14px;height:54px;cursor:pointer;
+  font-family:var(--font-sans);font-size:12px;font-weight:700;
+  white-space:nowrap;border-bottom:3px solid transparent;
+  transition:color 0.12s,border-color 0.12s;letter-spacing:0.04em;
+  text-transform:uppercase;
 }
-.nav-tab.active{color:var(--text);border-bottom-color:var(--text);}
+.nav-tab.active{color:var(--text);border-bottom-color:var(--accent);}
 .nav-tab:hover:not(.active){color:var(--text2);}
-/* Per-tab active accent colors */
-.nav-tab.t-general.active{color:#1d4ed8;border-bottom-color:#1d4ed8;}
-.nav-tab.t-sports.active{color:#d97706;border-bottom-color:#d97706;}
-.nav-tab.t-business.active{color:#16a34a;border-bottom-color:#16a34a;}
-.nav-tab.t-finance.active{color:#7c3aed;border-bottom-color:#7c3aed;}
+/* BBC category color coding — each section has identity */
+.nav-tab.t-general.active{color:var(--navy);border-bottom-color:var(--navy);}
+.nav-tab.t-sports.active{color:#b45309;border-bottom-color:#b45309;}
+.nav-tab.t-business.active{color:#1a6b2a;border-bottom-color:#1a6b2a;}
+.nav-tab.t-finance.active{color:#6d28d9;border-bottom-color:#6d28d9;}
 .nav-tab.t-bloom.active{color:#0369a1;border-bottom-color:#0369a1;}
-.nav-tab.t-comedy.active{color:#a855f7;border-bottom-color:#a855f7;}
-.nav-tab.t-popculture.active{color:#db2777;border-bottom-color:#db2777;}
-.nav-tab.t-podcasts.active{color:#e11d48;border-bottom-color:#e11d48;}
-.nav-right{display:flex;gap:6px;align-items:center;flex-shrink:0;}
+.nav-tab.t-comedy.active{color:#7c3aed;border-bottom-color:#7c3aed;}
+.nav-tab.t-popculture.active{color:#be185d;border-bottom-color:#be185d;}
+.nav-tab.t-podcasts.active{color:#c41d25;border-bottom-color:#c41d25;}
+.nav-right{display:flex;gap:8px;align-items:center;flex-shrink:0;padding-left:16px;border-left:1px solid var(--border);}
 .search-input{
   background:var(--surface2);border:1px solid var(--border);color:var(--text);
   border-radius:var(--radius-sm);padding:7px 13px;font-size:13px;width:130px;
-  font-family:inherit;transition:all 0.15s;
+  font-family:var(--font-sans);transition:all 0.15s;
 }
 .search-input:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-bg);width:170px;}
 .nav-btn{
   background:transparent;border:1px solid var(--border);color:var(--text3);
   border-radius:var(--radius-sm);padding:6px 11px;cursor:pointer;
-  font-size:13px;font-family:inherit;font-weight:500;transition:all 0.12s;
+  font-size:12px;font-family:var(--font-sans);font-weight:600;transition:all 0.12s;
 }
 .nav-btn:hover{border-color:var(--text3);color:var(--text);}
 .nav-btn-blue{
   background:var(--accent);border:none;color:#fff;
   border-radius:var(--radius-sm);padding:6px 14px;cursor:pointer;
-  font-size:13px;font-weight:700;font-family:inherit;transition:opacity 0.12s;
+  font-size:12px;font-weight:700;font-family:var(--font-sans);transition:opacity 0.12s;letter-spacing:0.02em;
 }
 .nav-btn-blue:hover{opacity:0.88;}
 
@@ -1091,52 +1124,73 @@ body{
 }
 
 /* ═══════════════════════════════════════════
-   GHOST FEED CARD
-   No border, no shadow, no bg at rest.
-   Pure typography hierarchy.
+   EDITORIAL FEED CARD — TIME + BBC hybrid
+   Left accent rule per category (BBC DNA).
+   Serif headlines (TIME DNA). Clean whitespace.
 ═══════════════════════════════════════════ */
 .fc{
-  background:transparent;border:none;padding:20px 0;cursor:pointer;
-  transition:background 0.15s;border-radius:var(--radius-sm);
+  background:transparent;border:none;
+  padding:20px 0 20px 16px;cursor:pointer;
+  transition:background 0.15s;border-radius:0;
   border-bottom:1px solid var(--border2);
+  /* BBC-style: left category accent rule — 3px, muted by default */
+  border-left:3px solid var(--border2);
+  margin-left:0;
 }
 .fc:last-child{border-bottom:none;}
-.fc:hover{background:var(--surface2);margin:0 -14px;padding:20px 14px;}
-.fc:active{transform:scale(0.998);}
+.fc:hover{
+  background:var(--surface2);
+  border-left-color:var(--accent); /* accent rule lights up on hover */
+}
+.fc:active{transform:scale(0.999);}
+
+/* Category-specific left rule colors — BBC section identity */
+.fc.general:hover{border-left-color:var(--navy);}
+.fc.sports:hover{border-left-color:#b45309;}
+.fc.business:hover{border-left-color:#1a6b2a;}
+.fc.finance:hover{border-left-color:#6d28d9;}
+.fc.bloom:hover{border-left-color:#0369a1;}
+.fc.popculture:hover{border-left-color:#be185d;}
+.fc.comedy:hover{border-left-color:#7c3aed;}
 
 .fc-meta{display:flex;align-items:center;gap:8px;margin-bottom:10px;flex-wrap:wrap;}
 .fc-source{
-  font-size:11px;font-weight:700;letter-spacing:0.04em;text-transform:uppercase;
+  /* BBC: source label = ALL-CAPS, small, high-contrast */
+  font-family:var(--font-sans);
+  font-size:10px;font-weight:800;letter-spacing:0.08em;text-transform:uppercase;
 }
 .fc-dot{color:var(--text4);font-size:10px;}
-.fc-date{font-size:11px;color:var(--text3);font-variant-numeric:tabular-nums;margin-left:auto;white-space:nowrap;}
+.fc-date{font-size:10px;color:var(--text3);font-variant-numeric:tabular-nums;margin-left:auto;white-space:nowrap;}
 .fc-topic{
-  font-size:9px;font-weight:700;border-radius:4px;padding:2px 7px;
-  letter-spacing:0.05em;text-transform:uppercase;
+  font-size:9px;font-weight:700;border-radius:2px;padding:2px 7px;
+  letter-spacing:0.06em;text-transform:uppercase;font-family:var(--font-sans);
 }
 .fc-alert-badge{
-  font-size:9px;font-weight:800;background:rgba(220,38,38,0.08);color:var(--red);
-  border-radius:4px;padding:2px 7px;letter-spacing:0.05em;
-  animation:pulse-badge 2s ease-in-out infinite;
+  font-size:9px;font-weight:900;background:var(--accent);color:#fff;
+  border-radius:2px;padding:2px 8px;letter-spacing:0.1em;
+  animation:pulse-badge 2s ease-in-out infinite;font-family:var(--font-sans);
 }
-@keyframes pulse-badge{0%,100%{opacity:1;}50%{opacity:0.55;}}
+@keyframes pulse-badge{0%,100%{opacity:1;}50%{opacity:0.65;}}
 
-.fc-body{display:flex;gap:18px;align-items:flex-start;}
+.fc-body{display:flex;gap:16px;align-items:flex-start;}
 .fc-thumb{
-  width:112px;height:74px;border-radius:var(--radius-sm);
+  width:108px;height:72px;border-radius:var(--radius-sm);
   object-fit:cover;flex-shrink:0;background:var(--surface2);
 }
 .fc-thumb-ph{
-  width:112px;height:74px;border-radius:var(--radius-sm);flex-shrink:0;
-  display:flex;align-items:center;justify-content:center;font-size:22px;background:var(--surface2);
+  width:108px;height:72px;border-radius:var(--radius-sm);flex-shrink:0;
+  display:flex;align-items:center;justify-content:center;font-size:20px;background:var(--surface2);
 }
 .fc-text{flex:1;min-width:0;}
 .fc-title{
-  font-size:17px;font-weight:800;color:var(--text);line-height:1.25;
-  letter-spacing:-0.5px;margin-bottom:6px;
+  /* TIME Magazine: Playfair Display bold serif headline — the definitive editorial signal */
+  font-family:var(--font-serif);
+  font-size:18px;font-weight:700;color:var(--text);line-height:1.25;
+  letter-spacing:-0.2px;margin-bottom:6px;
   display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;
 }
 .fc-desc{
+  font-family:var(--font-sans);
   font-size:13px;color:var(--text3);line-height:1.55;font-weight:400;
   display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;
 }
@@ -1323,13 +1377,14 @@ body{
 .sb-more{padding:5px;text-align:center;font-size:10px;color:var(--text3);font-style:italic;}
 
 /* ═══════════════════════════════════════════
-   MORNING BRIEFING — ghost card
-   Single overview paragraph, no category rows
+   MORNING BRIEFING — TIME editorial card
+   Bold left rule, serif section label
 ═══════════════════════════════════════════ */
 .briefing{
   margin-bottom:24px;
   background:var(--surface);border-radius:var(--radius);
   border:1px solid var(--border);overflow:hidden;
+  border-top:3px solid var(--accent);
 }
 .briefing-head{
   display:flex;align-items:center;justify-content:space-between;
@@ -1337,18 +1392,26 @@ body{
 }
 .briefing-left{display:flex;align-items:center;gap:10px;}
 .briefing-icon{font-size:18px;}
-.briefing-title{font-size:14px;font-weight:800;color:var(--text);letter-spacing:-0.3px;}
-.briefing-date{font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:0.06em;margin-top:1px;}
+.briefing-title{
+  font-family:var(--font-serif);
+  font-size:15px;font-weight:700;color:var(--text);letter-spacing:0;
+}
+.briefing-date{
+  font-family:var(--font-sans);
+  font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:0.08em;margin-top:2px;
+}
 .briefing-refresh{
   background:none;border:1px solid var(--border);color:var(--text3);
-  border-radius:6px;padding:4px 10px;font-size:10px;font-weight:600;cursor:pointer;
-  font-family:inherit;transition:all 0.12s;
+  border-radius:var(--radius-sm);padding:4px 10px;font-size:10px;font-weight:600;cursor:pointer;
+  font-family:var(--font-sans);transition:all 0.12s;
 }
-.briefing-refresh:hover{border-color:var(--text2);color:var(--text);}
+.briefing-refresh:hover{border-color:var(--accent);color:var(--accent);}
 .briefing-refresh:disabled{opacity:0.5;cursor:wait;}
-/* Body: single punchy paragraph */
 .briefing-body{padding:14px 18px 16px;}
-.briefing-overview{font-size:13px;color:var(--text2);line-height:1.65;font-weight:400;}
+.briefing-overview{
+  font-family:var(--font-sans);
+  font-size:13px;color:var(--text2);line-height:1.7;font-weight:400;
+}
 .briefing-overview strong{color:var(--text);font-weight:700;}
 .briefing-loading{font-size:12px;color:var(--text3);font-style:italic;padding:14px 18px 16px;}
 .briefing-err{font-size:11px;color:var(--red);padding:8px 18px 12px;}
@@ -1391,16 +1454,19 @@ body{
 .hero-prev{left:12px;}.hero-next{right:12px;}
 .hero-lead-text{padding:18px 20px 20px;}
 .hero-lead-title{
-  font-size:24px;font-weight:900;color:var(--text);line-height:1.2;
-  letter-spacing:-0.6px;margin:0 0 8px;
+  /* TIME-style: big bold Playfair Display serif — this is the centrepiece headline */
+  font-family:var(--font-serif);
+  font-size:26px;font-weight:700;color:var(--text);line-height:1.2;
+  letter-spacing:-0.3px;margin:0 0 10px;
   display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden;
 }
 .hero-lead-desc{
-  font-size:13px;color:var(--text2);line-height:1.55;margin:0 0 10px;
+  font-family:var(--font-sans);
+  font-size:14px;color:var(--text2);line-height:1.6;margin:0 0 12px;
   display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;font-weight:400;
 }
 .hero-lead-meta{display:flex;align-items:center;gap:5px;font-size:11px;color:var(--text3);}
-.hero-lead-source{font-weight:700;color:var(--text2);text-transform:uppercase;font-size:10px;letter-spacing:0.03em;}
+.hero-lead-source{font-weight:800;color:var(--text2);text-transform:uppercase;font-size:10px;letter-spacing:0.08em;}
 .hero-side{
   background:var(--surface);border-radius:14px;border:1px solid var(--border);
   display:flex;flex-direction:column;overflow:hidden;box-shadow:var(--shadow-sm);
@@ -2962,86 +3028,88 @@ body{overscroll-behavior-y:contain;}
 }
 
 /* ═══════════════════════════════════════════
-   MOBILE (≤640px) — Yahoo pattern
+   MOBILE (≤640px) — editorial vertical flow
+   BBC News mobile: full-width cards, large serif
+   headlines, clear category labels, generous spacing
 ═══════════════════════════════════════════ */
 @media (max-width:640px){
-  /* Swap desktop topbar for mobile topbar + bottom tabs.
-     v25: Pill bar stays visible on mobile (replaces the v22a mobile-strip). */
   .whisper-bar{display:none;}
   .nav-bar{display:none;}
   .mobile-top{display:block;}
   .bottom-tabs{display:block;}
-  /* v25: pill-bar denser on mobile so 4-5 pills are visible at once */
+
+  /* Pill bar: compact on mobile — 4 pills visible */
   .pill-bar{padding:0;}
-  .pill{min-width:120px;padding:6px 12px;gap:8px;}
-  .pill-icon{font-size:16px;}
-  .pill-label{font-size:9px;}
+  .pill{min-width:110px;padding:7px 12px;gap:7px;}
+  .pill-icon{font-size:15px;}
+  .pill-label{font-size:8px;}
   .pill-value{font-size:13px;}
   .pill-chg{font-size:9px;padding:1px 5px;}
-  /* Reserve space so content isn't hidden behind bottom tabs */
-  body{padding-bottom:calc(56px + env(safe-area-inset-bottom, 0));}
 
+  body{padding-bottom:calc(58px + env(safe-area-inset-bottom, 0));}
   .page{padding:12px 12px 20px;}
 
-  /* Hero — shorter + full-bleed on mobile (friend was right; 200px tall hero
-     wastes the fold. 16/10 at full-width ≈ ~220px on typical phones.) */
+  /* Hero — full-bleed on mobile for maximum impact */
   .hero-row{grid-template-columns:1fr;gap:12px;margin:-12px -12px 16px;}
   .hero-lead{border-radius:0;border-left:none;border-right:none;box-shadow:none;}
   .hero-lead:hover{box-shadow:none;transform:none;}
-  .hero-lead-img{aspect-ratio:16/10;max-height:240px;}
+  .hero-lead-img{aspect-ratio:16/10;max-height:220px;}
   .hero-lead-text{padding:14px 14px 16px;}
-  .hero-lead-title{font-size:19px;letter-spacing:-0.4px;-webkit-line-clamp:2;}
+  /* Smaller but still serif on mobile — BBC pattern */
+  .hero-lead-title{font-size:21px;letter-spacing:-0.2px;-webkit-line-clamp:3;}
   .hero-lead-desc{-webkit-line-clamp:2;font-size:13px;}
   .hero-arrow{width:30px;height:30px;font-size:16px;}
   .hero-prev{left:8px;}.hero-next{right:8px;}
-  .hero-side{display:none;} /* drop secondary hero sidebar — noise on mobile */
+  .hero-side{display:none;}
 
-  .breaking-bar{height:24px;}
+  .breaking-bar{height:26px;}
   .breaking-item{font-size:10px;}
-  .breaking-ticker-inner{animation-duration:60s;gap:40px;}
+  .breaking-ticker-inner{animation-duration:55s;gap:36px;}
 
-  /* Right Now strip — tighter on mobile */
-  .rn-strip{padding:8px 12px;margin-bottom:14px;gap:10px;border-radius:10px;}
+  .rn-strip{padding:8px 12px;margin-bottom:14px;gap:10px;border-radius:6px;}
   .rn-items{gap:12px;}
   .rn-item{font-size:11px;}
 
-  /* Following strip — slightly smaller cards for mobile */
   .follow-strip{margin-bottom:18px;}
   .follow-card{min-width:180px;max-width:210px;padding:9px 11px;}
   .follow-card-name{font-size:11px;}
   .follow-card-headline{font-size:11px;-webkit-line-clamp:2;}
 
-  /* Trending carousel — same pattern on mobile */
   .trending-inline{margin-bottom:20px;}
   .trending-card{width:220px;padding:11px;}
   .trending-card-title{font-size:12px;}
 
-  /* Bloom 1-col */
   .bloom-strip{grid-template-columns:1fr;}
   .bloom-strip-item{border-right:none;border-bottom:1px solid var(--border2);}
   .bloom-strip-item:last-child{border-bottom:none;}
 
-  /* FEED CARDS — Yahoo image-first pattern: big photo on top, tight title */
-  .fc{padding:14px 0;}
-  .fc:hover{background:transparent;margin:0;padding:14px 0;}
+  /* FEED CARDS — mobile BBC: image top, big serif title below */
+  .fc{
+    padding:16px 0 16px 12px;
+    border-left-width:3px;
+    margin-left:0;
+  }
+  .fc:hover{background:var(--surface2);border-left-color:var(--accent);}
   .fc:active{background:var(--surface2);}
   .fc-body{flex-direction:column-reverse;gap:10px;}
-  .fc-thumb,.fc-thumb-ph{width:100%;height:200px;border-radius:10px;}
-  .fc-title{font-size:16px;-webkit-line-clamp:3;letter-spacing:-0.3px;line-height:1.3;}
-  .fc-desc{display:none;} /* cleaner mobile — title carries the weight */
+  .fc-thumb,.fc-thumb-ph{width:100%;height:190px;border-radius:var(--radius);}
+  /* Larger serif headline on mobile — BBC mobile card DNA */
+  .fc-title{
+    font-size:20px;-webkit-line-clamp:3;letter-spacing:-0.2px;line-height:1.25;
+  }
+  .fc-desc{display:none;} /* title carries the weight on mobile */
   .fc-meta{margin-bottom:8px;order:-1;}
-  .fc-act{padding:8px 13px;font-size:12px;min-height:44px;border-radius:22px;}
+  .fc-act{padding:8px 13px;font-size:12px;min-height:44px;border-radius:20px;}
   .fc-actions{gap:6px;margin-top:10px;}
   .fc-read-link{font-size:11px;margin-left:auto;min-height:44px;display:flex;align-items:center;}
 
   /* Morning briefing */
-  .briefing{margin-bottom:16px;border-radius:10px;}
+  .briefing{margin-bottom:16px;border-radius:var(--radius);}
   .briefing-head{padding:11px 14px 9px;}
-  .briefing-title{font-size:13px;}
+  .briefing-title{font-size:14px;}
   .briefing-body{padding:11px 14px 13px;}
-  .briefing-overview{font-size:13px;line-height:1.6;}
+  .briefing-overview{font-size:13px;line-height:1.65;}
 
-  /* Today page */
   .today-main{gap:12px;}
   .today-grid{gap:10px;}
   .today-block-head{padding:10px 12px 8px;}
@@ -3050,20 +3118,17 @@ body{overscroll-behavior-y:contain;}
   .today-item-title{font-size:12px;}
   .today-ai-btn{padding:8px 12px;font-size:13px;min-height:44px;min-width:44px;}
 
-  /* Social / scoreboard */
   .social-page-grid{grid-template-columns:1fr;}
   .social-page-header{flex-direction:column;align-items:stretch;}
   .sb-games{padding:4px 6px 8px;}
   .sb-league-head{padding:10px 12px;min-height:44px;}
   .sidebar{gap:20px;margin-top:20px;}
 
-  /* Podcast */
   .pod-page{gap:20px;}
   .pod-card{padding:12px;}
   .pod-btn{padding:8px 12px;font-size:11px;min-height:44px;}
   .pod-show-item{padding:12px 0;min-height:44px;}
 
-  /* Customize bottom-sheet */
   .cp-overlay{padding:0;align-items:flex-end;}
   .cp-panel{max-width:100%;max-height:92vh;border-radius:16px 16px 0 0;}
   .cp-cat-tab,.cp-plat-tab{padding:8px 12px;font-size:11px;min-height:36px;}
@@ -3072,7 +3137,6 @@ body{overscroll-behavior-y:contain;}
   .cp-btn{padding:9px 13px;font-size:12px;min-height:44px;}
   .cp-save{padding:13px;font-size:14px;min-height:48px;}
 
-  /* Finance table */
   .fin-table td{padding:9px 8px;font-size:11px;}
   .fin-table thead th{padding:7px 8px;}
   .fin-name{display:none;}
@@ -3104,8 +3168,11 @@ body{overscroll-behavior-y:contain;}
 .fc-read{opacity:0.6;}
 .fc-read .fc-title{color:var(--text2);}
 
-/* Breaking news: title gets extra weight + size */
-.fc-title-breaking{font-size:20px!important;font-weight:900!important;color:var(--text)!important;}
+/* Breaking news: bigger serif + crimson — TIME urgent treatment */
+.fc-title-breaking{
+  font-size:21px!important;font-weight:900!important;
+  color:var(--accent)!important; /* crimson for breaking — TIME signature */
+}
 
 /* Paywall badge */
 .fc-paywall-badge{font-size:11px;cursor:default;flex-shrink:0;}
@@ -3131,17 +3198,28 @@ body{overscroll-behavior-y:contain;}
 .dark .fc-why-line{color:#d4b878;}
 .fc-why-line:last-child{margin-bottom:0;}
 
-/* v26: General homepage 2-col hero (lead left, briefing right) */
-.home-hero-row{display:grid;grid-template-columns:1.7fr 1fr;gap:24px;margin-bottom:32px;padding-bottom:24px;border-bottom:1px solid var(--border);}
+/* v26: General homepage 2-col hero (lead left, briefing right)
+   TIME-style: big serif headline left, editorial briefing right */
+.home-hero-row{display:grid;grid-template-columns:1.7fr 1fr;gap:28px;margin-bottom:36px;padding-bottom:28px;border-bottom:2px solid var(--border);}
 .home-hero-side .briefing-teaser{margin-bottom:0;height:100%;}
 .gn-lead-solo{cursor:pointer;transition:opacity 0.15s;}
 .gn-lead-solo:hover{opacity:0.92;}
-.gn-lead-solo .gn-lead-img{border-radius:8px;margin-bottom:14px;}
-.gn-lead-solo .gn-lead-title{font-size:26px;font-weight:900;line-height:1.15;letter-spacing:-0.6px;color:var(--text);margin:0 0 10px;max-width:720px;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden;}
-.gn-lead-solo .gn-lead-desc{font-size:14px;line-height:1.5;color:var(--text2);margin:0 0 10px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;}
-.gn-lead-solo .gn-lead-meta{font-size:11px;color:var(--text3);display:flex;align-items:center;gap:6px;}
-@media (max-width:900px){.home-hero-row{grid-template-columns:1fr;gap:14px;}.gn-lead-solo .gn-lead-title{font-size:22px;}}
-@media (max-width:640px){.home-hero-row{margin-bottom:20px;padding-bottom:18px;}.gn-lead-solo .gn-lead-title{font-size:20px;-webkit-line-clamp:3;}}
+.gn-lead-solo .gn-lead-img{border-radius:var(--radius);margin-bottom:16px;}
+/* TIME-magazine lead headline: largest Playfair Display on the page */
+.gn-lead-solo .gn-lead-title{
+  font-family:var(--font-serif);
+  font-size:32px;font-weight:700;line-height:1.15;letter-spacing:-0.3px;
+  color:var(--text);margin:0 0 12px;max-width:720px;
+  display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden;
+}
+.gn-lead-solo .gn-lead-desc{
+  font-family:var(--font-sans);
+  font-size:15px;line-height:1.6;color:var(--text2);margin:0 0 12px;
+  display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;
+}
+.gn-lead-solo .gn-lead-meta{font-size:11px;color:var(--text3);display:flex;align-items:center;gap:6px;font-family:var(--font-sans);}
+@media (max-width:900px){.home-hero-row{grid-template-columns:1fr;gap:16px;}.gn-lead-solo .gn-lead-title{font-size:26px;}}
+@media (max-width:640px){.home-hero-row{margin-bottom:20px;padding-bottom:18px;}.gn-lead-solo .gn-lead-title{font-size:22px;-webkit-line-clamp:3;}}
 
 /* v26: Sticky filter pill */
 .sticky-filter{position:sticky;top:96px;z-index:5;background:var(--bg);padding:8px 0;border-bottom:1px solid var(--border2);}
@@ -3201,6 +3279,405 @@ body{overscroll-behavior-y:contain;}
 
 /* Keyboard hint */
 kbd{display:inline-block;padding:1px 5px;border:1px solid var(--border);border-radius:3px;font-family:inherit;font-size:10px;color:var(--text3);background:var(--surface2);}
+
+/* ═══════════════════════════════════════════
+   v27 EDITORIAL ENHANCEMENTS
+   TIME/BBC design refresh
+═══════════════════════════════════════════ */
+
+/* SECTION DIVIDER — editorial rule between sections (BBC pattern) */
+.ed-section-head{
+  display:flex;align-items:baseline;gap:12px;
+  margin-bottom:20px;padding-bottom:10px;
+  border-bottom:2px solid var(--text);
+}
+.ed-section-label{
+  font-family:var(--font-sans);
+  font-size:11px;font-weight:800;color:var(--text);
+  text-transform:uppercase;letter-spacing:0.1em;
+}
+.ed-section-kicker{
+  font-family:var(--font-sans);
+  font-size:10px;font-weight:500;color:var(--text3);
+}
+
+/* LISTEN BUTTON — Web Speech TTS */
+.fc-listen-btn{
+  background:none;border:1px solid var(--border);
+  border-radius:20px;padding:4px 11px;
+  font-size:11px;cursor:pointer;color:var(--text3);
+  font-family:var(--font-sans);font-weight:600;
+  transition:all 0.12s;display:inline-flex;align-items:center;gap:5px;
+}
+.fc-listen-btn:hover{border-color:#0369a1;color:#0369a1;background:#f0f9ff;}
+.fc-listen-btn.listening{border-color:#0369a1;color:#0369a1;background:#e0f2fe;animation:listen-pulse 1.4s ease-in-out infinite;}
+@keyframes listen-pulse{0%,100%{box-shadow:0 0 0 0 rgba(3,105,161,0.3);}50%{box-shadow:0 0 0 4px rgba(3,105,161,0.08);}}
+.listen-wave{display:inline-flex;align-items:center;gap:2px;height:12px;}
+.listen-bar{width:2px;background:currentColor;border-radius:1px;animation:wave-bounce 1s ease-in-out infinite;}
+.listen-bar:nth-child(1){height:4px;animation-delay:0s;}
+.listen-bar:nth-child(2){height:8px;animation-delay:0.15s;}
+.listen-bar:nth-child(3){height:12px;animation-delay:0.3s;}
+.listen-bar:nth-child(4){height:8px;animation-delay:0.45s;}
+.listen-bar:nth-child(5){height:4px;animation-delay:0.6s;}
+@keyframes wave-bounce{0%,100%{transform:scaleY(0.4);}50%{transform:scaleY(1);}}
+
+/* VOICE SELECTOR (audio settings) */
+.voice-select{
+  background:var(--surface2);border:1px solid var(--border);color:var(--text);
+  border-radius:var(--radius-sm);padding:4px 8px;font-size:11px;
+  font-family:var(--font-sans);cursor:pointer;
+}
+
+/* VIDEO FEATURE COMPONENT */
+.video-feature{
+  background:var(--surface);border:1px solid var(--border);
+  border-radius:var(--radius);overflow:hidden;
+  margin-bottom:28px;
+}
+.video-feature-head{
+  display:flex;align-items:center;justify-content:space-between;
+  padding:12px 16px;border-bottom:1px solid var(--border2);
+}
+.video-feature-label{
+  font-family:var(--font-sans);
+  font-size:10px;font-weight:800;color:var(--accent);
+  text-transform:uppercase;letter-spacing:0.12em;
+  display:flex;align-items:center;gap:6px;
+}
+.video-feature-label::before{content:'▶';font-size:8px;}
+.video-feature-title{
+  font-family:var(--font-serif);
+  font-size:16px;font-weight:700;color:var(--text);
+}
+.video-embed{position:relative;padding-bottom:56.25%;height:0;overflow:hidden;}
+.video-embed iframe{position:absolute;top:0;left:0;width:100%;height:100%;border:none;}
+.video-embed-ph{
+  position:relative;padding-bottom:56.25%;height:0;
+  background:var(--navy);display:flex;align-items:center;justify-content:center;
+  cursor:pointer;overflow:hidden;
+}
+.video-embed-ph-inner{
+  position:absolute;inset:0;display:flex;flex-direction:column;
+  align-items:center;justify-content:center;gap:12px;
+}
+.video-play-btn{
+  width:64px;height:64px;border-radius:50%;
+  background:rgba(255,255,255,0.15);backdrop-filter:blur(8px);
+  border:2px solid rgba(255,255,255,0.4);
+  display:flex;align-items:center;justify-content:center;
+  font-size:24px;color:#fff;cursor:pointer;
+  transition:all 0.2s;
+}
+.video-play-btn:hover{background:rgba(255,255,255,0.25);transform:scale(1.05);}
+.video-play-caption{
+  font-family:var(--font-sans);
+  font-size:13px;color:rgba(255,255,255,0.8);font-weight:500;
+  text-align:center;padding:0 24px;max-width:400px;
+}
+.video-tabs{
+  display:flex;gap:0;padding:0 16px;border-bottom:1px solid var(--border2);
+  overflow-x:auto;scrollbar-width:none;
+}
+.video-tabs::-webkit-scrollbar{display:none;}
+.video-tab{
+  background:transparent;border:none;color:var(--text3);
+  padding:10px 14px;font-size:12px;font-weight:600;cursor:pointer;
+  font-family:var(--font-sans);border-bottom:2px solid transparent;
+  white-space:nowrap;transition:all 0.12s;
+}
+.video-tab.active{color:var(--accent);border-bottom-color:var(--accent);}
+.video-tab:hover:not(.active){color:var(--text2);}
+
+/* WEATHER WIDGET — improved editorial style */
+.weather-widget{
+  background:var(--surface);border:1px solid var(--border);
+  border-radius:var(--radius);padding:16px 18px;margin-bottom:20px;
+  border-top:3px solid #0369a1;
+}
+.weather-widget-head{
+  font-family:var(--font-sans);
+  font-size:9px;font-weight:800;color:var(--text3);
+  text-transform:uppercase;letter-spacing:0.1em;margin-bottom:12px;
+}
+.weather-city-row{
+  display:flex;align-items:center;gap:12px;
+  padding:8px 0;border-bottom:1px solid var(--border2);
+}
+.weather-city-row:last-child{border-bottom:none;}
+.weather-city-emoji{font-size:22px;width:28px;text-align:center;flex-shrink:0;}
+.weather-city-body{flex:1;min-width:0;}
+.weather-city-name{
+  font-family:var(--font-sans);
+  font-size:11px;font-weight:700;color:var(--text);
+  text-transform:uppercase;letter-spacing:0.06em;
+}
+.weather-city-desc{
+  font-family:var(--font-sans);
+  font-size:11px;color:var(--text3);margin-top:1px;
+}
+.weather-city-temp{
+  font-family:var(--font-sans);
+  font-size:22px;font-weight:700;color:var(--text);
+  font-variant-numeric:tabular-nums;
+}
+.weather-city-wind{
+  font-family:var(--font-sans);
+  font-size:10px;color:var(--text3);font-weight:500;
+  text-align:right;margin-top:2px;
+}
+
+/* PAGE SECTION HEADER — editorial rule style */
+.page-header{
+  font-family:var(--font-sans);
+  font-size:10px;font-weight:800;color:var(--text3);
+  text-transform:uppercase;letter-spacing:0.12em;
+}
+
+/* Trend row titles — use serif for editorial sidebar feel */
+.trend-title{
+  font-family:var(--font-serif);
+  font-size:13px;font-weight:700;color:var(--text);line-height:1.35;
+  display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;margin-bottom:3px;
+}
+
+/* Hero lead badge — editorial category label */
+.hero-lead-badge{
+  position:absolute;top:14px;left:14px;color:#fff;
+  font-family:var(--font-sans);
+  font-size:9px;font-weight:800;
+  padding:4px 10px;border-radius:2px;letter-spacing:0.12em;text-transform:uppercase;
+  background:var(--accent);
+}
+
+/* Scoreboard: editorial navy header */
+.sb-box{
+  background:var(--surface);border-radius:var(--radius);
+  border:1px solid var(--border);overflow:hidden;
+}
+.sb-box-head{
+  padding:10px 14px 8px;border-bottom:1px solid var(--border2);
+  display:flex;align-items:center;justify-content:space-between;
+  background:var(--navy);
+}
+.sb-box-title{
+  font-family:var(--font-sans);
+  font-size:11px;font-weight:800;color:rgba(255,255,255,0.9);
+  text-transform:uppercase;letter-spacing:0.08em;
+}
+.sb-box-sub{font-size:9px;color:rgba(255,255,255,0.5);text-transform:uppercase;letter-spacing:0.05em;}
+
+/* MOBILE CHIP BAR — editorial category pills */
+.chip-bar{
+  display:flex;gap:0;overflow-x:auto;scrollbar-width:none;
+  background:var(--navy);border-bottom:1px solid rgba(255,255,255,0.08);
+  padding:0;
+}
+.chip-bar::-webkit-scrollbar{display:none;}
+.chip{
+  flex-shrink:0;background:transparent;border:none;
+  color:rgba(255,255,255,0.6);
+  padding:10px 16px;font-size:11px;font-weight:700;cursor:pointer;
+  font-family:var(--font-sans);
+  text-transform:uppercase;letter-spacing:0.06em;
+  border-bottom:2px solid transparent;
+  transition:all 0.12s;white-space:nowrap;
+}
+.chip.active{color:#fff;border-bottom-color:#fff;}
+.chip:hover:not(.active){color:rgba(255,255,255,0.85);}
+
+/* MOBILE HEADER — editorial masthead */
+.mobile-header{
+  background:var(--surface);
+  border-top:3px solid var(--accent);
+  display:flex;align-items:center;justify-content:space-between;
+  padding:10px 16px;border-bottom:1px solid var(--border);
+}
+.mobile-logo{
+  font-family:var(--font-serif);
+  font-size:20px;font-weight:700;color:var(--text);line-height:1;
+}
+.mobile-logo span{color:var(--accent);}
+.mobile-logo-sub{
+  font-family:var(--font-sans);
+  font-size:8px;color:var(--text3);letter-spacing:0.16em;text-transform:uppercase;margin-top:2px;
+}
+.mobile-icon-btn{
+  background:transparent;border:1px solid var(--border);color:var(--text3);
+  border-radius:var(--radius-sm);padding:6px 10px;
+  font-size:14px;cursor:pointer;font-family:var(--font-sans);transition:all 0.12s;
+}
+.mobile-icon-btn:hover{color:var(--text);border-color:var(--text3);}
+.mobile-actions{display:flex;gap:6px;}
+
+/* BOTTOM TABS — editorial section icons */
+.bottom-tabs{
+  position:fixed;bottom:0;left:0;right:0;
+  background:var(--surface);
+  border-top:2px solid var(--accent);
+  display:flex;z-index:200;
+  padding-bottom:env(safe-area-inset-bottom, 0);
+  box-shadow:0 -2px 16px rgba(0,0,0,0.08);
+}
+.bottom-tab{
+  flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;
+  padding:8px 4px 6px;background:transparent;border:none;cursor:pointer;
+  font-family:var(--font-sans);
+  font-size:9px;font-weight:700;color:var(--text3);
+  text-transform:uppercase;letter-spacing:0.06em;gap:3px;
+  min-height:52px;transition:color 0.12s;
+}
+.bottom-tab.active{color:var(--accent);}
+.bottom-tab:hover:not(.active){color:var(--text2);}
+.bottom-tab-icon{font-size:18px;line-height:1;}
+
+/* Smooth page transitions */
+.page{
+  animation:page-enter 0.18s ease-out;
+}
+@keyframes page-enter{from{opacity:0;transform:translateY(4px);}to{opacity:1;transform:translateY(0);}}
+
+/* iPad 2-col: bridge desktop and mobile gracefully */
+@media (min-width:641px) and (max-width:1100px){
+  .page-grid{grid-template-columns:1fr 260px!important;gap:28px!important;}
+  .hero-lead-title{font-size:22px;}
+  .fc-title{font-size:17px;}
+  .gn-lead-solo .gn-lead-title{font-size:28px;}
+}
+
+/* Finance page: editorial serif section headers */
+.fin-header-title{
+  font-family:var(--font-serif);
+  font-size:22px;font-weight:700;color:var(--text);letter-spacing:0;
+}
+
+/* Reading stats: editorial typography */
+.stat-num{
+  font-family:var(--font-serif);
+  font-size:32px;font-weight:700;color:var(--text);letter-spacing:-1px;font-variant-numeric:tabular-nums;
+}
+
+/* Dark mode: warmer dark (less blue-cold IDE feel) — OVERRIDE */
+.dark{
+  --bg:#141210;--surface:#1e1c1a;--surface2:#272422;
+  --border:#2e2b28;--border2:#222020;
+  --text:#f0ede8;--text2:#a8a39d;--text3:#5e5a55;--text4:#303030;
+  --shadow-sm:0 1px 4px rgba(0,0,0,0.4);
+  --shadow-md:0 4px 20px rgba(0,0,0,0.5);
+  --shadow-lg:0 8px 40px rgba(0,0,0,0.6);
+}
+
+/* Podcast card serif title */
+.pod-title{
+  font-family:var(--font-serif);
+  font-size:16px;font-weight:700;color:var(--text);line-height:1.3;
+  cursor:pointer;margin-bottom:6px;
+  display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;
+}
+.pod-title:hover{color:var(--accent);}
+
+/* gn-grid: editorial card titles use serif */
+.gn-lead-title{
+  font-family:var(--font-serif);
+  font-size:22px;font-weight:700;line-height:1.2;letter-spacing:-0.2px;
+  color:var(--text);margin:0 0 10px;
+  display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden;
+}
+.gn-card-title{
+  font-family:var(--font-serif);
+  font-size:15px;font-weight:700;line-height:1.3;color:var(--text);
+  display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden;
+  margin-bottom:8px;letter-spacing:-0.1px;
+}
+.gn-lead-source,.gn-card-source{
+  font-family:var(--font-sans);
+  font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:0.08em;
+}
+
+/* Briefing teaser: editorial serif + crimson accent line */
+.briefing-teaser{
+  border-top:3px solid var(--accent);
+  border:1px solid var(--border);border-top:3px solid var(--accent);
+  border-radius:var(--radius);padding:16px 18px;
+  background:var(--surface);height:100%;
+}
+.briefing-teaser-label{
+  font-family:var(--font-sans);
+  font-size:9px;font-weight:800;color:var(--accent);
+  text-transform:uppercase;letter-spacing:0.12em;
+}
+.briefing-teaser-body{
+  font-family:var(--font-sans);
+  font-size:13px;line-height:1.65;color:var(--text2);margin:12px 0;
+}
+.briefing-teaser-bullets{
+  margin:8px 0 0 16px;
+  font-family:var(--font-sans);
+  font-size:12px;color:var(--text2);line-height:1.55;
+}
+.briefing-teaser-bullets li{margin-bottom:5px;}
+.briefing-teaser-cta{
+  background:var(--accent);color:#fff;border:none;
+  border-radius:var(--radius-sm);padding:6px 12px;
+  font-size:11px;font-weight:700;cursor:pointer;
+  font-family:var(--font-sans);transition:opacity 0.12s;
+}
+.briefing-teaser-cta:hover{opacity:0.88;}
+
+/* Today block serif label */
+.today-block-label{
+  font-family:var(--font-serif);
+  font-size:13px;font-weight:700;display:flex;align-items:center;gap:5px;
+}
+
+/* Sidebar trend numbers — editorial large */
+.trend-num{
+  font-family:var(--font-serif);
+  font-size:18px;font-weight:700;color:var(--accent);
+  min-width:22px;line-height:1;flex-shrink:0;font-variant-numeric:tabular-nums;
+}
+
+/* Briefing inline: editorial styles */
+.briefing-inline{
+  background:var(--surface);border:1px solid var(--border);
+  border-top:3px solid var(--accent);
+  border-radius:var(--radius);padding:20px 24px;margin-bottom:24px;
+}
+.briefing-inline-label{
+  font-family:var(--font-serif);
+  font-size:17px;font-weight:700;color:var(--text);
+}
+.briefing-inline-body{
+  font-family:var(--font-sans);
+  font-size:14px;line-height:1.7;color:var(--text2);margin:14px 0;
+}
+.briefing-inline-bullets{
+  margin:0 0 4px 18px;
+  font-family:var(--font-sans);
+  font-size:13px;color:var(--text2);line-height:1.6;
+}
+.briefing-inline-bullets li{margin-bottom:6px;}
+
+/* FC actions: smooth hover states */
+.fc-actions{
+  display:flex;align-items:center;gap:6px;margin-top:12px;flex-wrap:wrap;
+}
+.fc-act{
+  background:none;border:1px solid var(--border);border-radius:20px;
+  padding:4px 11px;font-size:11px;cursor:pointer;color:var(--text3);
+  font-family:var(--font-sans);font-weight:600;transition:all 0.12s;
+  display:flex;align-items:center;gap:4px;
+}
+.fc-act:hover{border-color:var(--accent);color:var(--accent);background:var(--accent-bg);}
+.fc-act:active{transform:scale(0.96);}
+.fc-act.saved{border-color:var(--amber);color:var(--amber);background:#fffbeb;}
+.fc-act.ai-on{border-color:#7c3aed;color:#7c3aed;background:#f5f3ff;}
+.fc-act.disc-on{border-color:#0ea5e9;color:#0ea5e9;background:#f0f9ff;}
+.fc-read-link{
+  margin-left:auto;font-size:10px;color:var(--text3);
+  text-decoration:none;font-weight:700;display:flex;align-items:center;gap:2px;
+  transition:color 0.1s;font-family:var(--font-sans);letter-spacing:0.02em;
+}
+.fc-read-link:hover{color:var(--accent);}
 `;
 
 
@@ -3260,6 +3737,113 @@ function diverseTrending(arts, kw, limit = 8, maxPerCat = 2) {
     if (result.length >= limit) break;
   }
   return result;
+}
+
+// ─── AUDIO LISTEN (Web Speech API TTS) ───────────────────────────────────────
+// Uses the browser's SpeechSynthesis API — free, no API key needed.
+// Prefers voices matching Australian English (Siri-adjacent) when available,
+// falls back to any English voice, then system default.
+function AudioListen({ text, title }) {
+  const [listening, setListening] = useState(false);
+  const [supported] = useState(() => typeof window !== 'undefined' && 'speechSynthesis' in window);
+  const utterRef = useRef(null);
+
+  const getBestVoice = () => {
+    if (!window.speechSynthesis) return null;
+    const voices = window.speechSynthesis.getVoices();
+    // Priority: Australian English (Siri-style) → British English → any English
+    return (
+      voices.find(v => v.lang === 'en-AU') ||
+      voices.find(v => v.lang === 'en-GB') ||
+      voices.find(v => v.lang.startsWith('en') && v.name.toLowerCase().includes('female')) ||
+      voices.find(v => v.lang.startsWith('en')) ||
+      null
+    );
+  };
+
+  const handleListen = () => {
+    if (!supported) return;
+    if (listening) {
+      window.speechSynthesis.cancel();
+      setListening(false);
+      return;
+    }
+    const content = title ? `${title}. ${text || ''}` : text || '';
+    if (!content.trim()) return;
+    const utter = new SpeechSynthesisUtterance(content.slice(0, 1200));
+    utter.rate = 0.95;
+    utter.pitch = 1.0;
+    utter.volume = 1.0;
+    const voice = getBestVoice();
+    if (voice) utter.voice = voice;
+    utter.onend = () => setListening(false);
+    utter.onerror = () => setListening(false);
+    utterRef.current = utter;
+    setListening(true);
+    window.speechSynthesis.speak(utter);
+  };
+
+  if (!supported) return null;
+
+  return (
+    <button className={`fc-listen-btn ${listening ? 'listening' : ''}`} onClick={e => { e.stopPropagation(); handleListen(); }} title={listening ? 'Stop reading' : 'Listen to article'}>
+      {listening ? (
+        <><span className="listen-wave"><span className="listen-bar"/><span className="listen-bar"/><span className="listen-bar"/><span className="listen-bar"/><span className="listen-bar"/></span> Stop</>
+      ) : (
+        <><span>♪</span> Listen</>
+      )}
+    </button>
+  );
+}
+
+// ─── VIDEO FEATURE COMPONENT ──────────────────────────────────────────────────
+// Embeds relevant YouTube news videos for context. Tabs cycle between curated
+// news channel playlists (AP, Reuters, Bloomberg). No API key needed.
+const VIDEO_CHANNELS = [
+  { label: 'AP News',    embed: 'https://www.youtube.com/embed?listType=user_uploads&list=AssociatedPress&autoplay=0', title: 'AP News Live' },
+  { label: 'Reuters',   embed: 'https://www.youtube.com/embed?listType=user_uploads&list=Reuters&autoplay=0',           title: 'Reuters TV' },
+  { label: 'Bloomberg', embed: 'https://www.youtube.com/embed?listType=user_uploads&list=BloombergTelevision&autoplay=0', title: 'Bloomberg Live' },
+];
+
+function VideoFeature() {
+  const [activeTab, setActiveTab] = useState(0);
+  const [loaded, setLoaded] = useState(false);
+
+  return (
+    <div className="video-feature">
+      <div className="video-feature-head">
+        <span className="video-feature-label">Watch</span>
+        <span className="video-feature-title">{VIDEO_CHANNELS[activeTab].title}</span>
+      </div>
+      <div className="video-tabs">
+        {VIDEO_CHANNELS.map((ch, i) => (
+          <button key={i} className={`video-tab ${activeTab === i ? 'active' : ''}`}
+            onClick={() => { setActiveTab(i); setLoaded(false); }}>
+            {ch.label}
+          </button>
+        ))}
+      </div>
+      {loaded ? (
+        <div className="video-embed">
+          <iframe
+            src={VIDEO_CHANNELS[activeTab].embed}
+            title={VIDEO_CHANNELS[activeTab].title}
+            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+            allowFullScreen
+          />
+        </div>
+      ) : (
+        <div className="video-embed-ph" style={{paddingBottom:'56.25%',position:'relative',background:'#0a1628',cursor:'pointer'}} onClick={() => setLoaded(true)}>
+          <div className="video-embed-ph-inner">
+            <div className="video-play-btn">▶</div>
+            <div className="video-play-caption">
+              Watch {VIDEO_CHANNELS[activeTab].title} — click to load
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
 }
 
 // ─── FEED CARD ────────────────────────────────────────────────────────────────
@@ -3450,6 +4034,8 @@ function FeedCard({a, cat, isSaved, onSave, onRead, relatedSources, isRead, user
             ↗ Share
           </button>
         )}
+        {/* Listen: Web Speech TTS — Australian Siri voice when available */}
+        <AudioListen text={`${a.title}. ${a.desc || ''}`} title={null} />
         <a className="fc-read-link" href={a.link} target="_blank" rel="noreferrer" onClick={e=>{e.stopPropagation();onRead(a);}}>
           {readMins ? `${readMins} min · ` : ''}Read →
         </a>
@@ -5547,12 +6133,13 @@ export default function App() {
           </div>
         )}
 
-        {/* Trending removed from FeedPage — sidebar handles it (no duplication) */}
+        {/* Video Feature — General homepage only, after hero row */}
+        {isHome && !activeKw && !activeSrc && !search && <VideoFeature />}
 
         <div className="page-grid">
           <div className="feed-col">
             <div className="page-header-row">
-              <span className="page-header">
+              <span className="page-header" style={{fontFamily:'var(--font-sans)'}}>
                 {cc.emoji} {cc.label}{feedItems.length>0?` — ${feedItems.length} articles`:''}
                 {lastUpdated[cat] && <span style={{marginLeft:'10px'}}><LastUpdated timestamp={lastUpdated[cat]} onRefresh={() => loadCat(cat)}/></span>}
               </span>
