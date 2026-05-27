@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { useApp } from '../App.jsx';
 import { callClaude, buildSystem, saveResearch, uid, timeAgo } from '../utils.js';
-import { CB_SPINE } from '../constants.js';
+import { CB_IDENTITY } from '../constants.js';
 import MD from './shared/MD.jsx';
 import { Btn, Input, Label, Card, Badge, ThinkingDots, Modal } from './shared/Common.jsx';
 
@@ -70,7 +70,10 @@ export default function ResearchHub() {
     setLoading(true);
 
     try {
-      const system = CB_SPINE + '\n\nMODE: TRUTH & RESEARCH HUB\nYour job: cut through narrative, surface signal, flag bias, give CB the contrarian insight most people miss. End every response with: (1) Truth Score (1-10, how confident you are in this), (2) Bias Flags (sources or narratives to be skeptical of), (3) Decisive Bet (what CB should do with this information). Be rigorous.';
+      const system = {
+        cached: CB_IDENTITY,
+        dynamic: '\n\nMODE: TRUTH & RESEARCH HUB\nYour job: cut through narrative, surface signal, flag bias, give CB the contrarian insight most people miss. Prioritize analytical depth and objectivity over forced connections. End every response with: (1) Truth Score (1-10, how confident you are in this), (2) Bias Flags (sources or narratives to be skeptical of), (3) Decisive Bet (what CB should do with this information). Be rigorous.',
+      };
       const reply = await callClaude({ system, messages: newMsgs.map(m => ({ role: m.role, content: m.content })), searchEnabled });
       const assistantMsg = { role: 'assistant', content: reply };
       const finalMsgs = [...newMsgs, assistantMsg];

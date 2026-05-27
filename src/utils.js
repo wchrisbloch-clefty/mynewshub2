@@ -1,4 +1,4 @@
-import { CB_SPINE } from './constants.js';
+import { CB_IDENTITY, CB_LEARNING_SPINE } from './constants.js';
 import { GRAPH_KEY, PROJECTS_KEY, NOTES_KEY, RESEARCH_KEY } from './constants.js';
 import { SEED_GRAPH, SEED_PROJECTS, SEED_NOTES, SEED_RESEARCH } from './seedData.js';
 
@@ -145,13 +145,16 @@ export async function processFiles(files) {
 }
 
 // ─── SYSTEM PROMPTS ───────────────────────────────────────────────────────
+// Returns { cached, dynamic } — callClaude caches the spine and sends
+// the dynamic part (graph history + mode instructions) uncached.
 export function buildSystem(entryMode, sessionMode, context, graph) {
   const graphSummary = graph && Object.keys(graph.topics || {}).length > 0
     ? '\n\nCB\'S LEARNING HISTORY (use this to personalize):\n' +
       Object.values(graph.topics).slice(-10).map(t => `- ${t.title} (${t.type}): ${t.sessions} sessions, ${t.totalMin}min, confidence ${t.confidence}/10`).join('\n')
     : '';
 
-  const base = CB_SPINE + graphSummary;
+  // Truth seeker uses identity-only — objective analysis, no forced connections
+  const spine = (entryMode === null && context.chatMode === 'truth') ? CB_IDENTITY : CB_LEARNING_SPINE;
 
   if (entryMode === 'book') {
     const instructions = {
@@ -161,28 +164,40 @@ export function buildSystem(entryMode, sessionMode, context, graph) {
       socratic: `SESSION: SOCRATIC MODE. You are the examiner, CB is the student. Ask one focused question at a time about "${context.book?.title}". Never lecture. Wait for CB's answer. Respond with: what he got right, what he missed, the correct answer, then the NEXT question. After 5 questions, scorecard: what he knows cold, what needs work. Start with: "Let's test your knowledge of ${context.book?.title}. First question:" then ask it.`,
       chat: 'SESSION: OPEN DISCUSSION. Follow CB\'s lead but stay ahead. Surface what he hasn\'t asked. Always end with recommendation or next question CB should be asking.',
     };
-    return base + `\n\nBOOK: "${context.book?.title}" by ${context.book?.author}\nTYPE: ${context.book?.type}\n\n` + (instructions[sessionMode] || instructions.chat);
+    return {
+      cached: spine,
+      dynamic: graphSummary + `\n\nBOOK: "${context.book?.title}" by ${context.book?.author}\nTYPE: ${context.book?.type}\n\n` + (instructions[sessionMode] || instructions.chat),
+    };
   }
 
   if (entryMode === 'document') {
-    return base + '\n\nSESSION: DOCUMENT ANALYSIS\n1. Identify document type and core purpose\n2. Extract key insights, data, frameworks\n3. Teach using CB\'s learning style\n4. Connect to CB\'s mental models and goals\n5. Flag what to act on, challenge, or investigate deeper\n\nIf CB asks to quiz — switch to Socratic mode: ask questions one at a time, wait for answers, correct and build.\n\nEnd by asking: "Want a course outline, quiz, reference guide, or visual summary from this?"';
+    return {
+      cached: spine,
+      dynamic: graphSummary + '\n\nSESSION: DOCUMENT ANALYSIS\n1. Identify document type and core purpose\n2. Extract key insights, data, frameworks\n3. Teach using CB\'s learning style\n4. Connect to CB\'s mental models and goals\n5. Flag what to act on, challenge, or investigate deeper\n\nIf CB asks to quiz — switch to Socratic mode: ask questions one at a time, wait for answers, correct and build.\n\nEnd by asking: "Want a course outline, quiz, reference guide, or visual summary from this?"',
+    };
   }
 
   if (entryMode === 'topic') {
     const socraticNote = sessionMode === 'socratic'
       ? '\n\nSOCRATIC MODE ACTIVE: Do NOT lecture. Ask CB one question at a time about this topic. Wait for his answer. Correct, affirm, and deepen. Track weak spots. After 5 questions give a scorecard.'
       : '\n\nBuild: thesis → prerequisite check → 4-7 module course outline → teach each module (concept → analogy → CB application → action) → resources → decisive bet.\nAsk first: full course outline or dive into a specific module?';
-    return base + `\n\nSESSION: TOPIC / COURSE BUILDER\nTopic: "${context.topic}"\nYou are world-class master expert in this topic and all surrounding domains.` + socraticNote;
+    return {
+      cached: spine,
+      dynamic: graphSummary + `\n\nSESSION: TOPIC / COURSE BUILDER\nTopic: "${context.topic}"\nYou are world-class master expert in this topic and all surrounding domains.` + socraticNote,
+    };
   }
 
   if (entryMode === 'youtube') {
     const { title, channel, transcript, url, transcriptAvailable } = context;
     const tSection = transcriptAvailable ? 'FULL TRANSCRIPT:\n' + transcript.slice(0, 8000) : 'NOTE: Transcript unavailable. Use your knowledge of this creator, channel, and topic. Be transparent.';
     const socraticNote = sessionMode === 'socratic' ? '\n\nSOCRATIC MODE: Ask CB questions about this video\'s content one at a time. Wait for answers. Correct and build.' : '\n\nTeach: orient → thesis → 5-7 key moments → CB translation → cross-reference → action → deeper dive.';
-    return base + `\n\nSESSION: YOUTUBE VIDEO INTELLIGENCE\nVideo: "${title}"\nChannel: ${channel}\nURL: ${url}\n\n` + tSection + socraticNote;
+    return {
+      cached: spine,
+      dynamic: graphSummary + `\n\nSESSION: YOUTUBE VIDEO INTELLIGENCE\nVideo: "${title}"\nChannel: ${channel}\nURL: ${url}\n\n` + tSection + socraticNote,
+    };
   }
 
-  // Global chat (no specific mode)
+  // Global chat
   const modeInstructions = {
     synthesis: 'MODE: SYNTHESIS. Connect the user\'s question to their knowledge graph, mental models, goals, and active projects. Find non-obvious intersections. End with a decisive insight or action.',
     socratic: 'MODE: SOCRATIC. Ask CB one powerful question at a time. No lectures. Wait for answers. Correct and build.',
@@ -190,7 +205,10 @@ export function buildSystem(entryMode, sessionMode, context, graph) {
     advisor: 'MODE: PROJECT ADVISOR. CB is asking about his active projects. Apply his knowledge and mental models directly to project decisions. Be decisive.',
     truth: 'MODE: TRUTH SEEKER. Strip away narrative, consensus, and noise. Give CB the signal. What\'s actually true? What do most people get wrong? End with the contrarian insight.',
   };
-  return base + '\n\n' + (modeInstructions[context.chatMode] || modeInstructions.synthesis);
+  return {
+    cached: spine,
+    dynamic: graphSummary + '\n\n' + (modeInstructions[context.chatMode] || modeInstructions.synthesis),
+  };
 }
 
 export function buildQuizPrompt(context, entryMode, count = 5) {
@@ -205,17 +223,31 @@ Format EXACTLY as JSON — no preamble, no markdown fences, just raw JSON:
 
 // ─── CLAUDE API CALL ──────────────────────────────────────────────────────
 export async function callClaude({ system, messages, maxTokens = 1500, searchEnabled = false }) {
-  const body = {
-    model: 'claude-sonnet-4-20250514',
-    max_tokens: maxTokens,
-    system,
-    messages,
-  };
+  // Build system blocks with prompt caching.
+  // system can be a string (cached as-is), an object { cached, dynamic },
+  // or empty/falsy (no system prompt, e.g. quiz generation).
+  let systemBlocks;
+  if (!system || (typeof system === 'string' && !system.trim())) {
+    systemBlocks = undefined;
+  } else if (typeof system === 'string') {
+    systemBlocks = [{ type: 'text', text: system, cache_control: { type: 'ephemeral' } }];
+  } else {
+    systemBlocks = [
+      { type: 'text', text: system.cached, cache_control: { type: 'ephemeral' } },
+      ...(system.dynamic ? [{ type: 'text', text: system.dynamic }] : []),
+    ];
+  }
+
+  const body = { model: 'claude-sonnet-4-6', max_tokens: maxTokens, messages };
+  if (systemBlocks) body.system = systemBlocks;
   if (searchEnabled) body.tools = [{ type: 'web_search_20250305', name: 'web_search' }];
 
   const res = await fetch('https://api.anthropic.com/v1/messages', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: {
+      'Content-Type': 'application/json',
+      'anthropic-beta': 'prompt-caching-2024-07-31',
+    },
     body: JSON.stringify(body),
   });
   const data = await res.json();

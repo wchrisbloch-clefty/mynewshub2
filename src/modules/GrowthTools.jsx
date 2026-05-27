@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useApp } from '../App.jsx';
 import { callClaude } from '../utils.js';
-import { CB_SPINE } from '../constants.js';
+import { CB_LEARNING_SPINE } from '../constants.js';
 import MD from './shared/MD.jsx';
 import { Card, Label, Badge, Btn, ThinkingDots } from './shared/Common.jsx';
 
@@ -46,7 +46,7 @@ export default function GrowthTools() {
       const topicList = topics.slice(-5).map(t => `${t.title} (confidence ${t.confidence}/10)`).join(', ');
       const projList = projects.filter(p => p.status === 'active').map(p => p.title).join(', ');
       const prompt = `CB's Growth Synthesis Request:\n\nRecent learning: ${topicList}\nActive projects: ${projList}\nLearning streak: ${streak} days\nTotal learning: ${Math.round(totalMin / 60)}h\n\nGenerate a decisive growth synthesis: (1) What is compounding right now in CB's favor? (2) What's the biggest gap between where he is and where he wants to be? (3) The single highest-leverage action for the next 90 days — be specific, be decisive. Format in CB style: big picture first, decisive action last.`;
-      const reply = await callClaude({ system: CB_SPINE, messages: [{ role: 'user', content: prompt }], maxTokens: 800 });
+      const reply = await callClaude({ system: CB_LEARNING_SPINE, messages: [{ role: 'user', content: prompt }], maxTokens: 800 });
       setSynthesis(reply);
     } catch {
       setSynthesis('Network error. Try again.');
