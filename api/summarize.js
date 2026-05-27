@@ -1,15 +1,17 @@
-// /api/summarize.js — v4
-// Multi-provider AI summary: Groq (free) → Gemini (free) → Claude (paid).
-// Claude uses prompt caching on the system instruction for lower latency.
-// Supports modes: summary | takeaways | explain | briefing
+// /api/summarize.js — v5
+// Multi-provider AI cascade: Groq → Gemini → Grok → Perplexity → Claude
+// Claude uses prompt caching. Supports modes: summary|takeaways|explain|briefing|briefing-gen
 //
-// Env vars (add in Vercel → Settings → Environment Variables):
-//   GROQ_API_KEY      — free, get from console.groq.com (no credit card)
-//   GOOGLE_AI_KEY     — free, get from aistudio.google.com (no credit card)
-//   ANTHROPIC_API_KEY — paid, get from console.anthropic.com ($5 minimum)
+// Env vars (Vercel → Settings → Environment Variables):
+//   GROQ_API_KEY        — free, console.groq.com
+//   GOOGLE_AI_KEY       — free, aistudio.google.com
+//   XAI_API_KEY         — grok-3-mini, console.x.ai (free tier)
+//   PERPLEXITY_API_KEY  — sonar model, perplexity.ai
+//   ANTHROPIC_API_KEY   — paid fallback, console.anthropic.com
 
-const MAX_INPUT = 3000;
-const TOKENS = { summary: 250, takeaways: 600, explain: 500, briefing: 400 };
+const MAX_INPUT       = 3000;
+const MAX_INPUT_LARGE = 5000; // briefing-gen mode
+const TOKENS = { summary: 250, takeaways: 600, explain: 500, briefing: 400, 'briefing-gen': 700 };
 
 // ── Body parser ──────────────────────────────────────────────────────────────
 async function readBody(req) {
@@ -25,9 +27,12 @@ async function readBody(req) {
   });
 }
 
-// ── System instructions (cached by Claude; used as prefix for Groq/Gemini) ──
+// ── System instructions ──────────────────────────────────────────────────────
 function buildSystem(type, mode) {
   const verb = type === 'podcast' ? 'podcast episode' : 'news article';
+  if (mode === 'briefing-gen') {
+    return 'You are a professional news briefing synthesizer. Follow the user instructions exactly. Output only what is requested — no headers, no meta-commentary.';
+  }
   if (mode === 'briefing') {
     return 'You are a sharp morning news briefing writer. Given headlines from multiple news categories, write ONE punchy sentence per category summarizing the single most important story. Be direct, specific, include names and numbers. No filler.\n\nFormat each line as:\nCategory: One sentence summary';
   }
@@ -40,14 +45,14 @@ function buildSystem(type, mode) {
   return `Summarize this ${verb} in 2-3 concise sentences. Be direct and factual. Skip filler like "this article discusses" — start with the actual content.`;
 }
 
-// ── User content (the article data) ─────────────────────────────────────────
+// ── User content ─────────────────────────────────────────────────────────────
 function buildUser(title, content, mode) {
-  if (mode === 'briefing') return content;
+  if (mode === 'briefing' || mode === 'briefing-gen') return content;
   return `Title: ${title}\n\nContent: ${content}`;
 }
 
-// Combined single-message prompt for Groq / Gemini
 function buildPrompt(type, title, content, mode) {
+  if (mode === 'briefing-gen') return content; // already contains full instructions
   return buildSystem(type, mode) + '\n\n' + buildUser(title, content, mode);
 }
 
@@ -65,7 +70,7 @@ async function tryGroq(prompt, maxTokens) {
         max_tokens: maxTokens,
         temperature: 0.3,
       }),
-      signal: AbortSignal.timeout(8000),
+      signal: AbortSignal.timeout(10000),
     });
     if (!r.ok) return null;
     const d = await r.json();
@@ -87,7 +92,7 @@ async function tryGemini(prompt, maxTokens) {
           contents: [{ parts: [{ text: prompt }] }],
           generationConfig: { maxOutputTokens: maxTokens, temperature: 0.3 },
         }),
-        signal: AbortSignal.timeout(10000),
+        signal: AbortSignal.timeout(12000),
       }
     );
     if (!r.ok) return null;
@@ -96,8 +101,51 @@ async function tryGemini(prompt, maxTokens) {
   } catch { return null; }
 }
 
-// ── Provider 3: Anthropic Claude (paid, highest quality + prompt caching) ───
-// System instructions are cached — saves ~60-80% latency on repeated calls.
+// ── Provider 3: xAI Grok (OpenAI-compatible, free tier) ─────────────────────
+async function tryGrok(prompt, maxTokens) {
+  const key = process.env.XAI_API_KEY;
+  if (!key) return null;
+  try {
+    const r = await fetch('https://api.x.ai/v1/chat/completions', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${key}` },
+      body: JSON.stringify({
+        model: 'grok-3-mini',
+        messages: [{ role: 'user', content: prompt }],
+        max_tokens: maxTokens,
+        temperature: 0.3,
+      }),
+      signal: AbortSignal.timeout(12000),
+    });
+    if (!r.ok) return null;
+    const d = await r.json();
+    return d?.choices?.[0]?.message?.content?.trim() || null;
+  } catch { return null; }
+}
+
+// ── Provider 4: Perplexity (sonar model) ────────────────────────────────────
+async function tryPerplexity(prompt, maxTokens) {
+  const key = process.env.PERPLEXITY_API_KEY;
+  if (!key) return null;
+  try {
+    const r = await fetch('https://api.perplexity.ai/chat/completions', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${key}` },
+      body: JSON.stringify({
+        model: 'sonar',
+        messages: [{ role: 'user', content: prompt }],
+        max_tokens: maxTokens,
+        temperature: 0.3,
+      }),
+      signal: AbortSignal.timeout(14000),
+    });
+    if (!r.ok) return null;
+    const d = await r.json();
+    return d?.choices?.[0]?.message?.content?.trim() || null;
+  } catch { return null; }
+}
+
+// ── Provider 5: Anthropic Claude (paid, prompt caching) ─────────────────────
 async function tryClaude(system, user, maxTokens) {
   const key = process.env.ANTHROPIC_API_KEY;
   if (!key) return null;
@@ -116,7 +164,7 @@ async function tryClaude(system, user, maxTokens) {
         system: [{ type: 'text', text: system, cache_control: { type: 'ephemeral' } }],
         messages: [{ role: 'user', content: user }],
       }),
-      signal: AbortSignal.timeout(9000),
+      signal: AbortSignal.timeout(12000),
     });
     if (!r.ok) return null;
     const d = await r.json();
@@ -140,17 +188,18 @@ export default async function handler(req, res) {
     return res.status(400).json({ error: 'title required' });
   }
 
-  const validModes = ['summary', 'takeaways', 'explain', 'briefing'];
+  const validModes = ['summary', 'takeaways', 'explain', 'briefing', 'briefing-gen'];
   const m = validModes.includes(mode) ? mode : 'summary';
   const maxTokens = TOKENS[m] || 250;
+  const maxInput = m === 'briefing-gen' ? MAX_INPUT_LARGE : MAX_INPUT;
   const t = String(title).slice(0, 500);
-  const c = String(content).slice(0, MAX_INPUT);
+  const c = String(content).slice(0, maxInput);
 
   const system = buildSystem(type, m);
   const user   = buildUser(t, c, m);
   const prompt = buildPrompt(type, t, c, m);
 
-  // Try providers in order: Groq (free) → Gemini (free) → Claude (paid+cached)
+  // Cascade: Groq → Gemini → Grok → Perplexity → Claude
   const groqResult = await tryGroq(prompt, maxTokens);
   if (groqResult) {
     res.setHeader('Cache-Control', 's-maxage=86400, stale-while-revalidate=604800');
@@ -163,17 +212,31 @@ export default async function handler(req, res) {
     return res.status(200).json({ summary: geminiResult, provider: 'Gemini' });
   }
 
+  const grokResult = await tryGrok(prompt, maxTokens);
+  if (grokResult) {
+    res.setHeader('Cache-Control', 's-maxage=86400, stale-while-revalidate=604800');
+    return res.status(200).json({ summary: grokResult, provider: 'Grok' });
+  }
+
+  const perplexityResult = await tryPerplexity(prompt, maxTokens);
+  if (perplexityResult) {
+    res.setHeader('Cache-Control', 's-maxage=86400, stale-while-revalidate=604800');
+    return res.status(200).json({ summary: perplexityResult, provider: 'Perplexity' });
+  }
+
   const claudeResult = await tryClaude(system, user, maxTokens);
   if (claudeResult) {
     res.setHeader('Cache-Control', 's-maxage=86400, stale-while-revalidate=604800');
     return res.status(200).json({ summary: claudeResult, provider: 'Claude' });
   }
 
-  // All three failed
+  // All five failed
   const configured = [];
-  if (process.env.GROQ_API_KEY) configured.push('Groq');
-  if (process.env.GOOGLE_AI_KEY) configured.push('Gemini');
-  if (process.env.ANTHROPIC_API_KEY) configured.push('Claude');
+  if (process.env.GROQ_API_KEY)        configured.push('Groq');
+  if (process.env.GOOGLE_AI_KEY)       configured.push('Gemini');
+  if (process.env.XAI_API_KEY)         configured.push('Grok');
+  if (process.env.PERPLEXITY_API_KEY)  configured.push('Perplexity');
+  if (process.env.ANTHROPIC_API_KEY)   configured.push('Claude');
 
   if (configured.length === 0) {
     return res.status(500).json({
