@@ -4638,7 +4638,7 @@ OUTPUT: 3-sentence paragraph followed by exactly 3 bullets (- markers). No heade
       type:'article',
       title:`Briefing Teaser — ${dateStr}`,
       content: prompt,
-      mode:'summary',
+      mode:'briefing-gen',
     });
     if (summary) {
       const { body: b, bullets: bs } = parseBriefing(summary.trim());
@@ -6454,6 +6454,11 @@ export default function App() {
 
     return (
       <div className="page">
+        {/* Scores strip — top of every page, above hero/headline */}
+        {!activeKw && !activeSrc && !search && (
+          <ActiveScoresBar scores={scores} onGoToSports={() => handleTabChange('sports')}/>
+        )}
+
         {/* v26: General gets 2-col hero (lead | briefing). Other cats: briefing above if no lead. */}
         {isHome && !activeKw && !activeSrc && catLead ? (
           <div className="home-hero-row">
@@ -6511,11 +6516,6 @@ export default function App() {
               ))}
             </div>
           </div>
-        )}
-
-        {/* Active scores strip — all category pages, leagues with live/final games */}
-        {!activeKw && !activeSrc && !search && (
-          <ActiveScoresBar scores={scores} onGoToSports={() => handleTabChange('sports')}/>
         )}
 
         {/* Trending topics bar — shown when no active filter/search */}
