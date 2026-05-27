@@ -1,7 +1,7 @@
-// /api/summarize.js — v3
+// /api/summarize.js — v4
 // Multi-provider AI summary: Groq (free) → Gemini (free) → Claude (paid).
-// Tries each in order; first success wins. All keys are optional — if a key
-// is missing, that provider is skipped silently.
+// Claude uses prompt caching on the system instruction for lower latency.
+// Supports modes: summary | takeaways | explain | briefing
 //
 // Env vars (add in Vercel → Settings → Environment Variables):
 //   GROQ_API_KEY      — free, get from console.groq.com (no credit card)
@@ -9,9 +9,9 @@
 //   ANTHROPIC_API_KEY — paid, get from console.anthropic.com ($5 minimum)
 
 const MAX_INPUT = 3000;
-const TOKENS = { summary: 250, takeaways: 600, briefing: 400 };
+const TOKENS = { summary: 250, takeaways: 600, explain: 500, briefing: 400 };
 
-// ── Body parser (Vercel doesn't auto-parse for plain serverless fns) ────
+// ── Body parser ──────────────────────────────────────────────────────────────
 async function readBody(req) {
   if (req.body && typeof req.body === 'object' && !req.body.on) return req.body;
   if (typeof req.body === 'string') {
@@ -25,19 +25,33 @@ async function readBody(req) {
   });
 }
 
-// ── Build the prompt ────────────────────────────────────────────────────
-function buildPrompt(type, title, content, mode) {
+// ── System instructions (cached by Claude; used as prefix for Groq/Gemini) ──
+function buildSystem(type, mode) {
   const verb = type === 'podcast' ? 'podcast episode' : 'news article';
   if (mode === 'briefing') {
-    return `You are a sharp morning news briefing writer. Given headlines from multiple news categories, write ONE punchy sentence per category summarizing the single most important story. Be direct, specific, include names and numbers. No filler.\n\nFormat each line as:\nCategory: One sentence summary\n\n${content}`;
+    return 'You are a sharp morning news briefing writer. Given headlines from multiple news categories, write ONE punchy sentence per category summarizing the single most important story. Be direct, specific, include names and numbers. No filler.\n\nFormat each line as:\nCategory: One sentence summary';
   }
   if (mode === 'takeaways') {
-    return `Analyze this ${verb} and extract 3-5 key takeaways. For each takeaway, write a bold short headline followed by a one-sentence explanation. Be specific and factual — include names, numbers, and concrete details. Skip generic observations.\n\nFormat each as:\n**1. [Headline]** — [Explanation]\n**2. [Headline]** — [Explanation]\n(etc.)\n\nTitle: ${title}\n\nContent: ${content}`;
+    return `Analyze this ${verb} and extract 3-5 key takeaways. For each takeaway, write a bold short headline followed by a one-sentence explanation. Be specific — include names, numbers, and concrete details. Skip generic observations.\n\nFormat each as:\n**1. [Headline]** — [Explanation]\n**2. [Headline]** — [Explanation]\n(etc.)`;
   }
-  return `Summarize this ${verb} in 2-3 concise sentences. Be direct and factual. Skip filler like "this article discusses" — start with the actual content.\n\nTitle: ${title}\n\nContent: ${content}`;
+  if (mode === 'explain') {
+    return `You are an expert news analyst. Explain this ${verb} for someone who wants full context.\n\nStructure your response as:\n**Background** — Context that makes this story important\n**Key Players** — Who is involved and their role\n**What's Happening** — The core development in plain language\n**Wider Impact** — Economic, political, or global implications\n**What to Watch** — One specific development to follow\n\nBe specific. Include names, numbers, and dates. No filler.`;
+  }
+  return `Summarize this ${verb} in 2-3 concise sentences. Be direct and factual. Skip filler like "this article discusses" — start with the actual content.`;
 }
 
-// ── Provider 1: Groq (Llama 3.3 70B, free, ~700 tok/s) ─────────────────
+// ── User content (the article data) ─────────────────────────────────────────
+function buildUser(title, content, mode) {
+  if (mode === 'briefing') return content;
+  return `Title: ${title}\n\nContent: ${content}`;
+}
+
+// Combined single-message prompt for Groq / Gemini
+function buildPrompt(type, title, content, mode) {
+  return buildSystem(type, mode) + '\n\n' + buildUser(title, content, mode);
+}
+
+// ── Provider 1: Groq (Llama 3.3 70B, free, ~700 tok/s) ─────────────────────
 async function tryGroq(prompt, maxTokens) {
   const key = process.env.GROQ_API_KEY;
   if (!key) return null;
@@ -55,12 +69,11 @@ async function tryGroq(prompt, maxTokens) {
     });
     if (!r.ok) return null;
     const d = await r.json();
-    const text = d?.choices?.[0]?.message?.content?.trim();
-    return text || null;
+    return d?.choices?.[0]?.message?.content?.trim() || null;
   } catch { return null; }
 }
 
-// ── Provider 2: Google Gemini (free 500 req/day) ────────────────────────
+// ── Provider 2: Google Gemini (free 500 req/day) ────────────────────────────
 async function tryGemini(prompt, maxTokens) {
   const key = process.env.GOOGLE_AI_KEY;
   if (!key) return null;
@@ -79,13 +92,13 @@ async function tryGemini(prompt, maxTokens) {
     );
     if (!r.ok) return null;
     const d = await r.json();
-    const text = d?.candidates?.[0]?.content?.parts?.[0]?.text?.trim();
-    return text || null;
+    return d?.candidates?.[0]?.content?.parts?.[0]?.text?.trim() || null;
   } catch { return null; }
 }
 
-// ── Provider 3: Anthropic Claude (paid, highest quality) ────────────────
-async function tryClaude(prompt, maxTokens) {
+// ── Provider 3: Anthropic Claude (paid, highest quality + prompt caching) ───
+// System instructions are cached — saves ~60-80% latency on repeated calls.
+async function tryClaude(system, user, maxTokens) {
   const key = process.env.ANTHROPIC_API_KEY;
   if (!key) return null;
   try {
@@ -95,22 +108,23 @@ async function tryClaude(prompt, maxTokens) {
         'Content-Type': 'application/json',
         'x-api-key': key,
         'anthropic-version': '2023-06-01',
+        'anthropic-beta': 'prompt-caching-2024-07-31',
       },
       body: JSON.stringify({
         model: 'claude-sonnet-4-6',
         max_tokens: maxTokens,
-        messages: [{ role: 'user', content: prompt }],
+        system: [{ type: 'text', text: system, cache_control: { type: 'ephemeral' } }],
+        messages: [{ role: 'user', content: user }],
       }),
       signal: AbortSignal.timeout(9000),
     });
     if (!r.ok) return null;
     const d = await r.json();
-    const text = d?.content?.[0]?.text?.trim();
-    return text || null;
+    return d?.content?.[0]?.text?.trim() || null;
   } catch { return null; }
 }
 
-// ── Handler ─────────────────────────────────────────────────────────────
+// ── Handler ──────────────────────────────────────────────────────────────────
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
@@ -126,24 +140,33 @@ export default async function handler(req, res) {
     return res.status(400).json({ error: 'title required' });
   }
 
-  const validModes = ['summary', 'takeaways'];
+  const validModes = ['summary', 'takeaways', 'explain', 'briefing'];
   const m = validModes.includes(mode) ? mode : 'summary';
   const maxTokens = TOKENS[m] || 250;
-  const prompt = buildPrompt(type, String(title).slice(0, 500), String(content).slice(0, MAX_INPUT), m);
+  const t = String(title).slice(0, 500);
+  const c = String(content).slice(0, MAX_INPUT);
 
-  // Try providers in order: Groq (free) → Gemini (free) → Claude (paid)
-  const providers = [
-    { name: 'Groq',    fn: tryGroq },
-    { name: 'Gemini',  fn: tryGemini },
-    { name: 'Claude',  fn: tryClaude },
-  ];
+  const system = buildSystem(type, m);
+  const user   = buildUser(t, c, m);
+  const prompt = buildPrompt(type, t, c, m);
 
-  for (const p of providers) {
-    const result = await p.fn(prompt, maxTokens);
-    if (result) {
-      res.setHeader('Cache-Control', 's-maxage=86400, stale-while-revalidate=604800');
-      return res.status(200).json({ summary: result, provider: p.name });
-    }
+  // Try providers in order: Groq (free) → Gemini (free) → Claude (paid+cached)
+  const groqResult = await tryGroq(prompt, maxTokens);
+  if (groqResult) {
+    res.setHeader('Cache-Control', 's-maxage=86400, stale-while-revalidate=604800');
+    return res.status(200).json({ summary: groqResult, provider: 'Groq' });
+  }
+
+  const geminiResult = await tryGemini(prompt, maxTokens);
+  if (geminiResult) {
+    res.setHeader('Cache-Control', 's-maxage=86400, stale-while-revalidate=604800');
+    return res.status(200).json({ summary: geminiResult, provider: 'Gemini' });
+  }
+
+  const claudeResult = await tryClaude(system, user, maxTokens);
+  if (claudeResult) {
+    res.setHeader('Cache-Control', 's-maxage=86400, stale-while-revalidate=604800');
+    return res.status(200).json({ summary: claudeResult, provider: 'Claude' });
   }
 
   // All three failed
