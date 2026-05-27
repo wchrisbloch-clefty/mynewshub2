@@ -282,9 +282,10 @@ const DEFAULT_URGENT = [
 ];
 
 const INDICES = [
-  { sym:'^GSPC', label:'S&P 500',   short:'S&P' },
-  { sym:'^DJI',  label:'Dow Jones', short:'DOW' },
-  { sym:'^IXIC', label:'Nasdaq',    short:'NDQ' },
+  { sym:'^GSPC', label:'S&P 500',     short:'S&P' },
+  { sym:'^DJI',  label:'Dow Jones',   short:'DOW' },
+  { sym:'^IXIC', label:'Nasdaq',      short:'NDQ' },
+  { sym:'NG=F',  label:'Natural Gas', short:'Gas' },
 ];
 
 const DEFAULT_WATCHLIST = [
@@ -645,7 +646,7 @@ async function fetchAISummary({type, title, content, mode='summary'}) {
     const r = await fetch('/api/summarize', {
       method:'POST', headers:{'Content-Type':'application/json'},
       body: JSON.stringify({type,title,content,mode}),
-      signal: AbortSignal.timeout(mode==='takeaways'?18000:12000),
+      signal: AbortSignal.timeout(mode==='briefing-gen'?25000:mode==='takeaways'?18000:20000),
     });
     if (!r.ok) {
       const e=await r.json().catch(()=>({}));
@@ -2445,6 +2446,22 @@ body:not(.dark) .pill-bar{
   .mini-sb-status{font-size: 9px;}
   .bottom-topics{margin-top: 28px;padding-top: 18px;}
 }
+
+/* BriefingArticleItem — slim expandable row with AI/Share actions */
+.ba-item{border-bottom:1px solid var(--border);}
+.ba-main{display:flex;gap:10px;padding:12px 0;cursor:pointer;align-items:flex-start;}
+.ba-main:hover .gf-title{color:var(--accent);}
+.ba-actions{display:flex;gap:5px;margin-top:6px;flex-wrap:wrap;}
+.ba-btn{font-size:10px;padding:3px 8px;border-radius:12px;border:1px solid var(--border);background:var(--surface2);color:var(--text2);cursor:pointer;white-space:nowrap;transition:background 0.12s,color 0.12s;}
+.ba-btn:hover,.ba-btn.on{background:var(--accent);color:#fff;border-color:var(--accent);}
+.ba-panel{padding:8px 12px 12px;font-size:13px;color:var(--text2);line-height:1.55;background:var(--surface2);border-radius:0 0 6px 6px;margin-bottom:4px;}
+
+/* MenuSheet search + trending */
+.ms-search-wrap{padding:8px 16px 4px;}
+.ms-search-input{width:100%;padding:8px 12px;border-radius:20px;border:1px solid var(--border);background:var(--surface2);color:var(--text);font-size:14px;outline:none;}
+.ms-trending{padding:6px 16px 10px;display:flex;gap:6px;flex-wrap:wrap;}
+.ms-trending-chip{font-size:11px;padding:3px 10px;border-radius:12px;background:var(--surface2);border:1px solid var(--border);color:var(--text2);cursor:pointer;white-space:nowrap;}
+.ms-trending-chip:hover{background:var(--accent);color:#fff;border-color:var(--accent);}
 
 /* ═══════════════════════════════════════════
    v19 ADDITIONS — Editorial top band + enhanced briefing + tabbed sidebar
@@ -4334,6 +4351,12 @@ function TodayItem({a, cc, onRead}) {
     setLoading(false);
   };
 
+  const handleShare = async (e) => {
+    e.stopPropagation();
+    if (navigator.share) { try { await navigator.share({title:a.title,url:a.link}); return; } catch {} }
+    try { await navigator.clipboard.writeText(a.link); } catch {}
+  };
+
   return (
     <div className="today-item-wrap">
       <div className="today-item" onClick={()=>onRead(a)}>
@@ -4346,6 +4369,9 @@ function TodayItem({a, cc, onRead}) {
         </div>
         <button className={`today-ai-btn ${showSum?'on':''}`} title="AI Summary" onClick={handleAI} disabled={loading}>
           {loading?'…':'✦'}
+        </button>
+        <button className="today-ai-btn" title="Share" onClick={handleShare} style={{marginLeft:'2px',fontSize:'13px'}}>
+          ⤴
         </button>
       </div>
       {showSum && (
@@ -4453,7 +4479,7 @@ Output ONLY the paragraph followed by the bullets. No headers, no labels, no clo
       type:'article',
       title:`News Briefing — ${dateStr}`,
       content: prompt,
-      mode:'summary',
+      mode:'briefing-gen',
     });
     if (summary) {
       const { body: b, bullets: bs } = parseBriefing(summary.trim());
@@ -4954,7 +4980,7 @@ function SourceFooter({cat, feeds, arts}) {
 const CAT_LABELS = {general:'🌐 General',sports:'🏆 Sports',business:'⚡ Business',finance:'📈 Markets',bloom:'🔋 Bloom',popculture:'✨ Pop Culture',comedy:'😂 Comedy'};
 const PLAT_LABELS = {twitter:'𝕏',linkedin:'in',instagram:'IG',youtube:'▶'};
 
-function CustomizePanel({feeds, kw, alerts, urgent, social, watchlist, teams, health, arts, weatherCities, initialTab, initialCat, onClose, onSave}) {
+function CustomizePanel({feeds, kw, alerts, urgent, social, watchlist, teams, health, arts, weatherCities, hiddenIndices, initialTab, initialCat, onClose, onSave}) {
   const [lf, setLf] = useState(JSON.parse(JSON.stringify(feeds)));
   const [lk, setLk] = useState(JSON.parse(JSON.stringify(kw)));
   const [la, setLa] = useState([...alerts]);
@@ -4964,6 +4990,7 @@ function CustomizePanel({feeds, kw, alerts, urgent, social, watchlist, teams, he
   const [newSymName, setNewSymName] = useState('');
   const [ls, setLs] = useState(JSON.parse(JSON.stringify(social)));
   const [lwx, setLwx] = useState(JSON.parse(JSON.stringify(weatherCities||DEFAULT_WEATHER_CITIES)));
+  const [lhi, setLhi] = useState([...(hiddenIndices||[])]);
   const [newCityName, setNewCityName] = useState('');
   const [newCityLat, setNewCityLat] = useState('');
   const [newCityLon, setNewCityLon] = useState('');
@@ -5243,15 +5270,28 @@ function CustomizePanel({feeds, kw, alerts, urgent, social, watchlist, teams, he
                   }
                 }}>Add City</button>
               </div>
-              <div className="cp-lbl" style={{marginTop:'16px'}}>Stock Tickers in Strip</div>
-              <div className="cp-desc">The strip always shows S&P, DOW, NASDAQ. Your watchlist tickers can also appear — manage them in the Watchlist tab.</div>
+              <div className="cp-lbl" style={{marginTop:'16px'}}>Market Indices in Strip</div>
+              <div className="cp-desc">Toggle which indices appear in the data strip. Uncheck any to hide.</div>
+              <div style={{display:'flex',flexWrap:'wrap',gap:'8px',margin:'8px 0'}}>
+                {INDICES.map(idx => (
+                  <label key={idx.sym} style={{display:'flex',alignItems:'center',gap:'5px',fontSize:'12px',cursor:'pointer'}}>
+                    <input type="checkbox"
+                      checked={!lhi.includes(idx.sym)}
+                      onChange={e => setLhi(prev => e.target.checked ? prev.filter(s=>s!==idx.sym) : [...prev,idx.sym])}
+                    />
+                    {idx.label} ({idx.short})
+                  </label>
+                ))}
+              </div>
+              <div className="cp-lbl" style={{marginTop:'12px'}}>Watchlist Tickers in Strip</div>
+              <div className="cp-desc">Your watchlist tickers also appear — manage them in the Watchlist tab.</div>
               <div style={{fontSize:'11px',color:'var(--text2)',background:'var(--surface2)',borderRadius:'6px',padding:'8px 10px'}}>
                 Current watchlist: {lw.map(w=>w.sym).join(' · ') || 'none'}
               </div>
             </div>
           )}
 
-          <button className="cp-save" onClick={()=>onSave({feeds:lf,kw:lk,alerts:la,urgent:lu,social:ls,watchlist:lw,teams:lt,weatherCities:lwx})}>Save & Refresh</button>
+          <button className="cp-save" onClick={()=>onSave({feeds:lf,kw:lk,alerts:la,urgent:lu,social:ls,watchlist:lw,teams:lt,weatherCities:lwx,hiddenIndices:lhi})}>Save & Refresh</button>
         </div>
       </div>
     </div>
@@ -5265,7 +5305,7 @@ function CustomizePanel({feeds, kw, alerts, urgent, social, watchlist, teams, he
 // (Finance, Bloom, Comedy, Podcasts, Social) and actions (refresh, theme,
 // customize) so the bottom tab bar can stay focused on the 3 primary
 // destinations a mobile user actually uses for quick check-ins.
-function MenuSheet({ tab, onTabChange, onClose, onCustomize, onRefresh, dark, setDark }) {
+function MenuSheet({ tab, onTabChange, onClose, onCustomize, onRefresh, dark, setDark, search, onSearch, trendingTopics }) {
   const items = [
     { key:'briefing',   emoji:'☕', label:'The Briefing' },
     { key:'podcasts',   emoji:'🎙️', label:'Podcasts' },
@@ -5274,6 +5314,23 @@ function MenuSheet({ tab, onTabChange, onClose, onCustomize, onRefresh, dark, se
     <div className="menu-sheet-overlay" onClick={onClose}>
       <div className="menu-sheet" onClick={e=>e.stopPropagation()}>
         <div className="menu-sheet-grab"/>
+        <div className="ms-search-wrap">
+          <input
+            className="ms-search-input"
+            placeholder="Search news…"
+            value={search}
+            onChange={e=>{ onSearch(e.target.value); if(e.target.value) onClose(); }}
+            onKeyDown={e=>{ if(e.key==='Enter'&&search) onClose(); }}
+            autoFocus={false}
+          />
+        </div>
+        {trendingTopics && trendingTopics.length > 0 && (
+          <div className="ms-trending">
+            {trendingTopics.slice(0,6).map((t,i)=>(
+              <span key={i} className="ms-trending-chip" onClick={()=>{ onSearch(t); onClose(); }}>{t}</span>
+            ))}
+          </div>
+        )}
         <div className="menu-sheet-head">More sections</div>
         {items.map(it => (
           <button key={it.key}
@@ -5668,7 +5725,7 @@ function LastUpdated({ timestamp, onRefresh }) {
 // the auto-hide-on-scroll-down behavior (mobile only — drives translate).
 function TopBar({tab, setTab, search, setSearch, dark, setDark,
                  onCustomize, onRefresh, breakingItems, onTickerClick,
-                 hidden, mobileSearchOpen, onMobileSearchToggle, weatherCities}) {
+                 hidden, mobileSearchOpen, onMobileSearchToggle, weatherCities, hiddenIndices}) {
   const [wxList, setWxList] = useState([]);
   const [quotes, setQuotes] = useState({});
   const [showBreaking, setShowBreaking] = useState(true);
@@ -5737,7 +5794,7 @@ function TopBar({tab, setTab, search, setSearch, dark, setDark,
               </div>
             </a>
           ))}
-          {INDICES.map(idx=>{
+          {INDICES.filter(idx=>!(hiddenIndices||[]).includes(idx.sym)).map(idx=>{
             const q=quotes[idx.sym]; const up=q?q.chg>=0:null;
             return (
               <div key={idx.sym} className="pill pill-idx" onClick={()=>q&&window.open(`https://finance.yahoo.com/quote/${encodeURIComponent(idx.sym)}`,'_blank')}>
@@ -5885,6 +5942,7 @@ export default function App() {
   // v23: customizable favorite teams. Defaults to SCORE_TEAMS; user can add/remove via Customize.
   const [teams, setTeams]       = useState(()=>ld('teams', SCORE_TEAMS));
   const [weatherCities, setWeatherCities] = useState(()=>ld('weatherCities', DEFAULT_WEATHER_CITIES));
+  const [hiddenIndices, setHiddenIndices] = useState(()=>ld('hiddenIndices',[]));
   const [marketData, setMarketData] = useState({});
   const [marketLoading, setMarketLoading] = useState(false);
   const [social, setSocial]     = useState(()=>ld('social',DEFAULT_SOCIAL));
@@ -6091,7 +6149,7 @@ export default function App() {
     return () => window.removeEventListener('keydown', handler);
   }, []);
 
-  const handleCustomizeSave = ({feeds:nf,kw:nk,alerts:na,urgent:nu,social:ns,watchlist:nw,teams:nt,weatherCities:nwx})=>{
+  const handleCustomizeSave = ({feeds:nf,kw:nk,alerts:na,urgent:nu,social:ns,watchlist:nw,teams:nt,weatherCities:nwx,hiddenIndices:ni})=>{
     setFeeds(nf);sv('feeds',nf);
     setKw(nk);sv('kw',nk);
     setAlerts(na);sv('alerts',na);
@@ -6100,6 +6158,7 @@ export default function App() {
     if(nw){setWatchlist(nw);sv('watchlist',nw);}
     if(nt){setTeams(nt);sv('teams',nt);}
     if(nwx){setWeatherCities(nwx);sv('weatherCities',nwx);}
+    if(ni!=null){setHiddenIndices(ni);sv('hiddenIndices',ni);}
     setShowPanel(false);refreshAll();
   };
 
@@ -6454,8 +6513,8 @@ export default function App() {
           </div>
         )}
 
-        {/* Active scores strip — General homepage, leagues with live/final games */}
-        {isHome && !activeKw && !activeSrc && !search && (
+        {/* Active scores strip — all category pages, leagues with live/final games */}
+        {!activeKw && !activeSrc && !search && (
           <ActiveScoresBar scores={scores} onGoToSports={() => handleTabChange('sports')}/>
         )}
 
@@ -6503,7 +6562,10 @@ export default function App() {
                   <a key={i} className="web-result" href={r.link} target="_blank" rel="noreferrer">
                     <div className="web-result-title">{r.title}</div>
                     {r.desc && <div className="web-result-desc">{r.desc.slice(0, 160)}</div>}
-                    <div className="web-result-src">{r.source}</div>
+                    <div className="web-result-src">
+                      {r.source}
+                      {r.pubDate && <span className="web-result-date"> · {fmtDate(r.pubDate)}</span>}
+                    </div>
                   </a>
                 ))}
               </div>
@@ -6615,6 +6677,82 @@ export default function App() {
   //            Comedy) that fed the AI
   // This makes the briefing transparent: users can see WHAT went in and click
   // through to any source article. Solves the v22b complaint of "what sources?"
+  // ── Briefing article row with AI summary, Explain, Listen, Share ──
+  const BriefingArticleItem = ({ a }) => {
+    const [showSum,setShowSum]     = useState(false);
+    const [sum,setSum]             = useState('');
+    const [sumErr,setSumErr]       = useState('');
+    const [loadSum,setLoadSum]     = useState(false);
+    const [showEx,setShowEx]       = useState(false);
+    const [exText,setExText]       = useState('');
+    const [loadEx,setLoadEx]       = useState(false);
+    const [speaking,setSpeaking]   = useState(false);
+
+    const handleAI = async (e) => {
+      e.stopPropagation();
+      if (showSum) { setShowSum(false); return; }
+      if (sum||sumErr) { setShowSum(true); return; }
+      setShowSum(true); setLoadSum(true);
+      const {summary,error} = await fetchAISummary({type:'article',title:a.title,content:a.desc||''});
+      if (summary) setSum(summary); else setSumErr(error||'Unavailable');
+      setLoadSum(false);
+    };
+
+    const handleExplain = async (e) => {
+      e.stopPropagation();
+      if (showEx) { setShowEx(false); return; }
+      if (exText) { setShowEx(true); return; }
+      setShowEx(true); setLoadEx(true);
+      const {summary:text} = await fetchAISummary({type:'article',title:a.title,content:a.desc||'',mode:'explain'});
+      setExText(text||'Could not explain.');
+      setLoadEx(false);
+    };
+
+    const handleListen = (e) => {
+      e.stopPropagation();
+      if (speaking) { window.speechSynthesis.cancel(); setSpeaking(false); return; }
+      const utt = new SpeechSynthesisUtterance(`${a.title}. ${sum||a.desc||''}`);
+      utt.onend = () => setSpeaking(false);
+      window.speechSynthesis.speak(utt); setSpeaking(true);
+    };
+
+    const handleShare = async (e) => {
+      e.stopPropagation();
+      if (navigator.share) { try { await navigator.share({title:a.title,url:a.link}); return; } catch {} }
+      try { await navigator.clipboard.writeText(a.link); } catch {}
+    };
+
+    return (
+      <div className="ba-item">
+        <div className="ba-main" onClick={()=>onRead(a)}>
+          {a.img
+            ? <div className="gf-thumb" style={{backgroundImage:`url(${a.img})`}}/>
+            : <div className="gf-thumb-ph"/>}
+          <div className="gf-body">
+            <div className="gf-title">{a.title}</div>
+            <div className="gf-meta">
+              <span>{a.source}</span><span>·</span><span>{fmtDate(a.pubDate)}</span>
+            </div>
+            <div className="ba-actions" onClick={e=>e.stopPropagation()}>
+              <button className={`ba-btn${showSum?' on':''}`} onClick={handleAI}>
+                {loadSum?'…':'✦'} {showSum?'Hide':'Summary'}
+              </button>
+              <button className={`ba-btn${showEx?' on':''}`} onClick={handleExplain}>
+                {loadEx?'…':'🧠'} {showEx?'Hide':'Explain'}
+              </button>
+              <button className={`ba-btn${speaking?' on':''}`} onClick={handleListen}>
+                {speaking?'⏹':'🔊'} {speaking?'Stop':'Listen'}
+              </button>
+              <button className="ba-btn" onClick={handleShare}>⤴ Share</button>
+            </div>
+          </div>
+        </div>
+        {showSum&&<div className="ba-panel">{loadSum?<em style={{color:'var(--text3)'}}>Generating…</em>:sumErr?<span style={{color:'var(--red)'}}>{sumErr}</span>:sum}</div>}
+        {showEx&&<div className="ba-panel">{loadEx?<em style={{color:'var(--text3)'}}>Analyzing…</em>:<ExplainContent text={exText}/>}</div>}
+      </div>
+    );
+  };
+
   const BriefingPage = () => {
     // Tier 1: priority briefing sources, latest 2 each
     const tier1 = useMemo(() => {
@@ -6679,21 +6817,7 @@ export default function App() {
                   Priority briefing sources haven't loaded yet. Make sure {BRIEFING_PRIORITY_SOURCES.join(', ')} are enabled in your General feeds.
                 </div>
               : tier1.items.map((a, i) => (
-                  <div key={`t1-${i}`} className="gf-item" onClick={()=>onRead(a)}>
-                    {a.img
-                      ? <div className="gf-thumb" style={{backgroundImage:`url(${a.img})`}}/>
-                      : <div className="gf-thumb-ph"/>}
-                    <div className="gf-body">
-                      <div className="gf-title">{a.title}</div>
-                      <div className="gf-meta">
-                        <span className="gf-meta-cat" style={{color:'var(--accent)',fontWeight:800}}>
-                          ★ {a.source}
-                        </span>
-                        <span>·</span>
-                        <span>{fmtDate(a.pubDate)}</span>
-                      </div>
-                    </div>
-                  </div>
+                  <BriefingArticleItem key={`t1-${i}`} a={a}/>
                 ))}
           </section>
 
@@ -6711,19 +6835,7 @@ export default function App() {
                   </button>
                 </div>
                 {headlines.map((a, i) => (
-                  <div key={`${cat}-${i}`} className="gf-item" onClick={()=>onRead(a)}>
-                    {a.img
-                      ? <div className="gf-thumb" style={{backgroundImage:`url(${a.img})`}}/>
-                      : <div className="gf-thumb-ph"/>}
-                    <div className="gf-body">
-                      <div className="gf-title">{a.title}</div>
-                      <div className="gf-meta">
-                        <span>{a.source}</span>
-                        <span>·</span>
-                        <span>{fmtDate(a.pubDate)}</span>
-                      </div>
-                    </div>
-                  </div>
+                  <BriefingArticleItem key={`${cat}-${i}`} a={a}/>
                 ))}
               </section>
             );
@@ -7066,7 +7178,8 @@ export default function App() {
           hidden={headerHidden}
           mobileSearchOpen={mobileSearchOpen}
           onMobileSearchToggle={() => setMobileSearchOpen(o => !o)}
-          weatherCities={weatherCities}/>
+          weatherCities={weatherCities}
+          hiddenIndices={hiddenIndices}/>
 
         {/* Pull-to-refresh indicator (mobile, touch-only) */}
         {isMobile && <PtrIndicator distance={ptrDistance} threshold={70} refreshing={refreshing}/>}
@@ -7090,6 +7203,9 @@ export default function App() {
             onRefresh={refreshAll}
             dark={dark}
             setDark={setDark}
+            search={search}
+            onSearch={setSearch}
+            trendingTopics={getTrendingTopics(Object.values(arts).flat(), 8)}
           />
         )}
 
@@ -7104,7 +7220,7 @@ export default function App() {
 
         {showPanel&&<CustomizePanel feeds={feeds} kw={kw} alerts={alerts} urgent={urgent}
           social={social} watchlist={watchlist} teams={teams} health={health} arts={arts}
-          weatherCities={weatherCities}
+          weatherCities={weatherCities} hiddenIndices={hiddenIndices}
           initialTab={panelInitial.tab} initialCat={panelInitial.cat}
           onClose={()=>setShowPanel(false)} onSave={handleCustomizeSave}/>}
       </div>
