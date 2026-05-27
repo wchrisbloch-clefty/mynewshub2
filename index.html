@@ -6,19 +6,42 @@
   <title>Aether Intelligence Hub</title>
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;0,9..40,800;1,9..40,400&family=Fraunces:ital,opsz,wght@0,9..144,700;0,9..144,800;0,9..144,900;1,9..144,700&display=swap" rel="stylesheet">
   <style>
+    :root {
+      --bg:            #08080f;
+      --bg-alt:        #060610;
+      --bg-nav:        #080812;
+      --surface:       #0c0c18;
+      --surf2:         #12122a;
+      --border:        #1e2a38;
+      --bord2:         #1a1a2e;
+      --border-dim:    rgba(30,42,56,0.25);
+      --overlay:       rgba(7,13,20,0.82);
+      --text:          #ffffff;
+      --text-b:        #c8d4e0;
+      --text-c:        #b0c0d0;
+      --muted:         #6a7890;
+      --subtle:        #5a6880;
+      --dim:           #4a5870;
+      --u-bubble:      #12122a;
+      --u-bubble-b:    #2a2a45;
+      --u-bubble-text: #c0d0e0;
+      --scrollbar:     #2a3548;
+      --scrollbar-h:   #3a4558;
+    }
+
     *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
     html, body, #root { height: 100%; }
     body {
-      background: #08080f;
-      color: #c8d4e0;
+      background: var(--bg);
+      color: var(--text-b);
       font-family: 'DM Sans', -apple-system, BlinkMacSystemFont, sans-serif;
       -webkit-font-smoothing: antialiased;
       overflow: hidden;
     }
     ::-webkit-scrollbar { width: 3px; height: 3px; }
     ::-webkit-scrollbar-track { background: transparent; }
-    ::-webkit-scrollbar-thumb { background: #1e2a38; border-radius: 2px; }
-    ::-webkit-scrollbar-thumb:hover { background: #2e3a48; }
+    ::-webkit-scrollbar-thumb { background: var(--scrollbar); border-radius: 2px; }
+    ::-webkit-scrollbar-thumb:hover { background: var(--scrollbar-h); }
 
     @keyframes pulse { 0%,100%{opacity:.35;transform:scale(.85)} 50%{opacity:1;transform:scale(1.1)} }
     @keyframes fadeUp { from{opacity:0;transform:translateY(12px)} to{opacity:1;transform:translateY(0)} }
@@ -31,11 +54,40 @@
       100% { background-position: 400px 0; }
     }
     .shimmer {
-      background: linear-gradient(90deg, #0c0c18 25%, #141422 50%, #0c0c18 75%);
+      background: linear-gradient(90deg, var(--surface) 25%, var(--surf2) 50%, var(--surface) 75%);
       background-size: 400px 100%;
       animation: shimmer 1.4s infinite;
     }
   </style>
+  <!-- Prevent flash of wrong theme on load -->
+  <script>
+    (function() {
+      var t = localStorage.getItem('aether-theme');
+      if (t === 'light') {
+        var r = document.documentElement.style;
+        r.setProperty('--bg',            '#f3f5f9');
+        r.setProperty('--bg-alt',        '#eef1f7');
+        r.setProperty('--bg-nav',        '#f0f2f8');
+        r.setProperty('--surface',       '#ffffff');
+        r.setProperty('--surf2',         '#e8f0ff');
+        r.setProperty('--border',        '#dde3ee');
+        r.setProperty('--bord2',         '#e5e9f4');
+        r.setProperty('--border-dim',    'rgba(180,190,210,0.4)');
+        r.setProperty('--overlay',       'rgba(30,41,59,0.45)');
+        r.setProperty('--text',          '#0f172a');
+        r.setProperty('--text-b',        '#1e293b');
+        r.setProperty('--text-c',        '#334155');
+        r.setProperty('--muted',         '#64748b');
+        r.setProperty('--subtle',        '#64748b');
+        r.setProperty('--dim',           '#94a3b8');
+        r.setProperty('--u-bubble',      '#e8f0ff');
+        r.setProperty('--u-bubble-b',    '#bfd4f0');
+        r.setProperty('--u-bubble-text', '#1e3a5f');
+        r.setProperty('--scrollbar',     '#c5d0df');
+        r.setProperty('--scrollbar-h',   '#b0bccf');
+      }
+    })();
+  </script>
 </head>
 <body>
   <div id="root"></div>
