@@ -15,7 +15,7 @@ const QUICK_PROMPTS = {
 };
 
 export default function ChatPanel() {
-  const { chatOpen, setChatOpen, activeModule, graph, projects } = useApp();
+  const { chatOpen, setChatOpen, activeModule, graph, projects, isMobile } = useApp();
   const [chatMode, setChatMode] = useState('synthesis');
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState('');
@@ -61,13 +61,13 @@ export default function ChatPanel() {
       position: 'fixed',
       top: 0,
       right: 0,
-      width: 360,
-      height: '100vh',
+      width: isMobile ? '100%' : 360,
+      height: isMobile ? 'calc(100vh - 60px)' : '100vh',
       background: '#080812',
-      borderLeft: '1px solid #1a1a2e',
+      borderLeft: isMobile ? 'none' : '1px solid #1a1a2e',
       display: 'flex',
       flexDirection: 'column',
-      zIndex: 50,
+      zIndex: isMobile ? 200 : 50,
       animation: 'slideInRight 0.22s ease',
     }}>
       {/* Header */}

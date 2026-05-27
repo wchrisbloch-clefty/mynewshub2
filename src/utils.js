@@ -211,8 +211,57 @@ export function buildSystem(entryMode, sessionMode, context, graph) {
   };
 }
 
+export function buildReadingSystem({ contentType, goal, depth, progress, content, graph }) {
+  const graphSummary = graph && Object.keys(graph.topics || {}).length > 0
+    ? '\n\nCB\'S LEARNING HISTORY:\n' +
+      Object.values(graph.topics).slice(-8).map(t => `- ${t.title}: confidence ${t.confidence}/10`).join('\n')
+    : '';
+
+  const typeInstructions = {
+    nonfiction:  `CONTENT TYPE: Non-Fiction / Business\nApproach: Thesis-first. Extract frameworks, CB applications, cross-references to mental models.\nEvery response: Core concept → Why it matters → CB application → Action.`,
+    fiction:     `CONTENT TYPE: Literary Fiction\nApproach: Literary analysis — character psychology, themes, symbolism, narrative craft, author technique.\nCRITICAL: Never reveal plot points beyond where the reader currently is.`,
+    scifi:       `CONTENT TYPE: Sci-Fi / Fantasy\nApproach: World-building logic, scientific plausibility vs. speculation, allegorical meaning.\nCRITICAL: No spoilers beyond the reader's current position. Explore internal consistency, real-world parallels, social allegory.`,
+    history:     `CONTENT TYPE: History / Biography\nApproach: Evidence-first. For every claim surface: (1) What supports it? (2) Who disagrees and why? (3) Present-day parallel.\nBiography: narrator reliability, era context, gap between self-presentation and reality.`,
+    academic:    `CONTENT TYPE: Academic / Textbook\nApproach: Concept ladder — check prerequisites first, never assume prior knowledge.\nTeach: definition → intuition → formal statement → example → common misconception → exam angle.\nAfter teaching: ask the reader to explain the core idea back in their own words.`,
+    reference:   `CONTENT TYPE: Reference / Technical Document\nApproach: Precision. No paraphrase that loses meaning. Flag scope of applicability.\nAlways: exact terminology → context of use → what this does NOT cover → when to escalate to a professional.`,
+    training:    `CONTENT TYPE: Training / Professional Development\nApproach: Performance coach. Map every concept to the reader's actual role and goals.\nFor each concept: translate to CB's context → concrete scenario → competency benchmark.\nEnd every section: "How would you apply this in the next 7 days?"`,
+    philosophy:  `CONTENT TYPE: Philosophy / Theory\nApproach: Dialectical. Present the argument → steelman it → challenge it.\nAlways: What is it claiming? What does it assume? What's the strongest counterargument? Share your genuine assessment.`,
+  };
+
+  const goalInstructions = {
+    master:  `GOAL: DEEP MASTERY\nAfter explaining each concept, ask the reader to explain it back. Track gaps. Confirm what's solid, surface what's fuzzy.`,
+    exam:    `GOAL: EXAM / CERT PREP\nFocus on high-yield concepts, likely question formats, common traps. After each concept generate a practice question. Track everything the reader struggles with.`,
+    apply:   `GOAL: APPLY TO WORK\nFilter through CB's context: BD, real estate, business building. Extract the framework → translate to CB's situation → give a concrete next action.`,
+    discuss: `GOAL: DISCUSS & EXPLORE\nOpen dialogue. Follow intellectual curiosity. Offer counterarguments, thought experiments. End every response with a question that advances the conversation.`,
+    quick:   `GOAL: QUICK UNDERSTANDING\nEfficiency mode. Core idea only. Format: essential insight → one practical implication → done.`,
+  };
+
+  const depthInstructions = {
+    surface:  `DEPTH: SURFACE — Concise. Key idea + one implication max.`,
+    standard: `DEPTH: STANDARD — Full explanation with at least one concrete example.`,
+    deep:     `DEPTH: DEEP DIVE — Full reasoning, multiple perspectives, edge cases. Don't oversimplify.`,
+    expert:   `DEPTH: EXPERT — Peer discourse. Challenge assumptions. No hand-holding.`,
+  };
+
+  const progressInstructions = {
+    start:     `READING POSITION: Just starting. Orient the reader to the full structure first, then work through the opening.`,
+    mid:       `READING POSITION: Mid-way through. Reference what they've encountered — never assume what they haven't reached yet.`,
+    done:      `READING POSITION: Finished. Full synthesis mode — themes, takeaways, connections, what to do with this material.`,
+    reference: `READING POSITION: Reference lookup. Reader needs a specific answer — don't re-teach the whole work.`,
+  };
+
+  const dynamic = graphSummary +
+    `\n\nCONTENT: "${content.title}"${content.author ? ` by ${content.author}` : ''}` +
+    `\n\n${typeInstructions[contentType] || typeInstructions.nonfiction}` +
+    `\n\n${goalInstructions[goal] || goalInstructions.master}` +
+    `\n\n${depthInstructions[depth] || depthInstructions.standard}` +
+    `\n\n${progressInstructions[progress] || progressInstructions.start}`;
+
+  return { cached: CB_LEARNING_SPINE, dynamic };
+}
+
 export function buildQuizPrompt(context, entryMode, count = 5) {
-  const subject = entryMode === 'book' ? context.book?.title : entryMode === 'topic' ? context.topic : entryMode === 'youtube' ? context.title : 'the uploaded document';
+  const subject = entryMode === 'reading' ? context.title : entryMode === 'book' ? context.book?.title : entryMode === 'topic' ? context.topic : entryMode === 'youtube' ? context.title : 'the uploaded document';
   return `Generate exactly ${count} quiz questions about "${subject}" tailored to CB's learning style and goals.
 
 Mix: 2 multiple choice (4 options each, label A/B/C/D), 2 open-ended, 1 application question (how would CB apply this to his specific goals: passive income, BD, longevity).
@@ -242,13 +291,10 @@ export async function callClaude({ system, messages, maxTokens = 1500, searchEna
   if (systemBlocks) body.system = systemBlocks;
   if (searchEnabled) body.tools = [{ type: 'web_search_20250305', name: 'web_search' }];
 
-  const apiKey = import.meta.env.VITE_ANTHROPIC_API_KEY;
   const res = await fetch('https://api.anthropic.com/v1/messages', {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      'x-api-key': apiKey,
-      'anthropic-version': '2023-06-01',
       'anthropic-beta': 'prompt-caching-2024-07-31',
     },
     body: JSON.stringify(body),

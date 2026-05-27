@@ -6,7 +6,7 @@ import { Card, Label, Badge, Modal, Btn } from './shared/Common.jsx';
 const NOTE_COLORS = ['#00FFB2', '#6366F1', '#ff8844', '#ffcc44', '#ff4488', '#4488ff'];
 
 export default function MasteryVault() {
-  const { notes, setNotes, graph } = useApp();
+  const { notes, setNotes, graph, isMobile } = useApp();
   const [activeNote, setActiveNote] = useState(null);
   const [showNew, setShowNew] = useState(false);
   const [filterTag, setFilterTag] = useState('all');
@@ -71,7 +71,7 @@ export default function MasteryVault() {
   }
 
   return (
-    <div style={{ padding: '24px 28px 60px', maxWidth: 900, margin: '0 auto' }}>
+    <div style={{ padding: isMobile ? '16px 16px 60px' : '24px 28px 60px', maxWidth: 900, margin: '0 auto' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 28 }}>
         <div>
           <div style={{ fontSize: 9, letterSpacing: 4, color: '#ffcc44', textTransform: 'uppercase', marginBottom: 6 }}>Mastery Vault</div>

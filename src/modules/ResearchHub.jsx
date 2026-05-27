@@ -28,7 +28,7 @@ const SOURCE_LIBRARY = [
 ];
 
 export default function ResearchHub() {
-  const { graph, research, setResearch } = useApp();
+  const { graph, research, setResearch, isMobile } = useApp();
   const [activeThread, setActiveThread] = useState(null);
   const [searchInput, setSearchInput] = useState('');
   const [messages, setMessages] = useState([]);
@@ -106,7 +106,7 @@ export default function ResearchHub() {
 
   // Thread list view
   if (!activeThread) return (
-    <div style={{ padding: '24px 28px 60px', maxWidth: 900, margin: '0 auto' }}>
+    <div style={{ padding: isMobile ? '16px 16px 60px' : '24px 28px 60px', maxWidth: 900, margin: '0 auto' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 28 }}>
         <div>
           <div style={{ fontSize: 9, letterSpacing: 4, color: '#6366F1', textTransform: 'uppercase', marginBottom: 6 }}>Truth & Research Hub</div>
@@ -135,7 +135,7 @@ export default function ResearchHub() {
         </div>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 280px', gap: 24 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 280px', gap: 24 }}>
         {/* Research threads */}
         <div>
           <Label color="#6366F1">Research Threads</Label>

@@ -30,7 +30,7 @@ const CERTS = [
 ];
 
 export default function GrowthTools() {
-  const { graph, projects } = useApp();
+  const { graph, projects, isMobile } = useApp();
   const [synthesis, setSynthesis] = useState('');
   const [synthLoading, setSynthLoading] = useState(false);
   const [activeTab, setActiveTab] = useState('goals');
@@ -62,7 +62,7 @@ export default function GrowthTools() {
   ];
 
   return (
-    <div style={{ padding: '24px 28px 60px', maxWidth: 900, margin: '0 auto' }}>
+    <div style={{ padding: isMobile ? '16px 16px 60px' : '24px 28px 60px', maxWidth: 900, margin: '0 auto' }}>
       <div style={{ marginBottom: 28 }}>
         <div style={{ fontSize: 9, letterSpacing: 4, color: '#44ffcc', textTransform: 'uppercase', marginBottom: 6 }}>Growth & Synthesis</div>
         <div style={{ fontSize: 22, fontWeight: 800, color: '#fff', fontFamily: "'Fraunces', serif", marginBottom: 4 }}>Compounding Dashboard</div>
@@ -70,7 +70,7 @@ export default function GrowthTools() {
       </div>
 
       {/* Summary stats */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 10, marginBottom: 28 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr 1fr' : 'repeat(4, 1fr)', gap: 10, marginBottom: 28 }}>
         {[
           { label: 'Avg Confidence', value: avgConf + '/10', color: '#44ffcc', icon: '🎯' },
           { label: 'Topics Mastered', value: topics.filter(t => t.confidence >= 7).length, color: '#00FFB2', icon: '✓' },
@@ -98,7 +98,7 @@ export default function GrowthTools() {
       {/* GOALS TAB */}
       {activeTab === 'goals' && (
         <div>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: 16 }}>
             {GOALS.map(g => {
               const pct = Math.min(100, Math.round((g.current / g.target) * 100));
               return (
@@ -128,7 +128,7 @@ export default function GrowthTools() {
       {activeTab === 'skills' && (
         <div>
           <Label>Skill Radar — Self Assessment</Label>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: 10 }}>
             {SKILLS.map(s => (
               <div key={s.name} style={{ padding: '12px 16px', background: '#0c0c18', border: `1px solid ${s.color}20`, borderRadius: 10 }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>

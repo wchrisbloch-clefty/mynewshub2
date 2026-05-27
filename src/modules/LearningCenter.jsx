@@ -1,10 +1,11 @@
 import { useState, useRef, useEffect } from 'react';
 import { useApp } from '../App.jsx';
 import {
-  KNOWN_BOOKS, TYPE_META, ENTRY_MODES, SESSION_MODES, ACCEPT_TYPES,
+  KNOWN_BOOKS, TYPE_META, SESSION_MODES, ACCEPT_TYPES,
+  CONTENT_TYPES, READER_GOALS, DEPTH_LEVELS, READING_PROGRESS_OPTIONS,
 } from '../constants.js';
 import {
-  buildSystem, buildQuizPrompt, callClaude, buildApiMessages,
+  buildSystem, buildReadingSystem, buildQuizPrompt, callClaude, buildApiMessages,
   logSession, saveGraph, extractYouTubeId, fetchYouTubeTranscript,
   fetchYouTubeMeta, processFiles,
 } from '../utils.js';
@@ -12,15 +13,33 @@ import MD from './shared/MD.jsx';
 import QuizMode from './shared/QuizMode.jsx';
 import { Btn, Input, Textarea, Label, Card, Badge, ThinkingDots, BottomSheet } from './shared/Common.jsx';
 
-// ─── SUBSCREEN TYPES ──────────────────────────────────────────────────────
-// home | book-select | book-mode | doc-upload | topic-input | youtube-input | session | progress
+const READING_QUICK_PROMPTS = {
+  nonfiction:  ['What\'s the single most important framework?', 'Connect this to my other reading', 'How does this apply to my goals?', 'What is the author getting wrong?', 'Quiz me on this section'],
+  fiction:     ['What does this character reveal?', 'What theme is emerging?', 'What\'s the author doing here?', 'Historical or cultural context?', 'What should I watch for next?'],
+  academic:    ['Explain this concept simply first', 'What prerequisites am I missing?', 'Generate a practice question', 'What do I need before moving on?', 'What would this look like on an exam?'],
+  history:     ['What\'s the evidence for this claim?', 'Who disputes this interpretation?', 'What\'s the present-day parallel?', 'Primary source vs. narrative?', 'What context am I missing?'],
+  reference:   ['Explain this term precisely', 'What are the exceptions?', 'When does this NOT apply?', 'What\'s the risk of misapplying this?', 'Adjacent concepts I should know?'],
+  training:    ['How do I apply this now?', 'Give me a scenario to practice', 'What competency does this build?', 'Connect to my current projects', 'What does mastery look like?'],
+  philosophy:  ['What is the argument actually claiming?', 'Steelman this position', 'Strongest counterargument?', 'What does this assume?', 'How does this connect to other thinkers?'],
+  scifi:       ['What\'s the real-world science here?', 'What\'s the speculative thesis?', 'What social issue is this allegorizing?', 'Internal consistency check', 'What genre conventions are at play?'],
+};
 
 export default function LearningCenter() {
-  const { graph, setGraph } = useApp();
+  const { graph, setGraph, isMobile } = useApp();
   const [screen, setScreen] = useState('home');
   const [entryMode, setEntryMode] = useState(null);
   const [sessionMode, setSessionMode] = useState('chat');
   const [context, setContext] = useState({});
+
+  // Reading companion state
+  const [contentType, setContentType] = useState('nonfiction');
+  const [readerGoal, setReaderGoal] = useState('master');
+  const [depthLevel, setDepthLevel] = useState('standard');
+  const [readingProgress, setReadingProgress] = useState('start');
+  const [customTitle, setCustomTitle] = useState('');
+  const [customAuthor, setCustomAuthor] = useState('');
+
+  // Session state
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
@@ -30,7 +49,6 @@ export default function LearningCenter() {
   const [ytLoading, setYtLoading] = useState(false);
   const [ytError, setYtError] = useState('');
   const [filterType, setFilterType] = useState('all');
-  const [customBook, setCustomBook] = useState({ title: '', author: '', type: 'other' });
   const [topicInput, setTopicInput] = useState('');
   const [dragOver, setDragOver] = useState(false);
   const [showLogModal, setShowLogModal] = useState(false);
@@ -39,17 +57,18 @@ export default function LearningCenter() {
   const [quizQuestions, setQuizQuestions] = useState([]);
   const [quizLoading, setQuizLoading] = useState(false);
   const [searchEnabled, setSearchEnabled] = useState(false);
+  const [showAnnotation, setShowAnnotation] = useState(false);
+  const [annotationText, setAnnotationText] = useState('');
+
   const fileRef = useRef(null);
   const bottomRef = useRef(null);
-
   useEffect(() => { bottomRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [messages, loading]);
 
-  const accentColor = ENTRY_MODES.find(m => m.id === entryMode)?.color || '#00FFB2';
-  const bookColor = context.book?.color || accentColor;
-  const currentAccent = entryMode === 'book' ? bookColor : accentColor;
-  const sessionTitle = entryMode === 'book' ? context.book?.title : entryMode === 'topic' ? context.topic : entryMode === 'youtube' ? context.title : 'Document';
+  const currentContentType = CONTENT_TYPES.find(t => t.id === contentType) || CONTENT_TYPES[0];
+  const accentColor = entryMode === 'reading' ? currentContentType.color : '#00FFB2';
+  const sessionTitle = entryMode === 'reading' ? context.title : entryMode === 'topic' ? context.topic : entryMode === 'youtube' ? context.title : 'Document';
 
-  // ── SEND ────────────────────────────────────────────────────────────────
+  // ── SEND ─────────────────────────────────────────────────────────────────
   const send = async (text, attachments = []) => {
     if ((!text.trim() && attachments.length === 0) || loading) return;
     const userMsg = { role: 'user', content: text, attachments };
@@ -60,7 +79,9 @@ export default function LearningCenter() {
     setLoading(true);
     try {
       const apiMessages = await buildApiMessages(newHistory);
-      const system = buildSystem(entryMode, sessionMode, context, graph);
+      const system = entryMode === 'reading'
+        ? buildReadingSystem({ contentType, goal: readerGoal, depth: depthLevel, progress: readingProgress, content: context, graph })
+        : buildSystem(entryMode, sessionMode, context, graph);
       const reply = await callClaude({ system, messages: apiMessages, searchEnabled });
       setMessages(prev => [...prev, { role: 'assistant', content: reply }]);
     } catch {
@@ -69,45 +90,71 @@ export default function LearningCenter() {
     setLoading(false);
   };
 
+  const sendWithAnnotation = () => {
+    if (!annotationText.trim() && !input.trim()) return;
+    const text = annotationText.trim()
+      ? `[PASSAGE FROM TEXT]:\n"${annotationText.trim()}"\n\n${input.trim() || 'Analyze this passage.'}`
+      : input;
+    setAnnotationText('');
+    setShowAnnotation(false);
+    send(text, uploadedFiles);
+  };
+
   // ── AUTO OPEN ────────────────────────────────────────────────────────────
-  const autoOpen = async (eMode, sMode, ctx) => {
+  const autoOpen = async (eMode, sMode, ctx, cType, goal, depth, progress) => {
     setMessages([]);
     setSessionStart(Date.now());
     setLoading(true);
-    const openers = {
-      book: {
-        package:   `I want the full intelligence package for "${ctx.book?.title}". Propose the right format and ask about depth. Be decisive.`,
-        readalong: `I'm reading "${ctx.book?.title}". Set up read-along — structural map first, then ask where I am.`,
-        reference: `I'm using "${ctx.book?.title}" as reference. Give master-expert orientation: what domains surround it, what insight most people miss. Ask what I want to go deep on.`,
-        socratic:  `Start the Socratic session on "${ctx.book?.title}". Begin immediately — first question now.`,
-        chat:      `Let's talk about "${ctx.book?.title}". Sharpest single insight most people miss, then ask what's on my mind.`,
-      },
-      document: 'I\'ve uploaded a document. Analyze completely, teach in CB style, connect to my mental models and goals. Tell me what to act on.',
-      topic:    sMode === 'socratic' ? `Start Socratic mode on the topic: "${ctx.topic}". First question now. No preamble.` : `I want to learn about "${ctx.topic}". Master expert mode. Ask: full course outline first or specific module?`,
-      youtube:  `YouTube video: "${ctx.title}" by ${ctx.channel}. ${ctx.transcriptAvailable ? 'Full transcript is in context.' : 'Transcript unavailable — use your knowledge.'} Teach me now in CB style.`,
-    };
-    const opener = eMode === 'book' ? (openers.book[sMode] || openers.book.chat) : openers[eMode];
+
+    let opener = '';
+    if (eMode === 'reading') {
+      const t = ctx.title;
+      const a = ctx.author ? ` by ${ctx.author}` : '';
+      opener = progress === 'done'
+        ? `I've finished "${t}"${a}. Let's do a full synthesis — key takeaways, connections, and what I should do with this.`
+        : progress === 'reference'
+        ? `I'm using "${t}"${a} as a reference. I have a specific question — ready when you are.`
+        : progress === 'mid'
+        ? `I'm mid-way through "${t}"${a}. Let's work through what I've been reading.`
+        : `I'm starting "${t}"${a}. Orient me — what should I know before diving in, and what should I watch for as I read?`;
+    } else {
+      const openers = {
+        book: {
+          package:   `I want the full intelligence package for "${ctx.book?.title}". Propose the right format and ask about depth.`,
+          readalong: `I'm reading "${ctx.book?.title}". Set up read-along — structural map first, then ask where I am.`,
+          reference: `I'm using "${ctx.book?.title}" as reference. Give master-expert orientation and ask what I want to go deep on.`,
+          socratic:  `Start the Socratic session on "${ctx.book?.title}". First question now.`,
+          chat:      `Let's talk about "${ctx.book?.title}". Sharpest single insight most people miss, then ask what's on my mind.`,
+        },
+        document: 'I\'ve uploaded a document. Analyze completely, teach in CB style, connect to my mental models and goals.',
+        topic:    sMode === 'socratic' ? `Start Socratic mode on: "${ctx.topic}". First question now.` : `I want to learn about "${ctx.topic}". Master expert mode. Full course outline or specific module?`,
+        youtube:  `YouTube: "${ctx.title}" by ${ctx.channel}. ${ctx.transcriptAvailable ? 'Transcript in context.' : 'No transcript — use your knowledge.'} Teach me now.`,
+      };
+      opener = eMode === 'book' ? (openers.book[sMode] || openers.book.chat) : openers[eMode];
+    }
+
     try {
-      const system = buildSystem(eMode, sMode, ctx, graph);
+      const system = eMode === 'reading'
+        ? buildReadingSystem({ contentType: cType, goal, depth, progress, content: ctx, graph })
+        : buildSystem(eMode, sMode, ctx, graph);
       const reply = await callClaude({ system, messages: [{ role: 'user', content: opener }] });
       setMessages([{ role: 'assistant', content: reply }]);
     } catch {
-      setMessages([{ role: 'assistant', content: 'Ready. What do you want to learn?' }]);
+      setMessages([{ role: 'assistant', content: 'Ready. What would you like to explore?' }]);
     }
     setLoading(false);
   };
 
-  // ── QUIZ ──────────────────────────────────────────────────────────────────
+  // ── QUIZ ─────────────────────────────────────────────────────────────────
   const generateQuiz = async () => {
     setQuizLoading(true);
     try {
       const reply = await callClaude({ system: '', messages: [{ role: 'user', content: buildQuizPrompt(context, entryMode) }] });
-      const clean = reply.replace(/```json|```/g, '').trim();
-      const parsed = JSON.parse(clean);
+      const parsed = JSON.parse(reply.replace(/```json|```/g, '').trim());
       setQuizQuestions(parsed.questions || []);
       setQuizMode(true);
     } catch {
-      setMessages(prev => [...prev, { role: 'assistant', content: 'Quiz generation failed. Ask me to quiz you directly in chat.' }]);
+      setMessages(prev => [...prev, { role: 'assistant', content: 'Quiz generation failed. Ask me to quiz you directly.' }]);
     }
     setQuizLoading(false);
   };
@@ -116,10 +163,10 @@ export default function LearningCenter() {
     const pct = Math.round((scores.filter(s => s > 0).length / scores.length) * 100);
     setQuizMode(false);
     setQuizQuestions([]);
-    setMessages(prev => [...prev, { role: 'assistant', content: `**Quiz Complete — ${pct}% (${scores.filter(s => s > 0).length}/${scores.length})**\n\n${pct >= 80 ? 'Strong. You\'ve internalized the core material.' : pct >= 60 ? 'Solid foundation. A few gaps — review what you missed and come back.' : 'Early stages. This is data, not judgment. Run the quiz again after another pass.'}\n\nWant to go deeper on anything you missed, or move forward?` }]);
+    setMessages(prev => [...prev, { role: 'assistant', content: `**Quiz Complete — ${pct}%**\n\n${pct >= 80 ? 'Strong. Core material internalized.' : pct >= 60 ? 'Solid foundation. Review what you missed.' : 'Early stages — this is data, not judgment. Run it again after another pass.'}\n\nWant to go deeper on anything you missed?` }]);
   };
 
-  // ── YOUTUBE ────────────────────────────────────────────────────────────────
+  // ── YOUTUBE ──────────────────────────────────────────────────────────────
   const handleYouTube = async () => {
     if (!youtubeUrl.trim()) return;
     const videoId = extractYouTubeId(youtubeUrl.trim());
@@ -132,7 +179,7 @@ export default function LearningCenter() {
     setYtLoading(false);
   };
 
-  // ── LOG SESSION ────────────────────────────────────────────────────────
+  // ── LOG SESSION ───────────────────────────────────────────────────────────
   const handleLogSession = async (conf, notes) => {
     const durationMin = sessionStart ? Math.round((Date.now() - sessionStart) / 60000) : 5;
     const updated = await logSession(sessionTitle, entryMode, Math.max(durationMin, 1), conf, notes);
@@ -140,41 +187,39 @@ export default function LearningCenter() {
     setShowLogModal(false);
   };
 
-  // ── QUICK PROMPTS ──────────────────────────────────────────────────────
-  const quickPrompts = {
-    book: {
-      package:   ['Confirm format proposed', 'Go deeper on key framework', 'Connect to my mental models', 'Investment/business angle', 'Decisive action now'],
-      readalong: ['What connects to my other books?', 'What to watch for next?', 'Master-expert breakdown', 'Connect to my goals', 'Spoil the next section'],
-      reference: ['Go master-expert deep', 'CB application — my goals', 'What am I missing?', 'Clean framework extraction', 'Cross-book connection'],
-      socratic:  ['Next question', 'Go harder', 'Explain what I got wrong', 'Quiz me on a different angle', 'Give me my scorecard'],
-      chat:      ['Sharpest counterargument', 'Blue Ocean angle', 'What would Buffett say?', 'Connect to Chip War', 'One decisive action'],
-    },
-    document: ['Core thesis of this doc', 'Extract key frameworks', 'Connect to my goals', 'What to act on now', 'Build a course from this', 'Quiz me on this'],
-    topic:    ['Full course outline', 'Start Module 1', 'Tipping point in this field', 'Blue Ocean opportunities', 'Best resources to go deeper', 'Decisive bet for my goals'],
-    youtube:  ['3 biggest ideas from this', 'Connect to my mental models', 'What should I act on?', 'Go deeper on key framework', 'Quiz me on this video'],
+  // ── QUICK PROMPTS ─────────────────────────────────────────────────────────
+  const getQuickPrompts = () => {
+    if (entryMode === 'reading') return READING_QUICK_PROMPTS[contentType] || READING_QUICK_PROMPTS.nonfiction;
+    const qp = {
+      book: { package: ['Confirm format proposed', 'Go deeper on key framework', 'Connect to my mental models', 'Decisive action now'], readalong: ['What connects to my other books?', 'Watch for next?', 'Master-expert breakdown', 'Connect to my goals'], reference: ['Go master-expert deep', 'CB application', 'What am I missing?', 'Cross-book connection'], socratic: ['Next question', 'Go harder', 'Explain what I got wrong', 'Scorecard'], chat: ['Sharpest counterargument', 'Blue Ocean angle', 'What would Buffett say?', 'One decisive action'] },
+      document: ['Core thesis', 'Extract key frameworks', 'Connect to my goals', 'What to act on now', 'Quiz me on this'],
+      topic: ['Full course outline', 'Start Module 1', 'Tipping point in this field', 'Blue Ocean opportunities', 'Decisive bet'],
+      youtube: ['3 biggest ideas', 'Connect to my mental models', 'What should I act on?', 'Quiz me on this video'],
+    };
+    if (entryMode === 'book') return qp.book[sessionMode] || qp.book.chat;
+    return qp[entryMode] || qp.topic;
   };
 
-  const getQuickPrompts = () => entryMode === 'book' ? (quickPrompts.book[sessionMode] || quickPrompts.book.chat) : (quickPrompts[entryMode] || quickPrompts.topic);
+  const pad = isMobile ? '16px 16px 60px' : '24px 28px 60px';
 
   // ─────────────────────────────────────────────────────────────────────────
-  // SCREENS
-  // ─────────────────────────────────────────────────────────────────────────
-
   // HOME
   if (screen === 'home') return (
-    <div style={{ padding: '24px 28px 60px', maxWidth: 800, margin: '0 auto' }}>
-      <div style={{ marginBottom: 28 }}>
+    <div style={{ padding: pad, maxWidth: 800, margin: '0 auto' }}>
+      <div style={{ marginBottom: 24 }}>
         <div style={{ fontSize: 9, letterSpacing: 4, color: '#334', textTransform: 'uppercase', marginBottom: 6 }}>CB · Learning Center</div>
-        <div style={{ fontSize: 22, fontWeight: 800, color: '#fff', fontFamily: "'Fraunces', serif", letterSpacing: -0.5, marginBottom: 6 }}>What do you want to master?</div>
+        <div style={{ fontSize: isMobile ? 20 : 22, fontWeight: 800, color: '#fff', fontFamily: "'Fraunces', serif", letterSpacing: -0.5, marginBottom: 6 }}>What do you want to learn?</div>
         <div style={{ fontSize: 11, color: '#445' }}>Books · Documents · Topics · YouTube — all tracked, all connected.</div>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 28 }}>
-        {ENTRY_MODES.map(m => (
-          <Card key={m.id} color={m.color} onClick={() => {
-            setEntryMode(m.id);
-            setScreen(m.id === 'book' ? 'book-select' : m.id === 'document' ? 'doc-upload' : m.id === 'youtube' ? 'youtube-input' : 'topic-input');
-          }} style={{ padding: '16px 18px', cursor: 'pointer' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: 10, marginBottom: 24 }}>
+        {[
+          { icon: '📚', label: 'Reading Companion', desc: 'Any book, paper, manual, or novel — personal mentor as you read.', color: '#00FFB2', action: () => setScreen('reading-add') },
+          { icon: '🎓', label: 'Topic / Course', desc: 'Name any subject. I build a structured course.', color: '#ff8844', action: () => { setEntryMode('topic'); setScreen('topic-input'); } },
+          { icon: '▶️', label: 'YouTube', desc: 'Paste a URL. Transcript extraction + deep analysis.', color: '#ff4444', action: () => { setEntryMode('youtube'); setScreen('youtube-input'); } },
+          { icon: '📄', label: 'Document', desc: 'PDF, Word, Excel, image, or web link.', color: '#4488ff', action: () => { setEntryMode('document'); setScreen('doc-upload'); } },
+        ].map(m => (
+          <Card key={m.label} color={m.color} onClick={m.action} style={{ padding: '16px 18px', cursor: 'pointer' }}>
             <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
               <div style={{ fontSize: 24 }}>{m.icon}</div>
               <div>
@@ -186,48 +231,152 @@ export default function LearningCenter() {
         ))}
       </div>
 
-      {/* Progress Overview */}
-      <div style={{ marginBottom: 16 }}>
+      <div style={{ marginBottom: 12 }}>
         <Label>Knowledge Graph</Label>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 8, marginBottom: 16 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 8, marginBottom: 14 }}>
           {[
             ['Topics', Object.keys(graph?.topics || {}).length, '#00FFB2'],
             ['Sessions', (graph?.sessions || []).length, '#6366F1'],
             ['Minutes', graph?.totalTime || 0, '#ff8844'],
             ['Avg Conf', (Object.values(graph?.topics || {}).length ? Math.round(Object.values(graph.topics).reduce((s, t) => s + t.confidence, 0) / Object.values(graph.topics).length) : 0) + '/10', '#ffcc44'],
           ].map(([label, val, color]) => (
-            <div key={label} style={{ background: '#0c0c18', border: `1px solid ${color}20`, borderRadius: 8, padding: '12px 10px', textAlign: 'center' }}>
-              <div style={{ fontSize: 18, fontWeight: 800, color, fontFamily: "'Fraunces', serif" }}>{val}</div>
+            <div key={label} style={{ background: '#0c0c18', border: `1px solid ${color}20`, borderRadius: 8, padding: '10px 8px', textAlign: 'center' }}>
+              <div style={{ fontSize: 16, fontWeight: 800, color, fontFamily: "'Fraunces', serif" }}>{val}</div>
               <div style={{ fontSize: 8, letterSpacing: 1.5, color: '#334', textTransform: 'uppercase', marginTop: 2 }}>{label}</div>
             </div>
           ))}
         </div>
-
-        {/* Topic list */}
-        {Object.values(graph?.topics || {}).slice(0, 5).map(t => (
-          <div key={t.title} style={{ padding: '10px 14px', background: '#0c0c18', border: '1px solid #1e2a38', borderRadius: 8, marginBottom: 6, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        {Object.values(graph?.topics || {}).slice(0, 4).map(t => (
+          <div key={t.title} style={{ padding: '9px 12px', background: '#0c0c18', border: '1px solid #1e2a38', borderRadius: 8, marginBottom: 5, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <div>
               <div style={{ fontSize: 12, fontWeight: 600, color: '#fff' }}>{t.title}</div>
-              <div style={{ fontSize: 9, color: '#334', marginTop: 2 }}>{t.sessions} sessions · {t.totalMin}min</div>
+              <div style={{ fontSize: 9, color: '#334', marginTop: 1 }}>{t.sessions} sessions · {t.totalMin}min</div>
             </div>
-            <div style={{ textAlign: 'right' }}>
-              <div style={{ fontSize: 11, fontWeight: 700, color: t.confidence >= 7 ? '#00FFB2' : t.confidence >= 4 ? '#ffcc44' : '#ff6644' }}>{t.confidence}/10</div>
-              <div style={{ width: 50, background: '#1e2a38', borderRadius: 2, height: 2, marginTop: 4 }}>
-                <div style={{ width: `${t.confidence * 10}%`, height: '100%', background: t.confidence >= 7 ? '#00FFB2' : t.confidence >= 4 ? '#ffcc44' : '#ff6644', borderRadius: 2 }} />
-              </div>
+            <div style={{ fontSize: 11, fontWeight: 700, color: t.confidence >= 7 ? '#00FFB2' : t.confidence >= 4 ? '#ffcc44' : '#ff6644' }}>{t.confidence}/10</div>
+          </div>
+        ))}
+      </div>
+      <div onClick={() => setScreen('book-select')} style={{ fontSize: 11, color: '#445', cursor: 'pointer', textAlign: 'center', padding: '10px', borderTop: '1px solid #1a1a2e', marginTop: 8 }}>
+        Browse CB Reading List →
+      </div>
+    </div>
+  );
+
+  // READING ADD
+  if (screen === 'reading-add') return (
+    <div style={{ padding: pad, maxWidth: 640, margin: '0 auto' }}>
+      <div onClick={() => setScreen('home')} style={{ fontSize: 11, color: '#445', cursor: 'pointer', marginBottom: 16 }}>← Learn</div>
+      <div style={{ fontSize: 9, letterSpacing: 4, color: '#00FFB2', textTransform: 'uppercase', marginBottom: 8 }}>📚 Reading Companion</div>
+      <div style={{ fontSize: isMobile ? 20 : 22, fontWeight: 800, color: '#fff', fontFamily: "'Fraunces', serif", marginBottom: 6 }}>What are you reading?</div>
+      <div style={{ fontSize: 11, color: '#445', marginBottom: 24 }}>Book, paper, manual, textbook, novel — anything.</div>
+
+      <input value={customTitle} onChange={e => setCustomTitle(e.target.value)} placeholder="Title *"
+        style={{ width: '100%', background: '#0c0c18', border: '1px solid #1e2a38', borderRadius: 8, padding: '12px 14px', color: '#c8d4e0', fontSize: 14, outline: 'none', fontFamily: 'inherit', fontWeight: 700, boxSizing: 'border-box', marginBottom: 10 }} />
+      <input value={customAuthor} onChange={e => setCustomAuthor(e.target.value)} placeholder="Author / Source (optional)"
+        style={{ width: '100%', background: '#0c0c18', border: '1px solid #1e2a38', borderRadius: 8, padding: '10px 14px', color: '#c8d4e0', fontSize: 13, outline: 'none', fontFamily: 'inherit', boxSizing: 'border-box', marginBottom: 20 }} />
+
+      <Label>Quick-add from reading list</Label>
+      <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 20 }}>
+        {KNOWN_BOOKS.slice(0, 10).map(b => (
+          <div key={b.title} onClick={() => { setCustomTitle(b.title); setCustomAuthor(b.author); }}
+            style={{ fontSize: 10, padding: '4px 10px', background: customTitle === b.title ? `${b.color}20` : '#0c0c18', border: `1px solid ${customTitle === b.title ? b.color : '#1e2a38'}`, color: customTitle === b.title ? b.color : '#445', borderRadius: 20, cursor: 'pointer' }}>
+            {b.title}
+          </div>
+        ))}
+      </div>
+
+      <div style={{ display: 'flex', gap: 10 }}>
+        <div onClick={() => setScreen('book-select')} style={{ flex: 1, padding: '11px', border: '1px solid #1e2a38', borderRadius: 10, textAlign: 'center', fontSize: 12, color: '#445', cursor: 'pointer' }}>Browse Full List</div>
+        <div onClick={() => { if (!customTitle.trim()) return; setContext({ title: customTitle.trim(), author: customAuthor.trim() }); setScreen('content-type'); }}
+          style={{ flex: 2, padding: '11px', background: customTitle.trim() ? '#00FFB2' : '#1a1a2e', borderRadius: 10, textAlign: 'center', fontSize: 12, fontWeight: 700, color: customTitle.trim() ? '#000' : '#334', cursor: customTitle.trim() ? 'pointer' : 'default' }}>
+          Continue →
+        </div>
+      </div>
+    </div>
+  );
+
+  // CONTENT TYPE
+  if (screen === 'content-type') return (
+    <div style={{ padding: pad, maxWidth: 640, margin: '0 auto' }}>
+      <div onClick={() => setScreen('reading-add')} style={{ fontSize: 11, color: '#445', cursor: 'pointer', marginBottom: 16 }}>← Back</div>
+      <div style={{ fontSize: 9, letterSpacing: 3, color: '#00FFB2', textTransform: 'uppercase', marginBottom: 6 }}>Step 1 of 2</div>
+      <div style={{ fontSize: isMobile ? 18 : 20, fontWeight: 800, color: '#fff', fontFamily: "'Fraunces', serif", marginBottom: 4 }}>What type of content is this?</div>
+      <div style={{ fontSize: 11, color: '#445', marginBottom: 20 }}>"{context.title}"</div>
+      <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr 1fr' : '1fr 1fr', gap: 8, marginBottom: 24 }}>
+        {CONTENT_TYPES.map(t => (
+          <div key={t.id} onClick={() => setContentType(t.id)}
+            style={{ padding: '12px 14px', borderRadius: 10, border: `1px solid ${contentType === t.id ? t.color : '#1a1a2e'}`, background: contentType === t.id ? `${t.color}12` : '#0c0c18', cursor: 'pointer' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+              <span style={{ fontSize: 18 }}>{t.icon}</span>
+              <span style={{ fontSize: 12, fontWeight: 700, color: contentType === t.id ? t.color : '#fff' }}>{t.label}</span>
+            </div>
+            <div style={{ fontSize: 9, color: '#445', lineHeight: 1.5 }}>{t.examples}</div>
+          </div>
+        ))}
+      </div>
+      <div onClick={() => setScreen('reader-setup')}
+        style={{ width: '100%', padding: '12px', background: currentContentType.color, borderRadius: 10, textAlign: 'center', fontSize: 13, fontWeight: 700, color: '#000', cursor: 'pointer', boxSizing: 'border-box' }}>
+        Continue →
+      </div>
+    </div>
+  );
+
+  // READER SETUP
+  if (screen === 'reader-setup') return (
+    <div style={{ padding: pad, maxWidth: 640, margin: '0 auto' }}>
+      <div onClick={() => setScreen('content-type')} style={{ fontSize: 11, color: '#445', cursor: 'pointer', marginBottom: 16 }}>← Back</div>
+      <div style={{ fontSize: 9, letterSpacing: 3, color: currentContentType.color, textTransform: 'uppercase', marginBottom: 6 }}>Step 2 of 2</div>
+      <div style={{ fontSize: isMobile ? 18 : 20, fontWeight: 800, color: '#fff', fontFamily: "'Fraunces', serif", marginBottom: 4 }}>How do you want to engage?</div>
+      <div style={{ fontSize: 11, color: '#445', marginBottom: 22 }}>"{context.title}"</div>
+
+      <Label>Your Goal</Label>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 7, marginBottom: 20 }}>
+        {READER_GOALS.map(g => (
+          <div key={g.id} onClick={() => setReaderGoal(g.id)}
+            style={{ padding: '11px 14px', borderRadius: 10, border: `1px solid ${readerGoal === g.id ? currentContentType.color : '#1a1a2e'}`, background: readerGoal === g.id ? `${currentContentType.color}10` : '#0c0c18', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 12 }}>
+            <span style={{ fontSize: 18 }}>{g.icon}</span>
+            <div>
+              <div style={{ fontSize: 12, fontWeight: 700, color: readerGoal === g.id ? currentContentType.color : '#fff' }}>{g.label}</div>
+              <div style={{ fontSize: 10, color: '#445' }}>{g.desc}</div>
             </div>
           </div>
         ))}
+      </div>
+
+      <Label>Depth Level</Label>
+      <div style={{ display: 'flex', gap: 7, marginBottom: 20, flexWrap: 'wrap' }}>
+        {DEPTH_LEVELS.map(d => (
+          <div key={d.id} onClick={() => setDepthLevel(d.id)}
+            style={{ padding: '7px 14px', borderRadius: 8, border: `1px solid ${depthLevel === d.id ? currentContentType.color : '#1a1a2e'}`, background: depthLevel === d.id ? `${currentContentType.color}15` : '#0c0c18', cursor: 'pointer', flex: 1, textAlign: 'center' }}>
+            <div style={{ fontSize: 11, fontWeight: 700, color: depthLevel === d.id ? currentContentType.color : '#fff' }}>{d.label}</div>
+            <div style={{ fontSize: 9, color: '#445', marginTop: 2 }}>{d.desc}</div>
+          </div>
+        ))}
+      </div>
+
+      <Label>Where are you in this content?</Label>
+      <div style={{ display: 'flex', gap: 7, marginBottom: 24, flexWrap: 'wrap' }}>
+        {READING_PROGRESS_OPTIONS.map(p => (
+          <div key={p.id} onClick={() => setReadingProgress(p.id)}
+            style={{ padding: '7px 14px', borderRadius: 8, border: `1px solid ${readingProgress === p.id ? currentContentType.color : '#1a1a2e'}`, background: readingProgress === p.id ? `${currentContentType.color}15` : '#0c0c18', cursor: 'pointer', fontSize: 11, fontWeight: readingProgress === p.id ? 700 : 400, color: readingProgress === p.id ? currentContentType.color : '#445', display: 'flex', alignItems: 'center', gap: 6 }}>
+            <span>{p.icon}</span> {p.label}
+          </div>
+        ))}
+      </div>
+
+      <div onClick={() => { setEntryMode('reading'); setScreen('session'); autoOpen('reading', sessionMode, context, contentType, readerGoal, depthLevel, readingProgress); }}
+        style={{ width: '100%', padding: '13px', background: currentContentType.color, borderRadius: 10, textAlign: 'center', fontSize: 13, fontWeight: 700, color: '#000', cursor: 'pointer', boxSizing: 'border-box' }}>
+        Start Session →
       </div>
     </div>
   );
 
   // BOOK SELECT
   if (screen === 'book-select') return (
-    <div style={{ padding: '24px 28px 80px', maxWidth: 800, margin: '0 auto' }}>
-      <div onClick={() => setScreen('home')} style={{ fontSize: 11, color: '#445', cursor: 'pointer', marginBottom: 16 }}>← Back</div>
+    <div style={{ padding: pad, maxWidth: 800, margin: '0 auto' }}>
+      <div onClick={() => setScreen('home')} style={{ fontSize: 11, color: '#445', cursor: 'pointer', marginBottom: 16 }}>← Learn</div>
       <div style={{ fontSize: 9, letterSpacing: 3, color: '#334', textTransform: 'uppercase', marginBottom: 14 }}>CB Reading List · {KNOWN_BOOKS.length} Books</div>
-      <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 18 }}>
+      <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 16 }}>
         {['all', ...Object.keys(TYPE_META)].map(t => (
           <div key={t} onClick={() => setFilterType(t)}
             style={{ padding: '4px 12px', fontSize: 9, letterSpacing: 1.5, textTransform: 'uppercase', border: `1px solid ${filterType === t ? '#00FFB2' : '#1a1a2e'}`, color: filterType === t ? '#00FFB2' : '#445', borderRadius: 20, cursor: 'pointer', background: filterType === t ? '#00FFB218' : 'transparent' }}>
@@ -235,10 +384,10 @@ export default function LearningCenter() {
           </div>
         ))}
       </div>
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 28 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: 8, marginBottom: 24 }}>
         {(filterType === 'all' ? KNOWN_BOOKS : KNOWN_BOOKS.filter(b => b.type === filterType)).map(book => (
-          <div key={book.title} onClick={() => { setContext({ book }); setScreen('book-mode'); }}
-            style={{ padding: '14px 16px', borderRadius: 8, border: '1px solid #1a1a2e', background: '#0c0c18', cursor: 'pointer', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <div key={book.title} onClick={() => { setContext({ title: book.title, author: book.author }); setContentType('nonfiction'); setScreen('reader-setup'); }}
+            style={{ padding: '12px 14px', borderRadius: 8, border: '1px solid #1a1a2e', background: '#0c0c18', cursor: 'pointer', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <div>
               <div style={{ fontSize: 12, fontWeight: 600, color: '#fff', marginBottom: 2 }}>{book.title}</div>
               <div style={{ fontSize: 10, color: '#445' }}>{book.author}</div>
@@ -250,71 +399,28 @@ export default function LearningCenter() {
           </div>
         ))}
       </div>
-
-      {/* Add custom book */}
-      <div style={{ padding: '20px', background: '#0c0c18', border: '1px solid #1e2a38', borderRadius: 12 }}>
-        <Label>Add Any Book</Label>
-        <Input label="Title *" value={customBook.title} onChange={v => setCustomBook(p => ({ ...p, title: v }))} placeholder="Book title..." />
-        <Input label="Author" value={customBook.author} onChange={v => setCustomBook(p => ({ ...p, author: v }))} placeholder="Author name..." />
-        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 16 }}>
-          {Object.entries(TYPE_META).map(([k, v]) => (
-            <div key={k} onClick={() => setCustomBook(p => ({ ...p, type: k }))}
-              style={{ padding: '5px 10px', fontSize: 9, border: `1px solid ${customBook.type === k ? '#00FFB2' : '#1a1a2e'}`, color: customBook.type === k ? '#00FFB2' : '#445', borderRadius: 6, cursor: 'pointer', background: customBook.type === k ? '#00FFB215' : 'transparent' }}>
-              {v.icon} {v.label}
-            </div>
-          ))}
-        </div>
-        <Btn color="#00FFB2" disabled={!customBook.title.trim()} onClick={() => {
-          const colors = { leadership: '#ff6644', systems: '#00FFB2', business: '#ffcc44', negotiation: '#ff4488', memoir: '#88ff44', stoic: '#ffaa66', fiction: '#aa88ff', other: '#4488ff' };
-          setContext({ book: { title: customBook.title, author: customBook.author || 'Unknown', type: customBook.type, color: colors[customBook.type] || '#00FFB2' } });
-          setCustomBook({ title: '', author: '', type: 'other' });
-          setScreen('book-mode');
-        }}>Continue →</Btn>
+      <div onClick={() => setScreen('reading-add')} style={{ textAlign: 'center', fontSize: 11, color: '#445', cursor: 'pointer', padding: 10 }}>
+        + Add any other book or content
       </div>
-    </div>
-  );
-
-  // BOOK MODE
-  if (screen === 'book-mode' && context.book) return (
-    <div style={{ padding: '24px 28px 80px', maxWidth: 640, margin: '0 auto' }}>
-      <div onClick={() => setScreen('book-select')} style={{ fontSize: 11, color: '#445', cursor: 'pointer', marginBottom: 16 }}>← Books</div>
-      <div style={{ fontSize: 9, letterSpacing: 4, color: context.book.color, textTransform: 'uppercase', marginBottom: 6 }}>{TYPE_META[context.book.type]?.icon} {TYPE_META[context.book.type]?.label}</div>
-      <div style={{ fontSize: 24, fontWeight: 800, color: '#fff', marginBottom: 4, fontFamily: "'Fraunces', serif" }}>{context.book.title}</div>
-      <div style={{ fontSize: 12, color: '#445', marginBottom: 28 }}>{context.book.author}</div>
-      <Label>How do you want to engage?</Label>
-      {SESSION_MODES.map(m => (
-        <div key={m.id} onClick={() => { setSessionMode(m.id); setEntryMode('book'); setScreen('session'); autoOpen('book', m.id, context); }}
-          style={{ padding: '14px 18px', borderRadius: 10, border: `1px solid ${m.id === 'socratic' ? `${context.book.color}40` : '#1a1a2e'}`, background: m.id === 'socratic' ? `${context.book.color}08` : '#0c0c18', marginBottom: 10, cursor: 'pointer' }}>
-          <div style={{ display: 'flex', gap: 12, alignItems: 'flex-start' }}>
-            <div style={{ fontSize: 20, lineHeight: 1, flexShrink: 0 }}>{m.icon}</div>
-            <div>
-              <div style={{ fontSize: 13, fontWeight: 700, color: m.id === 'socratic' ? context.book.color : '#fff', marginBottom: 3 }}>{m.label}</div>
-              <div style={{ fontSize: 11, color: '#445', lineHeight: 1.6 }}>{m.desc}</div>
-            </div>
-          </div>
-        </div>
-      ))}
     </div>
   );
 
   // DOCUMENT UPLOAD
   if (screen === 'doc-upload') return (
-    <div style={{ padding: '24px 28px 80px', maxWidth: 640, margin: '0 auto' }}>
+    <div style={{ padding: pad, maxWidth: 640, margin: '0 auto' }}>
       <div onClick={() => setScreen('home')} style={{ fontSize: 11, color: '#445', cursor: 'pointer', marginBottom: 16 }}>← Back</div>
       <div style={{ fontSize: 9, letterSpacing: 4, color: '#4488ff', textTransform: 'uppercase', marginBottom: 8 }}>📄 Document Intelligence</div>
-      <div style={{ fontSize: 22, fontWeight: 800, color: '#fff', marginBottom: 20, fontFamily: "'Fraunces', serif" }}>Upload Your Document</div>
-
+      <div style={{ fontSize: isMobile ? 20 : 22, fontWeight: 800, color: '#fff', marginBottom: 20, fontFamily: "'Fraunces', serif" }}>Upload Your Document</div>
       <div onDragOver={e => { e.preventDefault(); setDragOver(true); }} onDragLeave={() => setDragOver(false)}
         onDrop={async e => { e.preventDefault(); setDragOver(false); const files = await processFiles(e.dataTransfer.files); setUploadedFiles(p => [...p, ...files]); }}
         onClick={() => fileRef.current?.click()}
-        style={{ border: `2px dashed ${dragOver ? '#4488ff' : '#1e2a38'}`, borderRadius: 12, padding: '32px 20px', textAlign: 'center', cursor: 'pointer', marginBottom: 16, background: dragOver ? '#4488ff08' : 'transparent' }}>
-        <div style={{ fontSize: 36, marginBottom: 8 }}>📂</div>
+        style={{ border: `2px dashed ${dragOver ? '#4488ff' : '#1e2a38'}`, borderRadius: 12, padding: '28px 20px', textAlign: 'center', cursor: 'pointer', marginBottom: 14, background: dragOver ? '#4488ff08' : 'transparent' }}>
+        <div style={{ fontSize: 32, marginBottom: 8 }}>📂</div>
         <div style={{ fontSize: 12, color: '#fff', marginBottom: 3 }}>Drop files or tap to browse</div>
         <div style={{ fontSize: 10, color: '#445' }}>PDF · Word · Excel · PowerPoint · Images</div>
         <input ref={fileRef} type="file" multiple accept={ACCEPT_TYPES} style={{ display: 'none' }} onChange={async e => { const files = await processFiles(e.target.files); setUploadedFiles(p => [...p, ...files]); }} />
       </div>
-
-      <div style={{ marginBottom: 16 }}>
+      <div style={{ marginBottom: 14 }}>
         <Label>Or Paste a Web Link</Label>
         <div style={{ display: 'flex', gap: 8 }}>
           <input value={webUrl} onChange={e => setWebUrl(e.target.value)}
@@ -325,9 +431,8 @@ export default function LearningCenter() {
             style={{ padding: '10px 14px', background: '#4488ff', border: 'none', borderRadius: 8, color: '#fff', fontSize: 11, fontWeight: 700, cursor: 'pointer' }}>Add</button>
         </div>
       </div>
-
       {uploadedFiles.length > 0 && (
-        <div style={{ marginBottom: 16 }}>
+        <div style={{ marginBottom: 14 }}>
           {uploadedFiles.map((f, i) => (
             <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '9px 12px', background: '#0c0c18', border: '1px solid #1e2a38', borderRadius: 8, marginBottom: 6 }}>
               <span style={{ fontSize: 18 }}>{f.icon}</span>
@@ -345,14 +450,11 @@ export default function LearningCenter() {
 
   // TOPIC INPUT
   if (screen === 'topic-input') return (
-    <div style={{ padding: '24px 28px 80px', maxWidth: 640, margin: '0 auto' }}>
+    <div style={{ padding: pad, maxWidth: 640, margin: '0 auto' }}>
       <div onClick={() => setScreen('home')} style={{ fontSize: 11, color: '#445', cursor: 'pointer', marginBottom: 16 }}>← Back</div>
       <div style={{ fontSize: 9, letterSpacing: 4, color: '#ff8844', textTransform: 'uppercase', marginBottom: 8 }}>🎓 Topic / Course Builder</div>
-      <div style={{ fontSize: 22, fontWeight: 800, color: '#fff', marginBottom: 20, fontFamily: "'Fraunces', serif" }}>What do you want to master?</div>
-
-      <Textarea value={topicInput} onChange={setTopicInput} rows={3}
-        placeholder={'ERCOT energy markets\nReal estate underwriting\nSemiconductor supply chain\nNegotiation psychology'} />
-
+      <div style={{ fontSize: isMobile ? 20 : 22, fontWeight: 800, color: '#fff', marginBottom: 20, fontFamily: "'Fraunces', serif" }}>What do you want to master?</div>
+      <Textarea value={topicInput} onChange={setTopicInput} rows={3} placeholder={'ERCOT energy markets\nReal estate underwriting\nSemiconductor supply chain\nNegotiation psychology'} />
       <div style={{ marginBottom: 16 }}>
         <Label>Mode</Label>
         <div style={{ display: 'flex', gap: 8 }}>
@@ -364,7 +466,6 @@ export default function LearningCenter() {
           ))}
         </div>
       </div>
-
       <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 20 }}>
         {['ERCOT energy markets', 'Real estate underwriting', 'Semiconductor supply chain', 'Options basics', 'Negotiation psychology', 'Longevity & biohacking', 'AI agents', 'Dividend investing'].map(s => (
           <div key={s} onClick={() => setTopicInput(s)} style={{ fontSize: 10, padding: '4px 10px', background: '#0c0c18', border: '1px solid #1e2a38', color: '#556', borderRadius: 20, cursor: 'pointer' }}>{s}</div>
@@ -378,10 +479,10 @@ export default function LearningCenter() {
 
   // YOUTUBE INPUT
   if (screen === 'youtube-input') return (
-    <div style={{ padding: '24px 28px 80px', maxWidth: 640, margin: '0 auto' }}>
+    <div style={{ padding: pad, maxWidth: 640, margin: '0 auto' }}>
       <div onClick={() => setScreen('home')} style={{ fontSize: 11, color: '#445', cursor: 'pointer', marginBottom: 16 }}>← Back</div>
       <div style={{ fontSize: 9, letterSpacing: 4, color: '#ff4444', textTransform: 'uppercase', marginBottom: 8 }}>▶️ YouTube Intelligence</div>
-      <div style={{ fontSize: 22, fontWeight: 800, color: '#fff', marginBottom: 20, fontFamily: "'Fraunces', serif" }}>Paste a YouTube URL</div>
+      <div style={{ fontSize: isMobile ? 20 : 22, fontWeight: 800, color: '#fff', marginBottom: 20, fontFamily: "'Fraunces', serif" }}>Paste a YouTube URL</div>
       <Input label="YouTube URL" value={youtubeUrl} onChange={setYoutubeUrl} placeholder="https://youtube.com/watch?v=..." />
       {ytError && <div style={{ fontSize: 11, color: '#ff4444', marginBottom: 12, padding: '8px 12px', background: '#ff444412', borderRadius: 6 }}>{ytError}</div>}
       <div style={{ marginBottom: 16 }}>
@@ -404,83 +505,100 @@ export default function LearningCenter() {
   // SESSION
   if (screen === 'session') {
     const sessionModeLabel = SESSION_MODES.find(m => m.id === sessionMode);
+    const prompts = getQuickPrompts();
     return (
       <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
-        {/* Session Header */}
-        <div style={{ padding: '10px 20px', background: '#08080f', borderBottom: '1px solid #1a1a2e', flexShrink: 0 }}>
+        <div style={{ padding: '10px 16px', background: '#08080f', borderBottom: '1px solid #1a1a2e', flexShrink: 0 }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <div>
-              <div style={{ fontSize: 9, letterSpacing: 3, color: currentAccent, textTransform: 'uppercase', marginBottom: 3 }}>
-                {sessionModeLabel?.icon} {sessionModeLabel?.label}{sessionTitle ? ` · ${sessionTitle}` : ''}
+              <div style={{ fontSize: 9, letterSpacing: 3, color: accentColor, textTransform: 'uppercase', marginBottom: 3 }}>
+                {entryMode === 'reading' ? `${currentContentType.icon} ${currentContentType.label}` : `${sessionModeLabel?.icon} ${sessionModeLabel?.label}`}
+                {sessionTitle ? ` · ${sessionTitle.slice(0, isMobile ? 24 : 40)}${sessionTitle.length > (isMobile ? 24 : 40) ? '...' : ''}` : ''}
               </div>
-              <div style={{ display: 'flex', gap: 7, alignItems: 'center' }}>
+              <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
+                {entryMode === 'reading' && (
+                  <div style={{ fontSize: 9, padding: '2px 7px', background: `${accentColor}15`, border: `1px solid ${accentColor}30`, borderRadius: 6, color: accentColor }}>
+                    {READER_GOALS.find(g => g.id === readerGoal)?.icon} {READER_GOALS.find(g => g.id === readerGoal)?.label}
+                  </div>
+                )}
                 <div onClick={() => setSearchEnabled(s => !s)}
-                  style={{ fontSize: 9, padding: '3px 8px', border: `1px solid ${searchEnabled ? '#4488ff' : '#1e2a38'}`, borderRadius: 10, color: searchEnabled ? '#4488ff' : '#334', cursor: 'pointer' }}>
+                  style={{ fontSize: 9, padding: '2px 7px', border: `1px solid ${searchEnabled ? '#4488ff' : '#1e2a38'}`, borderRadius: 6, color: searchEnabled ? '#4488ff' : '#334', cursor: 'pointer' }}>
                   🔍 Web {searchEnabled ? 'ON' : 'OFF'}
                 </div>
-                <div onClick={generateQuiz} style={{ fontSize: 9, padding: '3px 8px', border: `1px solid ${currentAccent}40`, borderRadius: 10, color: currentAccent, cursor: 'pointer', background: `${currentAccent}10` }}>
+                <div onClick={generateQuiz} style={{ fontSize: 9, padding: '2px 7px', border: `1px solid ${accentColor}40`, borderRadius: 6, color: accentColor, cursor: 'pointer', background: `${accentColor}10` }}>
                   {quizLoading ? '...' : '🧠 Quiz'}
                 </div>
+                {entryMode === 'reading' && (
+                  <div onClick={() => setShowAnnotation(s => !s)} style={{ fontSize: 9, padding: '2px 7px', border: `1px solid ${showAnnotation ? accentColor : '#1e2a38'}`, borderRadius: 6, color: showAnnotation ? accentColor : '#334', cursor: 'pointer', background: showAnnotation ? `${accentColor}10` : 'transparent' }}>
+                    📌 Passage
+                  </div>
+                )}
               </div>
             </div>
             <div style={{ display: 'flex', gap: 5 }}>
-              <div onClick={() => setShowLogModal(true)} style={{ fontSize: 10, color: currentAccent, padding: '5px 10px', border: `1px solid ${currentAccent}40`, borderRadius: 6, cursor: 'pointer' }}>Log</div>
-              <div onClick={() => { setScreen('home'); setContext({}); setMessages([]); setUploadedFiles([]); setQuizMode(false); }} style={{ fontSize: 10, color: '#445', padding: '5px 10px', border: '1px solid #1a1a2e', borderRadius: 6, cursor: 'pointer' }}>← Learn</div>
+              <div onClick={() => setShowLogModal(true)} style={{ fontSize: 10, color: accentColor, padding: '5px 10px', border: `1px solid ${accentColor}40`, borderRadius: 6, cursor: 'pointer' }}>Log</div>
+              <div onClick={() => { setScreen('home'); setContext({}); setMessages([]); setUploadedFiles([]); setQuizMode(false); setShowAnnotation(false); }} style={{ fontSize: 10, color: '#445', padding: '5px 10px', border: '1px solid #1a1a2e', borderRadius: 6, cursor: 'pointer' }}>← Learn</div>
             </div>
           </div>
         </div>
 
-        {/* Messages */}
-        <div style={{ flex: 1, overflowY: 'auto', padding: '16px 20px 200px' }}>
+        <div style={{ flex: 1, overflowY: 'auto', padding: '16px 16px 200px' }}>
           {messages.length === 0 && !loading && (
             <div style={{ textAlign: 'center', padding: '60px 20px' }}>
-              <div style={{ fontSize: 40, marginBottom: 12 }}>{ENTRY_MODES.find(m => m.id === entryMode)?.icon || '📚'}</div>
+              <div style={{ fontSize: 36, marginBottom: 10 }}>{entryMode === 'reading' ? currentContentType.icon : '📚'}</div>
               <div style={{ fontSize: 13, color: '#333' }}>Initializing...</div>
             </div>
           )}
           {messages.map((msg, i) => (
             <div key={i} style={{ marginBottom: 18, display: 'flex', justifyContent: msg.role === 'user' ? 'flex-end' : 'flex-start', maxWidth: 720, margin: '0 auto 18px' }}>
               {msg.role === 'user' ? (
-                <div style={{ background: '#12122a', border: '1px solid #2a2a45', borderRadius: '16px 16px 4px 16px', padding: '11px 15px', maxWidth: '80%', fontSize: 13, lineHeight: 1.7, color: '#c0d0e0' }}>
-                  {msg.content}
-                </div>
+                <div style={{ background: '#12122a', border: '1px solid #2a2a45', borderRadius: '16px 16px 4px 16px', padding: '11px 15px', maxWidth: '85%', fontSize: 13, lineHeight: 1.7, color: '#c0d0e0' }}>{msg.content}</div>
               ) : (
-                <div style={{ background: '#0c0c18', border: `1px solid ${currentAccent}18`, borderRadius: '4px 16px 16px 16px', padding: '14px 18px', maxWidth: '92%', width: '100%' }}>
-                  <div style={{ fontSize: 8, letterSpacing: 3, color: currentAccent, textTransform: 'uppercase', marginBottom: 10 }}>CB Intelligence {searchEnabled ? '· 🔍 Web' : ''}</div>
-                  <MD text={msg.content} color={currentAccent} />
+                <div style={{ background: '#0c0c18', border: `1px solid ${accentColor}18`, borderRadius: '4px 16px 16px 16px', padding: '14px 18px', maxWidth: '92%', width: '100%' }}>
+                  <div style={{ fontSize: 8, letterSpacing: 3, color: accentColor, textTransform: 'uppercase', marginBottom: 10 }}>
+                    {entryMode === 'reading' ? `${currentContentType.label} · ${DEPTH_LEVELS.find(d => d.id === depthLevel)?.label}` : 'CB Intelligence'}
+                    {searchEnabled ? ' · 🔍 Web' : ''}
+                  </div>
+                  <MD text={msg.content} color={accentColor} />
                 </div>
               )}
             </div>
           ))}
           {quizMode && quizQuestions.length > 0 && (
             <div style={{ maxWidth: 720, margin: '0 auto' }}>
-              <QuizMode questions={quizQuestions} color={currentAccent} onComplete={onQuizComplete} />
+              <QuizMode questions={quizQuestions} color={accentColor} onComplete={onQuizComplete} />
             </div>
           )}
           {loading && (
-            <div style={{ display: 'flex', justifyContent: 'flex-start', marginBottom: 18, maxWidth: 720, margin: '0 auto 18px' }}>
-              <div style={{ background: '#0c0c18', border: `1px solid ${currentAccent}18`, borderRadius: '4px 16px 16px 16px', padding: '12px 16px' }}>
-                <div style={{ fontSize: 8, letterSpacing: 3, color: currentAccent, textTransform: 'uppercase', marginBottom: 8 }}>Thinking...</div>
-                <ThinkingDots color={currentAccent} />
+            <div style={{ display: 'flex', justifyContent: 'flex-start', maxWidth: 720, margin: '0 auto 18px' }}>
+              <div style={{ background: '#0c0c18', border: `1px solid ${accentColor}18`, borderRadius: '4px 16px 16px 16px', padding: '12px 16px' }}>
+                <div style={{ fontSize: 8, letterSpacing: 3, color: accentColor, textTransform: 'uppercase', marginBottom: 8 }}>Thinking...</div>
+                <ThinkingDots color={accentColor} />
               </div>
             </div>
           )}
           <div ref={bottomRef} />
         </div>
 
-        {/* Quick Prompts */}
         {!quizMode && (
-          <div style={{ position: 'sticky', bottom: 72, left: 0, right: 0, padding: '0 16px 6px', background: 'linear-gradient(transparent, #08080f 30%)', display: 'flex', gap: 6, overflowX: 'auto' }}>
-            {getQuickPrompts().map(p => (
-              <div key={p} onClick={() => send(p)} style={{ fontSize: 10, padding: '5px 12px', background: '#0c0c18', border: '1px solid #1a1a2e', color: '#445', borderRadius: 20, cursor: 'pointer', whiteSpace: 'nowrap', flexShrink: 0 }}>{p}</div>
+          <div style={{ position: 'sticky', bottom: 72, left: 0, right: 0, padding: '0 12px 6px', background: 'linear-gradient(transparent, #08080f 30%)', display: 'flex', gap: 5, overflowX: 'auto' }}>
+            {prompts.slice(0, isMobile ? 2 : 5).map(p => (
+              <div key={p} onClick={() => send(p)} style={{ fontSize: 10, padding: '5px 11px', background: '#0c0c18', border: '1px solid #1a1a2e', color: '#445', borderRadius: 20, cursor: 'pointer', whiteSpace: 'nowrap', flexShrink: 0 }}>{p}</div>
             ))}
           </div>
         )}
 
-        {/* Input */}
-        <div style={{ position: 'sticky', bottom: 0, background: '#08080f', borderTop: '1px solid #1a1a2e', padding: '8px 16px 16px' }}>
+        <div style={{ position: 'sticky', bottom: 0, background: '#08080f', borderTop: '1px solid #1a1a2e', padding: '8px 12px 12px' }}>
+          {showAnnotation && (
+            <div style={{ marginBottom: 8 }}>
+              <div style={{ fontSize: 9, color: accentColor, letterSpacing: 1, marginBottom: 4 }}>📌 PASTE A PASSAGE FROM YOUR TEXT</div>
+              <textarea value={annotationText} onChange={e => setAnnotationText(e.target.value)}
+                placeholder="Paste any passage, paragraph, or excerpt you want analyzed..."
+                rows={3} style={{ width: '100%', background: `${accentColor}08`, border: `1px solid ${accentColor}30`, borderRadius: 8, padding: '8px 12px', color: '#c8d4e0', fontSize: 12, outline: 'none', fontFamily: 'inherit', resize: 'none', boxSizing: 'border-box' }} />
+            </div>
+          )}
           {uploadedFiles.length > 0 && (
-            <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 8 }}>
+            <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 7 }}>
               {uploadedFiles.map((f, i) => (
                 <div key={i} style={{ fontSize: 9, color: '#4488ff', background: '#4488ff12', border: '1px solid #4488ff30', borderRadius: 5, padding: '2px 8px', display: 'flex', alignItems: 'center', gap: 4 }}>
                   {f.icon} {f.name.slice(0, 16)}<span onClick={() => setUploadedFiles(p => p.filter((_, j) => j !== i))} style={{ color: '#ff4444', cursor: 'pointer' }}>✕</span>
@@ -488,20 +606,20 @@ export default function LearningCenter() {
               ))}
             </div>
           )}
-          <div style={{ display: 'flex', gap: 8, maxWidth: 720, margin: '0 auto', alignItems: 'flex-end' }}>
-            <div onClick={() => fileRef.current?.click()} style={{ padding: '9px 11px', background: '#0c0c18', border: '1px solid #1e2a38', borderRadius: 9, cursor: 'pointer', color: '#445', fontSize: 14, flexShrink: 0 }}>📎</div>
+          <div style={{ display: 'flex', gap: 7, maxWidth: 720, margin: '0 auto', alignItems: 'flex-end' }}>
+            <div onClick={() => fileRef.current?.click()} style={{ padding: '9px 10px', background: '#0c0c18', border: '1px solid #1e2a38', borderRadius: 8, cursor: 'pointer', color: '#445', fontSize: 13, flexShrink: 0 }}>📎</div>
             <input ref={fileRef} type="file" multiple accept={ACCEPT_TYPES} style={{ display: 'none' }} onChange={async e => { const files = await processFiles(e.target.files); setUploadedFiles(p => [...p, ...files]); }} />
             <textarea value={input} onChange={e => setInput(e.target.value)}
-              onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(input, uploadedFiles); } }}
-              rows={1} placeholder="Ask anything, drop a file, or use a quick prompt..."
-              style={{ flex: 1, background: '#0c0c18', border: '1px solid #1e2a38', borderRadius: 12, padding: '10px 14px', color: '#c8d4e0', fontSize: 13, outline: 'none', fontFamily: 'inherit', resize: 'none', maxHeight: 100 }} />
-            <button onClick={() => send(input, uploadedFiles)} disabled={(!input.trim() && uploadedFiles.length === 0) || loading}
-              style={{ padding: '10px 16px', background: (input.trim() || uploadedFiles.length > 0) && !loading ? currentAccent : '#1a1a2e', border: 'none', borderRadius: 10, color: (input.trim() || uploadedFiles.length > 0) && !loading ? '#000' : '#333', fontSize: 13, fontWeight: 800, cursor: 'pointer', flexShrink: 0 }}>→</button>
+              onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); showAnnotation ? sendWithAnnotation() : send(input, uploadedFiles); } }}
+              rows={1} placeholder={showAnnotation ? 'Add your question about the passage...' : 'Ask anything...'}
+              style={{ flex: 1, background: '#0c0c18', border: '1px solid #1e2a38', borderRadius: 10, padding: '9px 13px', color: '#c8d4e0', fontSize: 13, outline: 'none', fontFamily: 'inherit', resize: 'none', maxHeight: 90 }} />
+            <button onClick={() => showAnnotation ? sendWithAnnotation() : send(input, uploadedFiles)}
+              disabled={(!input.trim() && !annotationText.trim() && uploadedFiles.length === 0) || loading}
+              style={{ padding: '9px 14px', background: (input.trim() || annotationText.trim() || uploadedFiles.length > 0) && !loading ? accentColor : '#1a1a2e', border: 'none', borderRadius: 9, color: (input.trim() || annotationText.trim() || uploadedFiles.length > 0) && !loading ? '#000' : '#333', fontSize: 13, fontWeight: 800, cursor: 'pointer', flexShrink: 0 }}>→</button>
           </div>
         </div>
 
-        {/* Log Modal */}
-        {showLogModal && <LogSessionModal title={sessionTitle} color={currentAccent} onLog={handleLogSession} onSkip={() => setShowLogModal(false)} />}
+        {showLogModal && <LogSessionModal title={sessionTitle} color={accentColor} onLog={handleLogSession} onSkip={() => setShowLogModal(false)} />}
       </div>
     );
   }

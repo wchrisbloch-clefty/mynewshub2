@@ -141,3 +141,36 @@ export const GRAPH_KEY    = "aether_graph_v1";
 export const PROJECTS_KEY = "aether_projects_v1";
 export const NOTES_KEY    = "aether_notes_v1";
 export const RESEARCH_KEY = "aether_research_v1";
+
+export const CONTENT_TYPES = [
+  { id: 'nonfiction',  label: 'Non-Fiction / Business', icon: '📊', color: '#00FFB2', examples: 'Business, finance, science, self-help' },
+  { id: 'fiction',     label: 'Literary Fiction',       icon: '📖', color: '#ff8844', examples: 'Novels, short stories, literary works' },
+  { id: 'scifi',       label: 'Sci-Fi / Fantasy',       icon: '🚀', color: '#6366F1', examples: 'Science fiction, fantasy, speculative' },
+  { id: 'history',     label: 'History / Biography',    icon: '🏛', color: '#ffcc44', examples: 'History, biography, memoir' },
+  { id: 'academic',    label: 'Academic / Textbook',    icon: '🎓', color: '#4488ff', examples: 'Textbooks, research papers, higher ed' },
+  { id: 'reference',   label: 'Reference / Technical',  icon: '📋', color: '#ff4488', examples: 'Legal, medical, technical manuals' },
+  { id: 'training',    label: 'Training / Professional',icon: '💼', color: '#44ffcc', examples: 'Corporate training, certifications' },
+  { id: 'philosophy',  label: 'Philosophy / Theory',    icon: '🧠', color: '#aa88ff', examples: 'Philosophy, critical theory, ethics' },
+];
+
+export const READER_GOALS = [
+  { id: 'master',  label: 'Master Deeply',    icon: '🎯', desc: 'Full comprehension and long-term retention' },
+  { id: 'exam',    label: 'Exam / Cert Prep', icon: '📝', desc: 'Test readiness, key concepts, likely questions' },
+  { id: 'apply',   label: 'Apply to Work',    icon: '⚡', desc: 'Extract frameworks for immediate application' },
+  { id: 'discuss', label: 'Discuss & Explore',icon: '💬', desc: 'Think out loud, debate, explore ideas' },
+  { id: 'quick',   label: 'Quick Take',       icon: '🔍', desc: 'Core ideas fast, no deep dive needed' },
+];
+
+export const DEPTH_LEVELS = [
+  { id: 'surface',  label: 'Surface',   desc: 'Key ideas, brief answers' },
+  { id: 'standard', label: 'Standard',  desc: 'Full explanation with examples' },
+  { id: 'deep',     label: 'Deep Dive', desc: 'Full reasoning, multiple perspectives' },
+  { id: 'expert',   label: 'Expert',    desc: 'Peer-level discourse, challenge everything' },
+];
+
+export const READING_PROGRESS_OPTIONS = [
+  { id: 'start',     label: 'Just Starting',    icon: '📖' },
+  { id: 'mid',       label: 'Mid-Way',          icon: '🔖' },
+  { id: 'done',      label: 'Finished',         icon: '✓' },
+  { id: 'reference', label: 'Reference Lookup', icon: '🔍' },
+];

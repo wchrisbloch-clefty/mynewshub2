@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useApp } from '../App.jsx';
 import { callClaude, buildSystem, timeAgo } from '../utils.js';
-import { CB_SPINE } from '../constants.js';
+import { CB_LEARNING_SPINE } from '../constants.js';
 import MD from './shared/MD.jsx';
 import { Card, Label, Badge, ThinkingDots, Btn } from './shared/Common.jsx';
 
@@ -17,7 +17,7 @@ const BLUE_OCEAN_SIGNALS = [
 ];
 
 export default function HomeDashboard() {
-  const { graph, projects, notes, setActiveModule } = useApp();
+  const { graph, projects, notes, setActiveModule, isMobile } = useApp();
   const [brief, setBrief] = useState('');
   const [briefLoading, setBriefLoading] = useState(false);
   const [briefGenerated, setBriefGenerated] = useState(false);
@@ -36,7 +36,7 @@ export default function HomeDashboard() {
   const generateBrief = async () => {
     setBriefLoading(true);
     try {
-      const system = CB_SPINE;
+      const system = CB_LEARNING_SPINE;
       const msg = BRIEF_PROMPTS[0] + '\n\nCB\'s current context:\n- Active projects: ' + activeProjects.map(p => p.title).join(', ') + '\n- Recent learning: ' + topics.slice(-3).map(t => t.title).join(', ') + '\n- Learning streak: ' + (graph?.streak || 0) + ' days';
       const reply = await callClaude({ system, messages: [{ role: 'user', content: msg }], maxTokens: 600 });
       setBrief(reply);
@@ -56,7 +56,7 @@ export default function HomeDashboard() {
   ];
 
   return (
-    <div style={{ padding: '24px 28px 60px', maxWidth: 960, margin: '0 auto' }}>
+    <div style={{ padding: isMobile ? '16px 16px 60px' : '24px 28px 60px', maxWidth: 960, margin: '0 auto' }}>
       {/* Greeting */}
       <div style={{ marginBottom: 28 }}>
         <div style={{ fontSize: 9, letterSpacing: 4, color: '#334', textTransform: 'uppercase', marginBottom: 6 }}>{new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}</div>
@@ -65,7 +65,7 @@ export default function HomeDashboard() {
       </div>
 
       {/* Stats row */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12, marginBottom: 24 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr 1fr' : 'repeat(4, 1fr)', gap: 12, marginBottom: 24 }}>
         {statCards.map(s => (
           <Card key={s.label} color={s.accent} style={{ padding: '14px 16px' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 8 }}>
@@ -78,7 +78,7 @@ export default function HomeDashboard() {
         ))}
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20, marginBottom: 24 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: 20, marginBottom: 24 }}>
         {/* Daily Brief */}
         <Card color="#00FFB2" style={{ padding: '18px 18px' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
@@ -140,7 +140,7 @@ export default function HomeDashboard() {
           <Label color="#6366F1">🌊 Blue Ocean Signals</Label>
           <div onClick={() => setActiveModule('research')} style={{ fontSize: 10, color: '#6366F1', cursor: 'pointer' }}>Explore →</div>
         </div>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 10 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(2, 1fr)', gap: 10 }}>
           {BLUE_OCEAN_SIGNALS.map((s, i) => (
             <Card key={i} color={s.urgency === 'high' ? '#00FFB2' : '#6366F1'} style={{ padding: '14px 16px' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 8 }}>
@@ -155,7 +155,7 @@ export default function HomeDashboard() {
       </div>
 
       {/* Recent Activity */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: 20 }}>
         {/* Recent Learning */}
         <div>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
