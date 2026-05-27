@@ -722,8 +722,24 @@ function isPaywalled(link) {
   } catch { return false; }
 }
 
-// ─── WEB SEARCH FALLBACK (DuckDuckGo Instant Answer) ─────────────────────────
+// ─── WEB SEARCH — Google News RSS (recent articles) + DuckDuckGo fallback ────
 async function fetchWebSearch(query) {
+  // Primary: Google News RSS via existing CORS proxy chain — returns real recent articles
+  try {
+    const gnUrl = `https://news.google.com/rss/search?q=${encodeURIComponent(query)}&hl=en-US&gl=US&ceid=US:en`;
+    const { items } = await fetchRSS(gnUrl);
+    if (items && items.length > 0) {
+      return items.slice(0, 8).map(item => ({
+        title: item.title,
+        desc: item.desc ? item.desc.replace(/<[^>]*>/g, '').slice(0, 200) : '',
+        link: item.link,
+        source: item.source || 'Google News',
+        pubDate: item.pubDate,
+      }));
+    }
+  } catch {}
+
+  // Fallback: DuckDuckGo Instant Answer
   try {
     const r = await fetchWithTimeout(`https://api.duckduckgo.com/?q=${encodeURIComponent(query)}&format=json&no_redirect=1&no_html=1`, 6000);
     if (r.ok) {
@@ -741,6 +757,35 @@ async function fetchWebSearch(query) {
     }
   } catch {}
   return [];
+}
+
+// ─── TRENDING TOPICS — derived from loaded article titles ────────────────────
+const TREND_STOP = new Set([
+  'the','and','for','that','with','this','from','have','will','are','was','were',
+  'been','about','into','than','they','their','what','when','where','which','who',
+  'said','says','after','before','would','could','should','there','these','those',
+  'report','update','first','last','more','also','just','news','new','amid',
+]);
+function getTrendingTopics(arts, limit = 10) {
+  const counts = {};
+  Object.values(arts).flat().forEach(a => {
+    const words = (a.title || '').toLowerCase()
+      .replace(/[^a-z\s]/g, ' ')
+      .split(/\s+/)
+      .filter(w => w.length > 4 && !TREND_STOP.has(w));
+    for (let i = 0; i < words.length - 1; i++) {
+      const bg = `${words[i]} ${words[i + 1]}`;
+      counts[bg] = (counts[bg] || 0) + 1;
+    }
+    words.forEach(w => {
+      if (w.length > 6) counts[w] = (counts[w] || 0) + 0.4;
+    });
+  });
+  return Object.entries(counts)
+    .filter(([, v]) => v >= 1.5)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, limit)
+    .map(([k]) => k);
 }
 
 // Source recommendations based on search query
@@ -931,10 +976,13 @@ body{
    Weather shown prominently; indices + tickers scroll
 ═══════════════════════════════════════════ */
 .pill-bar{
-  /* Deep navy strip — BBC data bar DNA */
   background:var(--navy);
-  border-bottom:none;
+  border-bottom:1px solid rgba(255,255,255,0.05);
   padding:0;
+}
+/* Light mode: softer data strip — still readable but not jarring */
+body:not(.dark) .pill-bar{
+  background:#1e2d42;
 }
 .pill-bar-inner{
   max-width:1400px;margin:0 auto;width:100%;
@@ -1428,7 +1476,7 @@ body{
 .hero-lead:hover{box-shadow:var(--shadow-md);transform:translateY(-1px);}
 .hero-lead:active{transform:scale(0.998);}
 .hero-lead-img{
-  width:100%;aspect-ratio:2.2/1;background-size:cover;background-position:center top;
+  width:100%;aspect-ratio:21/9;background-size:cover;background-position:center top;
   background-color:var(--surface2);position:relative;
 }
 .hero-lead-badge{
@@ -1804,8 +1852,8 @@ body{
 }
 .gn-lead:hover{opacity:0.92;}
 .gn-lead-img{
-  width:100%;aspect-ratio:16/10;
-  background-size:cover;background-position:center;
+  width:100%;aspect-ratio:21/9;
+  background-size:cover;background-position:center top;
   border-radius:8px;background-color:var(--surface2);
   position:relative;
 }
@@ -1840,12 +1888,12 @@ body{
 }
 .gn-card:hover{opacity:0.9;}
 .gn-card-img{
-  width:100%;aspect-ratio:16/10;
-  background-size:cover;background-position:center;
+  width:100%;aspect-ratio:16/7;
+  background-size:cover;background-position:center top;
   border-radius:6px;background-color:var(--surface2);
 }
 .gn-card-img-ph{
-  width:100%;aspect-ratio:16/10;
+  width:100%;aspect-ratio:16/7;
   background:var(--surface2);border-radius:6px;
 }
 .gn-card-title{
@@ -2188,8 +2236,8 @@ body{
 }
 .sports-hero:hover{opacity:0.92;}
 .sports-hero-img{
-  width:100%;aspect-ratio:16/10;
-  background-size:cover;background-position:center;
+  width:100%;aspect-ratio:21/9;
+  background-size:cover;background-position:center top;
   border-radius:8px;background-color:var(--surface2);
   position:relative;
 }
@@ -2244,7 +2292,7 @@ body{
   .team-pill{padding:7px 12px;font-size:11px;min-height:36px;}
   .team-pill-link{padding:7px 9px;min-height:36px;}
   .sports-hero{margin-bottom:18px;padding-bottom:18px;}
-  .sports-hero-img{aspect-ratio:16/10;max-height:240px;}
+  .sports-hero-img{aspect-ratio:21/9;max-height:200px;}
   .sports-hero-title{font-size:20px;-webkit-line-clamp:3;}
   .sports-hero-desc{-webkit-line-clamp:2;font-size:13px;}
   .active-team-notice{font-size:11px;padding:7px 12px;}
@@ -3332,7 +3380,8 @@ kbd{display:inline-block;padding:1px 5px;border:1px solid var(--border);border-r
 .video-feature{
   background:var(--surface);border:1px solid var(--border);
   border-radius:var(--radius);overflow:hidden;
-  margin-bottom:28px;
+  margin-top:32px;margin-bottom:0;
+  max-width:680px;
 }
 .video-feature-head{
   display:flex;align-items:center;justify-content:space-between;
@@ -3349,10 +3398,10 @@ kbd{display:inline-block;padding:1px 5px;border:1px solid var(--border);border-r
   font-family:var(--font-serif);
   font-size:16px;font-weight:700;color:var(--text);
 }
-.video-embed{position:relative;padding-bottom:56.25%;height:0;overflow:hidden;}
+.video-embed{position:relative;padding-bottom:45%;height:0;overflow:hidden;}
 .video-embed iframe{position:absolute;top:0;left:0;width:100%;height:100%;border:none;}
 .video-embed-ph{
-  position:relative;padding-bottom:56.25%;height:0;
+  position:relative;padding-bottom:45%;height:0;
   background:var(--navy);display:flex;align-items:center;justify-content:center;
   cursor:pointer;overflow:hidden;
 }
@@ -3678,6 +3727,124 @@ kbd{display:inline-block;padding:1px 5px;border:1px solid var(--border);border-r
   transition:color 0.1s;font-family:var(--font-sans);letter-spacing:0.02em;
 }
 .fc-read-link:hover{color:var(--accent);}
+
+/* ═══════════════════════════════════════════
+   v28 ADDITIONS — Explain panel, active scores, trending search, responsive
+═══════════════════════════════════════════ */
+
+/* LEARNING COMPANION — "Explain This" panel (amber editorial feel) */
+.fc-explain{
+  margin-top:10px;background:linear-gradient(135deg,#fffbf0 0%,#fef3c7 100%);
+  border:1px solid #fde68a;border-radius:8px;padding:12px 14px;
+}
+.dark .fc-explain{background:linear-gradient(135deg,#2a1f08 0%,#1e1504 100%);border-color:#4a3500;}
+.fc-explain-lbl{
+  font-size:9px;font-weight:800;color:#b45309;
+  text-transform:uppercase;letter-spacing:0.1em;margin-bottom:10px;
+  display:flex;align-items:center;gap:6px;
+}
+.dark .fc-explain-lbl{color:#fbbf24;}
+.fc-explain-section{margin-bottom:10px;}
+.fc-explain-section:last-child{margin-bottom:0;}
+.fc-explain-head{font-size:11px;font-weight:800;color:#92400e;margin-bottom:3px;}
+.dark .fc-explain-head{color:#fbbf24;}
+.fc-explain-body{font-size:12px;line-height:1.55;color:#5a3a00;}
+.dark .fc-explain-body{color:#d4b878;}
+.fc-act.explain-on{border-color:#b45309;color:#b45309;background:#fffbeb;}
+
+/* ACTIVE SCORES STRIP — compact live games on General homepage */
+.home-scores{
+  margin-bottom:20px;background:var(--surface);
+  border:1px solid var(--border);border-radius:var(--radius);
+  overflow:hidden;
+}
+.home-scores-head{
+  display:flex;align-items:center;justify-content:space-between;
+  padding:8px 14px;background:var(--navy);
+}
+.home-scores-label{
+  font-size:9px;font-weight:800;color:rgba(255,255,255,0.9);
+  text-transform:uppercase;letter-spacing:0.12em;
+  display:flex;align-items:center;gap:6px;
+}
+.home-scores-label::before{content:'●';color:#4ade80;font-size:7px;animation:score-pulse 2s ease-in-out infinite;}
+@keyframes score-pulse{0%,100%{opacity:1;}50%{opacity:0.4;}}
+.home-scores-see-all{
+  font-size:10px;font-weight:600;color:rgba(255,255,255,0.6);
+  background:none;border:none;cursor:pointer;font-family:inherit;
+}
+.home-scores-see-all:hover{color:#fff;}
+.home-scores-scroll{
+  display:flex;overflow-x:auto;scrollbar-width:none;gap:0;
+  -webkit-overflow-scrolling:touch;
+}
+.home-scores-scroll::-webkit-scrollbar{display:none;}
+.hs-tile{
+  flex-shrink:0;min-width:140px;padding:10px 14px;
+  border-right:1px solid var(--border2);cursor:pointer;
+  transition:background 0.12s;
+}
+.hs-tile:last-child{border-right:none;}
+.hs-tile:hover{background:var(--surface2);}
+.hs-league{font-size:8px;font-weight:800;color:var(--text3);text-transform:uppercase;letter-spacing:0.08em;margin-bottom:5px;}
+.hs-team-row{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:2px 0;}
+.hs-team-name{font-size:11px;font-weight:600;color:var(--text);flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.hs-team-score{font-size:13px;font-weight:800;color:var(--text);font-variant-numeric:tabular-nums;min-width:24px;text-align:right;}
+.hs-team-score.winner{color:var(--green);}
+.hs-status{font-size:8px;margin-top:4px;text-transform:uppercase;letter-spacing:0.05em;}
+.hs-status.live{color:var(--red);font-weight:700;display:flex;align-items:center;gap:3px;}
+.hs-status.live::before{content:'●';animation:score-pulse 1.2s ease-in-out infinite;}
+.hs-status.final{color:var(--text3);}
+
+/* TRENDING SEARCH BAR — chips when search is empty */
+.trending-bar{
+  display:flex;align-items:center;gap:8px;flex-wrap:wrap;
+  padding:10px 0 16px;
+}
+.trending-bar-label{
+  font-size:9px;font-weight:800;color:var(--text3);
+  text-transform:uppercase;letter-spacing:0.1em;white-space:nowrap;
+  flex-shrink:0;
+}
+.trending-chip{
+  font-size:11px;font-weight:600;color:var(--text2);
+  background:var(--surface2);border:1px solid var(--border);
+  border-radius:20px;padding:4px 11px;cursor:pointer;
+  transition:all 0.12s;white-space:nowrap;
+}
+.trending-chip:hover{border-color:var(--accent);color:var(--accent);background:var(--accent-bg);}
+
+/* WEB SEARCH — improved result cards */
+.web-result-meta{
+  display:flex;align-items:center;gap:8px;margin-bottom:5px;
+}
+.web-result-date{font-size:10px;color:var(--text3);}
+
+/* RESPONSIVE FIXES v28 */
+/* iPad bridge (641–1100px): improve grid + hero */
+@media (min-width:641px) and (max-width:1100px){
+  .home-hero-row{grid-template-columns:1fr;gap:16px;}
+  .page-grid{grid-template-columns:1fr 220px;gap:20px;}
+  .gn-lead{grid-template-columns:1fr;gap:12px;}
+  .gn-row{grid-template-columns:repeat(2,1fr);gap:14px;}
+  .hero-row{grid-template-columns:1fr 260px;gap:12px;}
+  .video-feature{max-width:100%;}
+  .pill-bar .pill{min-width:110px;padding:7px 14px;}
+  .fin-grid{grid-template-columns:1fr;}
+  .pod-page{grid-template-columns:1fr;}
+}
+/* Mobile: reduce card image heights, fix hero */
+@media (max-width:640px){
+  .gn-lead-img{aspect-ratio:16/7;max-height:180px;}
+  .sports-hero-img{aspect-ratio:16/7;max-height:170px;}
+  .hero-lead-img{aspect-ratio:16/7;max-height:180px;}
+  .video-feature{max-width:100%;}
+  .video-embed,.video-embed-ph{padding-bottom:50%;}
+  .home-scores{margin-left:-12px;margin-right:-12px;border-radius:0;border-left:none;border-right:none;}
+  .hs-tile{min-width:120px;padding:9px 11px;}
+  .trending-bar{padding:8px 0 12px;}
+  .trending-chip{font-size:10px;padding:4px 9px;}
+}
 `;
 
 
@@ -3846,6 +4013,85 @@ function VideoFeature() {
   );
 }
 
+// ─── ACTIVE SCORES BAR — compact live/final games for General homepage ────────
+function ActiveScoresBar({ scores, onGoToSports }) {
+  const activeLeagues = useMemo(() => {
+    return Object.entries(scores)
+      .map(([key, games]) => {
+        const active = (games || []).filter(g => g.state === 'in' || g.state === 'post');
+        return { key, games: active.slice(0, 4) };
+      })
+      .filter(l => l.games.length > 0);
+  }, [scores]);
+
+  if (!activeLeagues.length) return null;
+
+  const LEAGUE_LABEL = { nfl:'NFL', nba:'NBA', mlb:'MLB', cfb:'CFB', cbb:'CBB' };
+
+  return (
+    <div className="home-scores">
+      <div className="home-scores-head">
+        <span className="home-scores-label">Live Scores</span>
+        <button className="home-scores-see-all" onClick={onGoToSports}>Sports →</button>
+      </div>
+      <div className="home-scores-scroll">
+        {activeLeagues.flatMap(({ key, games }) =>
+          games.map((g, i) => {
+            const homeWin = g.state === 'post' && parseInt(g.homeScore) > parseInt(g.awayScore);
+            const awayWin = g.state === 'post' && parseInt(g.awayScore) > parseInt(g.homeScore);
+            return (
+              <div key={`${key}-${i}`} className="hs-tile" onClick={() => g.link && window.open(g.link, '_blank')}>
+                <div className="hs-league">{LEAGUE_LABEL[key] || key.toUpperCase()}</div>
+                <div className="hs-team-row">
+                  <span className="hs-team-name">{g.awayAbbr || g.awayName}</span>
+                  <span className={`hs-team-score ${awayWin ? 'winner' : ''}`}>{g.awayScore || '–'}</span>
+                </div>
+                <div className="hs-team-row">
+                  <span className="hs-team-name">{g.homeAbbr || g.homeName}</span>
+                  <span className={`hs-team-score ${homeWin ? 'winner' : ''}`}>{g.homeScore || '–'}</span>
+                </div>
+                <div className={`hs-status ${g.state === 'in' ? 'live' : 'final'}`}>
+                  {g.state === 'in' ? g.status || 'Live' : 'Final'}
+                </div>
+              </div>
+            );
+          })
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ─── EXPLAIN CONTENT ─────────────────────────────────────────────────────────
+function ExplainContent({ text }) {
+  if (!text) return null;
+  const lines = text.split('\n').filter(l => l.trim());
+  const sections = [];
+  let cur = null;
+  for (const line of lines) {
+    const m = line.match(/^\*\*([^*]+)\*\*\s*[—–-]?\s*(.*)/);
+    if (m) {
+      if (cur) sections.push(cur);
+      cur = { head: m[1].trim(), body: m[2].trim() };
+    } else if (cur) {
+      cur.body += (cur.body ? ' ' : '') + line;
+    } else {
+      sections.push({ head: null, body: line });
+    }
+  }
+  if (cur) sections.push(cur);
+  return (
+    <>
+      {sections.map((s, i) => (
+        <div key={i} className="fc-explain-section">
+          {s.head && <div className="fc-explain-head">{s.head}</div>}
+          <div className="fc-explain-body">{s.body}</div>
+        </div>
+      ))}
+    </>
+  );
+}
+
 // ─── FEED CARD ────────────────────────────────────────────────────────────────
 function FeedCard({a, cat, isSaved, onSave, onRead, relatedSources, isRead, userKw, userTeams}) {
   const [imgErr, setImgErr] = useState(false);
@@ -3854,6 +4100,9 @@ function FeedCard({a, cat, isSaved, onSave, onRead, relatedSources, isRead, user
   const [takeaways, setTakeaways] = useState('');
   const [aiErr, setAiErr] = useState('');
   const [loadingAI, setLoadingAI] = useState(false);
+  const [explainText, setExplainText] = useState('');
+  const [loadingExplain, setLoadingExplain] = useState(false);
+  const [showExplain, setShowExplain] = useState(false);
   const [showDisc, setShowDisc] = useState(false);
   const [disc, setDisc] = useState(null);
   const [loadingDisc, setLoadingDisc] = useState(false);
@@ -3885,6 +4134,18 @@ function FeedCard({a, cat, isSaved, onSave, onRead, relatedSources, isRead, user
       }
     }
     setLoadingAI(false);
+  };
+
+  const handleExplain = async (e) => {
+    e.stopPropagation();
+    if (showExplain) { setShowExplain(false); return; }
+    if (explainText) { setShowExplain(true); return; }
+    setShowExplain(true);
+    setLoadingExplain(true);
+    const { summary: text, error } = await fetchAISummary({ type: 'article', title: a.title, content: a.desc || '', mode: 'explain' });
+    if (text) setExplainText(text);
+    else setExplainText(error || 'Could not generate explanation.');
+    setLoadingExplain(false);
   };
 
   const handleShare = async (e) => {
@@ -4011,6 +4272,14 @@ function FeedCard({a, cat, isSaved, onSave, onRead, relatedSources, isRead, user
                 </>}
         </div>
       )}
+      {showExplain && (
+        <div className="fc-explain" onClick={e=>e.stopPropagation()}>
+          <div className="fc-explain-lbl">🧠 Learning Companion</div>
+          {loadingExplain
+            ? <div style={{fontSize:'12px',color:'#b45309',fontStyle:'italic'}}>Analyzing context…</div>
+            : <ExplainContent text={explainText}/>}
+        </div>
+      )}
       {relatedSources && relatedSources.length > 0 && (
         <div className="fc-more" onClick={e=>e.stopPropagation()}>
           <span className="fc-more-lbl">Also covering:</span>
@@ -4028,6 +4297,9 @@ function FeedCard({a, cat, isSaved, onSave, onRead, relatedSources, isRead, user
         </button>
         <button className={`fc-act ${showDisc?'disc-on':''}`} onClick={handleDisc} disabled={loadingDisc}>
           💬 {loadingDisc?'Searching...':showDisc?'Hide':'Pulse'}
+        </button>
+        <button className={`fc-act ${showExplain?'explain-on':''}`} onClick={handleExplain} disabled={loadingExplain}>
+          🧠 {loadingExplain?'Analyzing…':showExplain?'Hide':'Explain'}
         </button>
         {navigator.share !== undefined && (
           <button className="fc-act" onClick={handleShare} title="Share article">
@@ -4682,7 +4954,7 @@ function SourceFooter({cat, feeds, arts}) {
 const CAT_LABELS = {general:'🌐 General',sports:'🏆 Sports',business:'⚡ Business',finance:'📈 Markets',bloom:'🔋 Bloom',popculture:'✨ Pop Culture',comedy:'😂 Comedy'};
 const PLAT_LABELS = {twitter:'𝕏',linkedin:'in',instagram:'IG',youtube:'▶'};
 
-function CustomizePanel({feeds, kw, alerts, urgent, social, watchlist, teams, health, arts, initialTab, initialCat, onClose, onSave}) {
+function CustomizePanel({feeds, kw, alerts, urgent, social, watchlist, teams, health, arts, weatherCities, initialTab, initialCat, onClose, onSave}) {
   const [lf, setLf] = useState(JSON.parse(JSON.stringify(feeds)));
   const [lk, setLk] = useState(JSON.parse(JSON.stringify(kw)));
   const [la, setLa] = useState([...alerts]);
@@ -4691,6 +4963,10 @@ function CustomizePanel({feeds, kw, alerts, urgent, social, watchlist, teams, he
   const [newSym, setNewSym] = useState('');
   const [newSymName, setNewSymName] = useState('');
   const [ls, setLs] = useState(JSON.parse(JSON.stringify(social)));
+  const [lwx, setLwx] = useState(JSON.parse(JSON.stringify(weatherCities||DEFAULT_WEATHER_CITIES)));
+  const [newCityName, setNewCityName] = useState('');
+  const [newCityLat, setNewCityLat] = useState('');
+  const [newCityLon, setNewCityLon] = useState('');
   // v23: editable favorite teams
   const [lt, setLt] = useState(JSON.parse(JSON.stringify(teams||[])));
   const [newTeam, setNewTeam] = useState({team:'',match:'',sport:'football',league:'nfl',emoji:'🏈',espnUrl:'',teamUrl:''});
@@ -4746,9 +5022,9 @@ function CustomizePanel({feeds, kw, alerts, urgent, social, watchlist, teams, he
         <div className="cp-head"><span className="cp-title">Customize</span><button className="cp-x" onClick={onClose}>✕</button></div>
         <div className="cp-body">
           <div className="cp-sec-tabs">
-            {['keywords','alerts','sources','social','watchlist','teams'].map(t=>(
+            {['keywords','alerts','sources','social','watchlist','teams','datastrip'].map(t=>(
               <button key={t} className={`cp-sec-tab ${secTab===t?'active':''}`} onClick={()=>setSecTab(t)}>
-                {t==='keywords'?'Keywords':t==='alerts'?'Alerts':t==='sources'?'Sources':t==='social'?'Social':t==='watchlist'?'📈 Watchlist':'🏆 Teams'}
+                {t==='keywords'?'Keywords':t==='alerts'?'Alerts':t==='sources'?'Sources':t==='social'?'Social':t==='watchlist'?'📈 Watchlist':t==='teams'?'🏆 Teams':'🌤 Data Strip'}
               </button>
             ))}
           </div>
@@ -4938,7 +5214,44 @@ function CustomizePanel({feeds, kw, alerts, urgent, social, watchlist, teams, he
             </div>
           )}
 
-          <button className="cp-save" onClick={()=>onSave({feeds:lf,kw:lk,alerts:la,urgent:lu,social:ls,watchlist:lw,teams:lt})}>Save & Refresh</button>
+          {secTab==='datastrip' && (
+            <div className="cp-sec">
+              <div className="cp-lbl">Weather Cities</div>
+              <div className="cp-desc">Choose which cities appear in the top data strip. Uses open-meteo.com (no API key needed).</div>
+              {lwx.map((city, i) => (
+                <div key={i} className="cp-src-row">
+                  <span className="cp-src-name">{city.name} ({city.lat.toFixed(2)}, {city.lon.toFixed(2)})</span>
+                  <button className="cp-del" onClick={() => setLwx(prev => prev.filter((_,j) => j !== i))}>✕</button>
+                </div>
+              ))}
+              <div className="cp-add-src" style={{marginTop:'8px'}}>
+                <div className="cp-add-src-title">Add a city</div>
+                <input className="cp-input-sm" placeholder="City name (e.g. Austin)" value={newCityName} onChange={e=>setNewCityName(e.target.value)}/>
+                <div style={{display:'flex',gap:'6px'}}>
+                  <input className="cp-input-sm" placeholder="Latitude (e.g. 30.27)" value={newCityLat} onChange={e=>setNewCityLat(e.target.value)}/>
+                  <input className="cp-input-sm" placeholder="Longitude (e.g. -97.74)" value={newCityLon} onChange={e=>setNewCityLon(e.target.value)}/>
+                </div>
+                <button className="cp-btn" style={{width:'100%'}} onClick={()=>{
+                  const name=newCityName.trim();
+                  const lat=parseFloat(newCityLat);
+                  const lon=parseFloat(newCityLon);
+                  if (name && !isNaN(lat) && !isNaN(lon)) {
+                    const tz = lat > 0 ? (lon > -90 ? 'America/New_York' : 'America/Chicago') : 'UTC';
+                    const slug = name.replace(/\s+/g,'+');
+                    setLwx(prev=>[...prev,{name,lat,lon,tz,slug}]);
+                    setNewCityName(''); setNewCityLat(''); setNewCityLon('');
+                  }
+                }}>Add City</button>
+              </div>
+              <div className="cp-lbl" style={{marginTop:'16px'}}>Stock Tickers in Strip</div>
+              <div className="cp-desc">The strip always shows S&P, DOW, NASDAQ. Your watchlist tickers can also appear — manage them in the Watchlist tab.</div>
+              <div style={{fontSize:'11px',color:'var(--text2)',background:'var(--surface2)',borderRadius:'6px',padding:'8px 10px'}}>
+                Current watchlist: {lw.map(w=>w.sym).join(' · ') || 'none'}
+              </div>
+            </div>
+          )}
+
+          <button className="cp-save" onClick={()=>onSave({feeds:lf,kw:lk,alerts:la,urgent:lu,social:ls,watchlist:lw,teams:lt,weatherCities:lwx})}>Save & Refresh</button>
         </div>
       </div>
     </div>
@@ -5355,13 +5668,18 @@ function LastUpdated({ timestamp, onRefresh }) {
 // the auto-hide-on-scroll-down behavior (mobile only — drives translate).
 function TopBar({tab, setTab, search, setSearch, dark, setDark,
                  onCustomize, onRefresh, breakingItems, onTickerClick,
-                 hidden, mobileSearchOpen, onMobileSearchToggle}) {
+                 hidden, mobileSearchOpen, onMobileSearchToggle, weatherCities}) {
   const [wxList, setWxList] = useState([]);
   const [quotes, setQuotes] = useState({});
   const [showBreaking, setShowBreaking] = useState(true);
+  const cities = weatherCities || DEFAULT_WEATHER_CITIES;
 
   useEffect(()=>{
-    fetchAllWeather(DEFAULT_WEATHER_CITIES).then(setWxList);
+    fetchAllWeather(cities).then(setWxList);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  },[JSON.stringify(cities)]);
+
+  useEffect(()=>{
     // v25: also fetch indices (S&P, DOW, Nasdaq) for the pill bar
     const allSyms = [...TICKERS.map(t=>t.sym), ...INDICES.map(i=>i.sym)];
     const fetchAll = () => allSyms.forEach(sym =>
@@ -5566,6 +5884,7 @@ export default function App() {
   const [watchlist, setWatchlist]= useState(()=>ld('watchlist',DEFAULT_WATCHLIST));
   // v23: customizable favorite teams. Defaults to SCORE_TEAMS; user can add/remove via Customize.
   const [teams, setTeams]       = useState(()=>ld('teams', SCORE_TEAMS));
+  const [weatherCities, setWeatherCities] = useState(()=>ld('weatherCities', DEFAULT_WEATHER_CITIES));
   const [marketData, setMarketData] = useState({});
   const [marketLoading, setMarketLoading] = useState(false);
   const [social, setSocial]     = useState(()=>ld('social',DEFAULT_SOCIAL));
@@ -5734,6 +6053,7 @@ export default function App() {
 
   // v23: persist teams whenever they change
   useEffect(()=>{sv('teams',teams);},[teams]);
+  useEffect(()=>{sv('weatherCities',weatherCities);},[weatherCities]);
 
   // v26: Global search — when search text is present, query all categories
   // When internal results are thin (<3), fetch DuckDuckGo web fallback
@@ -5771,14 +6091,15 @@ export default function App() {
     return () => window.removeEventListener('keydown', handler);
   }, []);
 
-  const handleCustomizeSave = ({feeds:nf,kw:nk,alerts:na,urgent:nu,social:ns,watchlist:nw,teams:nt})=>{
+  const handleCustomizeSave = ({feeds:nf,kw:nk,alerts:na,urgent:nu,social:ns,watchlist:nw,teams:nt,weatherCities:nwx})=>{
     setFeeds(nf);sv('feeds',nf);
     setKw(nk);sv('kw',nk);
     setAlerts(na);sv('alerts',na);
     if(nu){setUrgent(nu);sv('urgent',nu);}
     setSocial(ns);sv('social',ns);
     if(nw){setWatchlist(nw);sv('watchlist',nw);}
-    if(nt){setTeams(nt);sv('teams',nt);} // v23
+    if(nt){setTeams(nt);sv('teams',nt);}
+    if(nwx){setWeatherCities(nwx);sv('weatherCities',nwx);}
     setShowPanel(false);refreshAll();
   };
 
@@ -6079,7 +6400,7 @@ export default function App() {
           <div className="home-hero-row">
             <div className="home-hero-main">
               <article className="gn-lead-solo" onClick={()=>onRead(catLead)}>
-                <div className="gn-lead-img" style={{backgroundImage:`url(${catLead.img})`,aspectRatio:'16/10'}}/>
+                <div className="gn-lead-img" style={{backgroundImage:`url(${catLead.img})`}}/>
                 <div className="gn-lead-text">
                   <h1 className="gn-lead-title">{catLead.title}</h1>
                   {catLead.desc&&<p className="gn-lead-desc">{catLead.desc}</p>}
@@ -6133,8 +6454,23 @@ export default function App() {
           </div>
         )}
 
-        {/* Video Feature — General homepage only, after hero row */}
-        {isHome && !activeKw && !activeSrc && !search && <VideoFeature />}
+        {/* Active scores strip — General homepage, leagues with live/final games */}
+        {isHome && !activeKw && !activeSrc && !search && (
+          <ActiveScoresBar scores={scores} onGoToSports={() => handleTabChange('sports')}/>
+        )}
+
+        {/* Trending topics bar — shown when no active filter/search */}
+        {isHome && !activeKw && !activeSrc && !search && (() => {
+          const topics = getTrendingTopics(arts);
+          return topics.length > 0 ? (
+            <div className="trending-bar">
+              <span className="trending-bar-label">Trending</span>
+              {topics.slice(0, 8).map((t, i) => (
+                <span key={i} className="trending-chip" onClick={() => setSearch(t)}>{t}</span>
+              ))}
+            </div>
+          ) : null;
+        })()}
 
         <div className="page-grid">
           <div className="feed-col">
@@ -6251,6 +6587,8 @@ export default function App() {
               </div>
             )}
 
+            {/* Video Feature — bottom of General homepage feed */}
+            {isHome && !activeKw && !activeSrc && !search && <VideoFeature />}
             <SocialFollows cat={cat} social={social}/>
             <SourceFooter cat={cat} feeds={feeds} arts={arts}/>
           </div>
@@ -6727,7 +7065,8 @@ export default function App() {
           breakingItems={breakingItems} onTickerClick={handleTickerClick}
           hidden={headerHidden}
           mobileSearchOpen={mobileSearchOpen}
-          onMobileSearchToggle={() => setMobileSearchOpen(o => !o)}/>
+          onMobileSearchToggle={() => setMobileSearchOpen(o => !o)}
+          weatherCities={weatherCities}/>
 
         {/* Pull-to-refresh indicator (mobile, touch-only) */}
         {isMobile && <PtrIndicator distance={ptrDistance} threshold={70} refreshing={refreshing}/>}
@@ -6765,6 +7104,7 @@ export default function App() {
 
         {showPanel&&<CustomizePanel feeds={feeds} kw={kw} alerts={alerts} urgent={urgent}
           social={social} watchlist={watchlist} teams={teams} health={health} arts={arts}
+          weatherCities={weatherCities}
           initialTab={panelInitial.tab} initialCat={panelInitial.cat}
           onClose={()=>setShowPanel(false)} onSave={handleCustomizeSave}/>}
       </div>
