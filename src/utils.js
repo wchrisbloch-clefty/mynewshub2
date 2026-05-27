@@ -242,10 +242,13 @@ export async function callClaude({ system, messages, maxTokens = 1500, searchEna
   if (systemBlocks) body.system = systemBlocks;
   if (searchEnabled) body.tools = [{ type: 'web_search_20250305', name: 'web_search' }];
 
+  const apiKey = import.meta.env.VITE_ANTHROPIC_API_KEY;
   const res = await fetch('https://api.anthropic.com/v1/messages', {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
+      'x-api-key': apiKey,
+      'anthropic-version': '2023-06-01',
       'anthropic-beta': 'prompt-caching-2024-07-31',
     },
     body: JSON.stringify(body),
