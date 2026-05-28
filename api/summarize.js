@@ -78,6 +78,28 @@ async function tryGroq(prompt, maxTokens) {
   } catch { return null; }
 }
 
+// ── Provider 1.5: Groq Fast (llama-3.1-8b-instant, higher rate limits) ──────
+async function tryGroqFast(prompt, maxTokens) {
+  const key = process.env.GROQ_API_KEY;
+  if (!key) return null;
+  try {
+    const r = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${key}` },
+      body: JSON.stringify({
+        model: 'llama-3.1-8b-instant',
+        messages: [{ role: 'user', content: prompt }],
+        max_tokens: maxTokens,
+        temperature: 0.3,
+      }),
+      signal: AbortSignal.timeout(7000),
+    });
+    if (!r.ok) return null;
+    const d = await r.json();
+    return d?.choices?.[0]?.message?.content?.trim() || null;
+  } catch { return null; }
+}
+
 // ── Provider 2: Google Gemini (free 500 req/day) ────────────────────────────
 async function tryGemini(prompt, maxTokens) {
   const key = process.env.GOOGLE_AI_KEY;
@@ -199,11 +221,17 @@ export default async function handler(req, res) {
   const user   = buildUser(t, c, m);
   const prompt = buildPrompt(type, t, c, m);
 
-  // Cascade: Groq → Gemini → Grok → Perplexity → Claude
+  // Cascade: Groq-70b → Groq-8b → Gemini → Grok → Perplexity → Claude
   const groqResult = await tryGroq(prompt, maxTokens);
   if (groqResult) {
     res.setHeader('Cache-Control', 's-maxage=86400, stale-while-revalidate=604800');
     return res.status(200).json({ summary: groqResult, provider: 'Groq' });
+  }
+
+  const groqFastResult = await tryGroqFast(prompt, maxTokens);
+  if (groqFastResult) {
+    res.setHeader('Cache-Control', 's-maxage=86400, stale-while-revalidate=604800');
+    return res.status(200).json({ summary: groqFastResult, provider: 'Groq' });
   }
 
   const geminiResult = await tryGemini(prompt, maxTokens);
