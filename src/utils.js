@@ -321,6 +321,84 @@ export async function buildApiMessages(messages) {
   }));
 }
 
+// ─── PODCAST RSS ─────────────────────────────────────────────────────────
+export function parsePodcastXML(txt) {
+  try {
+    const p = new DOMParser(), x = p.parseFromString(txt, 'text/xml');
+    const items = Array.from(x.querySelectorAll('item')).slice(0, 20);
+    return items.map(i => {
+      const descRaw = i.querySelector('description')?.textContent
+        || i.getElementsByTagNameNS('*', 'summary')?.[0]?.textContent || '';
+      const desc = descRaw.replace(/<[^>]*>/g, '').replace(/&amp;/g, '&').replace(/&nbsp;/g, ' ').replace(/&#\d+;/g, ' ').trim().slice(0, 400);
+      const duration = i.getElementsByTagNameNS('http://www.itunes.com/dtds/podcast-1.0.dtd', 'duration')?.[0]?.textContent
+        || i.querySelector('duration')?.textContent || '';
+      return {
+        title: (i.querySelector('title')?.textContent || '').trim(),
+        link: i.querySelector('link')?.textContent || i.querySelector('enclosure')?.getAttribute('url') || '',
+        desc, pubDate: i.querySelector('pubDate')?.textContent || '', duration,
+      };
+    });
+  } catch { return []; }
+}
+
+export async function fetchPodcastRSS(url) {
+  const proxies = [
+    `/api/rss?url=${encodeURIComponent(url)}`,
+    `https://api.rss2json.com/v1/api.json?rss_url=${encodeURIComponent(url)}&count=20`,
+    `https://api.allorigins.win/get?url=${encodeURIComponent(url)}`,
+    `https://corsproxy.io/?${encodeURIComponent(url)}`,
+  ];
+  for (const proxy of proxies) {
+    try {
+      const r = await fetch(proxy, { signal: AbortSignal.timeout(9000) });
+      if (!r.ok) continue;
+      if (proxy.includes('rss2json')) {
+        const d = await r.json();
+        if (d.items?.length) return d.items.map(i => ({
+          title: (i.title || '').trim(),
+          link: i.link || '',
+          desc: (i.description || i.content || '').replace(/<[^>]*>/g, '').replace(/&amp;/g, '&').replace(/&nbsp;/g, ' ').trim().slice(0, 400),
+          pubDate: i.pubDate,
+          duration: i.itunes_duration || '',
+        }));
+      } else if (proxy.includes('allorigins')) {
+        const d = await r.json();
+        if (d.contents) { const items = parsePodcastXML(d.contents); if (items.length) return items; }
+      } else {
+        const items = parsePodcastXML(await r.text());
+        if (items.length) return items;
+      }
+    } catch {}
+  }
+  return [];
+}
+
+export function fmtDuration(s) {
+  if (!s) return '';
+  const parts = String(s).split(':').map(Number);
+  if (parts.length === 3) return parts[0] > 0 ? `${parts[0]}h ${parts[1]}m` : `${parts[1]}m`;
+  if (parts.length === 2) return `${parts[0]}m`;
+  const secs = Number(s);
+  if (!isNaN(secs) && secs > 0) {
+    const mins = Math.floor(secs / 60);
+    return mins > 60 ? `${Math.floor(mins / 60)}h ${mins % 60}m` : `${mins}m`;
+  }
+  return s;
+}
+
+export function fmtPodDate(d) {
+  if (!d) return '';
+  const date = new Date(d);
+  if (isNaN(date.getTime())) return '';
+  const diff = Date.now() - date.getTime();
+  const days = Math.floor(diff / 86400000);
+  if (days === 0) return 'Today';
+  if (days === 1) return 'Yesterday';
+  if (days < 7) return `${days}d ago`;
+  if (days < 30) return `${Math.floor(days / 7)}w ago`;
+  return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+}
+
 // ─── MISC ─────────────────────────────────────────────────────────────────
 export function timeAgo(ts) {
   const diff = Date.now() - ts;

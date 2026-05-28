@@ -108,6 +108,7 @@ export const NAV_ITEMS = [
   { id: "learn",    icon: "📚", label: "Learn",    accent: "#00FFB2" },
   { id: "research", icon: "🔭", label: "Research", accent: "#6366F1" },
   { id: "projects", icon: "🚀", label: "Projects", accent: "#ff8844" },
+  { id: "podcast",  icon: "🎙️", label: "Podcasts", accent: "#e11d48" },
   { id: "vault",    icon: "🏛", label: "Vault",    accent: "#ffcc44" },
   { id: "growth",   icon: "📈", label: "Growth",   accent: "#44ffcc" },
 ];

@@ -11,6 +11,7 @@ import ResearchHub from './modules/ResearchHub.jsx';
 import ProjectsOS from './modules/ProjectsOS.jsx';
 import MasteryVault from './modules/MasteryVault.jsx';
 import GrowthTools from './modules/GrowthTools.jsx';
+import PodcastHub from './modules/PodcastHub.jsx';
 
 const AppContext = createContext(null);
 export const useApp = () => useContext(AppContext);
@@ -78,6 +79,7 @@ export default function App() {
     learn:    <LearningCenter />,
     research: <ResearchHub />,
     projects: <ProjectsOS />,
+    podcast:  <PodcastHub />,
     vault:    <MasteryVault />,
     growth:   <GrowthTools />,
   };
@@ -120,6 +122,9 @@ function BottomNav({ activeModule, setActiveModule, setChatOpen, chatOpen }) {
       alignItems: 'center',
       zIndex: 100,
       paddingBottom: 'env(safe-area-inset-bottom, 0)',
+      overflowX: 'auto',
+      scrollbarWidth: 'none',
+      WebkitOverflowScrolling: 'touch',
     }}>
       {NAV_ITEMS.map(item => {
         const isActive = activeModule === item.id;
@@ -128,14 +133,15 @@ function BottomNav({ activeModule, setActiveModule, setChatOpen, chatOpen }) {
             key={item.id}
             onClick={() => setActiveModule(item.id)}
             style={{
-              flex: 1,
+              minWidth: 52,
+              flex: '1 0 52px',
               display: 'flex',
               flexDirection: 'column',
               alignItems: 'center',
               justifyContent: 'center',
-              gap: 3,
+              gap: 2,
               cursor: 'pointer',
-              padding: '6px 0',
+              padding: '5px 0',
               position: 'relative',
             }}
           >
@@ -145,19 +151,20 @@ function BottomNav({ activeModule, setActiveModule, setChatOpen, chatOpen }) {
                 top: 0,
                 left: '50%',
                 transform: 'translateX(-50%)',
-                width: 28,
+                width: 24,
                 height: 2,
                 background: item.accent,
                 borderRadius: '0 0 2px 2px',
               }} />
             )}
-            <div style={{ fontSize: 16, lineHeight: 1 }}>{item.icon}</div>
+            <div style={{ fontSize: 15, lineHeight: 1 }}>{item.icon}</div>
             <div style={{
-              fontSize: 8,
-              letterSpacing: 0.5,
+              fontSize: 7,
+              letterSpacing: 0.3,
               color: isActive ? item.accent : 'var(--dim)',
               fontWeight: isActive ? 700 : 400,
               textTransform: 'uppercase',
+              whiteSpace: 'nowrap',
             }}>{item.label}</div>
           </div>
         );
@@ -165,7 +172,8 @@ function BottomNav({ activeModule, setActiveModule, setChatOpen, chatOpen }) {
       <div
         onClick={() => setChatOpen(o => !o)}
         style={{
-          width: 48,
+          minWidth: 48,
+          flex: '0 0 48px',
           display: 'flex',
           flexDirection: 'column',
           alignItems: 'center',
@@ -173,19 +181,18 @@ function BottomNav({ activeModule, setActiveModule, setChatOpen, chatOpen }) {
           gap: 3,
           cursor: 'pointer',
           padding: '6px 0',
-          flexShrink: 0,
         }}
       >
         <div style={{
-          width: 30,
-          height: 30,
+          width: 28,
+          height: 28,
           borderRadius: '50%',
           background: chatOpen ? 'linear-gradient(135deg, #00FFB2, #6366F1)' : 'var(--surface)',
           border: `1px solid ${chatOpen ? 'transparent' : 'var(--border)'}`,
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
-          fontSize: 14,
+          fontSize: 13,
         }}>💬</div>
       </div>
     </div>
