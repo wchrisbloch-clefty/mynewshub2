@@ -1,7 +1,9 @@
 # MyNewsHub — Competitive Gap Analysis
-*Last updated: May 2026 | Version 2 — BBC, TIME, Yahoo News, NBC News added*
+*Last updated: May 2026 | Version 3 — Codebase audit added; v26 feature status corrected; v27 build priorities defined*
 
 > **Purpose**: Map the competitive landscape for AI-curated news products. For each competitor, assess what they do brilliantly, their design and color philosophy, their AI integration, where they fail, and the specific gap MyNewsHub can exploit. Synthesized into actionable design and product direction at the end.
+>
+> **v3 Audit Note**: A full codebase scan of MyNewsHub v26 was completed May 2026. Many features previously listed as "target" are confirmed BUILT. The synthesis section now distinguishes between v26 confirmed capabilities and v27 build priorities.
 
 ---
 
@@ -457,7 +459,8 @@
 | NBC News | ★★★☆☆ | ★★☆☆☆ | ★☆☆☆☆ | ★★★★☆ | ★★★★☆ |
 | Yahoo News | ★★☆☆☆ | ★★☆☆☆ | ★★☆☆☆ | ★★★☆☆ | ★★★☆☆ |
 | Morning Brew | ★★★★☆ | ★☆☆☆☆ | ★☆☆☆☆ | ★★★★☆ | ★☆☆☆☆ |
-| **MyNewsHub Target** | **★★★★★** | **★★★★★** | **★★★★★** | **★★★★☆** | **★★★★☆** |
+| **MyNewsHub v26 ✅ Built** | **★★★★☆** | **★★★★☆** | **★★★☆☆** | **★★★★☆** | **★★★★☆** |
+| **MyNewsHub v27 Target** | **★★★★★** | **★★★★★** | **★★★★★** | **★★★★☆** | **★★★★☆** |
 
 ---
 
@@ -476,13 +479,36 @@ Yahoo News proves there is a massive audience for aggregated multi-topic news at
 
 ### MyNewsHub's Irreducible Design DNA (From This Analysis)
 
-1. **BBC's color discipline**: Crimson + navy + newsprint white. Apply it at BBC-level rigor. Never dilute.
-2. **BBC's card left-accent rule**: 3px vertical bar in section color. The single highest-value design pattern from the competitive landscape.
-3. **TIME's serif authority**: Playfair Display headlines. The crimson 3px top rule above section headers. Already in v27.
-4. **TIME's editorial hierarchy**: One dominant story leads. Not a grid of equals.
-5. **Axios's format intelligence**: Smart Brevity structure (Why It Matters, Key Context, What's Next) applied by AI to every story.
-6. **NBC's breaking news urgency**: Solid-color BREAKING banner, high-contrast label. Visual interruption, not a card.
-7. **Morning Brew's voice**: AI Briefing tab reads like a smart analyst, not a news wire.
-8. **Bloomberg's data density**: Markets and Business verticals use Bloomberg-adjacent design (orange accent, dense card treatment) as a deliberate category signal.
-9. **NOT Yahoo's addition-without-subtraction**: Every element added requires an element evaluated for removal.
-10. **NOT NBC's auto-play default**: Video is always opt-in. Reader trust is never sacrificed for ad revenue.
+Items marked ✅ are confirmed built in v26. Items marked 🔲 are v27 build priorities.
+
+1. ✅ **BBC's color discipline**: Crimson + navy + newsprint white. Implemented via CSS custom properties (--bg #141210, --accent crimson, warm white text). Already at BBC-level rigor.
+2. 🔲 **BBC's card left-accent rule**: 3px vertical bar in section color. Highest-value design pattern from the competitive landscape. Not yet implemented per-card.
+3. ✅ **TIME's serif authority**: Playfair Display headlines live in the current build. CSS typography system confirmed.
+4. ✅ **TIME's editorial hierarchy**: Category tabs + section headers apply editorial hierarchy. Morning Briefing tab adds the "lead story dominates" layer.
+5. ✅ **Axios's format intelligence**: AI summaries with "Why it matters" structure delivered via the 3-tier briefing system (morning digest → article summary → full read).
+6. ✅ **NBC's breaking news urgency**: Solid crimson BREAKING banner confirmed in v26. Visual interruption, not a card.
+7. ✅ **Morning Brew's voice**: 3-tier Morning Briefing tab (Top Brief / Key Points / Source Links) reads like a smart analyst's daily note.
+8. ✅ **Bloomberg's data density**: Yahoo Finance watchlist + live ticker strip provides the financial glance layer.
+9. ✅ **Provider attribution badge**: "Summarized by [Groq / Gemini / Claude]" is confirmed in the v26 summarization pipeline — the honesty feature no competitor has deployed.
+10. 🔲 **Density toggle**: Scan Mode (compressed, 5–6 per screen) vs. Read Mode (full AI summaries visible) — not yet implemented.
+11. 🔲 **Intelligence Profile page**: Visible, editable record of what the AI knows about the user's preferences. The gap no competitor has filled.
+12. 🔲 **Explicit feedback buttons**: "More like this / Less like this" per card, updating keyword weights in real time.
+13. 🔲 **Time-of-day adaptation**: Finance focus at market open; sports scores post-game; pop culture in evenings. Behavioral adaptation layer.
+14. 🔲 **Audio morning brief button**: One-tap text-to-speech rendering of the morning synthesis for commute listening. TTS infrastructure (Web Speech API) exists — needs a dedicated trigger.
+15. ✅ **NOT Yahoo's addition-without-subtraction**: Every element added requires an element evaluated for removal. This is a standing rule in all v27+ design decisions.
+16. ✅ **NOT NBC's auto-play default**: No auto-play video anywhere in the product. This is a confirmed architectural decision.
+
+---
+
+### v27 Build Priority — Quick Reference
+
+| Feature | Effort | Impact | Status |
+|---|---|---|---|
+| Audio morning brief button | LOW | HIGH | 🔲 Build next — TTS already exists |
+| Explicit feedback buttons (more/less like this) | LOW-MEDIUM | HIGH | 🔲 Core personalization gap |
+| Density toggle (Scan / Read mode) | LOW | MEDIUM | 🔲 UX polish, one setting |
+| BBC-style card left-accent rule (3px per category) | LOW | MEDIUM | 🔲 CSS only, high visual impact |
+| Intelligence Profile page | MEDIUM | HIGH | 🔲 Transparency = trust |
+| Time-of-day content adaptation | MEDIUM | MEDIUM | 🔲 Behavioral layer |
+| Cloud sync (Supabase activation) | MEDIUM | HIGH | 🔲 Infrastructure stubbed — needs wiring |
+| Cross-category connection alerts | HIGH | HIGH | 🔲 "This news is moving this ticker" |

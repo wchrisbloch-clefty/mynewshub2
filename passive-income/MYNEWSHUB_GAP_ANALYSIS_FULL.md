@@ -1,7 +1,9 @@
 # MyNewsHub — Full Competitive Gap Analysis & Strategic Product Brief
-*22 competitors across 5 categories | May 2026*
+*22 competitors across 5 categories | May 2026 | v2 — Codebase audit corrected*
 
-> **How to read this document:** Act I covers news aggregators and hubs. Act II covers financial intelligence terminals. Act III covers design-forward and social-hybrid products. Act IV is the synthesis — the blueprint for the elite personal intelligence hub that does not yet exist.
+> **How to read this document:** Act I covers news aggregators and hubs. Act II covers financial intelligence terminals. Act III covers design-forward and social-hybrid products. Act IV is the synthesis — the blueprint for the elite personal intelligence hub. Act V (new) is the v26 audit: what is already built, what remains for v27.
+>
+> **v2 Audit Note (May 2026):** A full codebase scan of MyNewsHub v26 confirmed that many features described in Act IV as targets are already built. Corrections are marked inline with ✅ (built) or 🔲 (v27 target). The competitive matrix has been updated to reflect actual v26 capabilities.
 
 ---
 
@@ -552,12 +554,13 @@ At the top of the feed: a single AI-generated morning briefing. Not a list of he
 ### 4. Ticker Strip — Financial Awareness Without Distraction
 Non-intrusive collapsible top strip showing 5–8 user-selected tickers: current price, delta, delta %. Color-coded green/red. Tapable to expand a mini-chart. A **glance layer** that connects news to market movement.
 
-### 5. Density Toggle
+### 5. Density Toggle 🔲 v27 Target
 - **Scan Mode:** Compressed cards, 5–6 per screen, headline + source + 1-sentence AI teaser
 - **Read Mode:** Full article cards with 3-bullet AI summaries visible without clicking
+- *Status: Not yet implemented. Infrastructure for both card formats exists. This is a single UI toggle — low effort, high perceived value.*
 
-### 6. Story Clustering (The Missing Feature)
-Show when 3+ sources cover the same story. Badge: "Covered by 7 sources." Tapping shows all sources for that story — a lightweight Ground News insight without the political bias scoring complexity.
+### 6. Story Clustering ✅ Built in v26
+MyNewsHub v26 implements bigram Jaccard similarity deduplication (≥0.28 threshold, 6-hour window) for story clustering. Related articles on the same event are grouped. The "Covered by N sources" badge is the next UI expression of this existing logic — the data layer is done, the display badge is a v27 addition.
 
 ---
 
@@ -573,41 +576,45 @@ Every morning at a user-set time, the AI processes new RSS items from the last 1
 
 None of this requires a user query. It happens before the user opens the app.
 
-### Multi-Provider Fallback — Make It Visible
-MyNewsHub's existing Groq → Gemini → Claude chain is architecturally sophisticated. Make it visible as a trust signal:
-- Small badge: "Summarized by [Groq / Gemini / Claude]"
-- Groq = speed-first (breaking news)
-- Gemini = quality-first (complex multi-source synthesis)
-- Claude = depth-first (nuanced reasoning, longer-form summaries)
-- This is an honesty feature no competitor has deployed
+### Multi-Provider Fallback — Already Visible ✅ Built in v26
+MyNewsHub v26 already implements the Groq → Gemini → Claude fallback chain AND exposes provider attribution in the UI. The `{summary, provider}` response from `api/summarize.js` is surfaced per article — users can see which provider generated each summary. This is confirmed built, not a target.
+- Groq = speed-first (breaking news, 700 tok/s, free tier)
+- Gemini = quality-first (complex multi-source synthesis, free tier)
+- Claude = depth-first (nuanced reasoning, longer-form summaries, paid reserve)
+- **This is the honesty feature no competitor has deployed — and MyNewsHub already has it.**
 
-### Personalization That Learns Explicitly
+### Personalization That Learns Explicitly 🔲 v27 Target
 The gap no competitor has filled — users should be able to teach the AI directly:
 - "Show me more stories like this" (positive reinforcement)
 - "Never show me this source again" (source block)
 - "This summary missed the key point — here's what matters" (summary correction)
 - "I care about Houston energy news more than national energy news" (geographic weight)
 
-These explicit signals update keyword filter and AI weighting in real time — visible to the user as an editable "intelligence profile."
+These explicit signals update keyword filter and AI weighting in real time — visible to the user as an editable "intelligence profile." *Per-category keyword filtering exists in v26; the explicit feedback buttons and intelligence profile UI are v27 targets.*
 
-### The Audio Intelligence Layer
-The podcast integration that exists in MyNewsHub is genuinely rare. The AI layer to accompany it: **auto-generate a 2-minute "news audio brief"** each morning by text-to-speech rendering the morning synthesis. Users can listen while commuting without opening the app. No competitor delivers this end-to-end.
+### The Audio Intelligence Layer 🔲 v27 Target (Infrastructure ✅ Built)
+MyNewsHub v26 has Web Speech API (TTS) integrated for article reading. The architecture exists. The v27 target is a dedicated "Audio Morning Brief" button on the Morning Briefing tab — one tap renders the AI-generated morning synthesis as audio. Users can listen while commuting without engaging visually. *No competitor delivers this end-to-end. The code infrastructure is already there — this is a button and a trigger, not a new system.*
 
 ---
 
-## The Personalization Depth That None Have Achieved
+## The Personalization Depth — v26 Built vs. v27 Target
 
-| Dimension | Best Competitor Today | What MyNewsHub Should Build |
-|---|---|---|
-| Topic following | All major competitors | Per-category keyword weighting — "Texas energy > national energy" |
-| Source control | Feedly only | RSS-level source management with trust scores |
-| Geographic depth | None | Houston-local feeds + zip-code-level event integration |
-| Reading-pace awareness | None | Track which summaries users expand vs. dismiss; adjust depth |
-| Time-of-day adaptation | None | Finance at market open; sports scores post-games; pop culture evenings |
-| Cross-category connections | None | "This energy headline is moving this ticker you follow" |
-| Financial portfolio sync | None | Optional: enter holdings; surface news relevant to your positions |
-| Explicit feedback loop | Feedly Leo (partially) | "More like this / Less like this" on every card, updating weights in real time |
-| Transparency | None | "Intelligence Profile" page showing exactly what AI knows and why |
+| Dimension | Best Competitor Today | MyNewsHub v26 Status | v27 Target |
+|---|---|---|---|
+| Topic following | All major competitors | ✅ Per-category keywords, per-feed filtering | Explicit weight sliders per category |
+| Source control | Feedly only | ✅ RSS-level source management, add/remove any feed | Trust score display per source |
+| Geographic depth | None | ✅ Houston-local feeds built in as named category | Zip-code-level event integration |
+| Reading-pace awareness | None | 🔲 Not yet implemented | Track expand vs. dismiss; auto-adjust depth |
+| Time-of-day adaptation | None | 🔲 Not yet implemented | Finance at market open; sports post-game; pop culture evenings |
+| Cross-category connections | None | 🔲 Not yet implemented | "This energy headline is moving this ticker you follow" |
+| Financial portfolio sync | None | ✅ Watchlist (Yahoo Finance) — custom ticker list with price + delta | Alert layer when watchlist ticker appears in news |
+| Explicit feedback loop | Feedly Leo (partially) | 🔲 Not yet implemented | "More like this / Less like this" per card, updating weights in real time |
+| Transparency | None | 🔲 Not yet implemented | "Intelligence Profile" page showing exactly what AI knows and why |
+| Story deduplication | Google News (partial) | ✅ Bigram Jaccard ≥0.28, 6-hour window — built | "Covered by N sources" badge (v27 display layer) |
+| Provider attribution | None | ✅ Groq/Gemini/Claude badge per article — built and unique | None needed — already the only competitor with this |
+| Morning brief | None | ✅ 3-tier briefing tab: Top Brief / Key Points / Source Links | Audio version (one-tap TTS render) |
+| Breaking news banner | NBC / BBC | ✅ Solid crimson BREAKING banner confirmed in v26 | — |
+| Sports scoreboard | ESPN app only | ✅ Live ESPN integration in v26 | Cross-sport alert when your team score changes |
 
 ---
 
@@ -632,20 +639,27 @@ The podcast integration that exists in MyNewsHub is genuinely rare. The AI layer
 
 ## The Comprehensive Competitive Matrix
 
-| Capability | Google News | Feedly | Perplexity | Bloomberg | Artifact (RIP) | **MyNewsHub** |
-|---|---|---|---|---|---|---|
-| AI Summarization | Partial | Yes (paid) | Yes | No | Yes | **Yes (multi-provider)** |
-| RSS Aggregation | No | Yes | No | No | No | **Yes (50+ sources)** |
-| Financial Tickers | No | No | No | Yes | No | **Yes (Yahoo Finance)** |
-| Podcast Integration | No | No | No | No | No | **Yes** |
-| Keyword Filtering | No | Yes (paid) | No | Yes | No | **Yes (per-category)** |
-| Local News Depth | Partial | No | No | No | No | **Yes (Houston)** |
-| PWA / Cross-Platform | Partial | Partial | Yes | No | No | **Yes** |
-| Source Transparency | No | Yes | Yes | Yes | No | **Yes (with AI attribution)** |
-| Story Clustering | Partial | No | No | No | No | **Buildable** |
-| Morning Brief AI | No | No | No | No | No | **Yes** |
-| Free Tier | Yes | Limited | Yes | No | Free | **Yes** |
-| Consumer Design Quality | Medium | Low | High | Low | High | **High (target)** |
+*v26 = confirmed built. v27 = planned next build cycle.*
+
+| Capability | Google News | Feedly | Perplexity | Bloomberg | Artifact (RIP) | **MyNewsHub v26** | **v27 Add** |
+|---|---|---|---|---|---|---|---|
+| AI Summarization | Partial | Yes (paid) | Yes | No | Yes | **✅ Multi-provider** | Visible quality tiers |
+| RSS Aggregation | No | Yes | No | No | No | **✅ 50+ sources** | Source trust scores |
+| Financial Tickers | No | No | No | Yes | No | **✅ Yahoo Finance watchlist** | Portfolio alert layer |
+| Sports Scoreboard | No | No | No | No | No | **✅ ESPN live scores** | Score-change alerts |
+| Keyword Filtering | No | Yes (paid) | No | Yes | No | **✅ Per-category** | Explicit weight sliders |
+| Local News Depth | Partial | No | No | No | No | **✅ Houston-local feeds** | Zip-code events |
+| PWA / Cross-Platform | Partial | Partial | Yes | No | No | **✅ Full PWA** | Offline-first caching |
+| Provider Attribution | No | No | No | No | No | **✅ Groq/Gemini/Claude badge** | — |
+| Story Clustering | Partial | No | No | No | No | **✅ Bigram Jaccard** | "Covered by N sources" badge |
+| Morning Brief AI | No | No | No | No | No | **✅ 3-tier briefing** | Audio TTS version |
+| Breaking News Banner | Partial | No | No | No | No | **✅ Solid crimson banner** | Severity levels |
+| Free Tier | Yes | Limited | Yes | No | Free | **✅ Yes** | — |
+| Consumer Design Quality | Medium | Low | High | Low | High | **✅ High** | Density toggle, card accents |
+| Explicit Feedback Loop | No | Partial | No | No | No | **🔲 Not yet** | v27 core feature |
+| Intelligence Profile Page | No | No | No | No | No | **🔲 Not yet** | v27 core feature |
+| Time-of-Day Adaptation | No | No | No | No | No | **🔲 Not yet** | v27 behavioral layer |
+| Cloud Sync | No | Yes | No | No | No | **🔲 Stubbed (Supabase)** | v27 activation |
 
 ---
 
@@ -689,4 +703,103 @@ Unlike X (which penalizes external links) and Apple News (which traps users in-a
 
 ---
 
-*Synthesizes research across 22 products in 5 categories. Strategic recommendations are grounded in the current MyNewsHub technical architecture (multi-provider AI, RSS aggregation, Yahoo Finance integration, PWA, Houston-local feeds) and designed to identify the specific competitive white space this product can own.*
+# ACT V: v26 CODEBASE AUDIT — WHAT IS BUILT, WHAT COMES NEXT
+
+*Completed May 2026 via full codebase scan of MyNewsHub v26.*
+
+---
+
+## What v26 Already Beats Every Competitor On
+
+The codebase scan revealed that MyNewsHub v26 is significantly more capable than this document's earlier drafts assumed. The following capabilities are **confirmed built and shipping** — not planned:
+
+| Feature | Confirmed Implementation |
+|---|---|
+| Multi-provider AI chain | Groq (llama-3.3-70b, free) → Gemini (gemini-2.5-flash, free) → Claude (claude-sonnet-4-6, paid fallback) |
+| Provider attribution badge | `{summary, provider}` returned per article; displayed in UI |
+| Morning Briefing 3-tier | Top Brief (synthesis) / Key Points (bullets) / Source Links — dedicated tab |
+| Story clustering | Bigram Jaccard ≥0.28 similarity threshold, 6-hour deduplication window |
+| Breaking news banner | Solid crimson strip, high-contrast BREAKING label — matches NBC/BBC pattern |
+| Financial watchlist | Yahoo Finance via `/api/quote.js` — live price, delta, delta% per ticker |
+| Sports scoreboard | ESPN API integration — live game scores across sports |
+| Per-category keywords | Keyword filtering per category — user-defined signal boosting |
+| Dark mode color system | CSS custom properties: `#141210` bg, `#F2EDE8` text, `#D4A843` News amber, `#2DB87C` Finance emerald, `#B5601B` Energy copper — matches the ideal palette from Act IV exactly |
+| Playfair Display serif | Confirmed in typography system alongside Inter sans-serif |
+| Web Speech API (TTS) | Article reading via speech synthesis — infrastructure for audio brief |
+| localStorage v26 persistence | Version migration backward-compatible to v22 — no data loss on upgrade |
+| CORS proxy chain | Vercel → rss2json → allorigins → corsproxy fallback — handles any RSS source |
+| 9 tabs, 7 categories | News, Finance, Sports, Energy, Business, Pop Culture, Local — full coverage |
+| PWA | Progressive Web App — installable, mobile-first |
+
+**The bottom line**: MyNewsHub v26 already exceeds the feature capability of Feedly (free tier), Flipboard, SmartNews, Ground News, and Artifact — and matches or exceeds Google News on AI depth, source transparency, and financial data. The competitive gap vs. top-tier competitors (Perplexity, Bloomberg, BBC) is now only 4–6 specific features away, not a fundamental rebuild.
+
+---
+
+## v27 Build Priority — Sequenced by Effort/Impact
+
+These are the remaining gaps. They are all additive — nothing in v26 needs to be removed or restructured.
+
+### Tier 1 — Low Effort, High Impact (Build First)
+
+**1. Audio Morning Brief Button**
+- What: One-tap button on the Morning Briefing tab that renders the top brief text via Web Speech API
+- Why: TTS infrastructure already exists. This is a button + a function call. No new system required.
+- Competitive angle: No competitor delivers a personalized AI-generated audio morning brief. This feature is a first.
+
+**2. "Covered by N sources" Story Badge**
+- What: Display badge on clustered stories showing how many sources covered the same event
+- Why: Bigram Jaccard clustering is already running in v26. The data is there — only the UI badge is missing.
+- Competitive angle: Ground News built a business on source diversity signals. MyNewsHub has the data, just not the display.
+
+**3. BBC-Style Card Left-Accent Rule**
+- What: 3px vertical bar in category color on the left edge of each news card
+- Why: Pure CSS. Zero performance cost. Instantly communicates section context without a text label on every card.
+- Competitive angle: The single highest-value design pattern in the competitive landscape, per this analysis.
+
+### Tier 2 — Medium Effort, High Impact (Build Second)
+
+**4. Explicit Feedback Buttons**
+- What: "More like this" / "Less like this" thumbs on each article card
+- Why: Signals feed back into keyword weighting. Closes the personalization feedback loop no competitor has cracked.
+- Implementation note: localStorage-persisted preference profile is already the architecture — these buttons write to it.
+
+**5. Density Toggle**
+- What: Toggle between Scan Mode (compressed cards, headline + 1-sentence teaser) and Read Mode (full 3-bullet AI summaries visible without clicking)
+- Why: Different sessions call for different depth. Power users want scan mode for speed; deep-read sessions want summaries front and center.
+- Implementation note: Card component already renders both formats — this is a CSS class toggle driven by a single state variable.
+
+**6. Intelligence Profile Page**
+- What: A dedicated settings/transparency page showing: which keywords are active per category, which sources the user follows, which providers have been used, feedback history
+- Why: The transparency feature no competitor has shipped. Turns a black-box algorithm into a visible, editable system. Trust-builder.
+
+### Tier 3 — Medium-High Effort, High Long-Term Value (Build Third)
+
+**7. Time-of-Day Content Adaptation**
+- What: Feed surface order adapts by time: Finance prioritized at market open (9:30–10:30am ET), Sports scores prioritized post-game windows (evenings/weekends), Pop Culture bumped on evenings
+- Why: Context-aware relevance is the last personalization dimension no one has solved.
+
+**8. Supabase Cloud Sync Activation**
+- What: `cloudSync.js` is already stubbed with full Supabase architecture. Activation = wiring the event bus to real Supabase calls.
+- Why: Cross-device persistence, preference sync across sessions, foundation for Pro tier features.
+- Prerequisite: Supabase project + API keys (zero build work, configuration only).
+
+**9. "This ticker is in the news" Cross-Category Alert**
+- What: When a news article mentions a company or instrument on the user's watchlist, surface a subtle connection indicator on both the article card and the watchlist ticker
+- Why: Connects news events to financial positions in real time. No competitor has shipped this.
+
+---
+
+## The Gap That Now Defines the v27 Positioning
+
+MyNewsHub v26 is a genuinely competitive product. The v27 gap vs. every competitor in this analysis is not a foundational gap — it is a polish and intelligence-layer gap. The four features that, when shipped, will make MyNewsHub categorically better than anything available:
+
+1. **Explicit feedback loop** — teaches the AI what you care about
+2. **Intelligence Profile page** — shows you what the AI has learned
+3. **Audio morning brief** — delivers intelligence before you open the app
+4. **Cross-category connection alerts** — shows when news is moving your financial positions
+
+No single competitor has all four. Most have zero. This is the remaining whitespace.
+
+---
+
+*Synthesizes research across 22 products in 5 categories. v26 audit completed May 2026 via full codebase scan. Strategic recommendations grounded in confirmed v26 architecture: multi-provider AI chain, RSS aggregation, Yahoo Finance integration, ESPN sports, PWA, Houston-local feeds, bigram Jaccard clustering, Web Speech API, Supabase stub.*
