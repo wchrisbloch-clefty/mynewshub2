@@ -2237,6 +2237,26 @@ body:not(.dark) .pill-bar{
 .sport-tab.active{color:#6001d2;border-bottom-color:#6001d2;}
 .sport-tab-emoji{font-size:13px;}
 
+/* ── LEAGUE HEADER — ESPN/Yahoo Sports section banner ── */
+.sport-league-header{
+  display:flex;align-items:center;justify-content:space-between;
+  padding:14px 16px;margin:10px 0 16px 0;
+  background:linear-gradient(135deg,#1a1a2e 0%,#16213e 100%);
+  border-radius:10px;color:#fff;
+}
+.dark .sport-league-header{background:linear-gradient(135deg,#0d0d1a 0%,#0a0f1e 100%);}
+.sport-league-header-left{display:flex;align-items:center;gap:12px;}
+.sport-league-emoji{font-size:28px;line-height:1;}
+.sport-league-title{font-size:18px;font-weight:800;letter-spacing:-0.3px;margin:0 0 2px 0;color:#fff;}
+.sport-league-count{font-size:11px;color:rgba(255,255,255,0.55);font-weight:500;}
+.sport-league-all-btn{
+  font-size:12px;font-weight:600;color:rgba(255,255,255,0.7);
+  background:rgba(255,255,255,0.1);border:1px solid rgba(255,255,255,0.2);
+  border-radius:16px;padding:5px 12px;cursor:pointer;font-family:inherit;
+  transition:background 0.15s,color 0.15s;
+}
+.sport-league-all-btn:hover{background:rgba(255,255,255,0.2);color:#fff;}
+
 /* TEAM PILLS row */
 .team-pills-row{
   display:flex;align-items:center;gap:10px;
@@ -2751,11 +2771,15 @@ body:not(.dark) .pill-bar{
   text-transform:uppercase;letter-spacing:0.1em;
 }
 .briefing-inline-sources{
-  font-size:10px;color:var(--text3);font-weight:500;
-  margin: 0 0 14px 0;
-  letter-spacing:0.02em;
+  display:flex;flex-wrap:wrap;gap:6px;
+  margin:0 0 14px 0;
 }
-.briefing-inline-sources strong{color:var(--text2);font-weight:700;}
+.briefing-src-pill{
+  font-size:10px;font-weight:600;color:var(--text3);
+  background:var(--surface2);border:1px solid var(--border);
+  border-radius:12px;padding:3px 8px;
+  letter-spacing:0.02em;white-space:nowrap;
+}
 .briefing-inline-refresh{
   background:none;border:none;color:var(--text3);
   font-size:14px;cursor:pointer;padding:4px 8px;border-radius:6px;
@@ -3221,23 +3245,25 @@ body{overscroll-behavior-y:contain;}
   .bloom-strip-item{border-right:none;border-bottom:1px solid var(--border2);}
   .bloom-strip-item:last-child{border-bottom:none;}
 
-  /* FEED CARDS — mobile BBC: image top, big serif title below */
+  /* FEED CARDS — Yahoo News mobile: small left thumb + compact headline right */
   .fc{
-    padding:16px 0 16px 12px;
+    padding:12px 0 12px 10px;
     border-left-width:3px;
     margin-left:0;
   }
   .fc:hover{background:var(--surface2);border-left-color:var(--accent);}
   .fc:active{background:var(--surface2);}
-  .fc-body{flex-direction:column-reverse;gap:10px;}
-  .fc-thumb,.fc-thumb-ph{width:100%;height:150px;border-radius:var(--radius);}
-  .fc-title{font-size:16px;-webkit-line-clamp:3;letter-spacing:-0.1px;line-height:1.3;}
+  /* Horizontal layout: thumb left, text right — Yahoo News pattern */
+  .fc-body{flex-direction:row;gap:10px;align-items:flex-start;}
+  .fc-thumb,.fc-thumb-ph{width:88px;height:66px;flex-shrink:0;border-radius:6px;border-top-left-radius:0;border-bottom-left-radius:0;}
+  .fc-text{flex:1;min-width:0;}
+  .fc-title{font-size:14px;-webkit-line-clamp:3;letter-spacing:0;line-height:1.35;font-weight:600;}
   .fc-desc{display:none;}
-  .fc-meta{margin-bottom:8px;order:-1;}
-  .fc-act{padding:7px 11px;font-size:11px;min-height:40px;border-radius:20px;}
+  .fc-meta{margin-bottom:6px;order:-1;font-size:10px;}
+  .fc-act{padding:6px 10px;font-size:11px;min-height:36px;border-radius:18px;}
   .fc-mobile-more-btn{background:var(--surface2);color:var(--text2);}
-  .fc-actions{gap:5px;margin-top:8px;flex-wrap:wrap;}
-  .fc-read-link{font-size:11px;margin-left:auto;min-height:40px;display:flex;align-items:center;}
+  .fc-actions{gap:4px;margin-top:6px;flex-wrap:wrap;}
+  .fc-read-link{font-size:11px;margin-left:auto;min-height:36px;display:flex;align-items:center;}
 
   /* Morning briefing */
   .briefing{margin-bottom:16px;border-radius:var(--radius);}
@@ -3282,7 +3308,7 @@ body{overscroll-behavior-y:contain;}
 }
 
 @media (max-width:380px){
-  .fc-thumb,.fc-thumb-ph{height:130px;}
+  .fc-thumb,.fc-thumb-ph{width:72px;height:56px;}
   .hero-lead-title{font-size:17px;}
   .follow-card{min-width:160px;max-width:180px;}
   .trending-card{width:200px;}
@@ -3290,6 +3316,20 @@ body{overscroll-behavior-y:contain;}
 
 @media (hover:none){
   button,a,.src-row,.trend-row,.today-item,.fc,.pod-card{-webkit-tap-highlight-color:rgba(29,78,216,0.08);}
+}
+
+/* ── iPad / tablet (641px–1024px) ──────────────────────────────────────────── */
+@media (min-width:641px) and (max-width:1024px){
+  .page-grid{grid-template-columns:1fr;} /* single col on tablet, sidebar stacks below */
+  .home-hero-row{grid-template-columns:1fr;gap:16px;}
+  .home-hero-side{max-width:100%;}
+  .gn-grid{grid-template-columns:1fr 1fr;gap:16px;}
+  .gn-card-img,.gn-lead-img{height:180px;}
+  .fc-title{font-size:17px;}
+  .fc-thumb,.fc-thumb-ph{width:130px;height:98px;}
+  .sport-tabs{gap:6px;}
+  .sport-tab{padding:7px 12px;font-size:13px;}
+  .sidebar{display:none;} /* sidebar hidden on tablet, keeps layout clean */
 }
 
 /* ═══════════════════════════════════════════
@@ -4644,7 +4684,8 @@ Output ONLY the paragraph followed by the bullets. No headers, no labels, no clo
         </button>
       </div>
       <div className="briefing-inline-sources">
-        Sourced from <strong>{BRIEFING_PRIORITY_SOURCES.join(', ')}</strong> + per-category top headlines
+        <span className="briefing-src-pill">☕ {BRIEFING_PRIORITY_SOURCES.join(' · ')}</span>
+        <span className="briefing-src-pill">📰 Top headlines per category</span>
       </div>
       {body
         ? <p className="briefing-inline-body" dangerouslySetInnerHTML={{__html: body.replace(/\*\*([^*]+)\*\*/g,'<strong>$1</strong>')}}/>
@@ -4805,11 +4846,9 @@ OUTPUT: 3-sentence paragraph followed by exactly 3 bullets (- markers). No heade
       )}
       <div className="briefing-teaser-footer">
         <span className="briefing-teaser-sources">
-          Sourced from <strong>{BRIEFING_PRIORITY_SOURCES.join(' · ')}</strong> + per-category headlines
+          ☕ {BRIEFING_PRIORITY_SOURCES.join(' · ')}
         </span>
-        <button className="briefing-teaser-cta-link" onClick={onOpenFull}>
-          See sources →
-        </button>
+        <button className="briefing-teaser-cta-link" onClick={onOpenFull}>Full briefing →</button>
       </div>
     </section>
   );
@@ -5098,7 +5137,7 @@ function SourceFooter({cat, feeds, arts}) {
 }
 
 // ─── CUSTOMIZE PANEL ──────────────────────────────────────────────────────────
-const CAT_LABELS = {general:'🌐 General',sports:'🏆 Sports',business:'⚡ Business',finance:'📈 Markets',bloom:'🔋 Bloom',tech:'🤖 AI & Tech',popculture:'✨ Pop Culture',comedy:'😂 Comedy'};
+const CAT_LABELS = {general:'🌐 General',sports:'🏆 Sports',business:'⚡ Business',finance:'📈 Markets',bloom:'🔋 Energy',tech:'🤖 AI & Tech',popculture:'✨ Pop Culture',comedy:'😂 Comedy'};
 const PLAT_LABELS = {twitter:'𝕏',linkedin:'in',instagram:'IG',youtube:'▶'};
 
 function CustomizePanel({feeds, kw, alerts, urgent, social, watchlist, teams, health, arts, weatherCities, hiddenIndices, initialTab, initialCat, onClose, onSave}) {
@@ -5873,7 +5912,7 @@ function TopBar({tab, setTab, search, setSearch, dark, setDark,
 
   // v24a: Desktop nav per user: General · Business · Markets · Bloom · Sports · Pop Culture · Briefing · Podcasts · Saved
   const ALL_TABS = ['general','business','finance','bloom','tech','sports','popculture','briefing','podcasts','saved'];
-  const TAB_LABELS = {bloom:'Bloom Energy',finance:'Markets',tech:'AI & Tech',popculture:'Pop Culture',podcasts:'Podcasts',saved:'Saved',briefing:'Briefing'};
+  const TAB_LABELS = {bloom:'Energy',finance:'Markets',tech:'AI & Tech',popculture:'Pop Culture',podcasts:'Podcasts',saved:'Saved',briefing:'Briefing'};
   const TAB_CLASS  = {general:'t-general',sports:'t-sports',business:'t-business',finance:'t-finance',bloom:'t-bloom',tech:'t-tech',popculture:'t-popculture',podcasts:'t-podcasts'};
 
   // v24a Mobile chip bar per user: General · Business · Markets · Energy · Sports · Pop Culture
@@ -6384,11 +6423,11 @@ export default function App() {
         // Sport-tab filter: keep articles mentioning any team in this sport,
         // OR keep any article from sport-specific kw (broad fallback).
         const teamsInSport = visibleTeams.map(t => (t.match||'').toLowerCase());
-        const sportKws = sportTab === 'nfl'    ? ['nfl']
-                       : sportTab === 'nba'    ? ['nba']
-                       : sportTab === 'mlb'    ? ['mlb']
-                       : sportTab === 'cfb'    ? ['cfb','college football']
-                       : sportTab === 'cbb'    ? ['cbb','college basketball']
+        const sportKws = sportTab === 'nfl'    ? ['nfl','football','quarterback','touchdown','super bowl','running back','wide receiver','defensive end','nfc','afc','nfl draft']
+                       : sportTab === 'nba'    ? ['nba','basketball','lakers','celtics','warriors','knicks','heat','bulls','playoffs','nba draft','three-pointer','slam dunk']
+                       : sportTab === 'mlb'    ? ['mlb','baseball','world series','yankees','dodgers','cubs','home run','pitcher','bullpen','batting average','mlb draft']
+                       : sportTab === 'cfb'    ? ['cfb','college football','ncaa football','sec','big ten','acc','pac-12','big 12','cfp','bowl game','heisman']
+                       : sportTab === 'cbb'    ? ['cbb','college basketball','ncaa','march madness','final four','ncaa tournament','big east','sweet 16']
                        : sportTab === 'racing' ? ['horse racing','thoroughbred','derby','stakes','jockey','paddock','furlong','harness racing','horse race','breeders cup','kentucky derby','preakness','belmont']
                        : [];
         items = items.filter(a => {
@@ -6447,6 +6486,25 @@ export default function App() {
             </button>
           ))}
         </div>
+
+        {/* ── LEAGUE HEADER — ESPN/Yahoo Sports style section banner ── */}
+        {sportTab !== 'all' && (() => {
+          const lt = SPORT_TABS.find(st => st.key === sportTab);
+          return (
+            <div className="sport-league-header">
+              <div className="sport-league-header-left">
+                {lt?.emoji && <span className="sport-league-emoji">{lt.emoji}</span>}
+                <div>
+                  <h2 className="sport-league-title">{lt?.label} Top Stories</h2>
+                  <span className="sport-league-count">
+                    {sportItems.length > 0 ? `${sportItems.length} stories` : 'No stories yet — refresh to load'}
+                  </span>
+                </div>
+              </div>
+              <button className="sport-league-all-btn" onClick={()=>setSportTab('all')}>← All Sports</button>
+            </div>
+          );
+        })()}
 
         {/* ── ACTIVE FILTER NOTICE ── */}
         {activeTeam && (
@@ -6574,8 +6632,8 @@ export default function App() {
 
     return (
       <div className="page">
-        {/* Scores strip — top of every page, above hero/headline */}
-        {!activeKw && !activeSrc && !search && (
+        {/* Scores strip — General and Sports only; Sports has its own strip */}
+        {cat === 'general' && !activeKw && !activeSrc && !search && (
           <ActiveScoresBar scores={scores} onGoToSports={() => handleTabChange('sports')}/>
         )}
 
