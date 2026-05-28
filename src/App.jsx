@@ -45,6 +45,7 @@ const CATS = {
   business:   { label:'Business',     color:'#16a34a', bg:'#f0fdf4', emoji:'⚡' },
   finance:    { label:'Markets',      color:'#7c3aed', bg:'#f5f3ff', emoji:'📈' },
   bloom:      { label:'Energy',       color:'#0369a1', bg:'#e0f2fe', emoji:'🔋' },
+  tech:       { label:'AI & Tech',    color:'#6366f1', bg:'#eef2ff', emoji:'🤖' },
   popculture: { label:'Pop Culture',  color:'#db2777', bg:'#fdf2f8', emoji:'✨' },
   comedy:     { label:'Comedy',       color:'#a855f7', bg:'#faf5ff', emoji:'😂' },
 };
@@ -53,7 +54,7 @@ const CATS = {
 // Matches the mobile chip bar order so swiping feels like advancing the chips.
 // v24a: Swipe order matches the mobile chip bar order. Today is removed;
 // General is the home position so swipes start from there.
-const SWIPE_ORDER = ['general','business','finance','bloom','sports','popculture'];
+const SWIPE_ORDER = ['general','business','finance','bloom','tech','sports','popculture'];
 
 const TICKERS = [
   { sym:'BE',   label:'Bloom Energy', color:'#60a5fa' },
@@ -82,7 +83,8 @@ const DEFAULT_KW = {
   business:   ['energy','oil','gas','data center','ERCOT','LNG','power grid','onshoring','AI','infrastructure'],
   finance:    ['investing','real estate','stock market','interest rates','Fed','inflation','crypto','portfolio'],
   bloom:      ['Bloom Energy','fuel cell','hydrogen','microgrid','distributed power','data center','onshoring','industrial energy','utility','ERCOT'],
-  popculture: ['celebrity','movie','TV','streaming','Hollywood','pop','music','album','box office','viral','meme','red carpet'],
+  tech:       ['AI','artificial intelligence','OpenAI','Anthropic','Google','Apple','Microsoft','NVIDIA','semiconductor','startup','LLM','AGI','robotics','chip'],
+  popculture: ['celebrity','movie','TV','streaming','Hollywood','music','album','box office','Grammy','Billboard','viral','red carpet'],
   comedy:     ['satire','parody','humor','comedy'],
 };
 
@@ -125,6 +127,11 @@ const DEFAULT_FEEDS = {
     { name:'Kentucky Sports Radio',url:'https://kentuckysportsradio.com/feed/',                                 on:true },
     { name:'On3 Recruiting',       url:'https://www.on3.com/feed/',                                             on:true },
     { name:'The Spun',             url:'https://thespun.com/.rss/full/',                                        on:true },
+    { name:'Paulick Report',       url:'https://www.paulickreport.com/feed/',                                    on:true },
+    { name:'BloodHorse',           url:'https://www.bloodhorse.com/horse-racing/feed/',                          on:true },
+    { name:'Thoroughbred Daily News', url:'https://www.thoroughbreddailynews.com/feed/',                         on:true },
+    { name:'Horse Race Nation',    url:'https://horseracenation.com/feed/',                                      on:true },
+    { name:'Daily Racing Form',    url:'https://www.drf.com/news/rss/news',                                      on:false },
   ],
   business: [
     { name:'Reuters Business',       url:'https://feeds.reuters.com/reuters/businessNews',                      on:true },
@@ -169,6 +176,23 @@ const DEFAULT_FEEDS = {
     { name:'BuzzFeed Celebrity',url:'https://www.buzzfeed.com/celebrity.xml',                     on:true },
     { name:'Rolling Stone',     url:'https://www.rollingstone.com/feed/',                         on:true },
     { name:'Pitchfork',         url:'https://pitchfork.com/rss/news/',                            on:true },
+    { name:'Billboard',         url:'https://www.billboard.com/feed/',                            on:true },
+    { name:'Deadline',          url:'https://deadline.com/feed/',                                 on:true },
+    { name:'Screen Rant',       url:'https://screenrant.com/feed/',                               on:true },
+    { name:'NME',               url:'https://www.nme.com/feed/',                                  on:false },
+  ],
+  tech: [
+    { name:'TechCrunch',        url:'https://techcrunch.com/feed/',                               on:true },
+    { name:'The Verge',         url:'https://www.theverge.com/rss/index.xml',                     on:true },
+    { name:'Wired',             url:'https://www.wired.com/feed/rss',                             on:true },
+    { name:'Ars Technica',      url:'https://feeds.arstechnica.com/arstechnica/index',            on:true },
+    { name:'VentureBeat',       url:'https://venturebeat.com/feed/',                              on:true },
+    { name:'MIT Tech Review',   url:'https://www.technologyreview.com/feed/',                     on:true },
+    { name:'AI News',           url:'https://artificialintelligence-news.com/feed/',              on:true },
+    { name:'Hacker News',       url:'https://news.ycombinator.com/rss',                           on:true },
+    { name:'IEEE Spectrum',     url:'https://spectrum.ieee.org/feeds/feed.rss',                   on:true },
+    { name:'9to5Google',        url:'https://9to5google.com/feed/',                               on:false },
+    { name:'9to5Mac',           url:'https://9to5mac.com/feed/',                                  on:false },
   ],
   comedy: [
     { name:'The Babylon Bee', url:'https://babylonbee.com/feed',  on:true },
@@ -1118,6 +1142,7 @@ body:not(.dark) .pill-bar{
 .nav-tab.t-business.active{color:#1a6b2a;border-bottom-color:#1a6b2a;}
 .nav-tab.t-finance.active{color:#6d28d9;border-bottom-color:#6d28d9;}
 .nav-tab.t-bloom.active{color:#0369a1;border-bottom-color:#0369a1;}
+.nav-tab.t-tech.active{color:#6366f1;border-bottom-color:#6366f1;}
 .nav-tab.t-comedy.active{color:#7c3aed;border-bottom-color:#7c3aed;}
 .nav-tab.t-popculture.active{color:#be185d;border-bottom-color:#be185d;}
 .nav-tab.t-podcasts.active{color:#c41d25;border-bottom-color:#c41d25;}
@@ -3205,16 +3230,14 @@ body{overscroll-behavior-y:contain;}
   .fc:hover{background:var(--surface2);border-left-color:var(--accent);}
   .fc:active{background:var(--surface2);}
   .fc-body{flex-direction:column-reverse;gap:10px;}
-  .fc-thumb,.fc-thumb-ph{width:100%;height:190px;border-radius:var(--radius);}
-  /* Larger serif headline on mobile — BBC mobile card DNA */
-  .fc-title{
-    font-size:20px;-webkit-line-clamp:3;letter-spacing:-0.2px;line-height:1.25;
-  }
-  .fc-desc{display:none;} /* title carries the weight on mobile */
+  .fc-thumb,.fc-thumb-ph{width:100%;height:150px;border-radius:var(--radius);}
+  .fc-title{font-size:16px;-webkit-line-clamp:3;letter-spacing:-0.1px;line-height:1.3;}
+  .fc-desc{display:none;}
   .fc-meta{margin-bottom:8px;order:-1;}
-  .fc-act{padding:8px 13px;font-size:12px;min-height:44px;border-radius:20px;}
-  .fc-actions{gap:6px;margin-top:10px;}
-  .fc-read-link{font-size:11px;margin-left:auto;min-height:44px;display:flex;align-items:center;}
+  .fc-act{padding:7px 11px;font-size:11px;min-height:40px;border-radius:20px;}
+  .fc-mobile-more-btn{background:var(--surface2);color:var(--text2);}
+  .fc-actions{gap:5px;margin-top:8px;flex-wrap:wrap;}
+  .fc-read-link{font-size:11px;margin-left:auto;min-height:40px;display:flex;align-items:center;}
 
   /* Morning briefing */
   .briefing{margin-bottom:16px;border-radius:var(--radius);}
@@ -3259,7 +3282,7 @@ body{overscroll-behavior-y:contain;}
 }
 
 @media (max-width:380px){
-  .fc-thumb,.fc-thumb-ph{height:170px;}
+  .fc-thumb,.fc-thumb-ph{height:130px;}
   .hero-lead-title{font-size:17px;}
   .follow-card{min-width:160px;max-width:180px;}
   .trending-card{width:200px;}
@@ -4171,6 +4194,8 @@ function FeedCard({a, cat, isSaved, onSave, onRead, relatedSources, isRead, user
   const [showDisc, setShowDisc] = useState(false);
   const [disc, setDisc] = useState(null);
   const [loadingDisc, setLoadingDisc] = useState(false);
+  const [mobileActionsOpen, setMobileActionsOpen] = useState(false);
+  const isMobile = typeof window !== 'undefined' && window.innerWidth <= 640;
   const cc = CATS[cat]||CATS.general;
   const topKw = a.matchedKw?.[0]||null;
   const paywall = isPaywalled(a.link);
@@ -4357,22 +4382,48 @@ function FeedCard({a, cat, isSaved, onSave, onRead, relatedSources, isRead, user
         <button className={`fc-act ${isSaved?'saved':''}`} onClick={e=>{e.stopPropagation();onSave(a);}}>
           {isSaved?'★ Saved':'☆ Save'}
         </button>
-        <button className={`fc-act ${aiState!=='closed'?'ai-on':''}`} onClick={handleAI} disabled={loadingAI}>
-          ✦ {loadingAI?'Thinking...':aiState==='closed'?'AI Summary':'Hide AI'}
-        </button>
-        <button className={`fc-act ${showDisc?'disc-on':''}`} onClick={handleDisc} disabled={loadingDisc}>
-          💬 {loadingDisc?'Searching...':showDisc?'Hide':'Pulse'}
-        </button>
-        <button className={`fc-act ${showExplain?'explain-on':''}`} onClick={handleExplain} disabled={loadingExplain}>
-          🧠 {loadingExplain?'Analyzing…':showExplain?'Hide':'Explain'}
-        </button>
-        {navigator.share !== undefined && (
-          <button className="fc-act" onClick={handleShare} title="Share article">
-            ↗ Share
-          </button>
+        {isMobile ? (
+          <>
+            <button className="fc-act fc-mobile-more-btn" onClick={e=>{e.stopPropagation();setMobileActionsOpen(o=>!o);}}>
+              {mobileActionsOpen ? '✕ Less' : '⋯ More'}
+            </button>
+            {mobileActionsOpen && (
+              <>
+                <button className={`fc-act ${aiState!=='closed'?'ai-on':''}`} onClick={handleAI} disabled={loadingAI}>
+                  ✦ {loadingAI?'Thinking...':aiState==='closed'?'AI Summary':'Hide AI'}
+                </button>
+                <button className={`fc-act ${showDisc?'disc-on':''}`} onClick={handleDisc} disabled={loadingDisc}>
+                  💬 {loadingDisc?'Searching...':showDisc?'Hide':'Pulse'}
+                </button>
+                <button className={`fc-act ${showExplain?'explain-on':''}`} onClick={handleExplain} disabled={loadingExplain}>
+                  🧠 {loadingExplain?'Analyzing…':showExplain?'Hide':'Explain'}
+                </button>
+                {navigator.share !== undefined && (
+                  <button className="fc-act" onClick={handleShare} title="Share article">↗ Share</button>
+                )}
+                <AudioListen text={`${a.title}. ${a.desc || ''}`} title={null} />
+              </>
+            )}
+          </>
+        ) : (
+          <>
+            <button className={`fc-act ${aiState!=='closed'?'ai-on':''}`} onClick={handleAI} disabled={loadingAI}>
+              ✦ {loadingAI?'Thinking...':aiState==='closed'?'AI Summary':'Hide AI'}
+            </button>
+            <button className={`fc-act ${showDisc?'disc-on':''}`} onClick={handleDisc} disabled={loadingDisc}>
+              💬 {loadingDisc?'Searching...':showDisc?'Hide':'Pulse'}
+            </button>
+            <button className={`fc-act ${showExplain?'explain-on':''}`} onClick={handleExplain} disabled={loadingExplain}>
+              🧠 {loadingExplain?'Analyzing…':showExplain?'Hide':'Explain'}
+            </button>
+            {navigator.share !== undefined && (
+              <button className="fc-act" onClick={handleShare} title="Share article">
+                ↗ Share
+              </button>
+            )}
+            <AudioListen text={`${a.title}. ${a.desc || ''}`} title={null} />
+          </>
         )}
-        {/* Listen: Web Speech TTS — Australian Siri voice when available */}
-        <AudioListen text={`${a.title}. ${a.desc || ''}`} title={null} />
         <a className="fc-read-link" href={a.link} target="_blank" rel="noreferrer" onClick={e=>{e.stopPropagation();onRead(a);}}>
           {readMins ? `${readMins} min · ` : ''}Read →
         </a>
@@ -5047,7 +5098,7 @@ function SourceFooter({cat, feeds, arts}) {
 }
 
 // ─── CUSTOMIZE PANEL ──────────────────────────────────────────────────────────
-const CAT_LABELS = {general:'🌐 General',sports:'🏆 Sports',business:'⚡ Business',finance:'📈 Markets',bloom:'🔋 Bloom',popculture:'✨ Pop Culture',comedy:'😂 Comedy'};
+const CAT_LABELS = {general:'🌐 General',sports:'🏆 Sports',business:'⚡ Business',finance:'📈 Markets',bloom:'🔋 Bloom',tech:'🤖 AI & Tech',popculture:'✨ Pop Culture',comedy:'😂 Comedy'};
 const PLAT_LABELS = {twitter:'𝕏',linkedin:'in',instagram:'IG',youtube:'▶'};
 
 function CustomizePanel({feeds, kw, alerts, urgent, social, watchlist, teams, health, arts, weatherCities, hiddenIndices, initialTab, initialCat, onClose, onSave}) {
@@ -5821,9 +5872,9 @@ function TopBar({tab, setTab, search, setSearch, dark, setDark,
   const tickerItems = hasBreaking?[...breakingItems,...breakingItems]:[];
 
   // v24a: Desktop nav per user: General · Business · Markets · Bloom · Sports · Pop Culture · Briefing · Podcasts · Saved
-  const ALL_TABS = ['general','business','finance','bloom','sports','popculture','briefing','podcasts','saved'];
-  const TAB_LABELS = {bloom:'Bloom Energy',finance:'Markets',popculture:'Pop Culture',podcasts:'Podcasts',saved:'Saved',briefing:'Briefing'};
-  const TAB_CLASS  = {general:'t-general',sports:'t-sports',business:'t-business',finance:'t-finance',bloom:'t-bloom',popculture:'t-popculture',podcasts:'t-podcasts'};
+  const ALL_TABS = ['general','business','finance','bloom','tech','sports','popculture','briefing','podcasts','saved'];
+  const TAB_LABELS = {bloom:'Bloom Energy',finance:'Markets',tech:'AI & Tech',popculture:'Pop Culture',podcasts:'Podcasts',saved:'Saved',briefing:'Briefing'};
+  const TAB_CLASS  = {general:'t-general',sports:'t-sports',business:'t-business',finance:'t-finance',bloom:'t-bloom',tech:'t-tech',popculture:'t-popculture',podcasts:'t-podcasts'};
 
   // v24a Mobile chip bar per user: General · Business · Markets · Energy · Sports · Pop Culture
   // Briefing lives in the More menu; surfaced via teaser on General page.
@@ -5832,6 +5883,7 @@ function TopBar({tab, setTab, search, setSearch, dark, setDark,
     { key:'business',   label:'Business',   color:CATS.business.color },
     { key:'finance',    label:'Markets',    color:CATS.finance.color },
     { key:'bloom',      label:'Energy',     color:CATS.bloom.color },
+    { key:'tech',       label:'AI & Tech',  color:CATS.tech.color },
     { key:'sports',     label:'Sports',     color:CATS.sports.color },
     { key:'popculture', label:'Pop Culture',color:CATS.popculture.color },
   ];
@@ -6016,8 +6068,8 @@ export default function App() {
   const [marketData, setMarketData] = useState({});
   const [marketLoading, setMarketLoading] = useState(false);
   const [social, setSocial]     = useState(()=>ld('social',DEFAULT_SOCIAL));
-  const [arts, setArts]         = useState({general:[],sports:[],business:[],finance:[],bloom:[],popculture:[],comedy:[]});
-  const [loading, setLoading]   = useState({general:false,sports:false,business:false,finance:false,bloom:false,popculture:false,comedy:false});
+  const [arts, setArts]         = useState({general:[],sports:[],business:[],finance:[],bloom:[],tech:[],popculture:[],comedy:[]});
+  const [loading, setLoading]   = useState({general:false,sports:false,business:false,finance:false,bloom:false,tech:false,popculture:false,comedy:false});
   const [health, setHealth]     = useState({});
   const [podEps, setPodEps]     = useState({});
   const [podLoading, setPodLoading] = useState({});
@@ -6289,7 +6341,7 @@ export default function App() {
     return { total, topSources, topCats };
   }, [clicks, readLinks, arts]);
 
-  const NEWS_CATS = ['general','sports','business','bloom','popculture','comedy'];
+  const NEWS_CATS = ['general','sports','business','bloom','tech','popculture','comedy'];
 
   // ─── FEED PAGE ─────────────────────────────────────────────────────────
   // ─── SPORTS PAGE (v23) — Yahoo Sports rebuild ──────────────────────────
@@ -6332,11 +6384,12 @@ export default function App() {
         // Sport-tab filter: keep articles mentioning any team in this sport,
         // OR keep any article from sport-specific kw (broad fallback).
         const teamsInSport = visibleTeams.map(t => (t.match||'').toLowerCase());
-        const sportKws = sportTab === 'nfl' ? ['nfl']
-                       : sportTab === 'nba' ? ['nba']
-                       : sportTab === 'mlb' ? ['mlb']
-                       : sportTab === 'cfb' ? ['cfb','college football']
-                       : sportTab === 'cbb' ? ['cbb','college basketball']
+        const sportKws = sportTab === 'nfl'    ? ['nfl']
+                       : sportTab === 'nba'    ? ['nba']
+                       : sportTab === 'mlb'    ? ['mlb']
+                       : sportTab === 'cfb'    ? ['cfb','college football']
+                       : sportTab === 'cbb'    ? ['cbb','college basketball']
+                       : sportTab === 'racing' ? ['horse racing','thoroughbred','derby','stakes','jockey','paddock','furlong','harness racing','horse race','breeders cup','kentucky derby','preakness','belmont']
                        : [];
         items = items.filter(a => {
           const t = (a.title + ' ' + (a.desc||'')).toLowerCase();
@@ -6363,12 +6416,13 @@ export default function App() {
     const feedItems = lead ? sportItems.filter(a => a.link !== lead.link) : sportItems;
 
     const SPORT_TABS = [
-      { key:'all', label:'All' },
-      { key:'nfl', label:'NFL', emoji:'🏈' },
-      { key:'nba', label:'NBA', emoji:'🏀' },
-      { key:'mlb', label:'MLB', emoji:'⚾' },
-      { key:'cfb', label:'College FB', emoji:'🏈' },
-      { key:'cbb', label:'College BB', emoji:'🏀' },
+      { key:'all',    label:'All' },
+      { key:'nfl',    label:'NFL',         emoji:'🏈' },
+      { key:'nba',    label:'NBA',         emoji:'🏀' },
+      { key:'mlb',    label:'MLB',         emoji:'⚾' },
+      { key:'cfb',    label:'College FB',  emoji:'🏈' },
+      { key:'cbb',    label:'College BB',  emoji:'🏀' },
+      { key:'racing', label:'Horse Racing',emoji:'🏇' },
     ];
 
     return (
@@ -6393,39 +6447,6 @@ export default function App() {
             </button>
           ))}
         </div>
-
-        {/* ── FAVORITE TEAM PILLS — pill is feed filter, side links go external ── */}
-        {visibleTeams.length > 0 && (
-          <div className="team-pills-row">
-            <span className="team-pills-label">My Teams</span>
-            <div className="team-pills">
-              {visibleTeams.map(t => {
-                const isActive = activeTeam?.team === t.team;
-                return (
-                  <span key={t.team} className={`team-pill-group ${isActive?'active':''}`}>
-                    <button className="team-pill"
-                      onClick={()=>setActiveTeam(isActive ? null : t)}
-                      title={`Filter to ${t.team}`}>
-                      <span className="team-pill-emoji">{t.emoji}</span>
-                      <span className="team-pill-name">{t.team}</span>
-                    </button>
-                    {t.espnUrl && (
-                      <a className="team-pill-link" href={t.espnUrl} target="_blank" rel="noreferrer" title="Open on ESPN">
-                        ESPN
-                      </a>
-                    )}
-                    {t.teamUrl && (
-                      <a className="team-pill-link" href={t.teamUrl} target="_blank" rel="noreferrer" title="Open team site">
-                        Team
-                      </a>
-                    )}
-                  </span>
-                );
-              })}
-              <button className="team-pills-edit" onClick={()=>openCustomize('teams','sports')}>⚙ Edit</button>
-            </div>
-          </div>
-        )}
 
         {/* ── ACTIVE FILTER NOTICE ── */}
         {activeTeam && (
@@ -6495,6 +6516,35 @@ export default function App() {
             onRead={onRead} scores={scores} scoresLoading={scoresLoading}
             showScoreboard={false}/>
         </div>
+
+        {/* ── MY TEAMS — moved to bottom per ESPN/Yahoo Sports pattern ── */}
+        {visibleTeams.length > 0 && (
+          <div className="team-pills-row" style={{marginTop:'28px',paddingTop:'20px',borderTop:'1px solid var(--border)'}}>
+            <span className="team-pills-label">⭐ My Teams</span>
+            <div className="team-pills">
+              {visibleTeams.map(t => {
+                const isActive = activeTeam?.team === t.team;
+                return (
+                  <span key={t.team} className={`team-pill-group ${isActive?'active':''}`}>
+                    <button className="team-pill"
+                      onClick={()=>setActiveTeam(isActive ? null : t)}
+                      title={`Filter to ${t.team}`}>
+                      <span className="team-pill-emoji">{t.emoji}</span>
+                      <span className="team-pill-name">{t.team}</span>
+                    </button>
+                    {t.espnUrl && (
+                      <a className="team-pill-link" href={t.espnUrl} target="_blank" rel="noreferrer" title="Open on ESPN">ESPN</a>
+                    )}
+                    {t.teamUrl && (
+                      <a className="team-pill-link" href={t.teamUrl} target="_blank" rel="noreferrer" title="Open team site">Team</a>
+                    )}
+                  </span>
+                );
+              })}
+              <button className="team-pills-edit" onClick={()=>openCustomize('teams','sports')}>⚙ Edit</button>
+            </div>
+          </div>
+        )}
       </div>
     );
   };
