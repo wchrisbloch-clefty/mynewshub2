@@ -1342,6 +1342,54 @@ body:not(.dark) .pill-bar{
 .kw-chip:hover{opacity:0.75;}
 .kw-chip.active{border-color:currentColor;}
 
+/* ── Redesigned sidebar sections ─────────────────────────────── */
+.sidebar-section{display:flex;flex-direction:column;gap:0;}
+.sidebar-sec-head{
+  display:flex;align-items:center;justify-content:space-between;
+  padding-bottom:9px;border-bottom:2px solid var(--border);margin-bottom:12px;
+}
+.sidebar-sec-label{
+  font-size:9px;font-weight:800;color:var(--text3);
+  text-transform:uppercase;letter-spacing:0.12em;
+}
+.sidebar-sec-action{
+  background:none;border:none;color:var(--accent);cursor:pointer;
+  font-size:10px;font-weight:600;font-family:inherit;padding:0;
+}
+.sidebar-sec-action:hover{text-decoration:underline;}
+.sidebar-sec-collapse{
+  background:none;border:none;cursor:pointer;font-family:inherit;padding:0;
+  display:flex;align-items:center;gap:6px;flex:1;text-align:left;
+}
+
+/* Today's Topics chips */
+.ttp-chips{display:flex;flex-wrap:wrap;gap:5px;}
+.ttp-chip{
+  display:inline-flex;align-items:center;gap:4px;
+  font-size:11px;font-weight:600;padding:5px 11px;border-radius:20px;
+  border:1px solid var(--border);background:var(--surface2);color:var(--text2);
+  cursor:pointer;transition:all 0.14s;white-space:nowrap;
+}
+.ttp-chip:hover{border-color:var(--accent);color:var(--accent);background:var(--surface);}
+.ttp-chip.active{color:#fff !important;border-color:transparent !important;}
+.ttp-chip.saved{border-style:dashed;}
+.ttp-count{font-size:9px;font-weight:700;opacity:0.6;}
+
+/* Sources pill grid */
+.src-pills{display:flex;flex-wrap:wrap;gap:5px;}
+.src-pill{
+  display:inline-flex;align-items:center;gap:5px;
+  font-size:11px;font-weight:500;padding:4px 10px;border-radius:20px;
+  border:1px solid var(--border);background:var(--surface2);color:var(--text2);
+  cursor:pointer;transition:all 0.14s;white-space:nowrap;font-family:inherit;
+}
+.src-pill:hover{border-color:var(--accent);color:var(--text);}
+.src-pill.active{background:var(--accent);color:#fff;border-color:var(--accent);}
+.src-pill-dot{width:5px;height:5px;border-radius:50%;flex-shrink:0;}
+.src-pill-count{font-size:9px;font-weight:700;opacity:0.55;}
+.src-show-more{background:none;border:none;color:var(--text3);font-size:10px;cursor:pointer;padding:6px 2px 2px;font-family:inherit;}
+.src-show-more:hover{color:var(--text);}
+
 /* Trend list — v18: Ghost, no dividers */
 .trend-row{
   display:flex;align-items:flex-start;gap:12px;
@@ -4806,21 +4854,38 @@ function Sidebar({cat, arts, kw, health, activeKw, setActiveKw, activeSource, se
   catArts.forEach(a=>{srcCounts[a.source]=(srcCounts[a.source]||0)+1;});
   const sources = [...new Set(catArts.map(a=>a.source))];
 
-  // v22: Topics + Sources collapse to keep Trending/Latest above the fold.
-  // Auto-expand when a filter is active so user can see what's filtering.
-  const [showTopics, setShowTopics] = useState(false);
   const [showSources, setShowSources] = useState(false);
-  useEffect(() => { if (activeKw) setShowTopics(true); }, [activeKw]);
+  const [showAllSrcs, setShowAllSrcs] = useState(false);
   useEffect(() => { if (activeSource) setShowSources(true); }, [activeSource]);
 
-  // v26: Sidebar trending now respects activeKw + activeSource filters
-  // so clicking a topic chip actually filters the trending list too.
+  // Trending list respects active filters
   const sbItems = useMemo(() => {
     let items = catArts;
-    if (activeKw) items = items.filter(a => (a.title + ' ' + (a.desc||'')).toLowerCase().includes(activeKw.toLowerCase()));
+    if (activeKw) items = items.filter(a => (a.title+' '+(a.desc||'')).toLowerCase().includes(activeKw.toLowerCase()));
     if (activeSource) items = items.filter(a => a.source === activeSource);
     return items.slice(0, 8).map(a => ({...a, _cat: cat}));
   }, [catArts, cat, activeKw, activeSource]);
+
+  // Today's Topics: merge user keywords + auto-derived trending topics with counts
+  const topicItems = useMemo(() => {
+    const autoTopics = getTrendingTopics(catArts, 14);
+    const allLabels = [...new Set([...catKws, ...autoTopics])];
+    return allLabels.map(t => ({
+      label: t,
+      count: catArts.filter(a => (a.title+' '+(a.desc||'')).toLowerCase().includes(t.toLowerCase())).length,
+      isSaved: catKws.includes(t),
+    })).filter(t => t.count > 0).sort((a,b) => b.count - a.count).slice(0, 16);
+  }, [catArts, catKws]);
+
+  const visibleSrcs = showAllSrcs ? sources : sources.slice(0, 10);
+
+  const handleTopicClick = (label) => {
+    setActiveKw(activeKw === label ? null : label);
+    setTimeout(() => {
+      const feed = document.querySelector('.feed-col');
+      if (feed) feed.scrollIntoView({behavior:'smooth', block:'start'});
+    }, 50);
+  };
 
   return (
     <div className="sidebar">
@@ -4833,79 +4898,84 @@ function Sidebar({cat, arts, kw, health, activeKw, setActiveKw, activeSource, se
 
       {showScoreboard && <Scoreboard scores={scores} loading={scoresLoading}/>}
 
-      {/* v26: single trending column — label updates when filter active */}
-      <div className="gs-section">
-        <div className="gs-label" style={{color:cc.color}}>
-          🔥 {activeKw ? `${activeKw} in ${cc.label}` : activeSource ? `${activeSource}` : `Trending in ${cc.label}`}
+      {/* Trending headlines */}
+      <div className="sidebar-section">
+        <div className="sidebar-sec-head">
+          <span className="sidebar-sec-label">
+            {activeKw ? `🔍 ${activeKw}` : activeSource ? `📰 ${activeSource}` : `🔥 Trending in ${cc.label}`}
+          </span>
         </div>
         {sbItems.length === 0
-          ? <div style={{padding:'14px 0',fontSize:'11px',color:'var(--text3)'}}>No stories yet</div>
+          ? <div style={{padding:'10px 0',fontSize:'11px',color:'var(--text3)'}}>No stories yet</div>
           : sbItems.map((a, i) => (
               <div key={i} className="trend-row" onClick={()=>onRead(a)}>
                 <div className="trend-num">{i+1}</div>
                 <div className="trend-body">
                   <div className="trend-title">{a.title}</div>
-                  <div className="trend-src">
-                    {a.source} · {fmtDate(a.pubDate)}
-                  </div>
+                  <div className="trend-src">{a.source} · {fmtDate(a.pubDate)}</div>
                 </div>
               </div>
             ))
         }
       </div>
 
-      {catKws.length > 0 && (
-        <div className="gs-section">
-          <div className="gs-label">
-            <button className="gs-collapse-btn" onClick={()=>setShowTopics(s=>!s)}>
-              <span>Topics{activeKw?` · ${activeKw}`:''}</span>
-              <span className="gs-collapse-chevron">{showTopics?'▾':'▸'}</span>
-            </button>
-            {activeKw && showTopics && <button className="gs-clear" onClick={()=>setActiveKw(null)}>Clear</button>}
+      {/* Today's Topics Panel — always visible, auto-derived + user keywords */}
+      {topicItems.length > 0 && (
+        <div className="sidebar-section">
+          <div className="sidebar-sec-head">
+            <span className="sidebar-sec-label">Today's Topics</span>
+            {activeKw && <button className="sidebar-sec-action" onClick={()=>setActiveKw(null)}>Clear</button>}
           </div>
-          {showTopics && (
-            <div className="kw-chips">
-              {catKws.map((k,i)=>(
-                <span key={i}
-                  className={`kw-chip ${activeKw===k?'active':''}`}
-                  style={{background:cc.bg,color:cc.color}}
-                  onClick={()=>{
-                    setActiveKw(activeKw===k?null:k);
-                    // v22: scroll feed into view so user can SEE the filter applied.
-                    // The chip lighting up alone gave no visible feedback.
-                    setTimeout(()=>{
-                      const feed = document.querySelector('.feed-col');
-                      if (feed) feed.scrollIntoView({behavior:'smooth', block:'start'});
-                    }, 50);
-                  }}>
-                  {k}
-                </span>
-              ))}
-            </div>
-          )}
+          <div className="ttp-chips">
+            {topicItems.map((t, i) => (
+              <span key={i}
+                className={`ttp-chip${activeKw===t.label?' active':''}${t.isSaved?' saved':''}`}
+                style={activeKw===t.label ? {background:cc.color} : {}}
+                onClick={()=>handleTopicClick(t.label)}>
+                {t.label}
+                <span className="ttp-count">{t.count}</span>
+              </span>
+            ))}
+          </div>
         </div>
       )}
 
+      {/* Sources — collapsible pill grid */}
       {sources.length > 0 && (
-        <div className="gs-section">
-          <div className="gs-label">
-            <button className="gs-collapse-btn" onClick={()=>setShowSources(s=>!s)}>
-              <span>Sources{activeSource?` · ${activeSource}`:` · ${sources.length}`}</span>
-              <span className="gs-collapse-chevron">{showSources?'▾':'▸'}</span>
+        <div className="sidebar-section">
+          <div className="sidebar-sec-head">
+            <button className="sidebar-sec-collapse" onClick={()=>setShowSources(s=>!s)}>
+              <span className="sidebar-sec-label">
+                {activeSource ? `Source: ${activeSource}` : `Sources · ${sources.length}`}
+              </span>
+              <span className="gs-collapse-chevron" style={{fontSize:'10px',color:'var(--text4)'}}>{showSources?'▾':'▸'}</span>
             </button>
-            {activeSource && showSources && <button className="gs-clear" onClick={()=>setActiveSource(null)}>Clear</button>}
+            {activeSource && showSources && <button className="sidebar-sec-action" onClick={()=>setActiveSource(null)}>Clear</button>}
           </div>
-          {showSources && sources.map((name,i)=>{
-            const h=health[name];
-            const cls=h==='green'?'h-green':h==='yellow'?'h-yellow':h==='red'?'h-red':'h-gray';
-            return (
-              <div key={i} className={`src-row ${activeSource===name?'active-src':''}`} onClick={()=>setActiveSource(activeSource===name?null:name)}>
-                <span className={`health-dot ${cls}`} title={h||'Pending'}/>
-                <span className="src-name" style={{fontWeight:activeSource===name?700:500, color:activeSource===name?cc.color:''}}>{name}</span>
-                <span className="src-count">{srcCounts[name]||0}</span>
+          {showSources && (
+            <>
+              <div className="src-pills">
+                {visibleSrcs.map((name,i)=>{
+                  const h=health[name];
+                  const dotCls=h==='green'?'h-green':h==='yellow'?'h-yellow':h==='red'?'h-red':'h-gray';
+                  return (
+                    <button key={i}
+                      className={`src-pill${activeSource===name?' active':''}`}
+                      onClick={()=>setActiveSource(activeSource===name?null:name)}>
+                      <span className={`src-pill-dot ${dotCls}`}/>
+                      {name}
+                      <span className="src-pill-count">{srcCounts[name]||0}</span>
+                    </button>
+                  );
+                })}
               </div>
-            );
-          })}
+              {sources.length > 10 && (
+                <button className="src-show-more" onClick={()=>setShowAllSrcs(s=>!s)}>
+                  {showAllSrcs ? 'Show less ▴' : `+${sources.length-10} more ▾`}
+                </button>
+              )}
+            </>
+          )}
         </div>
       )}
     </div>
