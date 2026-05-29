@@ -1177,7 +1177,7 @@ body:not(.dark) .pill-bar{
    PAGE SHELL
 ═══════════════════════════════════════════ */
 .page{max-width:1400px;margin:0 auto;padding:28px 24px;}
-.page-grid{display:grid;grid-template-columns:1fr 288px;gap:48px;align-items:start;}
+.page-grid{display:grid;grid-template-columns:1fr 320px;gap:32px;align-items:start;}
 .feed-col{display:flex;flex-direction:column;gap:0;}
 
 /* Page header row: label + customize button */
@@ -3212,13 +3212,13 @@ body{overscroll-behavior-y:contain;}
   .pill-chg{font-size:9px;padding:1px 5px;}
 
   body{padding-bottom:calc(58px + env(safe-area-inset-bottom, 0));}
-  .page{padding:12px 12px 20px;}
+  .page{padding:14px 14px 24px;}
 
   /* Hero — full-bleed on mobile for maximum impact */
   .hero-row{grid-template-columns:1fr;gap:12px;margin:-12px -12px 16px;}
   .hero-lead{border-radius:0;border-left:none;border-right:none;box-shadow:none;}
   .hero-lead:hover{box-shadow:none;transform:none;}
-  .hero-lead-img{aspect-ratio:16/10;max-height:220px;}
+  .hero-lead-img{aspect-ratio:16/9;max-height:200px;}
   .hero-lead-text{padding:14px 14px 16px;}
   /* Smaller but still serif on mobile — BBC pattern */
   .hero-lead-title{font-size:21px;letter-spacing:-0.2px;-webkit-line-clamp:3;}
@@ -3250,30 +3250,30 @@ body{overscroll-behavior-y:contain;}
 
   /* FEED CARDS — Yahoo News mobile: small left thumb + compact headline right */
   .fc{
-    padding:12px 0 12px 10px;
+    padding:13px 0 13px 12px;
     border-left-width:3px;
     margin-left:0;
   }
   .fc:hover{background:var(--surface2);border-left-color:var(--accent);}
   .fc:active{background:var(--surface2);}
   /* Horizontal layout: thumb left, text right — Yahoo News pattern */
-  .fc-body{flex-direction:row;gap:10px;align-items:flex-start;}
-  .fc-thumb,.fc-thumb-ph{width:88px;height:66px;flex-shrink:0;border-radius:6px;border-top-left-radius:0;border-bottom-left-radius:0;}
+  .fc-body{flex-direction:row;gap:8px;align-items:flex-start;}
+  .fc-thumb,.fc-thumb-ph{width:90px;height:68px;flex-shrink:0;border-radius:6px;}
   .fc-text{flex:1;min-width:0;}
-  .fc-title{font-size:14px;-webkit-line-clamp:3;letter-spacing:0;line-height:1.35;font-weight:600;}
+  .fc-title{font-size:15px;-webkit-line-clamp:3;letter-spacing:0;line-height:1.3;font-weight:700;}
   .fc-desc{display:none;}
-  .fc-meta{margin-bottom:6px;order:-1;font-size:10px;}
+  .fc-meta{margin-bottom:5px;order:-1;font-size:10px;}
   .fc-act{padding:6px 10px;font-size:11px;min-height:36px;border-radius:18px;}
   .fc-mobile-more-btn{background:var(--surface2);color:var(--text2);}
   .fc-actions{gap:4px;margin-top:6px;flex-wrap:wrap;}
   .fc-read-link{font-size:11px;margin-left:auto;min-height:36px;display:flex;align-items:center;}
 
   /* Morning briefing */
-  .briefing{margin-bottom:16px;border-radius:var(--radius);}
-  .briefing-head{padding:11px 14px 9px;}
-  .briefing-title{font-size:14px;}
-  .briefing-body{padding:11px 14px 13px;}
-  .briefing-overview{font-size:13px;line-height:1.65;}
+  .briefing{margin-bottom:18px;border-radius:var(--radius);}
+  .briefing-head{padding:13px 16px 11px;}
+  .briefing-title{font-size:15px;}
+  .briefing-body{padding:13px 16px 15px;}
+  .briefing-overview{font-size:13px;line-height:1.7;}
 
   .today-main{gap:12px;}
   .today-grid{gap:10px;}
@@ -3287,7 +3287,7 @@ body{overscroll-behavior-y:contain;}
   .social-page-header{flex-direction:column;align-items:stretch;}
   .sb-games{padding:4px 6px 8px;}
   .sb-league-head{padding:10px 12px;min-height:44px;}
-  .sidebar{gap:20px;margin-top:20px;}
+  .sidebar{display:none;} /* sidebar hidden on mobile — content only */
 
   .pod-page{gap:20px;}
   .pod-card{padding:12px;}
@@ -3311,7 +3311,8 @@ body{overscroll-behavior-y:contain;}
 }
 
 @media (max-width:380px){
-  .fc-thumb,.fc-thumb-ph{width:72px;height:56px;}
+  .fc-thumb,.fc-thumb-ph{width:78px;height:60px;}
+  .fc-title{font-size:14px;}
   .hero-lead-title{font-size:17px;}
   .follow-card{min-width:160px;max-width:180px;}
   .trending-card{width:200px;}
@@ -3323,16 +3324,22 @@ body{overscroll-behavior-y:contain;}
 
 /* ── iPad / tablet (641px–1024px) ──────────────────────────────────────────── */
 @media (min-width:641px) and (max-width:1024px){
-  .page-grid{grid-template-columns:1fr;} /* single col on tablet, sidebar stacks below */
+  .page{padding:20px 18px;}
+  .page-grid{grid-template-columns:1fr;gap:20px;}
   .home-hero-row{grid-template-columns:1fr;gap:16px;}
   .home-hero-side{max-width:100%;}
   .gn-grid{grid-template-columns:1fr 1fr;gap:16px;}
-  .gn-card-img,.gn-lead-img{height:180px;}
-  .fc-title{font-size:17px;}
-  .fc-thumb,.fc-thumb-ph{width:130px;height:98px;}
+  /* Use 16/9 aspect + max-height to prevent overflow on iPad portrait (810px) */
+  .gn-card-img,.gn-card-img-ph{aspect-ratio:16/9;height:auto;max-height:170px;}
+  .gn-lead-img{aspect-ratio:16/9;height:auto;max-height:220px;}
+  .gn-lead-title{font-size:26px;}
+  .gn-lead-solo .gn-lead-title{font-size:28px;}
+  .fc-title{font-size:16px;}
+  .fc-thumb,.fc-thumb-ph{width:120px;height:90px;}
   .sport-tabs{gap:6px;}
   .sport-tab{padding:7px 12px;font-size:13px;}
-  .sidebar{display:none;} /* sidebar hidden on tablet, keeps layout clean */
+  .sidebar{display:none;}
+  /* Show slimmed sidebar on iPad landscape (≥900px) */
 }
 
 /* ═══════════════════════════════════════════
@@ -3898,7 +3905,7 @@ kbd{display:inline-block;padding:1px 5px;border:1px solid var(--border);border-r
   text-transform:uppercase;letter-spacing:0.12em;
   display:flex;align-items:center;gap:6px;
 }
-.home-scores-label::before{content:'●';color:#4ade80;font-size:7px;animation:score-pulse 2s ease-in-out infinite;}
+.home-scores-label::before{content:'●';color:var(--green);font-size:7px;animation:score-pulse 2s ease-in-out infinite;}
 @keyframes score-pulse{0%,100%{opacity:1;}50%{opacity:0.4;}}
 .home-scores-see-all{
   font-size:10px;font-weight:600;color:rgba(255,255,255,0.6);
