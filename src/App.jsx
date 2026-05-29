@@ -593,28 +593,35 @@ function useScrollDirection(enabled) {
 
 // Horizontal swipe detection — returns touch handlers to spread onto an
 // element. Fires onSwipe('left'|'right') when user completes a decisive
-// horizontal swipe. Requires horizontal dx to dominate dy by 1.8× and
-// exceed threshold, so vertical scrolls still feel native and don't trigger
-// accidental category changes.
-function useSwipe(onSwipe, { threshold = 60, enabled = true } = {}) {
-  const state = useRef({ x: 0, y: 0, active: false });
+// horizontal swipe. Tracks touchMove to cancel early if vertical scroll
+// intent is detected, preventing accidental tab changes while scrolling.
+function useSwipe(onSwipe, { threshold = 80, enabled = true } = {}) {
+  const state = useRef({ x: 0, y: 0, active: false, cancelled: false });
   const onTouchStart = (e) => {
     if (!enabled) return;
     const t = e.touches[0];
-    state.current = { x: t.clientX, y: t.clientY, active: true };
+    state.current = { x: t.clientX, y: t.clientY, active: true, cancelled: false };
+  };
+  const onTouchMove = (e) => {
+    if (!enabled || !state.current.active || state.current.cancelled) return;
+    const t = e.touches[0];
+    const dy = Math.abs(t.clientY - state.current.y);
+    const dx = Math.abs(t.clientX - state.current.x);
+    // Cancel swipe if vertical scroll intent detected early
+    if (dy > 8 && dy > dx * 1.2) state.current.cancelled = true;
   };
   const onTouchEnd = (e) => {
     if (!enabled || !state.current.active) return;
     const t = (e.changedTouches && e.changedTouches[0]) || null;
     state.current.active = false;
-    if (!t) return;
+    if (!t || state.current.cancelled) return;
     const dx = t.clientX - state.current.x;
     const dy = t.clientY - state.current.y;
-    if (Math.abs(dx) > threshold && Math.abs(dx) > Math.abs(dy) * 1.8) {
+    if (Math.abs(dx) > threshold && Math.abs(dx) > Math.abs(dy) * 2.5) {
       onSwipe(dx > 0 ? 'right' : 'left');
     }
   };
-  return { onTouchStart, onTouchEnd };
+  return { onTouchStart, onTouchMove, onTouchEnd };
 }
 
 // Pull-to-refresh. Activates only when scrollY is near 0 (user is at
@@ -1718,51 +1725,47 @@ body:not(.dark) .pill-bar{
 .fin-main{display:flex;flex-direction:column;gap:12px;min-width:0;}
 .fin-watchlist,.fin-news{
   background:var(--surface);border:1px solid var(--border);
-  /* Bloomberg-style: square corners */
-  border-radius:0;overflow:hidden;
+  border-radius:var(--radius);overflow:hidden;
 }
 .fin-section-head{
   display:flex;justify-content:space-between;align-items:center;
-  padding:9px 14px;
-  /* Bloomberg-style: dark header bar */
-  background:var(--bg);border-bottom:1px solid var(--border);
+  padding:10px 16px;
+  background:var(--surface);border-bottom:1px solid var(--border);
 }
 .fin-section-title{
-  font-size:11px;font-weight:800;color:var(--text);letter-spacing:0.06em;
-  text-transform:uppercase;
+  font-size:12px;font-weight:700;color:var(--text);letter-spacing:0.01em;
 }
 .fin-news{padding:0;}
-.fin-news .fin-section-head{margin:0;border-radius:0;background:var(--bg);}
+.fin-news .fin-section-head{margin:0;border-radius:0;}
 .fin-news > *:not(.fin-section-head){padding:0 14px;}
 .fin-news > *:not(.fin-section-head):first-of-type{padding-top:14px;}
 .fin-news > *:not(.fin-section-head):last-of-type{padding-bottom:14px;}
 .fin-table{width:100%;border-collapse:collapse;font-variant-numeric:tabular-nums;}
 .fin-table thead th{
-  background:var(--bg);
-  font-size:9px;font-weight:800;color:var(--text3);
-  text-transform:uppercase;letter-spacing:0.08em;
-  padding:7px 12px;border-bottom:1px solid var(--border);
+  background:var(--surface2);
+  font-size:9px;font-weight:700;color:var(--text3);
+  text-transform:uppercase;letter-spacing:0.07em;
+  padding:7px 16px;border-bottom:1px solid var(--border);
 }
-.fin-table tbody tr{cursor:pointer;transition:background 0.08s;border-bottom:1px solid var(--border2);}
-.fin-table tbody tr:hover{background:var(--surface2);}
+.fin-table tbody tr{cursor:pointer;transition:background 0.1s;border-bottom:1px solid var(--border2);}
+.fin-table tbody tr:hover{background:#f0f7ff;}
+.dark .fin-table tbody tr:hover{background:rgba(99,102,241,0.08);}
 .fin-table tbody tr:last-child{border-bottom:none;}
 .fin-table td{
-  /* Bloomberg-style: tighter rows for terminal density */
-  padding:7px 12px;font-size:12px;color:var(--text);
+  padding:10px 16px;font-size:13px;color:var(--text);
 }
-.fin-sym{font-weight:800;font-family:'SF Mono','Cascadia Code','Consolas',monospace;letter-spacing:-0.3px;color:#fa7800;}
-.fin-name{color:var(--text2);font-size:11px;font-weight:500;}
-.fin-px{font-family:'SF Mono','Cascadia Code','Consolas',monospace;text-align:right;font-weight:700;letter-spacing:-0.2px;}
+.fin-sym{font-weight:800;font-size:13px;color:#6366f1;letter-spacing:-0.2px;}
+.fin-name{color:var(--text3);font-size:11px;font-weight:400;}
+.fin-px{font-variant-numeric:tabular-nums;text-align:right;font-weight:600;font-size:13px;}
 .fin-up{color:#16a34a;}
 .fin-down{color:#dc2626;}
 .fin-pct-pill{
-  /* Bloomberg-style: square monospace pct badges */
-  background:rgba(22,163,74,0.1);border-radius:0;padding:2px 6px;
-  font-size:10px;font-weight:800;font-family:'SF Mono','Cascadia Code','Consolas',monospace;
-  letter-spacing:0.02em;
+  display:inline-block;
+  background:rgba(22,163,74,0.12);border-radius:6px;padding:3px 8px;
+  font-size:11px;font-weight:700;font-variant-numeric:tabular-nums;
 }
 .fin-down .fin-pct-pill{background:rgba(220,38,38,0.1);}
-.fin-empty{padding:28px;text-align:center;color:var(--text3);font-style:italic;font-size:12px;}
+.fin-empty{padding:32px;text-align:center;color:var(--text3);font-style:italic;font-size:12px;}
 
 /* ═══════════════════════════════════════════
    SOCIAL FOLLOWS (per category)
@@ -2171,7 +2174,7 @@ body:not(.dark) .pill-bar{
   display:flex;gap:8px;
   overflow-x:auto;scrollbar-width:none;
   -webkit-overflow-scrolling:touch;
-  scroll-snap-type:x mandatory;
+  scroll-snap-type:x proximity;
   padding-bottom:2px;
 }
 .sports-score-strip-inner::-webkit-scrollbar{display:none;}
@@ -2179,8 +2182,8 @@ body:not(.dark) .pill-bar{
   position:relative;
   flex-shrink:0;scroll-snap-align:start;
   background:#162635;border:1px solid #243446;
-  border-radius:6px;padding:10px 14px;
-  min-width:130px;cursor:pointer;
+  border-radius:6px;padding:8px 12px;
+  min-width:108px;cursor:pointer;
   transition:border-color 0.15s, transform 0.1s;
 }
 .sst-tile:hover{border-color:#3b5168;transform:translateY(-1px);}
@@ -3908,7 +3911,7 @@ kbd{display:inline-block;padding:1px 5px;border:1px solid var(--border);border-r
 }
 .home-scores-scroll::-webkit-scrollbar{display:none;}
 .hs-tile{
-  flex-shrink:0;min-width:140px;padding:10px 14px;
+  flex-shrink:0;min-width:112px;padding:8px 12px;
   border-right:1px solid var(--border2);cursor:pointer;
   transition:background 0.12s;
 }
@@ -4530,7 +4533,8 @@ function TodayItem({a, cc, onRead}) {
 // takeaways + "Updated Xm ago" timestamp + visible Refresh Digest button.
 // Parses AI output for bullet markers (- or • or numbered) and splits into
 // paragraph vs. bullets. Ghost treatment — no card, no border, no bg.
-function MorningBriefingInline({arts}) {
+function MorningBriefingInline({arts, excludeCats}) {
+  const effectiveExclude = excludeCats || BRIEFING_EXCLUDE_CATS;
   const [body, setBody]       = useState('');   // main paragraph
   const [bullets, setBullets] = useState([]);   // array of strings
   const [ts, setTs]           = useState(null); // timestamp of last gen
@@ -4574,10 +4578,10 @@ function MorningBriefingInline({arts}) {
       });
     });
 
-    // ── TIER 2: Per-category top headlines (excluding Comedy + dedup against Tier 1) ──
+    // ── TIER 2: Per-category top headlines (dedup against Tier 1) ──
     const tier2 = {};
     Object.entries(arts).forEach(([cat, list]) => {
-      if (BRIEFING_EXCLUDE_CATS.includes(cat)) return;
+      if (effectiveExclude.includes(cat)) return;
       const headlines = (list || [])
         .filter(a => {
           const key = a.title.slice(0,60).toLowerCase().replace(/\s+/g,'');
@@ -4713,7 +4717,8 @@ Output ONLY the paragraph followed by the bullets. No headers, no labels, no clo
 // Generates its own copy independently from the full briefing — they auto-
 // share state via the same fetchAISummary cache when the prompt matches.
 // Time-aware: regenerates if >90min stale, like the full version.
-function BriefingTeaser({arts, onOpenFull}) {
+function BriefingTeaser({arts, excludeCats, onOpenFull}) {
+  const effectiveExclude = excludeCats || BRIEFING_EXCLUDE_CATS;
   const [body, setBody]       = useState('');
   const [bullets, setBullets] = useState([]);
   const [ts, setTs]           = useState(null);
@@ -4750,7 +4755,7 @@ function BriefingTeaser({arts, onOpenFull}) {
     });
     const tier2 = {};
     Object.entries(arts).forEach(([cat, list]) => {
-      if (BRIEFING_EXCLUDE_CATS.includes(cat)) return;
+      if (effectiveExclude.includes(cat)) return;
       const headlines = (list||[])
         .filter(a => !tier1Keys.has(a.title.slice(0,60).toLowerCase().replace(/\s+/g,'')))
         .sort((a,b) => new Date(b.pubDate) - new Date(a.pubDate))
@@ -5140,12 +5145,13 @@ function SourceFooter({cat, feeds, arts}) {
 const CAT_LABELS = {general:'🌐 General',sports:'🏆 Sports',business:'⚡ Business',finance:'📈 Markets',bloom:'🔋 Energy',tech:'🤖 AI & Tech',popculture:'✨ Pop Culture',comedy:'😂 Comedy'};
 const PLAT_LABELS = {twitter:'𝕏',linkedin:'in',instagram:'IG',youtube:'▶'};
 
-function CustomizePanel({feeds, kw, alerts, urgent, social, watchlist, teams, health, arts, weatherCities, hiddenIndices, initialTab, initialCat, onClose, onSave}) {
+function CustomizePanel({feeds, kw, alerts, urgent, social, watchlist, teams, health, arts, weatherCities, hiddenIndices, briefingExclude, initialTab, initialCat, onClose, onSave}) {
   const [lf, setLf] = useState(JSON.parse(JSON.stringify(feeds)));
   const [lk, setLk] = useState(JSON.parse(JSON.stringify(kw)));
   const [la, setLa] = useState([...alerts]);
   const [lu, setLu] = useState([...(urgent||[])]);
   const [lw, setLw] = useState(JSON.parse(JSON.stringify(watchlist||[])));
+  const [lbe, setLbe] = useState([...(briefingExclude||['comedy'])]);
   const [newSym, setNewSym] = useState('');
   const [newSymName, setNewSymName] = useState('');
   const [ls, setLs] = useState(JSON.parse(JSON.stringify(social)));
@@ -5209,9 +5215,9 @@ function CustomizePanel({feeds, kw, alerts, urgent, social, watchlist, teams, he
         <div className="cp-head"><span className="cp-title">Customize</span><button className="cp-x" onClick={onClose}>✕</button></div>
         <div className="cp-body">
           <div className="cp-sec-tabs">
-            {['keywords','alerts','sources','social','watchlist','teams','datastrip'].map(t=>(
+            {['keywords','alerts','sources','social','watchlist','teams','datastrip','briefing'].map(t=>(
               <button key={t} className={`cp-sec-tab ${secTab===t?'active':''}`} onClick={()=>setSecTab(t)}>
-                {t==='keywords'?'Keywords':t==='alerts'?'Alerts':t==='sources'?'Sources':t==='social'?'Social':t==='watchlist'?'📈 Watchlist':t==='teams'?'🏆 Teams':'🌤 Data Strip'}
+                {t==='keywords'?'Keywords':t==='alerts'?'Alerts':t==='sources'?'Sources':t==='social'?'Social':t==='watchlist'?'📈 Watchlist':t==='teams'?'🏆 Teams':t==='briefing'?'☕ Briefing':'🌤 Data Strip'}
               </button>
             ))}
           </div>
@@ -5451,7 +5457,43 @@ function CustomizePanel({feeds, kw, alerts, urgent, social, watchlist, teams, he
             </div>
           )}
 
-          <button className="cp-save" onClick={()=>onSave({feeds:lf,kw:lk,alerts:la,urgent:lu,social:ls,watchlist:lw,teams:lt,weatherCities:lwx,hiddenIndices:lhi})}>Save & Refresh</button>
+          {secTab==='briefing' && (
+            <div className="cp-sec">
+              <div className="cp-lbl">☕ Morning Briefing Sources</div>
+              <div className="cp-desc">The briefing pulls top headlines from each category. Toggle categories off to exclude them from the briefing synthesis.</div>
+              <div className="cp-lbl" style={{marginTop:'14px'}}>Priority Sources (always included when available)</div>
+              <div className="cp-desc" style={{marginBottom:'8px'}}>
+                {BRIEFING_PRIORITY_SOURCES.map(s=>(
+                  <span key={s} style={{display:'inline-block',background:'var(--surface2)',border:'1px solid var(--border)',borderRadius:'12px',padding:'3px 10px',fontSize:'11px',fontWeight:600,marginRight:'6px',marginBottom:'4px'}}>{s}</span>
+                ))}
+                <div style={{marginTop:'6px',fontSize:'10px',color:'var(--text3)'}}>Make sure these are enabled in your General sources tab for best results.</div>
+              </div>
+              <div className="cp-lbl" style={{marginTop:'14px'}}>Categories included in briefing</div>
+              <div style={{display:'flex',flexWrap:'wrap',gap:'8px',marginTop:'8px'}}>
+                {Object.entries(CAT_LABELS).map(([cat,label])=>{
+                  const excluded = lbe.includes(cat);
+                  return (
+                    <label key={cat} style={{display:'flex',alignItems:'center',gap:'6px',cursor:'pointer',
+                      background:excluded?'var(--surface2)':'var(--surface)',
+                      border:`1px solid ${excluded?'var(--border)':'var(--accent)'}`,
+                      borderRadius:'20px',padding:'5px 12px',fontSize:'12px',fontWeight:600,
+                      color:excluded?'var(--text3)':'var(--text)',transition:'all 0.15s'}}>
+                      <input type="checkbox" style={{accentColor:'var(--accent)'}}
+                        checked={!excluded}
+                        onChange={()=>setLbe(prev=>excluded?prev.filter(c=>c!==cat):[...prev,cat])}
+                      />
+                      {label}
+                    </label>
+                  );
+                })}
+              </div>
+              <div style={{marginTop:'12px',fontSize:'11px',color:'var(--text3)'}}>
+                Currently excluded: {lbe.length===0?'none':lbe.map(c=>CAT_LABELS[c]||c).join(', ')}
+              </div>
+            </div>
+          )}
+
+          <button className="cp-save" onClick={()=>onSave({feeds:lf,kw:lk,alerts:la,urgent:lu,social:ls,watchlist:lw,teams:lt,weatherCities:lwx,hiddenIndices:lhi,briefingExclude:lbe})}>Save & Refresh</button>
         </div>
       </div>
     </div>
@@ -6104,6 +6146,7 @@ export default function App() {
   const [teams, setTeams]       = useState(()=>ld('teams', SCORE_TEAMS));
   const [weatherCities, setWeatherCities] = useState(()=>ld('weatherCities', DEFAULT_WEATHER_CITIES));
   const [hiddenIndices, setHiddenIndices] = useState(()=>ld('hiddenIndices',[]));
+  const [briefingExclude, setBriefingExclude] = useState(()=>ld('briefingExclude',['comedy']));
   const [marketData, setMarketData] = useState({});
   const [marketLoading, setMarketLoading] = useState(false);
   const [social, setSocial]     = useState(()=>ld('social',DEFAULT_SOCIAL));
@@ -6310,7 +6353,7 @@ export default function App() {
     return () => window.removeEventListener('keydown', handler);
   }, []);
 
-  const handleCustomizeSave = ({feeds:nf,kw:nk,alerts:na,urgent:nu,social:ns,watchlist:nw,teams:nt,weatherCities:nwx,hiddenIndices:ni})=>{
+  const handleCustomizeSave = ({feeds:nf,kw:nk,alerts:na,urgent:nu,social:ns,watchlist:nw,teams:nt,weatherCities:nwx,hiddenIndices:ni,briefingExclude:nbe})=>{
     setFeeds(nf);sv('feeds',nf);
     setKw(nk);sv('kw',nk);
     setAlerts(na);sv('alerts',na);
@@ -6320,6 +6363,7 @@ export default function App() {
     if(nt){setTeams(nt);sv('teams',nt);}
     if(nwx){setWeatherCities(nwx);sv('weatherCities',nwx);}
     if(ni!=null){setHiddenIndices(ni);sv('hiddenIndices',ni);}
+    if(nbe!=null){setBriefingExclude(nbe);sv('briefingExclude',nbe);}
     setShowPanel(false);refreshAll();
   };
 
@@ -6344,7 +6388,7 @@ export default function App() {
       setRefreshing(true);
       try { await refreshAll(); } finally { setRefreshing(false); }
     },
-    { enabled: isMobile, threshold: 70 }
+    { enabled: isMobile, threshold: 110 }
   );
 
   // Swipe left/right between categories on mobile. Only active on news-ish
@@ -6654,12 +6698,12 @@ export default function App() {
               </article>
             </div>
             <div className="home-hero-side">
-              <BriefingTeaser arts={arts} onOpenFull={() => handleTabChange('briefing')}/>
+              <BriefingTeaser arts={arts} excludeCats={briefingExclude} onOpenFull={() => handleTabChange('briefing')}/>
             </div>
           </div>
         ) : (
           isHome && !activeKw && !activeSrc && (
-            <BriefingTeaser arts={arts} onOpenFull={() => handleTabChange('briefing')}/>
+            <BriefingTeaser arts={arts} excludeCats={briefingExclude} onOpenFull={() => handleTabChange('briefing')}/>
           )
         )}
 
@@ -6980,7 +7024,7 @@ export default function App() {
           </header>
 
           {/* The synthesized briefing itself (paragraph + bullets) */}
-          <MorningBriefingInline arts={arts}/>
+          <MorningBriefingInline arts={arts} excludeCats={briefingExclude}/>
 
           {/* Tier 1 — Priority briefings */}
           <section className="briefing-sources">
@@ -7237,9 +7281,7 @@ export default function App() {
             <div>
               <div className="fin-header-title">📈 Markets</div>
               <div className="fin-header-sub">
-                <span className="fin-status-dot" style={{background:marketStatus.color}}/>
-                <span style={{color:marketStatus.color,fontWeight:600}}>{marketStatus.label}</span>
-                <span style={{color:'var(--text3)',marginLeft:8}}>· Quotes via Yahoo Finance · 5min cache</span>
+                <span style={{color:'var(--text3)'}}>Quotes via Yahoo Finance · 5min delay</span>
               </div>
             </div>
             <div style={{display:'flex',alignItems:'center',gap:'12px'}}>
@@ -7399,6 +7441,7 @@ export default function App() {
         {showPanel&&<CustomizePanel feeds={feeds} kw={kw} alerts={alerts} urgent={urgent}
           social={social} watchlist={watchlist} teams={teams} health={health} arts={arts}
           weatherCities={weatherCities} hiddenIndices={hiddenIndices}
+          briefingExclude={briefingExclude}
           initialTab={panelInitial.tab} initialCat={panelInitial.cat}
           onClose={()=>setShowPanel(false)} onSave={handleCustomizeSave}/>}
       </div>
