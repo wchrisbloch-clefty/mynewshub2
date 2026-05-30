@@ -5,6 +5,139 @@ import { CB_IDENTITY } from '../constants.js';
 import MD from './shared/MD.jsx';
 import { Btn, Input, Label, Card, Badge, ThinkingDots, Modal } from './shared/Common.jsx';
 
+const BOARD_COLS = [
+  { id: 'collecting',   label: 'Collecting',   icon: '📥', color: '#38bdf8' },
+  { id: 'analyzing',    label: 'Analyzing',    icon: '🔍', color: '#6366F1' },
+  { id: 'synthesizing', label: 'Synthesizing', icon: '⚗️', color: '#a78bfa' },
+  { id: 'insights',     label: 'Insights',     icon: '💡', color: '#ffcc44' },
+];
+
+function loadBoard()   { try { return JSON.parse(localStorage.getItem('aether_board') || '[]'); } catch { return []; } }
+function saveBoard(b)  { localStorage.setItem('aether_board', JSON.stringify(b)); }
+
+function ResearchBoard() {
+  const [cards, setCards]         = useState(loadBoard);
+  const [adding, setAdding]       = useState(null); // colId being added to
+  const [draft, setDraft]         = useState('');
+  const [synthesis, setSynthesis] = useState('');
+  const [synLoading, setSynLoading] = useState(false);
+
+  const persist = (updated) => { setCards(updated); saveBoard(updated); };
+
+  const addCard = (colId) => {
+    if (!draft.trim()) return;
+    const isUrl = /^https?:\/\//i.test(draft.trim());
+    const card = { id: uid(), content: draft.trim(), type: isUrl ? 'url' : 'text', column: colId, createdAt: Date.now() };
+    persist([card, ...cards]);
+    setDraft('');
+    setAdding(null);
+  };
+
+  const moveCard = (id, dir) => {
+    const idx = BOARD_COLS.findIndex(c => c.id === cards.find(c2 => c2.id === id)?.column);
+    const next = BOARD_COLS[idx + dir];
+    if (!next) return;
+    persist(cards.map(c => c.id === id ? { ...c, column: next.id } : c));
+  };
+
+  const removeCard = (id) => persist(cards.filter(c => c.id !== id));
+
+  const synthesizeAll = async () => {
+    if (cards.length === 0) return;
+    setSynLoading(true);
+    setSynthesis('');
+    const grouped = BOARD_COLS.map(col => {
+      const colCards = cards.filter(c => c.column === col.id);
+      if (!colCards.length) return '';
+      return `${col.label}:\n${colCards.map(c => `- ${c.content}`).join('\n')}`;
+    }).filter(Boolean).join('\n\n');
+    try {
+      const r = await callClaude({
+        system: CB_IDENTITY + '\n\nMODE: RESEARCH BOARD SYNTHESIS — Synthesize all research cards into a coherent intelligence brief. End with Truth Score, key insight, and decisive bet for CB.',
+        messages: [{ role: 'user', content: `Synthesize my research board into a comprehensive intelligence brief:\n\n${grouped}` }],
+        maxTokens: 900,
+      });
+      setSynthesis(r);
+    } catch { setSynthesis('Synthesis failed — try again.'); }
+    setSynLoading(false);
+  };
+
+  return (
+    <div>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
+        <div>
+          <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text)' }}>{cards.length} research cards</div>
+          <div style={{ fontSize: 10, color: 'var(--dim)' }}>Collect signals → analyze → synthesize → extract insights</div>
+        </div>
+        {cards.length > 0 && (
+          <div onClick={synthesizeAll} style={{ padding: '7px 16px', background: '#6366F1', borderRadius: 9, fontSize: 11, fontWeight: 700, color: '#fff', cursor: 'pointer', flexShrink: 0 }}>
+            {synLoading ? '⟳ Synthesizing…' : '✦ AI Synthesize All'}
+          </div>
+        )}
+      </div>
+
+      {synthesis && (
+        <div style={{ background: 'var(--surface)', border: '1px solid #6366F130', borderRadius: 12, padding: '16px 18px', marginBottom: 20 }}>
+          <div style={{ fontSize: 8, letterSpacing: 3, color: '#6366F1', textTransform: 'uppercase', marginBottom: 10 }}>Board Synthesis</div>
+          <MD text={synthesis} color="#6366F1" />
+          <div onClick={() => setSynthesis('')} style={{ marginTop: 10, fontSize: 10, color: 'var(--dim)', cursor: 'pointer' }}>Clear</div>
+        </div>
+      )}
+
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12, overflowX: 'auto' }}>
+        {BOARD_COLS.map((col, colIdx) => {
+          const colCards = cards.filter(c => c.column === col.id);
+          return (
+            <div key={col.id} style={{ background: 'var(--surface)', border: `1px solid ${col.color}25`, borderRadius: 12, padding: '12px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12, paddingBottom: 8, borderBottom: `1px solid ${col.color}25` }}>
+                <div style={{ fontSize: 11, fontWeight: 700, color: col.color }}>{col.icon} {col.label}</div>
+                <span style={{ fontSize: 10, color: 'var(--dim)' }}>{colCards.length}</span>
+              </div>
+
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 7, marginBottom: 10, minHeight: 60 }}>
+                {colCards.map(card => (
+                  <div key={card.id} style={{ background: 'var(--bg)', border: `1px solid ${col.color}20`, borderRadius: 8, padding: '9px 10px' }}>
+                    <div style={{ fontSize: 11, color: 'var(--text-b)', lineHeight: 1.45, marginBottom: 6, wordBreak: 'break-word' }}>
+                      {card.type === 'url'
+                        ? <span onClick={() => window.open(card.content, '_blank')} style={{ color: 'var(--accent,#00C6E6)', cursor: 'pointer', textDecoration: 'underline' }}>{card.content.slice(0, 50)}…</span>
+                        : card.content.slice(0, 120) + (card.content.length > 120 ? '…' : '')
+                      }
+                    </div>
+                    <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
+                      {colIdx > 0 && <span onClick={() => moveCard(card.id, -1)} style={{ fontSize: 11, color: 'var(--dim)', cursor: 'pointer', padding: '1px 5px' }}>←</span>}
+                      {colIdx < BOARD_COLS.length - 1 && <span onClick={() => moveCard(card.id, 1)} style={{ fontSize: 11, color: col.color, cursor: 'pointer', padding: '1px 5px' }}>→</span>}
+                      <span onClick={() => removeCard(card.id)} style={{ fontSize: 10, color: 'var(--dim)', cursor: 'pointer', marginLeft: 'auto', padding: '1px 4px' }}>✕</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              {adding === col.id ? (
+                <div>
+                  <textarea value={draft} onChange={e => setDraft(e.target.value)}
+                    onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); addCard(col.id); } }}
+                    placeholder="Text or URL… (Enter to save)"
+                    rows={2}
+                    style={{ width: '100%', background: 'var(--bg)', border: `1px solid ${col.color}40`, borderRadius: 7, padding: '7px 10px', color: 'var(--text-b)', fontSize: 11, outline: 'none', fontFamily: 'inherit', resize: 'none', lineHeight: 1.5, boxSizing: 'border-box', marginBottom: 6 }} />
+                  <div style={{ display: 'flex', gap: 5 }}>
+                    <div onClick={() => addCard(col.id)} style={{ flex: 1, padding: '5px', textAlign: 'center', background: col.color, borderRadius: 6, fontSize: 10, fontWeight: 700, color: '#000', cursor: 'pointer' }}>Add</div>
+                    <div onClick={() => { setAdding(null); setDraft(''); }} style={{ padding: '5px 8px', border: '1px solid var(--border)', borderRadius: 6, fontSize: 10, color: 'var(--dim)', cursor: 'pointer' }}>✕</div>
+                  </div>
+                </div>
+              ) : (
+                <div onClick={() => { setAdding(col.id); setDraft(''); }}
+                  style={{ padding: '6px', border: `1px dashed ${col.color}40`, borderRadius: 7, textAlign: 'center', fontSize: 10, color: 'var(--dim)', cursor: 'pointer', transition: 'all 0.12s' }}>
+                  + Add
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 const SEARCH_SUGGESTIONS = [
   'Houston real estate market 2025 tipping point',
   'AI agent disruption — which industries first',
@@ -36,6 +169,7 @@ export default function ResearchHub() {
   const [searchEnabled, setSearchEnabled] = useState(false);
   const [showNewThread, setShowNewThread] = useState(false);
   const [newQuery, setNewQuery] = useState('');
+  const [boardView, setBoardView] = useState(false);
   const bottomRef = useRef(null);
 
   useEffect(() => { bottomRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [messages, loading]);
@@ -109,7 +243,19 @@ export default function ResearchHub() {
         <div onClick={() => setShowNewThread(true)} style={{ padding: '8px 16px', background: 'linear-gradient(135deg, #6366F1, #00FFB2)', borderRadius: 10, fontSize: 11, fontWeight: 700, color: '#000', cursor: 'pointer', whiteSpace: 'nowrap' }}>+ New Thread</div>
       </div>
 
-      <div style={{ marginBottom: 24 }}>
+      {/* View switcher: Threads | Board */}
+      <div style={{ display: 'flex', gap: 6, marginBottom: 20 }}>
+        {[{ id: false, label: '💬 Threads' }, { id: true, label: '🗂 Research Board' }].map(v => (
+          <div key={String(v.id)} onClick={() => setBoardView(v.id)}
+            style={{ padding: '7px 16px', fontSize: 12, fontWeight: 700, borderRadius: 10, cursor: 'pointer', border: `1px solid ${boardView === v.id ? '#6366F1' : 'var(--border)'}`, background: boardView === v.id ? '#6366F115' : 'var(--surface)', color: boardView === v.id ? '#6366F1' : 'var(--muted)', transition: 'all 0.12s' }}>
+            {v.label}
+          </div>
+        ))}
+      </div>
+
+      {boardView && <ResearchBoard />}
+
+      {!boardView && <div style={{ marginBottom: 24 }}>
         <div style={{ display: 'flex', gap: 10, alignItems: 'center', background: 'var(--surface)', border: '1px solid #6366F130', borderRadius: 14, padding: '14px 18px', marginBottom: 12 }}>
           <span style={{ fontSize: 16, color: '#6366F1' }}>🔭</span>
           <input value={newQuery} onChange={e => setNewQuery(e.target.value)}
@@ -124,9 +270,9 @@ export default function ResearchHub() {
             <div key={s} onClick={() => startThread(s)} style={{ fontSize: 10, padding: '4px 10px', background: 'var(--surface)', border: '1px solid var(--border)', color: 'var(--subtle)', borderRadius: 20, cursor: 'pointer' }}>{s}</div>
           ))}
         </div>
-      </div>
+      </div>}
 
-      <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 280px', gap: 24 }}>
+      {!boardView && <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 280px', gap: 24 }}>
         <div>
           <Label color="#6366F1">Research Threads</Label>
           {research.length === 0 && <div style={{ fontSize: 12, color: 'var(--dim)', padding: '24px 0' }}>No research threads yet. Start one above.</div>}
@@ -163,7 +309,7 @@ export default function ResearchHub() {
             </div>
           ))}
         </div>
-      </div>
+      </div>}
 
       {showNewThread && (
         <Modal title="New Research Thread" accent="#6366F1" onClose={() => setShowNewThread(false)}>

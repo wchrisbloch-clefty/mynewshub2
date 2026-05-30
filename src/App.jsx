@@ -14,6 +14,9 @@ import ProjectsOS from './modules/ProjectsOS.jsx';
 import MasteryVault from './modules/MasteryVault.jsx';
 import GrowthTools from './modules/GrowthTools.jsx';
 import PodcastHub from './modules/PodcastHub.jsx';
+import ContentInbox from './modules/ContentInbox.jsx';
+import DecisionLog from './modules/DecisionLog.jsx';
+import CoachAI from './modules/CoachAI.jsx';
 
 const AppContext = createContext(null);
 export const useApp = () => useContext(AppContext);
@@ -76,8 +79,11 @@ export default function App() {
     translate: <TranslatorHub />,
     projects:  <ProjectsOS />,
     podcast:   <PodcastHub />,
-    vault:    <MasteryVault />,
-    growth:   <GrowthTools />,
+    vault:     <MasteryVault />,
+    growth:    <GrowthTools />,
+    inbox:     <ContentInbox />,
+    decisions: <DecisionLog />,
+    coach:     <CoachAI />,
   };
 
   // Tablets show icon-only sidebar automatically
@@ -110,6 +116,7 @@ export default function App() {
   );
 }
 
+// Scrollable bottom nav — supports any number of items
 function BottomNav({ activeModule, setActiveModule, isPhone }) {
   return (
     <nav style={{
@@ -117,6 +124,8 @@ function BottomNav({ activeModule, setActiveModule, isPhone }) {
       background: 'var(--surface)',
       borderTop: '1px solid var(--border)',
       display: 'flex',
+      overflowX: 'auto',
+      scrollbarWidth: 'none',
       flexShrink: 0,
       zIndex: 30,
     }}>
@@ -125,25 +134,25 @@ function BottomNav({ activeModule, setActiveModule, isPhone }) {
         return (
           <button key={item.id} onClick={() => setActiveModule(item.id)}
             style={{
-              flex: 1,
+              minWidth: isPhone ? 52 : 60,
+              flex: 'none',
               display: 'flex',
               flexDirection: 'column',
               alignItems: 'center',
               justifyContent: 'center',
               gap: 2,
               border: 'none',
-              borderTop: `2px solid ${active ? 'var(--accent, #00C6E6)' : 'transparent'}`,
+              borderTop: `2px solid ${active ? (item.accent || 'var(--accent, #00C6E6)') : 'transparent'}`,
               background: 'transparent',
-              color: active ? 'var(--accent, #00C6E6)' : 'var(--muted)',
+              color: active ? (item.accent || 'var(--accent, #00C6E6)') : 'var(--muted)',
               cursor: 'pointer',
               fontFamily: 'inherit',
               outline: 'none',
               transition: 'color 0.12s',
-              padding: 0,
-              minWidth: 0,
+              padding: '0 2px',
             }}>
-            <span style={{ fontSize: isPhone ? 19 : 17 }}>{item.icon}</span>
-            {!isPhone && <span style={{ fontSize: 8, fontWeight: active ? 700 : 500, letterSpacing: 0.3 }}>{item.label}</span>}
+            <span style={{ fontSize: isPhone ? 18 : 16 }}>{item.icon}</span>
+            {!isPhone && <span style={{ fontSize: 7, fontWeight: active ? 700 : 500, letterSpacing: 0.2, whiteSpace: 'nowrap' }}>{item.label}</span>}
           </button>
         );
       })}

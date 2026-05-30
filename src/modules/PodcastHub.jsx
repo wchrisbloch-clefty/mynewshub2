@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useApp } from '../App.jsx';
-import { callClaude, fetchPodcastRSS, fmtDuration, fmtPodDate } from '../utils.js';
+import { callClaude, fetchPodcastRSS, fmtDuration, fmtPodDate, saveNotes, uid } from '../utils.js';
 import { CB_IDENTITY } from '../constants.js';
 import MD from './shared/MD.jsx';
 import { ThinkingDots } from './shared/Common.jsx';
@@ -25,11 +25,12 @@ const PODCAST_FEEDS = [
 ];
 
 // ─── EPISODE CARD ────────────────────────────────────────────────────────────
-function PodCard({ ep, idx }) {
+function PodCard({ ep, idx, onSaveToVault }) {
   const [aiPanel, setAiPanel] = useState(''); // '' | 'summary' | 'takeaways' | 'transcript'
   const [aiLoading, setAiLoading] = useState(false);
   const [aiCache, setAiCache] = useState({});
   const [reading, setReading] = useState(false);
+  const [vaulted, setVaulted] = useState(false);
   const [ttsSupported] = useState(() => typeof window !== 'undefined' && 'speechSynthesis' in window);
 
   const getBestVoice = () => {
@@ -136,7 +137,16 @@ function PodCard({ ep, idx }) {
             {aiLoading && !aiCache[aiPanel]
               ? <ThinkingDots color={ACCENT} />
               : aiCache[aiPanel]
-                ? <MD text={aiCache[aiPanel]} color={ACCENT} />
+                ? <>
+                    <MD text={aiCache[aiPanel]} color={ACCENT} />
+                    {!vaulted && (
+                      <div onClick={() => { onSaveToVault(`[Podcast] ${ep.title}`, aiCache[aiPanel]); setVaulted(true); }}
+                        style={{ marginTop: 10, display: 'inline-flex', alignItems: 'center', gap: 6, padding: '5px 12px', background: '#ffcc4410', border: '1px solid #ffcc4440', borderRadius: 7, fontSize: 10, fontWeight: 700, color: '#ffcc44', cursor: 'pointer' }}>
+                        🏛 Save to Vault
+                      </div>
+                    )}
+                    {vaulted && <div style={{ marginTop: 10, fontSize: 10, color: '#ffcc44' }}>✓ Saved to Vault</div>}
+                  </>
                 : null
             }
           </div>
@@ -176,7 +186,14 @@ function PodCard({ ep, idx }) {
 
 // ─── MAIN MODULE ─────────────────────────────────────────────────────────────
 export default function PodcastHub() {
-  const { isMobile, isTablet } = useApp();
+  const { isMobile, isTablet, notes, setNotes } = useApp();
+
+  const saveToVault = async (title, content) => {
+    const note = { id: uid(), title, content, tags: ['podcast'], connections: [], color: ACCENT, createdAt: Date.now() };
+    const updated = [note, ...notes];
+    setNotes(updated);
+    await saveNotes(updated);
+  };
   const [podEps, setPodEps]         = useState({});
   const [podLoading, setPodLoading] = useState({});
   const [activePod, setActivePod]   = useState(null);
@@ -185,10 +202,11 @@ export default function PodcastHub() {
   // ─── Paste & Analyze state ─────────────────────────────────────────────
   const [pasteOpen, setPasteOpen]   = useState(false);
   const [pasteText, setPasteText]   = useState('');
-  const [pasteMode, setPasteMode]   = useState('');     // '' | 'summary' | 'takeaways' | 'deepdive'
+  const [pasteMode, setPasteMode]   = useState('');
   const [pasteResult, setPasteResult] = useState('');
   const [pasteLoading, setPasteLoading] = useState(false);
   const [pasteReading, setPasteReading] = useState(false);
+  const [pasteVaulted, setPasteVaulted] = useState(false);
   const [ttsGlobal] = useState(() => typeof window !== 'undefined' && 'speechSynthesis' in window);
 
   const handlePasteAI = async (mode) => {
@@ -356,7 +374,7 @@ export default function PodcastHub() {
       )}
       <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
         {displayEps.slice(0, 25).map((ep, i) => (
-          <PodCard key={`${ep.show}-${i}`} ep={ep} idx={i} />
+          <PodCard key={`${ep.show}-${i}`} ep={ep} idx={i} onSaveToVault={saveToVault} />
         ))}
       </div>
     </div>
@@ -427,7 +445,18 @@ export default function PodcastHub() {
                 <div style={{ fontSize: 8, letterSpacing: 3, color: ACCENT, textTransform: 'uppercase', marginBottom: 8 }}>
                   {pasteMode === 'summary' ? 'AI Summary' : pasteMode === 'takeaways' ? 'Key Takeaways' : 'Deep Dive Analysis'}
                 </div>
-                {pasteLoading ? <ThinkingDots color={ACCENT} /> : <MD text={pasteResult} color={ACCENT} />}
+                {pasteLoading ? <ThinkingDots color={ACCENT} /> : (
+                  <>
+                    <MD text={pasteResult} color={ACCENT} />
+                    {!pasteVaulted
+                      ? <div onClick={() => { saveToVault('[Podcast Notes] Paste Analysis', pasteResult); setPasteVaulted(true); }}
+                          style={{ marginTop: 10, display: 'inline-flex', alignItems: 'center', gap: 6, padding: '5px 12px', background: '#ffcc4410', border: '1px solid #ffcc4440', borderRadius: 7, fontSize: 10, fontWeight: 700, color: '#ffcc44', cursor: 'pointer' }}>
+                          🏛 Save to Vault
+                        </div>
+                      : <div style={{ marginTop: 10, fontSize: 10, color: '#ffcc44' }}>✓ Saved to Vault</div>
+                    }
+                  </>
+                )}
               </div>
             )}
           </div>

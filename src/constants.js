@@ -113,6 +113,9 @@ export const NAV_ITEMS = [
   { id: "podcast",   icon: "🎙️", label: "Podcasts",  accent: "#e11d48" },
   { id: "vault",     icon: "🏛", label: "Vault",     accent: "#ffcc44" },
   { id: "growth",    icon: "📈", label: "Growth",    accent: "#44ffcc" },
+  { id: "inbox",     icon: "📥", label: "Inbox",     accent: "#10b981" },
+  { id: "decisions", icon: "⚖️", label: "Decisions", accent: "#f59e0b" },
+  { id: "coach",     icon: "🧭", label: "Coach",     accent: "#8b5cf6" },
 ];
 
 export const CHAT_MODES = [
