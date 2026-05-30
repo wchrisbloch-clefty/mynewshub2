@@ -15,7 +15,7 @@ const QUICK_PROMPTS = {
 };
 
 export default function ChatPanel() {
-  const { chatOpen, setChatOpen, activeModule, graph, projects, isMobile } = useApp();
+  const { chatOpen, setChatOpen, activeModule, graph, projects, isMobile, chatPrefill, setChatPrefill } = useApp();
   const [chatMode, setChatMode] = useState('synthesis');
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState('');
@@ -23,8 +23,18 @@ export default function ChatPanel() {
   const [attachments, setAttachments] = useState([]);
   const fileRef = useRef(null);
   const bottomRef = useRef(null);
+  const sendRef = useRef(null);
 
   useEffect(() => { bottomRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [messages, loading]);
+
+  // Auto-send when opened via AI search
+  useEffect(() => {
+    if (chatOpen && chatPrefill) {
+      const query = chatPrefill;
+      setChatPrefill('');
+      setTimeout(() => sendRef.current?.(query), 120);
+    }
+  }, [chatOpen, chatPrefill, setChatPrefill]);
 
   const send = async (text) => {
     if ((!text.trim() && attachments.length === 0) || loading) return;
@@ -44,6 +54,7 @@ export default function ChatPanel() {
     }
     setLoading(false);
   };
+  sendRef.current = send;
 
   const handleFiles = async (files) => {
     const processed = await processFiles(files);

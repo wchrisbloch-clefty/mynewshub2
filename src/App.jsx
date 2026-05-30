@@ -2,7 +2,6 @@ import { createContext, useContext, useState, useEffect } from 'react';
 import { loadGraph, loadProjects, loadNotes, loadResearch } from './utils.js';
 import { NAV_ITEMS, THEME_DARK, THEME_LIGHT } from './constants.js';
 import useViewport from './hooks/useViewport.js';
-import Sidebar from './modules/Sidebar.jsx';
 import TopBar from './modules/TopBar.jsx';
 import ChatPanel from './modules/ChatPanel.jsx';
 import HomeDashboard from './modules/HomeDashboard.jsx';
@@ -23,9 +22,9 @@ function applyThemeVars(vars) {
 
 export default function App() {
   const [activeModule, setActiveModule] = useState('home');
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [chatOpen, setChatOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+  const [chatPrefill, setChatPrefill] = useState('');
 
   const [graph, setGraph] = useState(null);
   const [projects, setProjects] = useState([]);
@@ -36,10 +35,6 @@ export default function App() {
   const [theme, setTheme] = useState(() => localStorage.getItem('aether-theme') || 'dark');
 
   const { isMobile, isTablet } = useViewport();
-
-  useEffect(() => {
-    if (isTablet) setSidebarCollapsed(true);
-  }, [isTablet]);
 
   useEffect(() => {
     const vars = theme === 'light' ? THEME_LIGHT : THEME_DARK;
@@ -63,9 +58,9 @@ export default function App() {
 
   const ctx = {
     activeModule, setActiveModule,
-    sidebarCollapsed, setSidebarCollapsed,
     chatOpen, setChatOpen,
     searchQuery, setSearchQuery,
+    chatPrefill, setChatPrefill,
     graph, setGraph,
     projects, setProjects,
     notes, setNotes,
@@ -86,116 +81,20 @@ export default function App() {
 
   return (
     <AppContext.Provider value={ctx}>
-      <div style={{ display: 'flex', height: '100vh', background: 'var(--bg)', overflow: 'hidden' }}>
-        {!isMobile && <Sidebar />}
-        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0, overflow: 'hidden' }}>
-          <TopBar />
-          <main style={{
-            flex: 1,
-            overflowY: 'auto',
-            overflowX: 'hidden',
-            paddingRight: (!isMobile && chatOpen) ? 360 : 0,
-            paddingBottom: isMobile ? 60 : 0,
-            transition: 'padding-right 0.22s ease',
-          }}>
-            {modules[activeModule] || <HomeDashboard />}
-          </main>
-        </div>
+      <div style={{ display: 'flex', flexDirection: 'column', height: '100vh', background: 'var(--bg)', overflow: 'hidden' }}>
+        <TopBar />
+        <main style={{
+          flex: 1,
+          overflowY: 'auto',
+          overflowX: 'hidden',
+          paddingRight: (!isMobile && chatOpen) ? 360 : 0,
+          transition: 'padding-right 0.22s ease',
+        }}>
+          {modules[activeModule] || <HomeDashboard />}
+        </main>
         <ChatPanel />
-        {isMobile && <BottomNav activeModule={activeModule} setActiveModule={setActiveModule} setChatOpen={setChatOpen} chatOpen={chatOpen} />}
       </div>
     </AppContext.Provider>
-  );
-}
-
-function BottomNav({ activeModule, setActiveModule, setChatOpen, chatOpen }) {
-  return (
-    <div style={{
-      position: 'fixed',
-      bottom: 0,
-      left: 0,
-      right: 0,
-      height: 60,
-      background: 'var(--bg-nav)',
-      borderTop: '1px solid var(--bord2)',
-      display: 'flex',
-      alignItems: 'center',
-      zIndex: 100,
-      paddingBottom: 'env(safe-area-inset-bottom, 0)',
-      overflowX: 'auto',
-      scrollbarWidth: 'none',
-      WebkitOverflowScrolling: 'touch',
-    }}>
-      {NAV_ITEMS.map(item => {
-        const isActive = activeModule === item.id;
-        return (
-          <div
-            key={item.id}
-            onClick={() => setActiveModule(item.id)}
-            style={{
-              minWidth: 52,
-              flex: '1 0 52px',
-              display: 'flex',
-              flexDirection: 'column',
-              alignItems: 'center',
-              justifyContent: 'center',
-              gap: 2,
-              cursor: 'pointer',
-              padding: '5px 0',
-              position: 'relative',
-            }}
-          >
-            {isActive && (
-              <div style={{
-                position: 'absolute',
-                top: 0,
-                left: '50%',
-                transform: 'translateX(-50%)',
-                width: 24,
-                height: 2,
-                background: item.accent,
-                borderRadius: '0 0 2px 2px',
-              }} />
-            )}
-            <div style={{ fontSize: 15, lineHeight: 1 }}>{item.icon}</div>
-            <div style={{
-              fontSize: 7,
-              letterSpacing: 0.3,
-              color: isActive ? item.accent : 'var(--dim)',
-              fontWeight: isActive ? 700 : 400,
-              textTransform: 'uppercase',
-              whiteSpace: 'nowrap',
-            }}>{item.label}</div>
-          </div>
-        );
-      })}
-      <div
-        onClick={() => setChatOpen(o => !o)}
-        style={{
-          minWidth: 48,
-          flex: '0 0 48px',
-          display: 'flex',
-          flexDirection: 'column',
-          alignItems: 'center',
-          justifyContent: 'center',
-          gap: 3,
-          cursor: 'pointer',
-          padding: '6px 0',
-        }}
-      >
-        <div style={{
-          width: 28,
-          height: 28,
-          borderRadius: '50%',
-          background: chatOpen ? 'linear-gradient(135deg, #00FFB2, #6366F1)' : 'var(--surface)',
-          border: `1px solid ${chatOpen ? 'transparent' : 'var(--border)'}`,
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          fontSize: 13,
-        }}>💬</div>
-      </div>
-    </div>
   );
 }
 

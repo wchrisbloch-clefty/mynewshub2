@@ -177,11 +177,61 @@ function PodCard({ ep, idx }) {
 // ─── MAIN MODULE ─────────────────────────────────────────────────────────────
 export default function PodcastHub() {
   const { isMobile, isTablet } = useApp();
-  const [podEps, setPodEps]     = useState({});
+  const [podEps, setPodEps]         = useState({});
   const [podLoading, setPodLoading] = useState({});
   const [activePod, setActivePod]   = useState(null);
   const [initialized, setInitialized] = useState(false);
-  const [showMobileShows, setShowMobileShows] = useState(false);
+
+  // ─── Paste & Analyze state ─────────────────────────────────────────────
+  const [pasteOpen, setPasteOpen]   = useState(false);
+  const [pasteText, setPasteText]   = useState('');
+  const [pasteMode, setPasteMode]   = useState('');     // '' | 'summary' | 'takeaways' | 'deepdive'
+  const [pasteResult, setPasteResult] = useState('');
+  const [pasteLoading, setPasteLoading] = useState(false);
+  const [pasteReading, setPasteReading] = useState(false);
+  const [ttsGlobal] = useState(() => typeof window !== 'undefined' && 'speechSynthesis' in window);
+
+  const handlePasteAI = async (mode) => {
+    if (!pasteText.trim()) return;
+    if (pasteMode === mode) { setPasteMode(''); return; }
+    setPasteMode(mode);
+    setPasteResult('');
+    setPasteLoading(true);
+    const prompts = {
+      summary: `Summarize this podcast content in 3-4 tight, insight-packed sentences for CB. Give the core message, key argument, and why it matters to CB's world (BD, investing, health, leadership).\n\nContent:\n${pasteText.slice(0, 6000)}`,
+      takeaways: `Extract 5 key takeaways from this podcast content for CB. Format as:\n1. **Point title** — one-sentence explanation with CB application\n2. **Point title** — one-sentence explanation\n(continue for 5 total)\n\nContent:\n${pasteText.slice(0, 6000)}`,
+      deepdive: `Provide a comprehensive analysis of this podcast content for CB. Cover: main thesis, key arguments and evidence, frameworks mentioned, counterarguments, and CB-specific action items (BD professional, investor, Houston TX). Be specific, thorough, and decisive.\n\nContent:\n${pasteText.slice(0, 6000)}`,
+    };
+    try {
+      const result = await callClaude({
+        system: CB_IDENTITY,
+        messages: [{ role: 'user', content: prompts[mode] }],
+        maxTokens: mode === 'deepdive' ? 1400 : 700,
+      });
+      setPasteResult(result);
+    } catch {
+      setPasteResult('Network error — try again.');
+    }
+    setPasteLoading(false);
+  };
+
+  const handlePasteReadAloud = () => {
+    if (!ttsGlobal) return;
+    if (pasteReading || window.speechSynthesis.speaking) {
+      window.speechSynthesis.cancel(); setPasteReading(false); return;
+    }
+    const textToRead = pasteResult || pasteText;
+    if (!textToRead.trim()) return;
+    const utt = new SpeechSynthesisUtterance(textToRead.slice(0, 3000));
+    const voices = window.speechSynthesis.getVoices();
+    const voice = voices.find(v => v.lang.startsWith('en') && !v.localService) || voices.find(v => v.lang.startsWith('en')) || null;
+    if (voice) utt.voice = voice;
+    utt.rate = 0.95;
+    utt.onend = () => setPasteReading(false);
+    utt.onerror = () => setPasteReading(false);
+    window.speechSynthesis.speak(utt);
+    setPasteReading(true);
+  };
 
   const loadPod = useCallback(async (pod) => {
     setPodLoading(l => ({ ...l, [pod.name]: true }));
@@ -325,6 +375,64 @@ export default function PodcastHub() {
       `}</style>
 
       {header}
+
+      {/* ─── Paste & Analyze ──────────────────────────────────────────────── */}
+      <div style={{ marginBottom: 20 }}>
+        <div
+          onClick={() => setPasteOpen(o => !o)}
+          style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '11px 16px', background: 'var(--surface)', border: `1px solid ${pasteOpen ? ACCENT_BORDER : 'var(--border)'}`, borderRadius: pasteOpen ? '10px 10px 0 0' : 10, cursor: 'pointer', transition: 'all 0.15s' }}>
+          <span style={{ fontSize: 14 }}>📋</span>
+          <div style={{ flex: 1 }}>
+            <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--text)' }}>Paste & Analyze</div>
+            <div style={{ fontSize: 10, color: 'var(--dim)' }}>Paste any podcast transcript, show notes, or text — get instant AI analysis</div>
+          </div>
+          <span style={{ fontSize: 11, color: 'var(--subtle)', transition: 'transform 0.2s', transform: pasteOpen ? 'rotate(180deg)' : 'none' }}>▼</span>
+        </div>
+
+        {pasteOpen && (
+          <div style={{ background: 'var(--surface)', border: `1px solid ${ACCENT_BORDER}`, borderTop: 'none', borderRadius: '0 0 10px 10px', padding: '16px' }}>
+            <textarea
+              value={pasteText}
+              onChange={e => { setPasteText(e.target.value); setPasteResult(''); setPasteMode(''); }}
+              placeholder="Paste podcast transcript, episode description, show notes, or any text here..."
+              rows={5}
+              style={{ width: '100%', background: 'var(--bg)', border: '1px solid var(--border)', borderRadius: 8, padding: '10px 14px', color: 'var(--text-b)', fontSize: 12, outline: 'none', fontFamily: 'inherit', resize: 'vertical', lineHeight: 1.65, boxSizing: 'border-box', marginBottom: 12 }}
+            />
+            <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center' }}>
+              {[
+                { id: 'summary',   label: '✦ Summary',    short: '✦' },
+                { id: 'takeaways', label: '📋 Takeaways', short: '📋' },
+                { id: 'deepdive',  label: '📄 Deep Dive', short: '📄' },
+              ].map(btn => (
+                <button key={btn.id} onClick={() => handlePasteAI(btn.id)} disabled={!pasteText.trim() || (pasteLoading && pasteMode !== btn.id)}
+                  style={{ padding: '6px 13px', fontSize: 11, fontWeight: 600, border: `1px solid ${pasteMode === btn.id ? ACCENT : 'var(--border)'}`, borderRadius: 7, background: pasteMode === btn.id ? ACCENT_BG : 'transparent', color: !pasteText.trim() ? 'var(--dim)' : pasteMode === btn.id ? ACCENT : 'var(--subtle)', cursor: !pasteText.trim() ? 'default' : 'pointer', fontFamily: 'inherit', transition: 'all 0.12s' }}>
+                  {pasteLoading && pasteMode === btn.id ? `${btn.short} Analyzing…` : btn.label}
+                </button>
+              ))}
+              {ttsGlobal && (
+                <button onClick={handlePasteReadAloud} disabled={!pasteText.trim() && !pasteResult}
+                  style={{ padding: '6px 13px', fontSize: 11, fontWeight: 600, border: `1px solid ${pasteReading ? ACCENT : 'var(--border)'}`, borderRadius: 7, background: pasteReading ? ACCENT_BG : 'transparent', color: (!pasteText.trim() && !pasteResult) ? 'var(--dim)' : pasteReading ? ACCENT : 'var(--subtle)', cursor: 'pointer', fontFamily: 'inherit', transition: 'all 0.12s' }}>
+                  {pasteReading ? '⏹ Stop' : '🔊 Read Aloud'}
+                </button>
+              )}
+              {pasteText && (
+                <button onClick={() => { setPasteText(''); setPasteResult(''); setPasteMode(''); }}
+                  style={{ padding: '6px 10px', fontSize: 10, border: '1px solid var(--border)', borderRadius: 7, background: 'transparent', color: 'var(--dim)', cursor: 'pointer', fontFamily: 'inherit', marginLeft: 'auto' }}>
+                  Clear
+                </button>
+              )}
+            </div>
+            {(pasteLoading || pasteResult) && (
+              <div style={{ marginTop: 14, background: ACCENT_BG, border: `1px solid ${ACCENT_BORDER}`, borderRadius: 8, padding: '12px 14px' }}>
+                <div style={{ fontSize: 8, letterSpacing: 3, color: ACCENT, textTransform: 'uppercase', marginBottom: 8 }}>
+                  {pasteMode === 'summary' ? 'AI Summary' : pasteMode === 'takeaways' ? 'Key Takeaways' : 'Deep Dive Analysis'}
+                </div>
+                {pasteLoading ? <ThinkingDots color={ACCENT} /> : <MD text={pasteResult} color={ACCENT} />}
+              </div>
+            )}
+          </div>
+        )}
+      </div>
 
       {/* Mobile: show pills */}
       {isMobile && mobilePills}
