@@ -34,7 +34,7 @@ export default function App() {
 
   const [theme, setTheme] = useState(() => localStorage.getItem('aether-theme') || 'dark');
 
-  const { isMobile, isTablet } = useViewport();
+  const { isMobile, isTablet, isPhone, isDesktop } = useViewport();
 
   useEffect(() => {
     const vars = theme === 'light' ? THEME_LIGHT : THEME_DARK;
@@ -65,7 +65,7 @@ export default function App() {
     projects, setProjects,
     notes, setNotes,
     research, setResearch,
-    isMobile, isTablet,
+    isMobile, isTablet, isPhone, isDesktop,
     theme, toggleTheme,
   };
 

@@ -3,7 +3,14 @@ import { useState, useEffect } from 'react';
 export default function useViewport() {
   const snap = () => {
     const w = window.innerWidth;
-    return { width: w, isMobile: w < 768, isTablet: w >= 768 && w < 1200, isDesktop: w >= 1200 };
+    return {
+      width:     w,
+      isPhone:   w < 480,
+      isMobile:  w < 768,
+      isTablet:  w >= 768 && w < 1024,
+      isDesktop: w >= 1024,
+      isWide:    w >= 1280,
+    };
   };
   const [vp, setVp] = useState(snap);
   useEffect(() => {
