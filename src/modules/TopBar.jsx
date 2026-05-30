@@ -1,5 +1,6 @@
 import { useState, useRef } from 'react';
 import { useApp } from '../App.jsx';
+import useVoiceInput from '../hooks/useVoiceInput.js';
 
 export default function TopBar() {
   const {
@@ -13,6 +14,7 @@ export default function TopBar() {
 
   const [searchFocused, setSearchFocused] = useState(false);
   const searchRef = useRef(null);
+  const { listening: voiceListening, toggle: toggleVoice, supported: voiceOk } = useVoiceInput();
 
   const allTopics = Object.values(graph?.topics || {}).map(t => ({ label: t.title, type: 'topic',   module: 'learn'    }));
   const projItems = (graph?.projects  || []).map(p => ({ label: p.title, type: 'project', module: 'projects' }));
@@ -89,6 +91,13 @@ export default function TopBar() {
                 placeholder="Ask anything..."
                 style={{ flex: 1, background: 'none', border: 'none', outline: 'none', fontSize: 12, color: 'var(--text-b)', fontFamily: 'inherit', minWidth: 0 }}
               />
+              {voiceOk && (
+                <span onClick={() => toggleVoice(t => setSearchQuery(t))}
+                  title={voiceListening ? 'Stop' : 'Voice search'}
+                  style={{ fontSize: 14, cursor: 'pointer', color: voiceListening ? '#ff4444' : 'var(--dim)', flexShrink: 0, transition: 'color 0.15s' }}>
+                  🎙️
+                </span>
+              )}
               {searchQuery && <span onClick={handleSearchSubmit} style={{ fontSize: 11, color: 'var(--accent, #00C6E6)', cursor: 'pointer', fontWeight: 700, flexShrink: 0 }}>↵</span>}
             </div>
             {dropdown}
@@ -125,6 +134,13 @@ export default function TopBar() {
               placeholder="Ask anything — AI-powered intelligence search..."
               style={{ flex: 1, background: 'none', border: 'none', outline: 'none', fontSize: 13, color: 'var(--text)', fontFamily: 'inherit' }}
             />
+            {voiceOk && (
+              <span onClick={() => toggleVoice(t => setSearchQuery(t))}
+                title={voiceListening ? 'Stop recording' : 'Voice search'}
+                style={{ fontSize: 14, cursor: 'pointer', color: voiceListening ? '#ff4444' : 'var(--dim)', flexShrink: 0, transition: 'color 0.15s' }}>
+                🎙️
+              </span>
+            )}
             {searchQuery
               ? <span onClick={handleSearchSubmit} style={{ fontSize: 11, color: 'var(--accent, #00C6E6)', cursor: 'pointer', fontWeight: 700, flexShrink: 0 }}>Ask AI →</span>
               : <span style={{ fontSize: 9, color: 'var(--dim)', background: 'var(--surf2)', border: '1px solid var(--border)', padding: '2px 7px', borderRadius: 5, flexShrink: 0 }}>↵</span>

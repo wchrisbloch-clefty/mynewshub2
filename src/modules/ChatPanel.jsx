@@ -2,6 +2,7 @@ import { useState, useRef, useEffect } from 'react';
 import { useApp } from '../App.jsx';
 import { CHAT_MODES } from '../constants.js';
 import { callClaude, buildApiMessages, buildSystem, processFiles } from '../utils.js';
+import useVoiceInput from '../hooks/useVoiceInput.js';
 import MD from './shared/MD.jsx';
 import { ThinkingDots, Label } from './shared/Common.jsx';
 
@@ -24,6 +25,7 @@ export default function ChatPanel() {
   const fileRef = useRef(null);
   const bottomRef = useRef(null);
   const sendRef = useRef(null);
+  const { listening, toggle: toggleVoice, supported: voiceOk } = useVoiceInput();
 
   useEffect(() => { bottomRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [messages, loading]);
 
@@ -167,15 +169,26 @@ export default function ChatPanel() {
             ))}
           </div>
         )}
-        <div style={{ display: 'flex', gap: 7, alignItems: 'flex-end' }}>
-          <div onClick={() => fileRef.current?.click()} style={{ padding: '8px', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 8, cursor: 'pointer', color: 'var(--subtle)', fontSize: 13, flexShrink: 0 }}>📎</div>
-          <input ref={fileRef} type="file" multiple style={{ display: 'none' }} onChange={e => handleFiles(e.target.files)} />
+        <div style={{ display: 'flex', gap: 6, alignItems: 'flex-end' }}>
+          {/* File upload */}
+          <div onClick={() => fileRef.current?.click()}
+            title="Attach files — docs, images, audio, video"
+            style={{ padding: '8px', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 8, cursor: 'pointer', color: 'var(--subtle)', fontSize: 13, flexShrink: 0, minHeight: 36, display: 'flex', alignItems: 'center' }}>📎</div>
+          <input ref={fileRef} type="file" multiple accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.csv,.jpg,.jpeg,.png,.gif,.webp,.mp3,.m4a,.wav,.mp4,.mov" style={{ display: 'none' }} onChange={e => handleFiles(e.target.files)} />
+          {/* Voice input */}
+          {voiceOk && (
+            <div onClick={() => toggleVoice((t, final) => { setInput(t); })}
+              title={listening ? 'Stop recording' : 'Voice input'}
+              style={{ padding: '8px', background: listening ? '#ff444412' : 'var(--surface)', border: `1px solid ${listening ? '#ff4444' : 'var(--border)'}`, borderRadius: 8, cursor: 'pointer', color: listening ? '#ff4444' : 'var(--subtle)', fontSize: 13, flexShrink: 0, minHeight: 36, display: 'flex', alignItems: 'center', transition: 'all 0.15s' }}>
+              🎙️
+            </div>
+          )}
           <textarea value={input} onChange={e => setInput(e.target.value)}
             onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(input); } }}
-            rows={1} placeholder="Ask anything..."
-            style={{ flex: 1, background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 10, padding: '8px 12px', color: 'var(--text-b)', fontSize: 12, outline: 'none', fontFamily: 'inherit', resize: 'none', maxHeight: 80 }} />
+            rows={1} placeholder={listening ? 'Listening…' : 'Ask anything — paste docs, images, or use voice…'}
+            style={{ flex: 1, background: 'var(--surface)', border: `1px solid ${listening ? '#ff444440' : 'var(--border)'}`, borderRadius: 10, padding: '8px 12px', color: 'var(--text-b)', fontSize: 12, outline: 'none', fontFamily: 'inherit', resize: 'none', maxHeight: 80, transition: 'border-color 0.15s' }} />
           <button onClick={() => send(input)} disabled={!input.trim() && attachments.length === 0}
-            style={{ padding: '8px 13px', background: input.trim() ? '#00FFB2' : 'var(--bord2)', border: 'none', borderRadius: 9, color: input.trim() ? '#000' : 'var(--dim)', fontSize: 12, fontWeight: 800, cursor: 'pointer', flexShrink: 0 }}>→</button>
+            style={{ padding: '8px 13px', background: input.trim() || attachments.length > 0 ? 'var(--accent,#00C6E6)' : 'var(--bord2)', border: 'none', borderRadius: 9, color: input.trim() || attachments.length > 0 ? '#000' : 'var(--dim)', fontSize: 12, fontWeight: 800, cursor: 'pointer', flexShrink: 0, minHeight: 36 }}>→</button>
         </div>
       </div>
     </div>

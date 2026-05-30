@@ -104,13 +104,15 @@ export const SESSION_MODES = [
 ];
 
 export const NAV_ITEMS = [
-  { id: "home",     icon: "⌂",  label: "Home",     accent: "#00FFB2" },
-  { id: "learn",    icon: "📚", label: "Learn",    accent: "#00FFB2" },
-  { id: "research", icon: "🔭", label: "Research", accent: "#6366F1" },
-  { id: "projects", icon: "🚀", label: "Projects", accent: "#ff8844" },
-  { id: "podcast",  icon: "🎙️", label: "Podcasts", accent: "#e11d48" },
-  { id: "vault",    icon: "🏛", label: "Vault",    accent: "#ffcc44" },
-  { id: "growth",   icon: "📈", label: "Growth",   accent: "#44ffcc" },
+  { id: "home",      icon: "⌂",  label: "Home",      accent: "#00C6E6" },
+  { id: "learn",     icon: "📚", label: "Learn",     accent: "#00C6E6" },
+  { id: "books",     icon: "📖", label: "Books",     accent: "#a78bfa" },
+  { id: "research",  icon: "🔭", label: "Research",  accent: "#6366F1" },
+  { id: "translate", icon: "🌐", label: "Translate", accent: "#38bdf8" },
+  { id: "projects",  icon: "🚀", label: "Projects",  accent: "#ff8844" },
+  { id: "podcast",   icon: "🎙️", label: "Podcasts",  accent: "#e11d48" },
+  { id: "vault",     icon: "🏛", label: "Vault",     accent: "#ffcc44" },
+  { id: "growth",    icon: "📈", label: "Growth",    accent: "#44ffcc" },
 ];
 
 export const CHAT_MODES = [
@@ -136,7 +138,76 @@ export const PROJECT_STATUSES = [
   { id: "done",        label: "Done",        color: "#44ff88" },
 ];
 
-export const ACCEPT_TYPES = ".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.csv,.jpg,.jpeg,.png,.gif,.webp,.heic";
+export const ACCEPT_TYPES = ".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.csv,.jpg,.jpeg,.png,.gif,.webp,.heic,.mp3,.m4a,.wav,.ogg,.mp4,.mov";
+
+export const LANGUAGES = [
+  { code: 'auto', label: 'Auto-detect', flag: '🔍', variants: null },
+  { code: 'en',   label: 'English',     flag: '🇺🇸', variants: [
+    { code: 'en-US', label: 'American English' },
+    { code: 'en-GB', label: 'British English' },
+    { code: 'en-AU', label: 'Australian English' },
+  ]},
+  { code: 'es',   label: 'Spanish',     flag: '🇪🇸', variants: [
+    { code: 'es-MX', label: 'Mexican Spanish' },
+    { code: 'es-ES', label: 'Castilian Spanish (Spain)' },
+    { code: 'es-AR', label: 'Argentine Spanish (vos)' },
+    { code: 'es-CO', label: 'Colombian Spanish' },
+    { code: 'es-VE', label: 'Venezuelan Spanish' },
+    { code: 'es-CL', label: 'Chilean Spanish' },
+    { code: 'es-PR', label: 'Puerto Rican Spanish' },
+    { code: 'es-DO', label: 'Dominican Spanish' },
+    { code: 'es-US', label: 'US Latino Spanish' },
+  ]},
+  { code: 'pt',   label: 'Portuguese',  flag: '🇧🇷', variants: [
+    { code: 'pt-BR', label: 'Brazilian Portuguese' },
+    { code: 'pt-PT', label: 'European Portuguese (Portugal)' },
+  ]},
+  { code: 'fr',   label: 'French',      flag: '🇫🇷', variants: [
+    { code: 'fr-FR', label: 'French (France)' },
+    { code: 'fr-CA', label: 'Quebec French (Canada)' },
+    { code: 'fr-BE', label: 'Belgian French' },
+  ]},
+  { code: 'de',   label: 'German',      flag: '🇩🇪', variants: [
+    { code: 'de-DE', label: 'German (Germany)' },
+    { code: 'de-AT', label: 'Austrian German' },
+    { code: 'de-CH', label: 'Swiss German' },
+  ]},
+  { code: 'zh',   label: 'Chinese',     flag: '🇨🇳', variants: [
+    { code: 'zh-CN', label: 'Simplified Chinese (Mainland)' },
+    { code: 'zh-TW', label: 'Traditional Chinese (Taiwan)' },
+    { code: 'zh-HK', label: 'Traditional Chinese (Hong Kong)' },
+  ]},
+  { code: 'ar',   label: 'Arabic',      flag: '🇸🇦', variants: [
+    { code: 'ar',    label: 'Modern Standard Arabic (فصحى)' },
+    { code: 'ar-EG', label: 'Egyptian Arabic (Masri)' },
+    { code: 'ar-SA', label: 'Gulf Arabic (Saudi)' },
+    { code: 'ar-LB', label: 'Levantine Arabic (Shami)' },
+    { code: 'ar-MA', label: 'Moroccan Darija' },
+  ]},
+  { code: 'ja',  label: 'Japanese',   flag: '🇯🇵', variants: null },
+  { code: 'ko',  label: 'Korean',     flag: '🇰🇷', variants: null },
+  { code: 'hi',  label: 'Hindi',      flag: '🇮🇳', variants: null },
+  { code: 'it',  label: 'Italian',    flag: '🇮🇹', variants: null },
+  { code: 'ru',  label: 'Russian',    flag: '🇷🇺', variants: null },
+  { code: 'tr',  label: 'Turkish',    flag: '🇹🇷', variants: null },
+  { code: 'nl',  label: 'Dutch',      flag: '🇳🇱', variants: null },
+  { code: 'pl',  label: 'Polish',     flag: '🇵🇱', variants: null },
+  { code: 'sv',  label: 'Swedish',    flag: '🇸🇪', variants: null },
+  { code: 'he',  label: 'Hebrew',     flag: '🇮🇱', variants: null },
+  { code: 'id',  label: 'Indonesian', flag: '🇮🇩', variants: null },
+  { code: 'vi',  label: 'Vietnamese', flag: '🇻🇳', variants: null },
+  { code: 'th',  label: 'Thai',       flag: '🇹🇭', variants: null },
+  { code: 'el',  label: 'Greek',      flag: '🇬🇷', variants: null },
+  { code: 'uk',  label: 'Ukrainian',  flag: '🇺🇦', variants: null },
+];
+
+export const TRANSLATION_MODES = [
+  { id: 'standard',  label: 'Standard',   icon: '🌐', desc: 'Natural, fluent translation' },
+  { id: 'formal',    label: 'Formal',     icon: '👔', desc: 'Business / professional register' },
+  { id: 'casual',    label: 'Casual',     icon: '💬', desc: 'Everyday conversational tone' },
+  { id: 'literal',   label: 'Literal',    icon: '📖', desc: 'Word-for-word (for language study)' },
+  { id: 'localized', label: 'Localized',  icon: '🏘', desc: 'Local idioms & cultural expressions' },
+];
 export const STORAGE_KEY  = "aether_hub_v1";
 export const GRAPH_KEY    = "aether_graph_v1";
 export const PROJECTS_KEY = "aether_projects_v1";

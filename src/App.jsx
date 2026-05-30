@@ -7,7 +7,9 @@ import Sidebar from './modules/Sidebar.jsx';
 import ChatPanel from './modules/ChatPanel.jsx';
 import HomeDashboard from './modules/HomeDashboard.jsx';
 import LearningCenter from './modules/LearningCenter.jsx';
+import BookClub from './modules/BookClub.jsx';
 import ResearchHub from './modules/ResearchHub.jsx';
+import TranslatorHub from './modules/TranslatorHub.jsx';
 import ProjectsOS from './modules/ProjectsOS.jsx';
 import MasteryVault from './modules/MasteryVault.jsx';
 import GrowthTools from './modules/GrowthTools.jsx';
@@ -67,11 +69,13 @@ export default function App() {
   };
 
   const modules = {
-    home:     <HomeDashboard />,
-    learn:    <LearningCenter />,
-    research: <ResearchHub />,
-    projects: <ProjectsOS />,
-    podcast:  <PodcastHub />,
+    home:      <HomeDashboard />,
+    learn:     <LearningCenter />,
+    books:     <BookClub />,
+    research:  <ResearchHub />,
+    translate: <TranslatorHub />,
+    projects:  <ProjectsOS />,
+    podcast:   <PodcastHub />,
     vault:    <MasteryVault />,
     growth:   <GrowthTools />,
   };
