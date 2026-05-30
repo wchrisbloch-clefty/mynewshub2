@@ -3,6 +3,7 @@ import { loadGraph, loadProjects, loadNotes, loadResearch } from './utils.js';
 import { NAV_ITEMS, THEME_DARK, THEME_LIGHT } from './constants.js';
 import useViewport from './hooks/useViewport.js';
 import TopBar from './modules/TopBar.jsx';
+import Sidebar from './modules/Sidebar.jsx';
 import ChatPanel from './modules/ChatPanel.jsx';
 import HomeDashboard from './modules/HomeDashboard.jsx';
 import LearningCenter from './modules/LearningCenter.jsx';
@@ -21,34 +22,30 @@ function applyThemeVars(vars) {
 }
 
 export default function App() {
-  const [activeModule, setActiveModule] = useState('home');
-  const [chatOpen, setChatOpen] = useState(false);
-  const [searchQuery, setSearchQuery] = useState('');
-  const [chatPrefill, setChatPrefill] = useState('');
+  const [activeModule,     setActiveModule]    = useState('home');
+  const [chatOpen,         setChatOpen]         = useState(false);
+  const [searchQuery,      setSearchQuery]      = useState('');
+  const [chatPrefill,      setChatPrefill]      = useState('');
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
 
-  const [graph, setGraph] = useState(null);
+  const [graph,    setGraph]    = useState(null);
   const [projects, setProjects] = useState([]);
-  const [notes, setNotes] = useState([]);
+  const [notes,    setNotes]    = useState([]);
   const [research, setResearch] = useState([]);
-  const [loaded, setLoaded] = useState(false);
+  const [loaded,   setLoaded]   = useState(false);
 
   const [theme, setTheme] = useState(() => localStorage.getItem('aether-theme') || 'dark');
 
-  const { isMobile, isTablet, isPhone, isDesktop } = useViewport();
+  const { isMobile, isTablet, isPhone, isDesktop, isWide } = useViewport();
 
   useEffect(() => {
-    const vars = theme === 'light' ? THEME_LIGHT : THEME_DARK;
-    applyThemeVars(vars);
+    applyThemeVars(theme === 'light' ? THEME_LIGHT : THEME_DARK);
     localStorage.setItem('aether-theme', theme);
   }, [theme]);
 
   useEffect(() => {
     Promise.all([loadGraph(), loadProjects(), loadNotes(), loadResearch()]).then(([g, p, n, r]) => {
-      setGraph(g);
-      setProjects(p);
-      setNotes(n);
-      setResearch(r);
-      setLoaded(true);
+      setGraph(g); setProjects(p); setNotes(n); setResearch(r); setLoaded(true);
     });
   }, []);
 
@@ -58,15 +55,15 @@ export default function App() {
 
   const ctx = {
     activeModule, setActiveModule,
-    chatOpen, setChatOpen,
-    searchQuery, setSearchQuery,
-    chatPrefill, setChatPrefill,
-    graph, setGraph,
-    projects, setProjects,
-    notes, setNotes,
-    research, setResearch,
-    isMobile, isTablet, isPhone, isDesktop,
-    theme, toggleTheme,
+    chatOpen,     setChatOpen,
+    searchQuery,  setSearchQuery,
+    chatPrefill,  setChatPrefill,
+    graph,        setGraph,
+    projects,     setProjects,
+    notes,        setNotes,
+    research,     setResearch,
+    isMobile, isTablet, isPhone, isDesktop, isWide,
+    theme,    toggleTheme,
   };
 
   const modules = {
@@ -79,22 +76,74 @@ export default function App() {
     growth:   <GrowthTools />,
   };
 
+  // Tablets show icon-only sidebar automatically
+  const collapsed = isTablet || sidebarCollapsed;
+
   return (
     <AppContext.Provider value={ctx}>
       <div style={{ display: 'flex', flexDirection: 'column', height: '100vh', background: 'var(--bg)', overflow: 'hidden' }}>
         <TopBar />
-        <main style={{
-          flex: 1,
-          overflowY: 'auto',
-          overflowX: 'hidden',
-          paddingRight: (!isMobile && chatOpen) ? 360 : 0,
-          transition: 'padding-right 0.22s ease',
-        }}>
-          {modules[activeModule] || <HomeDashboard />}
-        </main>
+
+        <div style={{ display: 'flex', flex: 1, overflow: 'hidden' }}>
+          {!isMobile && (
+            <Sidebar collapsed={collapsed} onToggle={() => setSidebarCollapsed(c => !c)} />
+          )}
+          <main style={{
+            flex: 1,
+            overflowY: 'auto',
+            overflowX: 'hidden',
+            paddingRight: (!isMobile && chatOpen) ? 360 : 0,
+            transition: 'padding-right 0.22s ease',
+          }}>
+            {modules[activeModule] || <HomeDashboard />}
+          </main>
+        </div>
+
+        {isMobile && <BottomNav activeModule={activeModule} setActiveModule={setActiveModule} isPhone={isPhone} />}
         <ChatPanel />
       </div>
     </AppContext.Provider>
+  );
+}
+
+function BottomNav({ activeModule, setActiveModule, isPhone }) {
+  return (
+    <nav style={{
+      height: isPhone ? 56 : 62,
+      background: 'var(--surface)',
+      borderTop: '1px solid var(--border)',
+      display: 'flex',
+      flexShrink: 0,
+      zIndex: 30,
+    }}>
+      {NAV_ITEMS.map(item => {
+        const active = activeModule === item.id;
+        return (
+          <button key={item.id} onClick={() => setActiveModule(item.id)}
+            style={{
+              flex: 1,
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: 2,
+              border: 'none',
+              borderTop: `2px solid ${active ? 'var(--accent, #00C6E6)' : 'transparent'}`,
+              background: 'transparent',
+              color: active ? 'var(--accent, #00C6E6)' : 'var(--muted)',
+              cursor: 'pointer',
+              fontFamily: 'inherit',
+              outline: 'none',
+              transition: 'color 0.12s',
+              padding: 0,
+              minWidth: 0,
+            }}>
+            <span style={{ fontSize: isPhone ? 19 : 17 }}>{item.icon}</span>
+            {!isPhone && <span style={{ fontSize: 8, fontWeight: active ? 700 : 500, letterSpacing: 0.3 }}>{item.label}</span>}
+          </button>
+        );
+      })}
+    </nav>
   );
 }
 
@@ -104,7 +153,7 @@ function LoadingScreen() {
       <div style={{ fontSize: 28, fontFamily: "'Fraunces', serif", fontWeight: 800, color: 'var(--text)', letterSpacing: -1 }}>Aether</div>
       <div style={{ display: 'flex', gap: 5 }}>
         {[0, 1, 2].map(i => (
-          <div key={i} style={{ width: 6, height: 6, borderRadius: '50%', background: '#00FFB2', animation: `pulse 1.2s ${i * 0.2}s infinite ease-in-out` }} />
+          <div key={i} style={{ width: 6, height: 6, borderRadius: '50%', background: 'var(--accent, #00C6E6)', animation: `pulse 1.2s ${i * 0.2}s infinite ease-in-out` }} />
         ))}
       </div>
       <div style={{ fontSize: 9, letterSpacing: 3, color: 'var(--dim)', textTransform: 'uppercase' }}>Loading intelligence hub</div>
