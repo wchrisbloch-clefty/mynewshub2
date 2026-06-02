@@ -123,6 +123,9 @@ const DEFAULT_FEEDS = {
     { name:'CBS Sports CBB',       url:'https://www.cbssports.com/rss/headlines/college-basketball',            on:true },
     { name:'Pro Football Talk',    url:'https://www.nbcsports.com/profootballtalk.rss',                         on:true },
     { name:'Bleacher Report',      url:'https://feeds.bleacherreport.com/articles/feed',                        on:true },
+    { name:'OutKick',              url:'https://www.outkick.com/feed/',                                              on:true },
+    { name:'D1Baseball',           url:'https://d1baseball.com/feed/',                                              on:true },
+    { name:'Baseball America',     url:'https://www.baseballamerica.com/feed/',                                      on:false },
     { name:'247Sports',            url:'https://247sports.com/Page/College-Sports-News-and-Recruiting-100021/Feeds/', on:true },
     { name:'Kentucky Sports Radio',url:'https://kentuckysportsradio.com/feed/',                                 on:true },
     { name:'On3 Recruiting',       url:'https://www.on3.com/feed/',                                             on:true },
@@ -4102,6 +4105,50 @@ kbd{display:inline-block;padding:1px 5px;border:1px solid var(--border);border-r
 .chat-send:hover{background:#7c3aed;}
 .chat-send:disabled{background:var(--border);cursor:not-allowed;}
 
+/* ═══ v36: POP CULTURE SUB-TABS ═══ */
+.pc-subtabs{
+  display:flex;gap:8px;flex-wrap:wrap;
+  padding:8px 0 16px;
+  overflow-x:auto;scrollbar-width:none;
+}
+.pc-subtabs::-webkit-scrollbar{display:none;}
+.pc-subtab{
+  display:inline-flex;align-items:center;gap:5px;
+  padding:7px 15px;border-radius:22px;
+  background:var(--surface2);border:1.5px solid var(--border);
+  font-size:12px;font-weight:600;color:var(--text2);
+  cursor:pointer;white-space:nowrap;transition:all 0.14s;
+  font-family:var(--font-sans);
+}
+.pc-subtab:hover{background:var(--surface);color:var(--text);border-color:var(--text3);}
+.pc-subtab.active{background:#db2777;color:#fff;border-color:#db2777;box-shadow:0 2px 8px rgba(219,39,119,0.35);}
+@media(max-width:640px){
+  .pc-subtab{padding:8px 12px;font-size:12px;min-height:44px;}
+}
+
+/* ═══ v36: RECOMMENDATIONS / FOR YOU ═══ */
+.rec-section{border-top:2px solid var(--border);}
+.rec-section-sub{font-size:10px;color:var(--text3);margin-left:6px;}
+.rec-row{
+  display:flex;align-items:flex-start;gap:10px;
+  padding:9px 0;border-bottom:1px solid var(--border2);
+  cursor:pointer;transition:background 0.1s;border-radius:4px;
+}
+.rec-row:last-child{border-bottom:none;}
+.rec-row:hover{background:var(--surface2);}
+.rec-thumb{
+  width:52px;height:40px;flex-shrink:0;
+  background-size:cover;background-position:center;
+  border-radius:4px;
+}
+.rec-body{flex:1;min-width:0;}
+.rec-title{
+  font-size:12px;font-weight:600;color:var(--text);
+  line-height:1.35;display:-webkit-box;-webkit-line-clamp:2;
+  -webkit-box-orient:vertical;overflow:hidden;
+}
+.rec-src{font-size:10px;color:var(--text3);margin-top:3px;}
+
 /* TRENDING SEARCH BAR — chips when search is empty */
 .trending-bar{
   display:flex;align-items:center;gap:8px;flex-wrap:wrap;
@@ -5116,7 +5163,7 @@ function Scoreboard({scores, loading, compact=false}) {
 }
 
 // ─── GHOST SIDEBAR ────────────────────────────────────────────────────────────
-function Sidebar({cat, arts, kw, health, activeKw, setActiveKw, activeSource, setActiveSource, onRead, scores, scoresLoading, showScoreboard}) {
+function Sidebar({cat, arts, kw, health, activeKw, setActiveKw, activeSource, setActiveSource, onRead, scores, scoresLoading, showScoreboard, recommended}) {
   const cc = CATS[cat]||CATS.general;
   const catKws = kw[cat]||[];
   const catArts = arts[cat]||[];
@@ -5246,6 +5293,25 @@ function Sidebar({cat, arts, kw, health, activeKw, setActiveKw, activeSource, se
               )}
             </>
           )}
+        </div>
+      )}
+
+      {/* v36: For You — personalized recommendations based on reading/search history */}
+      {recommended && recommended.length > 0 && (
+        <div className="sidebar-section rec-section">
+          <div className="sidebar-sec-head">
+            <span className="sidebar-sec-label">⭐ For You</span>
+            <span className="rec-section-sub">Based on your interests</span>
+          </div>
+          {recommended.slice(0, 5).map((a, i) => (
+            <div key={i} className="rec-row" onClick={()=>onRead(a)}>
+              {a.img && <div className="rec-thumb" style={{backgroundImage:`url(${a.img})`}}/>}
+              <div className="rec-body">
+                <div className="rec-title">{a.title}</div>
+                <div className="rec-src">{a.source} · {fmtDate(a.pubDate)}</div>
+              </div>
+            </div>
+          ))}
         </div>
       )}
     </div>
@@ -6428,6 +6494,7 @@ export default function App() {
   const [activeSrc, setActiveSrc]   = useState(null);
   const [scores, setScores]         = useState({});
   const [scoresLoading, setScoresLoading] = useState(false);
+  const [searchHistory, setSearchHistory] = useState(()=>ld('searchHistory',[]));
 
   // ── v16 mobile + editorial state ──
   const [menuOpen, setMenuOpen]         = useState(false);
@@ -6442,6 +6509,40 @@ export default function App() {
   useEffect(()=>{sv('saved',saved);},[saved]);
   useEffect(()=>{sv('clicks',clicks);},[clicks]);
   useEffect(()=>{sv('readLinks',[...readLinks]);},[readLinks]);
+
+  // v36: Interest profile derived from reading history + saves + searches
+  const interestProfile = useMemo(() => {
+    const freq = {};
+    const STOP = new Set(['the','and','for','a','an','to','in','of','on','is','it','at','by','or','be','as','with','this','that','from','are','was','were','has','have','had','but','not','can','will','their','they','we','you','all','said']);
+    const addWords = (text, weight=1) => {
+      if (!text) return;
+      text.toLowerCase().replace(/[^a-z0-9\s]/g,'').split(/\s+/).forEach(w => {
+        if (w.length > 3 && !STOP.has(w)) freq[w] = (freq[w] || 0) + weight;
+      });
+    };
+    saved.forEach(a => { addWords(a.title, 3); addWords(a.desc, 1); });
+    [...readLinks].forEach(link => {
+      const all = Object.values(arts).flat();
+      const a = all.find(x => x.link === link);
+      if (a) { addWords(a.title, 2); addWords(a.desc, 1); }
+    });
+    searchHistory.forEach(q => addWords(q, 4));
+    return Object.entries(freq).sort((a,b)=>b[1]-a[1]).slice(0,30).map(([w])=>w);
+  }, [saved, readLinks, searchHistory, arts]);
+
+  // v36: Recommended articles — score all unread/unsaved articles by interest profile
+  const recommended = useMemo(() => {
+    if (interestProfile.length === 0) return [];
+    const all = Object.values(arts).flat();
+    const scored = all.map(a => {
+      if ((a.link && readLinks.has(a.link)) || saved.some(s=>s.link===a.link)) return null;
+      const text = (a.title + ' ' + (a.desc||'')).toLowerCase();
+      const score = interestProfile.reduce((s,w) => text.includes(w) ? s+1 : s, 0);
+      return score > 0 ? { ...a, _recScore: score } : null;
+    }).filter(Boolean);
+    scored.sort((a,b) => b._recScore - a._recScore || new Date(b.pubDate) - new Date(a.pubDate));
+    return scored.slice(0, 8);
+  }, [arts, interestProfile, readLinks, saved]);
 
   // v20: whole-word urgent match + 6h recency window + cap 8.
   // Whole-word prevents "killed" matching "killed it" or "killing" substrings.
@@ -6583,23 +6684,23 @@ export default function App() {
   useEffect(()=>{sv('teams',teams);},[teams]);
   useEffect(()=>{sv('weatherCities',weatherCities);},[weatherCities]);
 
-  // v26: Global search — when search text is present, query all categories
-  // When internal results are thin (<3), fetch DuckDuckGo web fallback
+  // v36: Global search — always fetch web results alongside internal articles
   useEffect(() => {
     if (!search || search.length < 3) {
       setWebResults([]); setSourceRecs([]); return;
     }
-    const internalCount = Object.values(arts).flat().filter(a =>
-      (a.title + ' ' + (a.desc||'')).toLowerCase().includes(search)
-    ).length;
     setSourceRecs(suggestSourcesForQuery(search));
-    if (internalCount < 3) {
-      setWebLoading(true);
-      fetchWebSearch(search).then(r => { setWebResults(r); setWebLoading(false); });
-    } else {
-      setWebResults([]);
-    }
-  }, [search, arts]);
+    setWebLoading(true);
+    fetchWebSearch(search).then(r => { setWebResults(r); setWebLoading(false); });
+    // Track search history (last 10 unique queries)
+    setSearchHistory(prev => {
+      const trimmed = search.trim().toLowerCase();
+      if (!trimmed) return prev;
+      const next = [trimmed, ...prev.filter(s => s !== trimmed)].slice(0, 10);
+      sv('searchHistory', next);
+      return next;
+    });
+  }, [search]);
 
   // Keyboard shortcuts: J/K navigate articles, B bookmark, / focus search, Escape clear
   useEffect(() => {
@@ -6698,8 +6799,24 @@ export default function App() {
   // NBA/MLB/CFB/CBB), favorite team pills with external links, then prioritized
   // stories feed. Yahoo Sports' actual layout pattern.
   const SportsPage = () => {
-    const [sportTab, setSportTab] = useState('all'); // 'all' | 'nfl' | 'nba' | 'mlb' | 'cfb' | 'cbb'
+    const [sportTab, setSportTab] = useState('all'); // 'all' | 'nfl' | 'nba' | 'mlb' | 'cfb' | 'cbb' | 'cbase'
     const [activeTeam, setActiveTeam] = useState(null); // team obj when filter pill tapped
+    const [sportWebResults, setSportWebResults] = useState([]);
+    const [sportWebLoading, setSportWebLoading] = useState(false);
+
+    // v36: Fetch web results when a specific league tab is active
+    useEffect(() => {
+      if (sportTab === 'all') { setSportWebResults([]); return; }
+      const SPORT_TAB_QUERIES = {
+        nfl: 'NFL football news today', nba: 'NBA basketball news today',
+        mlb: 'MLB baseball news today', cfb: 'college football news today',
+        cbb: 'college basketball news today', cbase: 'college baseball news today',
+        racing: 'horse racing news today',
+      };
+      const q = SPORT_TAB_QUERIES[sportTab] || `${sportTab} sports news`;
+      setSportWebLoading(true);
+      fetchWebSearch(q).then(r => { setSportWebResults(r); setSportWebLoading(false); });
+    }, [sportTab]);
 
     const cc = CATS.sports;
     const allItems = sorted('sports');
@@ -6738,6 +6855,7 @@ export default function App() {
                        : sportTab === 'mlb'    ? ['mlb','baseball','world series','yankees','dodgers','cubs','home run','pitcher','bullpen','batting average','mlb draft']
                        : sportTab === 'cfb'    ? ['cfb','college football','ncaa football','sec','big ten','acc','pac-12','big 12','cfp','bowl game','heisman']
                        : sportTab === 'cbb'    ? ['cbb','college basketball','ncaa','march madness','final four','ncaa tournament','big east','sweet 16']
+                       : sportTab === 'cbase'  ? ['college baseball','ncaa baseball','cws','college world series','super regional','sec baseball','acc baseball','big 12 baseball','d1baseball','college world']
                        : sportTab === 'racing' ? ['horse racing','thoroughbred','derby','stakes','jockey','paddock','furlong','harness racing','horse race','breeders cup','kentucky derby','preakness','belmont']
                        : [];
         items = items.filter(a => {
@@ -6766,12 +6884,13 @@ export default function App() {
 
     const SPORT_TABS = [
       { key:'all',    label:'All' },
-      { key:'nfl',    label:'NFL',         emoji:'🏈' },
-      { key:'nba',    label:'NBA',         emoji:'🏀' },
-      { key:'mlb',    label:'MLB',         emoji:'⚾' },
-      { key:'cfb',    label:'College FB',  emoji:'🏈' },
-      { key:'cbb',    label:'College BB',  emoji:'🏀' },
-      { key:'racing', label:'Horse Racing',emoji:'🏇' },
+      { key:'nfl',    label:'NFL',            emoji:'🏈' },
+      { key:'nba',    label:'NBA',            emoji:'🏀' },
+      { key:'mlb',    label:'MLB',            emoji:'⚾' },
+      { key:'cfb',    label:'College FB',     emoji:'🏈' },
+      { key:'cbb',    label:'College BB',     emoji:'🏀' },
+      { key:'cbase',  label:'College Baseball',emoji:'⚾' },
+      { key:'racing', label:'Horse Racing',   emoji:'🏇' },
     ];
 
     const feedRef = useRef(null);
@@ -6920,6 +7039,21 @@ export default function App() {
                   ))
             }
 
+            {/* v36: Web results for active league tab */}
+            {sportTab !== 'all' && (sportWebResults.length > 0 || sportWebLoading) && (
+              <div className="web-fallback">
+                <div className="rail-label" style={{margin:'24px 0 12px'}}>🌐 From the Web</div>
+                {sportWebLoading && <div style={{fontSize:'12px',color:'var(--text3)',fontStyle:'italic',padding:'10px 0'}}>Searching the web…</div>}
+                {sportWebResults.map((r,i) => (
+                  <a key={i} className="web-result" href={r.link} target="_blank" rel="noreferrer">
+                    <div className="web-result-title">{r.title}</div>
+                    {r.desc && <div className="web-result-desc">{r.desc.slice(0,160)}</div>}
+                    <div className="web-result-src">{r.source}{r.pubDate && <span className="web-result-date"> · {fmtDate(r.pubDate)}</span>}</div>
+                  </a>
+                ))}
+              </div>
+            )}
+
             {lastUpdated.sports && (
               <div style={{display:'flex',justifyContent:'flex-end',padding:'8px 0'}}>
                 <LastUpdated timestamp={lastUpdated.sports} onRefresh={() => loadCat('sports')}/>
@@ -6932,7 +7066,7 @@ export default function App() {
             activeKw={activeKw} setActiveKw={k=>{setActiveKw(k);setActiveSrc(null);}}
             activeSource={activeSrc} setActiveSource={s=>{setActiveSrc(s);setActiveKw(null);}}
             onRead={onRead} scores={scores} scoresLoading={scoresLoading}
-            showScoreboard={false}/>
+            showScoreboard={false} recommended={recommended}/>
         </div>
       </div>
     );
@@ -6944,9 +7078,51 @@ export default function App() {
     const rawItems=sorted(cat);
     const items=useMemo(()=>clusterStories(rawItems),[rawItems]);
     const isLoading=loading[cat];
-    const heroItems=items.filter(a=>a.img);
+
+    // v36: Pop Culture sub-tab state (hooks always declared, only used when cat===popculture)
+    const [pcSubTab, setPcSubTab] = useState('all');
+    const [pcWebResults, setPcWebResults] = useState([]);
+    const [pcWebLoading, setPcWebLoading] = useState(false);
+
+    const PC_SUBTABS = [
+      { key:'all',         label:'All',         emoji:'✨' },
+      { key:'shows',       label:'Shows/Movies', emoji:'🎬' },
+      { key:'music',       label:'Music',        emoji:'🎵' },
+      { key:'books',       label:'Books',        emoji:'📚' },
+      { key:'comedy',      label:'Comedy',       emoji:'😂' },
+    ];
+    const PC_KWS = {
+      shows:  ['movie','film','tv','streaming','netflix','hbo','disney','show','series','premiere','season','episode','cinema','trailer','oscar','emmy','golden globe'],
+      music:  ['album','music','song','artist','chart','grammy','billboard','concert','tour','release','single','rapper','singer','playlist','spotify','pop star'],
+      books:  ['book','novel','author','bestseller','fiction','reading','publisher','memoir','nonfiction','literary','penguin','bestselling','new book'],
+      comedy: ['comedy','comedian','stand-up','funny','humor','joke','sketch','snl','sitcom','comic','parody','satire'],
+    };
+
+    // Filter items by pop culture sub-tab
+    const pcFilteredItems = useMemo(() => {
+      if (cat !== 'popculture' || pcSubTab === 'all') return items;
+      const kws = PC_KWS[pcSubTab] || [];
+      return items.filter(a => {
+        const t = (a.title + ' ' + (a.desc||'')).toLowerCase();
+        return kws.some(k => t.includes(k));
+      });
+    }, [items, cat, pcSubTab]);
+
+    // v36: Web results for pop culture sub-tab
+    useEffect(() => {
+      if (cat !== 'popculture' || pcSubTab === 'all') { setPcWebResults([]); return; }
+      const queries = {
+        shows:'movies TV shows streaming news today', music:'music news trending albums today',
+        books:'best books reading news today', comedy:'comedy entertainment news today',
+      };
+      const q = queries[pcSubTab] || `${pcSubTab} pop culture news today`;
+      setPcWebLoading(true);
+      fetchWebSearch(q).then(r => { setPcWebResults(r); setPcWebLoading(false); });
+    }, [cat, pcSubTab]);
+
+    const heroItems=pcFilteredItems.filter(a=>a.img);
     const catLead=heroItems[0]||null;
-    const feedItems=catLead?items.filter(a=>a.link!==catLead.link):items;
+    const feedItems=catLead?pcFilteredItems.filter(a=>a.link!==catLead.link):pcFilteredItems;
 
     const isHome = cat === 'general';
     const catKws = kw[cat] || [];
@@ -7040,6 +7216,18 @@ export default function App() {
           ) : null;
         })()}
 
+        {/* v36: Pop Culture sub-tabs */}
+        {cat === 'popculture' && !activeKw && !activeSrc && !search && (
+          <div className="pc-subtabs">
+            {PC_SUBTABS.map(t => (
+              <button key={t.key} className={`pc-subtab ${pcSubTab===t.key?'active':''}`}
+                onClick={()=>setPcSubTab(t.key)}>
+                {t.emoji} {t.label}
+              </button>
+            ))}
+          </div>
+        )}
+
         <div className="page-grid">
           <div className="feed-col">
             <div className="page-header-row">
@@ -7072,6 +7260,21 @@ export default function App() {
                 ?<div className="empty-state"><div className="empty-icon">📭</div><div className="empty-msg">{activeKw||activeSrc?'No articles match this filter':search?`No internal results for "${search}"`:'No articles loaded yet'}</div><button className="refresh-btn" onClick={refreshAll}>Refresh</button></div>
                 :feedItems.slice(activeKw||activeSrc||search?0:3,20).map((a,i)=><FeedCard key={i} a={a} cat={cat} isSaved={isSavedFn(a)} onSave={onSave} onRead={onRead} relatedSources={getRelated(a,cat)} isRead={isReadFn(a)} userKw={kw} userTeams={teams}/>)
             }
+
+            {/* v36: Pop culture sub-tab web results */}
+            {cat === 'popculture' && pcSubTab !== 'all' && (pcWebResults.length > 0 || pcWebLoading) && (
+              <div className="web-fallback">
+                <div className="rail-label" style={{margin:'24px 0 12px'}}>🌐 From the Web</div>
+                {pcWebLoading && <div style={{fontSize:'12px',color:'var(--text3)',fontStyle:'italic',padding:'10px 0'}}>Searching the web…</div>}
+                {pcWebResults.map((r,i) => (
+                  <a key={i} className="web-result" href={r.link} target="_blank" rel="noreferrer">
+                    <div className="web-result-title">{r.title}</div>
+                    {r.desc && <div className="web-result-desc">{r.desc.slice(0,160)}</div>}
+                    <div className="web-result-src">{r.source}{r.pubDate && <span className="web-result-date"> · {fmtDate(r.pubDate)}</span>}</div>
+                  </a>
+                ))}
+              </div>
+            )}
 
             {/* v26: Web search fallback when searching with thin internal results */}
             {search && (webResults.length > 0 || webLoading) && (
@@ -7178,7 +7381,7 @@ export default function App() {
             activeKw={activeKw} setActiveKw={k=>{setActiveKw(k);setActiveSrc(null);}}
             activeSource={activeSrc} setActiveSource={s=>{setActiveSrc(s);setActiveKw(null);}}
             onRead={onRead} scores={scores} scoresLoading={scoresLoading}
-            showScoreboard={cat==='sports'}/>
+            showScoreboard={cat==='sports'} recommended={recommended}/>
         </div>
       </div>
     );
