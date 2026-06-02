@@ -123,6 +123,9 @@ const DEFAULT_FEEDS = {
     { name:'CBS Sports CBB',       url:'https://www.cbssports.com/rss/headlines/college-basketball',            on:true },
     { name:'Pro Football Talk',    url:'https://www.nbcsports.com/profootballtalk.rss',                         on:true },
     { name:'Bleacher Report',      url:'https://feeds.bleacherreport.com/articles/feed',                        on:true },
+    { name:'OutKick',              url:'https://www.outkick.com/feed/',                                              on:true },
+    { name:'D1Baseball',           url:'https://d1baseball.com/feed/',                                              on:true },
+    { name:'Baseball America',     url:'https://www.baseballamerica.com/feed/',                                      on:false },
     { name:'247Sports',            url:'https://247sports.com/Page/College-Sports-News-and-Recruiting-100021/Feeds/', on:true },
     { name:'Kentucky Sports Radio',url:'https://kentuckysportsradio.com/feed/',                                 on:true },
     { name:'On3 Recruiting',       url:'https://www.on3.com/feed/',                                             on:true },
@@ -320,6 +323,7 @@ const DEFAULT_WATCHLIST = [
   { sym:'NVDA',  name:'NVIDIA' },
   { sym:'MSFT',  name:'Microsoft' },
   { sym:'GOOGL', name:'Alphabet' },
+  { sym:'ASML',  name:'ASML Holding NV' },
 ];
 
 const DEFAULT_WEATHER_CITIES = [
@@ -1033,8 +1037,15 @@ body:not(.dark) .pill-bar{
   min-width:130px;
 }
 .pill:hover{background:rgba(255,255,255,0.06);}
-/* Weather pills: slightly warmer feel */
-.pill-wx{min-width:150px;}
+/* Weather pills: blue tint to distinguish from financial data */
+.pill-wx{
+  min-width:150px;
+  background:rgba(37,99,235,0.35);
+  border-right-color:rgba(59,130,246,0.25);
+}
+.pill-wx:hover{background:rgba(37,99,235,0.48);}
+.pill-wx .pill-label{color:rgba(147,197,253,0.85);}
+.pill-wx .pill-value{color:#bfdbfe;}
 .pill-icon{font-size:16px;flex-shrink:0;}
 .pill-body{display:flex;flex-direction:column;line-height:1.2;flex:1;min-width:0;}
 .pill-label{
@@ -2182,8 +2193,8 @@ body:not(.dark) .pill-bar{
   position:relative;
   flex-shrink:0;scroll-snap-align:start;
   background:#162635;border:1px solid #243446;
-  border-radius:6px;padding:8px 12px;
-  min-width:108px;cursor:pointer;
+  border-radius:8px;padding:11px 14px;
+  min-width:162px;cursor:pointer;
   transition:border-color 0.15s, transform 0.1s;
 }
 .sst-tile:hover{border-color:#3b5168;transform:translateY(-1px);}
@@ -2194,71 +2205,113 @@ body:not(.dark) .pill-bar{
   position:absolute;top:6px;right:8px;
   color:#fbbf24;font-size:10px;
 }
+.sst-league-badge{
+  font-size:9px;font-weight:800;color:rgba(255,255,255,0.45);
+  text-transform:uppercase;letter-spacing:0.1em;margin-bottom:7px;
+}
 .sst-row{
   display:flex;justify-content:space-between;align-items:center;
-  font-size:12px;color:rgba(255,255,255,0.85);
-  font-variant-numeric:tabular-nums;padding:1px 0;
+  font-size:13px;color:rgba(255,255,255,0.85);
+  font-variant-numeric:tabular-nums;padding:3px 0;
 }
-.sst-team{font-weight:600;letter-spacing:-0.2px;}
+.sst-team{font-weight:600;letter-spacing:-0.2px;max-width:105px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
 .sst-team.win{color:#fff;font-weight:800;}
-.sst-team.loss{color:rgba(255,255,255,0.5);}
-.sst-score{font-weight:800;font-size:13px;color:#fff;min-width:24px;text-align:right;}
+.sst-team.loss{color:rgba(255,255,255,0.4);}
+.sst-score{font-weight:900;font-size:17px;color:#fff;min-width:28px;text-align:right;}
 .sst-score.win{color:#22c55e;}
-.sst-score.loss{color:rgba(255,255,255,0.4);}
+.sst-score.loss{color:rgba(255,255,255,0.35);}
 .sst-status{
-  font-size:9px;color:rgba(255,255,255,0.55);
+  font-size:10px;color:rgba(255,255,255,0.55);
   text-transform:uppercase;letter-spacing:0.05em;
-  margin-top:4px;display:flex;align-items:center;gap:4px;
+  margin-top:6px;display:flex;align-items:center;gap:5px;
+  border-top:1px solid rgba(255,255,255,0.07);padding-top:6px;
 }
 .sst-status.live{color:#ef4444;font-weight:700;}
-.sst-status.final{color:rgba(255,255,255,0.45);}
+.sst-status.final{color:rgba(255,255,255,0.4);}
 .sst-status.pre{color:#60a5fa;}
 .sst-live-dot{
   width:5px;height:5px;border-radius:50%;background:#ef4444;
   animation:pulse-badge 1.4s ease-in-out infinite;
 }
 
-/* SPORT TABS — Yahoo Sports purple accent */
+/* SPORT TABS — ESPN-style larger tabs */
 .sport-tabs{
-  display:flex;gap:0;
-  border-bottom:1px solid var(--border);
-  margin-bottom:14px;
+  display:flex;gap:6px;
+  padding:0 0 14px 0;
+  margin-bottom:16px;
   overflow-x:auto;scrollbar-width:none;
 }
 .sport-tabs::-webkit-scrollbar{display:none;}
 .sport-tab{
-  background:none;border:none;border-bottom:2px solid transparent;
-  padding:10px 16px;font-size:13px;font-weight:700;
-  color:var(--text3);cursor:pointer;font-family:inherit;
+  background:var(--surface2);
+  border:1.5px solid var(--border);
+  border-radius:22px;
+  padding:8px 18px;font-size:13px;font-weight:700;
+  color:var(--text2);cursor:pointer;font-family:inherit;
   white-space:nowrap;flex-shrink:0;
-  transition:color 0.15s,border-color 0.15s;
-  margin-bottom:-1px;
+  transition:all 0.15s;
   display:inline-flex;align-items:center;gap:6px;
   -webkit-tap-highlight-color:transparent;
+  min-height:38px;
 }
-.sport-tab:hover{color:var(--text);}
-.sport-tab.active{color:#6001d2;border-bottom-color:#6001d2;}
-.sport-tab-emoji{font-size:13px;}
+.sport-tab:hover{background:var(--surface);color:var(--text);border-color:var(--text3);}
+.sport-tab.active{
+  background:#6001d2;color:#fff;border-color:#6001d2;
+  box-shadow:0 2px 8px rgba(96,1,210,0.35);
+}
+.sport-tab-emoji{font-size:15px;}
 
-/* ── LEAGUE HEADER — ESPN/Yahoo Sports section banner ── */
+/* ── LEAGUE HEADER — ESPN-style hero banner ── */
 .sport-league-header{
   display:flex;align-items:center;justify-content:space-between;
-  padding:14px 16px;margin:10px 0 16px 0;
-  background:linear-gradient(135deg,#1a1a2e 0%,#16213e 100%);
-  border-radius:10px;color:#fff;
+  padding:20px 24px;margin:0 0 20px 0;
+  background:linear-gradient(135deg,#12002a 0%,#2d006b 50%,#1a0048 100%);
+  border-radius:12px;color:#fff;
+  box-shadow:0 4px 20px rgba(96,1,210,0.3);
+  position:relative;overflow:hidden;
 }
-.dark .sport-league-header{background:linear-gradient(135deg,#0d0d1a 0%,#0a0f1e 100%);}
-.sport-league-header-left{display:flex;align-items:center;gap:12px;}
-.sport-league-emoji{font-size:28px;line-height:1;}
-.sport-league-title{font-size:18px;font-weight:800;letter-spacing:-0.3px;margin:0 0 2px 0;color:#fff;}
-.sport-league-count{font-size:11px;color:rgba(255,255,255,0.55);font-weight:500;}
+.sport-league-header::after{
+  content:'';position:absolute;right:-20px;top:-20px;
+  width:120px;height:120px;border-radius:50%;
+  background:rgba(255,255,255,0.04);
+}
+.dark .sport-league-header{background:linear-gradient(135deg,#0a001a 0%,#1a0040 50%,#0d0024 100%);}
+.sport-league-header-left{display:flex;align-items:center;gap:14px;}
+.sport-league-emoji{font-size:36px;line-height:1;}
+.sport-league-title{font-size:22px;font-weight:900;letter-spacing:-0.5px;margin:0 0 4px 0;color:#fff;}
+.sport-league-count{font-size:12px;color:rgba(255,255,255,0.6);font-weight:500;}
+.sport-league-sub{font-size:11px;color:rgba(255,255,255,0.45);margin-top:2px;}
 .sport-league-all-btn{
-  font-size:12px;font-weight:600;color:rgba(255,255,255,0.7);
-  background:rgba(255,255,255,0.1);border:1px solid rgba(255,255,255,0.2);
-  border-radius:16px;padding:5px 12px;cursor:pointer;font-family:inherit;
+  font-size:12px;font-weight:700;color:rgba(255,255,255,0.85);
+  background:rgba(255,255,255,0.12);border:1px solid rgba(255,255,255,0.25);
+  border-radius:20px;padding:7px 16px;cursor:pointer;font-family:inherit;
   transition:background 0.15s,color 0.15s;
+  backdrop-filter:blur(4px);
 }
-.sport-league-all-btn:hover{background:rgba(255,255,255,0.2);color:#fff;}
+.sport-league-all-btn:hover{background:rgba(255,255,255,0.22);color:#fff;}
+
+/* Team Hub — shown when a team pill is active */
+.team-hub{
+  background:var(--surface);border:1px solid var(--border);
+  border-radius:12px;padding:18px 20px;margin-bottom:20px;
+  border-left:4px solid #6001d2;
+}
+.team-hub-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;}
+.team-hub-title{font-size:18px;font-weight:800;display:flex;align-items:center;gap:10px;}
+.team-hub-links{display:flex;gap:8px;}
+.team-hub-link{
+  font-size:11px;font-weight:700;padding:5px 12px;border-radius:16px;
+  text-decoration:none;border:1px solid var(--border);color:var(--text2);
+  transition:all 0.12s;
+}
+.team-hub-link:hover{border-color:#6001d2;color:#6001d2;}
+.team-hub-count{font-size:12px;color:var(--text3);margin-top:2px;}
+.team-hub-clear{
+  font-size:12px;font-weight:600;color:var(--text3);
+  background:none;border:1px solid var(--border);border-radius:14px;
+  padding:4px 12px;cursor:pointer;font-family:inherit;
+}
+.team-hub-clear:hover{color:var(--accent);border-color:var(--accent);}
 
 /* TEAM PILLS row */
 .team-pills-row{
@@ -3918,21 +3971,183 @@ kbd{display:inline-block;padding:1px 5px;border:1px solid var(--border);border-r
 }
 .home-scores-scroll::-webkit-scrollbar{display:none;}
 .hs-tile{
-  flex-shrink:0;min-width:112px;padding:8px 12px;
+  flex-shrink:0;min-width:148px;padding:10px 14px;
   border-right:1px solid var(--border2);cursor:pointer;
   transition:background 0.12s;
 }
 .hs-tile:last-child{border-right:none;}
 .hs-tile:hover{background:var(--surface2);}
-.hs-league{font-size:8px;font-weight:800;color:var(--text3);text-transform:uppercase;letter-spacing:0.08em;margin-bottom:5px;}
-.hs-team-row{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:2px 0;}
-.hs-team-name{font-size:11px;font-weight:600;color:var(--text);flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
-.hs-team-score{font-size:13px;font-weight:800;color:var(--text);font-variant-numeric:tabular-nums;min-width:24px;text-align:right;}
+.hs-league{font-size:9px;font-weight:800;color:var(--text3);text-transform:uppercase;letter-spacing:0.08em;margin-bottom:6px;}
+.hs-team-row{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:3px 0;}
+.hs-team-name{font-size:12px;font-weight:600;color:var(--text);flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.hs-team-score{font-size:16px;font-weight:900;color:var(--text);font-variant-numeric:tabular-nums;min-width:28px;text-align:right;}
 .hs-team-score.winner{color:var(--green);}
-.hs-status{font-size:8px;margin-top:4px;text-transform:uppercase;letter-spacing:0.05em;}
-.hs-status.live{color:var(--red);font-weight:700;display:flex;align-items:center;gap:3px;}
+.hs-status{font-size:9px;margin-top:5px;text-transform:uppercase;letter-spacing:0.05em;border-top:1px solid var(--border2);padding-top:5px;}
+.hs-status.live{color:var(--red);font-weight:700;display:flex;align-items:center;gap:4px;}
 .hs-status.live::before{content:'●';animation:score-pulse 1.2s ease-in-out infinite;}
 .hs-status.final{color:var(--text3);}
+.hs-status.pre{color:#3b82f6;}
+
+/* SEARCH RESULTS BANNER */
+.search-results-banner{
+  display:flex;align-items:center;justify-content:space-between;
+  background:var(--surface);border:1px solid var(--border);
+  border-radius:10px;padding:10px 16px;margin-bottom:18px;
+  gap:12px;
+}
+.search-results-text{font-size:13px;color:var(--text2);}
+.search-results-text strong{color:var(--text);font-weight:700;}
+.search-results-clear{
+  font-size:12px;font-weight:600;color:var(--text3);
+  background:none;border:1px solid var(--border);border-radius:14px;
+  padding:4px 12px;cursor:pointer;font-family:inherit;flex-shrink:0;
+  transition:all 0.12s;
+}
+.search-results-clear:hover{color:var(--accent);border-color:var(--accent);}
+
+/* ── CHATBOT ─────────────────────────────────────────────────── */
+.chat-fab{
+  position:fixed;bottom:calc(70px + env(safe-area-inset-bottom, 0));right:20px;
+  width:52px;height:52px;border-radius:50%;
+  background:linear-gradient(135deg,#6001d2,#9333ea);
+  color:#fff;border:none;cursor:pointer;
+  display:flex;align-items:center;justify-content:center;font-size:22px;
+  box-shadow:0 4px 20px rgba(96,1,210,0.45);
+  z-index:200;transition:transform 0.15s,box-shadow 0.15s;
+}
+.chat-fab:hover{transform:scale(1.08);box-shadow:0 6px 28px rgba(96,1,210,0.6);}
+.chat-fab.open{background:linear-gradient(135deg,#444,#222);}
+@media (min-width:641px){
+  .chat-fab{bottom:24px;}
+}
+.chat-drawer{
+  position:fixed;bottom:0;right:20px;
+  width:360px;max-height:540px;
+  background:var(--surface);border:1px solid var(--border);
+  border-radius:16px 16px 0 0;
+  box-shadow:0 -8px 40px rgba(0,0,0,0.18);
+  z-index:199;display:flex;flex-direction:column;
+  overflow:hidden;
+  animation:chat-slide-up 0.25s ease;
+}
+@media (max-width:640px){
+  .chat-drawer{right:0;left:0;width:100%;border-radius:20px 20px 0 0;max-height:70vh;}
+}
+@keyframes chat-slide-up{from{transform:translateY(60px);opacity:0;}to{transform:translateY(0);opacity:1;}}
+.chat-header{
+  display:flex;align-items:center;justify-content:space-between;
+  padding:14px 16px;
+  background:linear-gradient(135deg,#6001d2,#9333ea);
+  color:#fff;flex-shrink:0;
+}
+.chat-header-title{font-size:14px;font-weight:700;display:flex;align-items:center;gap:8px;}
+.chat-header-title span{font-size:18px;}
+.chat-header-sub{font-size:10px;color:rgba(255,255,255,0.7);margin-top:1px;}
+.chat-close{background:none;border:none;color:rgba(255,255,255,0.8);cursor:pointer;font-size:18px;padding:4px;}
+.chat-messages{
+  flex:1;overflow-y:auto;padding:14px 14px 8px;
+  display:flex;flex-direction:column;gap:10px;
+  scrollbar-width:thin;
+}
+.chat-msg{
+  display:flex;flex-direction:column;gap:2px;
+  max-width:88%;
+}
+.chat-msg.user{align-self:flex-end;}
+.chat-msg.bot{align-self:flex-start;}
+.chat-bubble{
+  padding:9px 13px;border-radius:16px;font-size:13px;line-height:1.5;
+}
+.chat-msg.user .chat-bubble{
+  background:#6001d2;color:#fff;border-radius:16px 16px 4px 16px;
+}
+.chat-msg.bot .chat-bubble{
+  background:var(--surface2);color:var(--text);border:1px solid var(--border);
+  border-radius:4px 16px 16px 16px;
+}
+.chat-msg-time{font-size:9px;color:var(--text3);padding:0 4px;}
+.chat-typing{display:flex;gap:4px;padding:8px 12px;align-items:center;}
+.chat-typing-dot{
+  width:7px;height:7px;border-radius:50%;background:var(--text3);
+  animation:typing-bounce 1.2s ease-in-out infinite;
+}
+.chat-typing-dot:nth-child(2){animation-delay:0.2s;}
+.chat-typing-dot:nth-child(3){animation-delay:0.4s;}
+@keyframes typing-bounce{0%,100%{transform:translateY(0);}40%{transform:translateY(-6px);}}
+.chat-quick-btns{
+  display:flex;gap:6px;flex-wrap:wrap;
+  padding:6px 14px 10px;border-top:1px solid var(--border2);
+}
+.chat-quick-btn{
+  font-size:11px;font-weight:600;padding:5px 11px;
+  background:var(--surface2);border:1px solid var(--border);
+  border-radius:14px;cursor:pointer;font-family:inherit;color:var(--text2);
+  transition:all 0.12s;white-space:nowrap;
+}
+.chat-quick-btn:hover{background:#6001d2;color:#fff;border-color:#6001d2;}
+.chat-input-row{
+  display:flex;gap:8px;padding:10px 14px;
+  border-top:1px solid var(--border);flex-shrink:0;
+}
+.chat-input{
+  flex:1;padding:9px 12px;font-size:13px;font-family:inherit;
+  background:var(--surface2);border:1px solid var(--border);
+  border-radius:20px;color:var(--text);outline:none;
+  transition:border-color 0.12s;
+}
+.chat-input:focus{border-color:#6001d2;}
+.chat-send{
+  width:36px;height:36px;border-radius:50%;
+  background:#6001d2;color:#fff;border:none;cursor:pointer;
+  display:flex;align-items:center;justify-content:center;font-size:16px;
+  flex-shrink:0;transition:background 0.12s;align-self:center;
+}
+.chat-send:hover{background:#7c3aed;}
+.chat-send:disabled{background:var(--border);cursor:not-allowed;}
+
+/* ═══ v36: POP CULTURE SUB-TABS ═══ */
+.pc-subtabs{
+  display:flex;gap:8px;flex-wrap:wrap;
+  padding:8px 0 16px;
+  overflow-x:auto;scrollbar-width:none;
+}
+.pc-subtabs::-webkit-scrollbar{display:none;}
+.pc-subtab{
+  display:inline-flex;align-items:center;gap:5px;
+  padding:7px 15px;border-radius:22px;
+  background:var(--surface2);border:1.5px solid var(--border);
+  font-size:12px;font-weight:600;color:var(--text2);
+  cursor:pointer;white-space:nowrap;transition:all 0.14s;
+  font-family:var(--font-sans);
+}
+.pc-subtab:hover{background:var(--surface);color:var(--text);border-color:var(--text3);}
+.pc-subtab.active{background:#db2777;color:#fff;border-color:#db2777;box-shadow:0 2px 8px rgba(219,39,119,0.35);}
+@media(max-width:640px){
+  .pc-subtab{padding:8px 12px;font-size:12px;min-height:44px;}
+}
+
+/* ═══ v36: RECOMMENDATIONS / FOR YOU ═══ */
+.rec-section{border-top:2px solid var(--border);}
+.rec-section-sub{font-size:10px;color:var(--text3);margin-left:6px;}
+.rec-row{
+  display:flex;align-items:flex-start;gap:10px;
+  padding:9px 0;border-bottom:1px solid var(--border2);
+  cursor:pointer;transition:background 0.1s;border-radius:4px;
+}
+.rec-row:last-child{border-bottom:none;}
+.rec-row:hover{background:var(--surface2);}
+.rec-thumb{
+  width:52px;height:40px;flex-shrink:0;
+  background-size:cover;background-position:center;
+  border-radius:4px;
+}
+.rec-body{flex:1;min-width:0;}
+.rec-title{
+  font-size:12px;font-weight:600;color:var(--text);
+  line-height:1.35;display:-webkit-box;-webkit-line-clamp:2;
+  -webkit-box-orient:vertical;overflow:hidden;
+}
+.rec-src{font-size:10px;color:var(--text3);margin-top:3px;}
 
 /* TRENDING SEARCH BAR — chips when search is empty */
 .trending-bar{
@@ -4948,7 +5163,7 @@ function Scoreboard({scores, loading, compact=false}) {
 }
 
 // ─── GHOST SIDEBAR ────────────────────────────────────────────────────────────
-function Sidebar({cat, arts, kw, health, activeKw, setActiveKw, activeSource, setActiveSource, onRead, scores, scoresLoading, showScoreboard}) {
+function Sidebar({cat, arts, kw, health, activeKw, setActiveKw, activeSource, setActiveSource, onRead, scores, scoresLoading, showScoreboard, recommended}) {
   const cc = CATS[cat]||CATS.general;
   const catKws = kw[cat]||[];
   const catArts = arts[cat]||[];
@@ -5078,6 +5293,25 @@ function Sidebar({cat, arts, kw, health, activeKw, setActiveKw, activeSource, se
               )}
             </>
           )}
+        </div>
+      )}
+
+      {/* v36: For You — personalized recommendations based on reading/search history */}
+      {recommended && recommended.length > 0 && (
+        <div className="sidebar-section rec-section">
+          <div className="sidebar-sec-head">
+            <span className="sidebar-sec-label">⭐ For You</span>
+            <span className="rec-section-sub">Based on your interests</span>
+          </div>
+          {recommended.slice(0, 5).map((a, i) => (
+            <div key={i} className="rec-row" onClick={()=>onRead(a)}>
+              {a.img && <div className="rec-thumb" style={{backgroundImage:`url(${a.img})`}}/>}
+              <div className="rec-body">
+                <div className="rec-title">{a.title}</div>
+                <div className="rec-src">{a.source} · {fmtDate(a.pubDate)}</div>
+              </div>
+            </div>
+          ))}
         </div>
       )}
     </div>
@@ -5811,6 +6045,7 @@ function SportsScoreStrip({ scores, teams }) {
               className={`sst-tile ${live?'live':''} ${fav?'fav':''}`}
               onClick={()=>g.link && window.open(g.link, '_blank')}>
               {fav && <span className="sst-fav-star">★</span>}
+              {g.league && <div className="sst-league-badge">{g.league.toUpperCase()}</div>}
               <div className="sst-row">
                 <span className={`sst-team ${awayWin?'win':final?'loss':''}`}>{away}</span>
                 <span className={`sst-score ${awayWin?'win':final?'loss':''}`}>{g.awayScore || '—'}</span>
@@ -6134,6 +6369,96 @@ function TopBar({tab, setTab, search, setSearch, dark, setDark,
 }
 
 // ─── MAIN APP ─────────────────────────────────────────────────────────────────
+// ─── CHATBOT COMPONENT ───────────────────────────────────────────────────────
+function ChatBot({ arts }) {
+  const [open, setOpen] = useState(false);
+  const [msgs, setMsgs] = useState([
+    { role:'bot', text:"Hi! I'm your AI news assistant. Ask me anything about today's stories, markets, or sports.", time: new Date().toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'}) }
+  ]);
+  const [input, setInput] = useState('');
+  const [loading, setLoading] = useState(false);
+  const messagesEndRef = useRef(null);
+
+  useEffect(() => {
+    if (open) messagesEndRef.current?.scrollIntoView({ behavior:'smooth' });
+  }, [msgs, open]);
+
+  const QUICK = ["What's trending today?", "Sports update?", "Markets summary", "Top tech news"];
+
+  const buildContext = () => {
+    const headlines = [];
+    Object.entries(arts).forEach(([cat, items]) => {
+      (items || []).slice(0, 5).forEach(a => {
+        headlines.push(`[${cat.toUpperCase()}] ${a.title}`);
+      });
+    });
+    return headlines.slice(0, 40).join('\n');
+  };
+
+  const send = async (text) => {
+    const q = (text || input).trim();
+    if (!q || loading) return;
+    const t = new Date().toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'});
+    setMsgs(m => [...m, { role:'user', text:q, time:t }]);
+    setInput('');
+    setLoading(true);
+    const ctx = buildContext();
+    const prompt = `You are a smart news briefing assistant. Current headlines:\n${ctx}\n\nUser question: ${q}\n\nAnswer concisely in 2-4 sentences, referencing specific stories when relevant.`;
+    const { summary, error } = await fetchAISummary({ type:'article', title:'User Question', content:prompt, mode:'summary' });
+    const t2 = new Date().toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'});
+    setMsgs(m => [...m, { role:'bot', text: error ? `Sorry, I couldn't fetch that. Try again.` : (summary || 'No response.'), time:t2 }]);
+    setLoading(false);
+  };
+
+  return (
+    <>
+      <button className={`chat-fab ${open?'open':''}`} onClick={() => setOpen(o => !o)} aria-label="Chat assistant">
+        {open ? '✕' : '💬'}
+      </button>
+      {open && (
+        <div className="chat-drawer">
+          <div className="chat-header">
+            <div>
+              <div className="chat-header-title"><span>✨</span> AI News Assistant</div>
+              <div className="chat-header-sub">Powered by Claude · asks about today's news</div>
+            </div>
+            <button className="chat-close" onClick={() => setOpen(false)}>✕</button>
+          </div>
+          <div className="chat-messages">
+            {msgs.map((m, i) => (
+              <div key={i} className={`chat-msg ${m.role}`}>
+                <div className="chat-bubble">{m.text}</div>
+                <span className="chat-msg-time">{m.time}</span>
+              </div>
+            ))}
+            {loading && (
+              <div className="chat-msg bot">
+                <div className="chat-bubble" style={{padding:'10px 14px'}}>
+                  <div className="chat-typing">
+                    <div className="chat-typing-dot"/><div className="chat-typing-dot"/><div className="chat-typing-dot"/>
+                  </div>
+                </div>
+              </div>
+            )}
+            <div ref={messagesEndRef}/>
+          </div>
+          {msgs.length <= 2 && (
+            <div className="chat-quick-btns">
+              {QUICK.map(q => <button key={q} className="chat-quick-btn" onClick={() => send(q)}>{q}</button>)}
+            </div>
+          )}
+          <div className="chat-input-row">
+            <input className="chat-input" placeholder="Ask about today's news…" value={input}
+              onChange={e => setInput(e.target.value)}
+              onKeyDown={e => e.key === 'Enter' && send()}/>
+            <button className="chat-send" onClick={() => send()} disabled={!input.trim() || loading}>➤</button>
+          </div>
+        </div>
+      )}
+    </>
+  );
+}
+
 export default function App() {
   const [tab, setTab]           = useState('general');
   const [search, setSearch]     = useState('');
@@ -6169,6 +6494,7 @@ export default function App() {
   const [activeSrc, setActiveSrc]   = useState(null);
   const [scores, setScores]         = useState({});
   const [scoresLoading, setScoresLoading] = useState(false);
+  const [searchHistory, setSearchHistory] = useState(()=>ld('searchHistory',[]));
 
   // ── v16 mobile + editorial state ──
   const [menuOpen, setMenuOpen]         = useState(false);
@@ -6183,6 +6509,40 @@ export default function App() {
   useEffect(()=>{sv('saved',saved);},[saved]);
   useEffect(()=>{sv('clicks',clicks);},[clicks]);
   useEffect(()=>{sv('readLinks',[...readLinks]);},[readLinks]);
+
+  // v36: Interest profile derived from reading history + saves + searches
+  const interestProfile = useMemo(() => {
+    const freq = {};
+    const STOP = new Set(['the','and','for','a','an','to','in','of','on','is','it','at','by','or','be','as','with','this','that','from','are','was','were','has','have','had','but','not','can','will','their','they','we','you','all','said']);
+    const addWords = (text, weight=1) => {
+      if (!text) return;
+      text.toLowerCase().replace(/[^a-z0-9\s]/g,'').split(/\s+/).forEach(w => {
+        if (w.length > 3 && !STOP.has(w)) freq[w] = (freq[w] || 0) + weight;
+      });
+    };
+    saved.forEach(a => { addWords(a.title, 3); addWords(a.desc, 1); });
+    [...readLinks].forEach(link => {
+      const all = Object.values(arts).flat();
+      const a = all.find(x => x.link === link);
+      if (a) { addWords(a.title, 2); addWords(a.desc, 1); }
+    });
+    searchHistory.forEach(q => addWords(q, 4));
+    return Object.entries(freq).sort((a,b)=>b[1]-a[1]).slice(0,30).map(([w])=>w);
+  }, [saved, readLinks, searchHistory, arts]);
+
+  // v36: Recommended articles — score all unread/unsaved articles by interest profile
+  const recommended = useMemo(() => {
+    if (interestProfile.length === 0) return [];
+    const all = Object.values(arts).flat();
+    const scored = all.map(a => {
+      if ((a.link && readLinks.has(a.link)) || saved.some(s=>s.link===a.link)) return null;
+      const text = (a.title + ' ' + (a.desc||'')).toLowerCase();
+      const score = interestProfile.reduce((s,w) => text.includes(w) ? s+1 : s, 0);
+      return score > 0 ? { ...a, _recScore: score } : null;
+    }).filter(Boolean);
+    scored.sort((a,b) => b._recScore - a._recScore || new Date(b.pubDate) - new Date(a.pubDate));
+    return scored.slice(0, 8);
+  }, [arts, interestProfile, readLinks, saved]);
 
   // v20: whole-word urgent match + 6h recency window + cap 8.
   // Whole-word prevents "killed" matching "killed it" or "killing" substrings.
@@ -6324,23 +6684,23 @@ export default function App() {
   useEffect(()=>{sv('teams',teams);},[teams]);
   useEffect(()=>{sv('weatherCities',weatherCities);},[weatherCities]);
 
-  // v26: Global search — when search text is present, query all categories
-  // When internal results are thin (<3), fetch DuckDuckGo web fallback
+  // v36: Global search — always fetch web results alongside internal articles
   useEffect(() => {
     if (!search || search.length < 3) {
       setWebResults([]); setSourceRecs([]); return;
     }
-    const internalCount = Object.values(arts).flat().filter(a =>
-      (a.title + ' ' + (a.desc||'')).toLowerCase().includes(search)
-    ).length;
     setSourceRecs(suggestSourcesForQuery(search));
-    if (internalCount < 3) {
-      setWebLoading(true);
-      fetchWebSearch(search).then(r => { setWebResults(r); setWebLoading(false); });
-    } else {
-      setWebResults([]);
-    }
-  }, [search, arts]);
+    setWebLoading(true);
+    fetchWebSearch(search).then(r => { setWebResults(r); setWebLoading(false); });
+    // Track search history (last 10 unique queries)
+    setSearchHistory(prev => {
+      const trimmed = search.trim().toLowerCase();
+      if (!trimmed) return prev;
+      const next = [trimmed, ...prev.filter(s => s !== trimmed)].slice(0, 10);
+      sv('searchHistory', next);
+      return next;
+    });
+  }, [search]);
 
   // Keyboard shortcuts: J/K navigate articles, B bookmark, / focus search, Escape clear
   useEffect(() => {
@@ -6439,8 +6799,24 @@ export default function App() {
   // NBA/MLB/CFB/CBB), favorite team pills with external links, then prioritized
   // stories feed. Yahoo Sports' actual layout pattern.
   const SportsPage = () => {
-    const [sportTab, setSportTab] = useState('all'); // 'all' | 'nfl' | 'nba' | 'mlb' | 'cfb' | 'cbb'
+    const [sportTab, setSportTab] = useState('all'); // 'all' | 'nfl' | 'nba' | 'mlb' | 'cfb' | 'cbb' | 'cbase'
     const [activeTeam, setActiveTeam] = useState(null); // team obj when filter pill tapped
+    const [sportWebResults, setSportWebResults] = useState([]);
+    const [sportWebLoading, setSportWebLoading] = useState(false);
+
+    // v36: Fetch web results when a specific league tab is active
+    useEffect(() => {
+      if (sportTab === 'all') { setSportWebResults([]); return; }
+      const SPORT_TAB_QUERIES = {
+        nfl: 'NFL football news today', nba: 'NBA basketball news today',
+        mlb: 'MLB baseball news today', cfb: 'college football news today',
+        cbb: 'college basketball news today', cbase: 'college baseball news today',
+        racing: 'horse racing news today',
+      };
+      const q = SPORT_TAB_QUERIES[sportTab] || `${sportTab} sports news`;
+      setSportWebLoading(true);
+      fetchWebSearch(q).then(r => { setSportWebResults(r); setSportWebLoading(false); });
+    }, [sportTab]);
 
     const cc = CATS.sports;
     const allItems = sorted('sports');
@@ -6479,6 +6855,7 @@ export default function App() {
                        : sportTab === 'mlb'    ? ['mlb','baseball','world series','yankees','dodgers','cubs','home run','pitcher','bullpen','batting average','mlb draft']
                        : sportTab === 'cfb'    ? ['cfb','college football','ncaa football','sec','big ten','acc','pac-12','big 12','cfp','bowl game','heisman']
                        : sportTab === 'cbb'    ? ['cbb','college basketball','ncaa','march madness','final four','ncaa tournament','big east','sweet 16']
+                       : sportTab === 'cbase'  ? ['college baseball','ncaa baseball','cws','college world series','super regional','sec baseball','acc baseball','big 12 baseball','d1baseball','college world']
                        : sportTab === 'racing' ? ['horse racing','thoroughbred','derby','stakes','jockey','paddock','furlong','harness racing','horse race','breeders cup','kentucky derby','preakness','belmont']
                        : [];
         items = items.filter(a => {
@@ -6507,38 +6884,66 @@ export default function App() {
 
     const SPORT_TABS = [
       { key:'all',    label:'All' },
-      { key:'nfl',    label:'NFL',         emoji:'🏈' },
-      { key:'nba',    label:'NBA',         emoji:'🏀' },
-      { key:'mlb',    label:'MLB',         emoji:'⚾' },
-      { key:'cfb',    label:'College FB',  emoji:'🏈' },
-      { key:'cbb',    label:'College BB',  emoji:'🏀' },
-      { key:'racing', label:'Horse Racing',emoji:'🏇' },
+      { key:'nfl',    label:'NFL',            emoji:'🏈' },
+      { key:'nba',    label:'NBA',            emoji:'🏀' },
+      { key:'mlb',    label:'MLB',            emoji:'⚾' },
+      { key:'cfb',    label:'College FB',     emoji:'🏈' },
+      { key:'cbb',    label:'College BB',     emoji:'🏀' },
+      { key:'cbase',  label:'College Baseball',emoji:'⚾' },
+      { key:'racing', label:'Horse Racing',   emoji:'🏇' },
     ];
+
+    const feedRef = useRef(null);
+    const scrollToFeed = () => feedRef.current?.scrollIntoView({ behavior:'smooth', block:'start' });
 
     return (
       <div className="page sports-page">
-        {/* v26: Last updated stamp */}
-        {lastUpdated.sports && (
-          <div style={{padding:'8px 0',display:'flex',justifyContent:'flex-end'}}>
-            <LastUpdated timestamp={lastUpdated.sports} onRefresh={() => loadCat('sports')}/>
-          </div>
-        )}
-        {/* ── SCOREBOARD STRIP — dark navy Yahoo Sports look ── */}
-        <SportsScoreStrip scores={visibleScores} teams={teams}/>
 
-        {/* ── SPORT TABS — Yahoo purple accent ── */}
+        {/* ── SPORT TABS — ESPN pill-style ── */}
         <div className="sport-tabs">
           {SPORT_TABS.map(t => (
             <button key={t.key}
               className={`sport-tab ${sportTab===t.key?'active':''}`}
-              onClick={()=>{setSportTab(t.key); setActiveTeam(null);}}>
+              onClick={()=>{setSportTab(t.key); setActiveTeam(null); setTimeout(scrollToFeed,80);}}>
               {t.emoji && <span className="sport-tab-emoji">{t.emoji}</span>}
               {t.label}
             </button>
           ))}
         </div>
 
-        {/* ── LEAGUE HEADER — ESPN/Yahoo Sports style section banner ── */}
+        {/* ── MY TEAMS — ESPN-style at top for quick team access ── */}
+        {teams.length > 0 && (
+          <div className="team-pills-row" style={{marginBottom:'16px'}}>
+            <span className="team-pills-label">⭐ My Teams</span>
+            <div className="team-pills">
+              {teams.map(t => {
+                const isActive = activeTeam?.team === t.team;
+                return (
+                  <span key={t.team} className={`team-pill-group ${isActive?'active':''}`}>
+                    <button className="team-pill"
+                      onClick={()=>{ setActiveTeam(isActive ? null : t); setSportTab('all'); setTimeout(scrollToFeed,80); }}
+                      title={`Filter to ${t.team}`}>
+                      <span className="team-pill-emoji">{t.emoji}</span>
+                      <span className="team-pill-name">{t.team}</span>
+                    </button>
+                    {t.espnUrl && (
+                      <a className="team-pill-link" href={t.espnUrl} target="_blank" rel="noreferrer" title="Open on ESPN">ESPN</a>
+                    )}
+                    {t.teamUrl && (
+                      <a className="team-pill-link" href={t.teamUrl} target="_blank" rel="noreferrer" title="Open team site">Site</a>
+                    )}
+                  </span>
+                );
+              })}
+              <button className="team-pills-edit" onClick={()=>openCustomize('teams','sports')}>⚙ Edit</button>
+            </div>
+          </div>
+        )}
+
+        {/* ── SCOREBOARD STRIP — ESPN dark card style ── */}
+        <SportsScoreStrip scores={visibleScores} teams={teams}/>
+
+        {/* ── LEAGUE HEADER — ESPN hero banner (only when league tab active) ── */}
         {sportTab !== 'all' && (() => {
           const lt = SPORT_TABS.find(st => st.key === sportTab);
           return (
@@ -6546,10 +6951,11 @@ export default function App() {
               <div className="sport-league-header-left">
                 {lt?.emoji && <span className="sport-league-emoji">{lt.emoji}</span>}
                 <div>
-                  <h2 className="sport-league-title">{lt?.label} Top Stories</h2>
-                  <span className="sport-league-count">
+                  <h2 className="sport-league-title">{lt?.label}</h2>
+                  <div className="sport-league-count">
                     {sportItems.length > 0 ? `${sportItems.length} stories` : 'No stories yet — refresh to load'}
-                  </span>
+                  </div>
+                  <div className="sport-league-sub">Top Stories · Trending News</div>
                 </div>
               </div>
               <button className="sport-league-all-btn" onClick={()=>setSportTab('all')}>← All Sports</button>
@@ -6557,17 +6963,27 @@ export default function App() {
           );
         })()}
 
-        {/* ── ACTIVE FILTER NOTICE ── */}
+        {/* ── TEAM HUB — ESPN team page header when team is active ── */}
         {activeTeam && (
-          <div className="active-team-notice">
-            <span>Showing stories about <strong>{activeTeam.emoji} {activeTeam.team}</strong></span>
-            <button onClick={()=>setActiveTeam(null)}>Clear ✕</button>
+          <div className="team-hub">
+            <div className="team-hub-header">
+              <div>
+                <div className="team-hub-title">{activeTeam.emoji} {activeTeam.team}</div>
+                <div className="team-hub-count">{sportItems.length} stories found · {activeTeam.league?.toUpperCase()}</div>
+              </div>
+              <div style={{display:'flex',alignItems:'center',gap:'8px'}}>
+                {activeTeam.espnUrl && <a className="team-hub-link" href={activeTeam.espnUrl} target="_blank" rel="noreferrer">ESPN ↗</a>}
+                {activeTeam.teamUrl && <a className="team-hub-link" href={activeTeam.teamUrl} target="_blank" rel="noreferrer">Team Site ↗</a>}
+                <button className="team-hub-clear" onClick={()=>setActiveTeam(null)}>✕ Clear</button>
+              </div>
+            </div>
           </div>
         )}
 
-        {/* ── HERO + FEED (Yahoo lead + Google News grid below) ── */}
-        <div className="page-grid">
+        {/* ── HERO + FEED ── */}
+        <div className="page-grid" ref={feedRef}>
           <div className="feed-col">
+            {/* Hero lead article */}
             {lead && (
               <article className="sports-hero" onClick={()=>onRead(lead)}>
                 <div className="sports-hero-img" style={{backgroundImage:`url(${lead.img})`}}>
@@ -6585,8 +7001,7 @@ export default function App() {
               </article>
             )}
 
-            {/* v25b: Google News grid for the next 6 stories (the visual punch),
-                then FeedCard list for the rest (deeper read). */}
+            {/* 3-column story grid — ESPN visual punch for top stories */}
             {feedItems.length > 0 && !activeTeam && (
               <div className="gn-row" style={{marginBottom:'24px'}}>
                 {feedItems.slice(0, 6).filter(a=>a.img).slice(0, 3).concat(
@@ -6610,12 +7025,40 @@ export default function App() {
             {isLoading && !feedItems.length
               ? <div className="empty-state"><div className="empty-icon">🏆</div><div className="empty-msg">Loading sports…</div></div>
               : feedItems.length === 0
-                ? <div className="empty-state"><div className="empty-icon">📭</div><div className="empty-msg">{activeTeam?'No stories about this team yet':'No articles loaded yet'}</div><button className="refresh-btn" onClick={refreshAll}>Refresh</button></div>
-                : feedItems.slice(activeTeam?0:3, 25).map((a, i) => (
+                ? <div className="empty-state">
+                    <div className="empty-icon">{activeTeam ? activeTeam.emoji : '🏆'}</div>
+                    <div className="empty-msg">{activeTeam ? `No stories found for ${activeTeam.team} yet` : 'No articles loaded yet'}</div>
+                    <div style={{fontSize:'12px',color:'var(--text3)',marginTop:'6px',marginBottom:'12px'}}>
+                      {activeTeam ? 'Try refreshing or check ESPN directly.' : 'Pull to refresh or tap below.'}
+                    </div>
+                    {activeTeam?.espnUrl && <a href={activeTeam.espnUrl} target="_blank" rel="noreferrer" className="refresh-btn" style={{textDecoration:'none',display:'inline-block'}}>Open on ESPN ↗</a>}
+                    <button className="refresh-btn" style={{marginTop:'8px'}} onClick={refreshAll}>Refresh</button>
+                  </div>
+                : feedItems.slice(activeTeam?0:3, 30).map((a, i) => (
                     <FeedCard key={i} a={a} cat="sports" isSaved={isSavedFn(a)} onSave={onSave} onRead={onRead} relatedSources={getRelated(a,'sports')} isRead={isReadFn(a)} userKw={kw} userTeams={teams}/>
                   ))
             }
 
+            {/* v36: Web results for active league tab */}
+            {sportTab !== 'all' && (sportWebResults.length > 0 || sportWebLoading) && (
+              <div className="web-fallback">
+                <div className="rail-label" style={{margin:'24px 0 12px'}}>🌐 From the Web</div>
+                {sportWebLoading && <div style={{fontSize:'12px',color:'var(--text3)',fontStyle:'italic',padding:'10px 0'}}>Searching the web…</div>}
+                {sportWebResults.map((r,i) => (
+                  <a key={i} className="web-result" href={r.link} target="_blank" rel="noreferrer">
+                    <div className="web-result-title">{r.title}</div>
+                    {r.desc && <div className="web-result-desc">{r.desc.slice(0,160)}</div>}
+                    <div className="web-result-src">{r.source}{r.pubDate && <span className="web-result-date"> · {fmtDate(r.pubDate)}</span>}</div>
+                  </a>
+                ))}
+              </div>
+            )}
+
+            {lastUpdated.sports && (
+              <div style={{display:'flex',justifyContent:'flex-end',padding:'8px 0'}}>
+                <LastUpdated timestamp={lastUpdated.sports} onRefresh={() => loadCat('sports')}/>
+              </div>
+            )}
             <SourceFooter cat="sports" feeds={feeds} arts={arts}/>
           </div>
 
@@ -6623,37 +7066,8 @@ export default function App() {
             activeKw={activeKw} setActiveKw={k=>{setActiveKw(k);setActiveSrc(null);}}
             activeSource={activeSrc} setActiveSource={s=>{setActiveSrc(s);setActiveKw(null);}}
             onRead={onRead} scores={scores} scoresLoading={scoresLoading}
-            showScoreboard={false}/>
+            showScoreboard={false} recommended={recommended}/>
         </div>
-
-        {/* ── MY TEAMS — moved to bottom per ESPN/Yahoo Sports pattern ── */}
-        {visibleTeams.length > 0 && (
-          <div className="team-pills-row" style={{marginTop:'28px',paddingTop:'20px',borderTop:'1px solid var(--border)'}}>
-            <span className="team-pills-label">⭐ My Teams</span>
-            <div className="team-pills">
-              {visibleTeams.map(t => {
-                const isActive = activeTeam?.team === t.team;
-                return (
-                  <span key={t.team} className={`team-pill-group ${isActive?'active':''}`}>
-                    <button className="team-pill"
-                      onClick={()=>setActiveTeam(isActive ? null : t)}
-                      title={`Filter to ${t.team}`}>
-                      <span className="team-pill-emoji">{t.emoji}</span>
-                      <span className="team-pill-name">{t.team}</span>
-                    </button>
-                    {t.espnUrl && (
-                      <a className="team-pill-link" href={t.espnUrl} target="_blank" rel="noreferrer" title="Open on ESPN">ESPN</a>
-                    )}
-                    {t.teamUrl && (
-                      <a className="team-pill-link" href={t.teamUrl} target="_blank" rel="noreferrer" title="Open team site">Team</a>
-                    )}
-                  </span>
-                );
-              })}
-              <button className="team-pills-edit" onClick={()=>openCustomize('teams','sports')}>⚙ Edit</button>
-            </div>
-          </div>
-        )}
       </div>
     );
   };
@@ -6664,9 +7078,51 @@ export default function App() {
     const rawItems=sorted(cat);
     const items=useMemo(()=>clusterStories(rawItems),[rawItems]);
     const isLoading=loading[cat];
-    const heroItems=items.filter(a=>a.img);
+
+    // v36: Pop Culture sub-tab state (hooks always declared, only used when cat===popculture)
+    const [pcSubTab, setPcSubTab] = useState('all');
+    const [pcWebResults, setPcWebResults] = useState([]);
+    const [pcWebLoading, setPcWebLoading] = useState(false);
+
+    const PC_SUBTABS = [
+      { key:'all',         label:'All',         emoji:'✨' },
+      { key:'shows',       label:'Shows/Movies', emoji:'🎬' },
+      { key:'music',       label:'Music',        emoji:'🎵' },
+      { key:'books',       label:'Books',        emoji:'📚' },
+      { key:'comedy',      label:'Comedy',       emoji:'😂' },
+    ];
+    const PC_KWS = {
+      shows:  ['movie','film','tv','streaming','netflix','hbo','disney','show','series','premiere','season','episode','cinema','trailer','oscar','emmy','golden globe'],
+      music:  ['album','music','song','artist','chart','grammy','billboard','concert','tour','release','single','rapper','singer','playlist','spotify','pop star'],
+      books:  ['book','novel','author','bestseller','fiction','reading','publisher','memoir','nonfiction','literary','penguin','bestselling','new book'],
+      comedy: ['comedy','comedian','stand-up','funny','humor','joke','sketch','snl','sitcom','comic','parody','satire'],
+    };
+
+    // Filter items by pop culture sub-tab
+    const pcFilteredItems = useMemo(() => {
+      if (cat !== 'popculture' || pcSubTab === 'all') return items;
+      const kws = PC_KWS[pcSubTab] || [];
+      return items.filter(a => {
+        const t = (a.title + ' ' + (a.desc||'')).toLowerCase();
+        return kws.some(k => t.includes(k));
+      });
+    }, [items, cat, pcSubTab]);
+
+    // v36: Web results for pop culture sub-tab
+    useEffect(() => {
+      if (cat !== 'popculture' || pcSubTab === 'all') { setPcWebResults([]); return; }
+      const queries = {
+        shows:'movies TV shows streaming news today', music:'music news trending albums today',
+        books:'best books reading news today', comedy:'comedy entertainment news today',
+      };
+      const q = queries[pcSubTab] || `${pcSubTab} pop culture news today`;
+      setPcWebLoading(true);
+      fetchWebSearch(q).then(r => { setPcWebResults(r); setPcWebLoading(false); });
+    }, [cat, pcSubTab]);
+
+    const heroItems=pcFilteredItems.filter(a=>a.img);
     const catLead=heroItems[0]||null;
-    const feedItems=catLead?items.filter(a=>a.link!==catLead.link):items;
+    const feedItems=catLead?pcFilteredItems.filter(a=>a.link!==catLead.link):pcFilteredItems;
 
     const isHome = cat === 'general';
     const catKws = kw[cat] || [];
@@ -6760,6 +7216,18 @@ export default function App() {
           ) : null;
         })()}
 
+        {/* v36: Pop Culture sub-tabs */}
+        {cat === 'popculture' && !activeKw && !activeSrc && !search && (
+          <div className="pc-subtabs">
+            {PC_SUBTABS.map(t => (
+              <button key={t.key} className={`pc-subtab ${pcSubTab===t.key?'active':''}`}
+                onClick={()=>setPcSubTab(t.key)}>
+                {t.emoji} {t.label}
+              </button>
+            ))}
+          </div>
+        )}
+
         <div className="page-grid">
           <div className="feed-col">
             <div className="page-header-row">
@@ -6769,6 +7237,17 @@ export default function App() {
               </span>
               <button className="page-customize-btn" onClick={()=>openCustomize('sources',cat)}>⚙ Customize</button>
             </div>
+            {/* Active search banner — shows result count + clear button */}
+            {search && (
+              <div className="search-results-banner">
+                <span className="search-results-text">
+                  {feedItems.length > 0
+                    ? <><strong>{feedItems.length} results</strong> for "{search}"</>
+                    : <>No results for "<strong>{search}</strong>" — showing web results below</>}
+                </span>
+                <button className="search-results-clear" onClick={()=>setSearch('')}>✕ Clear</button>
+              </div>
+            )}
             {(activeKw||activeSrc)&&(
               <div className="sticky-filter" style={{display:'flex',gap:'6px',flexWrap:'wrap',marginBottom:'12px'}}>
                 {activeKw&&<span style={{background:cc.bg,color:cc.color,borderRadius:'20px',padding:'3px 10px',fontSize:'10px',fontWeight:'600',display:'inline-flex',alignItems:'center',gap:'5px'}}>🔍 {activeKw}<button onClick={()=>setActiveKw(null)} style={{background:'none',border:'none',cursor:'pointer',color:'inherit',fontSize:'12px',padding:0}}>✕</button></span>}
@@ -6781,6 +7260,21 @@ export default function App() {
                 ?<div className="empty-state"><div className="empty-icon">📭</div><div className="empty-msg">{activeKw||activeSrc?'No articles match this filter':search?`No internal results for "${search}"`:'No articles loaded yet'}</div><button className="refresh-btn" onClick={refreshAll}>Refresh</button></div>
                 :feedItems.slice(activeKw||activeSrc||search?0:3,20).map((a,i)=><FeedCard key={i} a={a} cat={cat} isSaved={isSavedFn(a)} onSave={onSave} onRead={onRead} relatedSources={getRelated(a,cat)} isRead={isReadFn(a)} userKw={kw} userTeams={teams}/>)
             }
+
+            {/* v36: Pop culture sub-tab web results */}
+            {cat === 'popculture' && pcSubTab !== 'all' && (pcWebResults.length > 0 || pcWebLoading) && (
+              <div className="web-fallback">
+                <div className="rail-label" style={{margin:'24px 0 12px'}}>🌐 From the Web</div>
+                {pcWebLoading && <div style={{fontSize:'12px',color:'var(--text3)',fontStyle:'italic',padding:'10px 0'}}>Searching the web…</div>}
+                {pcWebResults.map((r,i) => (
+                  <a key={i} className="web-result" href={r.link} target="_blank" rel="noreferrer">
+                    <div className="web-result-title">{r.title}</div>
+                    {r.desc && <div className="web-result-desc">{r.desc.slice(0,160)}</div>}
+                    <div className="web-result-src">{r.source}{r.pubDate && <span className="web-result-date"> · {fmtDate(r.pubDate)}</span>}</div>
+                  </a>
+                ))}
+              </div>
+            )}
 
             {/* v26: Web search fallback when searching with thin internal results */}
             {search && (webResults.length > 0 || webLoading) && (
@@ -6887,7 +7381,7 @@ export default function App() {
             activeKw={activeKw} setActiveKw={k=>{setActiveKw(k);setActiveSrc(null);}}
             activeSource={activeSrc} setActiveSource={s=>{setActiveSrc(s);setActiveKw(null);}}
             onRead={onRead} scores={scores} scoresLoading={scoresLoading}
-            showScoreboard={cat==='sports'}/>
+            showScoreboard={cat==='sports'} recommended={recommended}/>
         </div>
       </div>
     );
@@ -7452,6 +7946,8 @@ export default function App() {
           initialTab={panelInitial.tab} initialCat={panelInitial.cat}
           onClose={()=>setShowPanel(false)} onSave={handleCustomizeSave}/>}
       </div>
+      {/* Floating AI chatbot — available on all pages */}
+      <ChatBot arts={arts}/>
     </>
   );
 }
