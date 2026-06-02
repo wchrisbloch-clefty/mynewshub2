@@ -5,6 +5,103 @@ import { CB_IDENTITY } from '../constants.js';
 import MD from './shared/MD.jsx';
 import { ThinkingDots } from './shared/Common.jsx';
 
+const ONBOARDING_KEY = 'aether_onboarded_v1';
+
+const RECO_CACHE_KEY = () => `aether_recos_${new Date().toDateString()}`;
+
+function OnboardingBanner({ onDismiss }) {
+  return (
+    <div style={{ margin: '0 0 20px', padding: '14px 18px', background: 'linear-gradient(135deg, rgba(0,198,230,0.06) 0%, rgba(99,102,241,0.06) 100%)', border: '1px solid rgba(0,198,230,0.2)', borderRadius: 12 }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 10 }}>
+        <div style={{ fontSize: 11, fontWeight: 800, color: 'var(--text)' }}>Welcome to your Intelligence Hub, CB.</div>
+        <div onClick={onDismiss} style={{ fontSize: 12, color: 'var(--dim)', cursor: 'pointer', fontWeight: 700, lineHeight: 1 }}>✕</div>
+      </div>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8 }}>
+        {[
+          { icon: '📡', label: 'Daily Brief', desc: 'AI-generated signal intel every morning — refresh anytime.' },
+          { icon: '🌊', label: 'Blue Ocean', desc: 'CB-curated opportunities in Real Estate, Finance, and Longevity.' },
+          { icon: '📚', label: '14 Modules', desc: 'Learn, Research, Coach, TED, Quiz, Projects, Vault and more.' },
+        ].map(item => (
+          <div key={item.label} style={{ padding: '10px 12px', background: 'var(--surface)', borderRadius: 8, border: '1px solid var(--bord2)' }}>
+            <div style={{ fontSize: 16, marginBottom: 4 }}>{item.icon}</div>
+            <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--text)', marginBottom: 2 }}>{item.label}</div>
+            <div style={{ fontSize: 9, color: 'var(--dim)', lineHeight: 1.4 }}>{item.desc}</div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function RecommendationsSection({ graph, projects, setActiveModule }) {
+  const [recos,   setRecos]   = useState(() => { try { return JSON.parse(localStorage.getItem(RECO_CACHE_KEY()) || 'null'); } catch { return null; } });
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    if (!recos) generate();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const generate = async () => {
+    setLoading(true);
+    const topics   = Object.values(graph?.topics || {}).slice(0, 4).map(t => t.title).join(', ') || 'none';
+    const projs    = (projects || []).filter(p => p.status === 'active').slice(0, 2).map(p => p.title).join(', ') || 'none';
+    const prompt = `Generate 4 personalized recommendations for CB right now.
+
+CB context: Learning topics: ${topics}. Active projects: ${projs}. Houston TX, BD professional. Interests: real estate, finance/dividends, longevity (Attia), AI-augmented BD, stoic philosophy.
+
+Return ONLY valid JSON (no markdown):
+{"recommendations":[
+  {"type":"book","title":"Book title","reason":"One direct sentence connecting to CB's specific goals or active topics","action":"learn","icon":"📚"},
+  {"type":"video","title":"Talk or podcast title","reason":"One direct sentence","action":"ted","icon":"🎙"},
+  {"type":"action","title":"Specific action CB should take today","reason":"One direct sentence","action":"projects","icon":"⚡"},
+  {"type":"concept","title":"Concept or framework name","reason":"One direct sentence","action":"research","icon":"🔭"}
+]}`;
+    try {
+      const raw = await callClaude({ system: CB_IDENTITY, messages: [{ role: 'user', content: prompt }], maxTokens: 500 });
+      const clean = raw.replace(/```json|```/g, '').trim();
+      const parsed = JSON.parse(clean);
+      setRecos(parsed.recommendations || []);
+      localStorage.setItem(RECO_CACHE_KEY(), JSON.stringify(parsed.recommendations || []));
+    } catch {
+      setRecos([]);
+    }
+    setLoading(false);
+  };
+
+  const typeColors = { book: '#a78bfa', video: '#e2231a', action: '#00C6E6', concept: '#6366F1' };
+
+  return (
+    <div style={{ marginBottom: 20 }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
+        <div style={{ fontSize: 9, fontWeight: 700, color: 'var(--dim)', letterSpacing: 2.5, textTransform: 'uppercase' }}>✦ For You</div>
+        <div onClick={generate} style={{ fontSize: 10, color: 'var(--accent, #00C6E6)', cursor: 'pointer', fontWeight: 600 }}>↻ Refresh</div>
+      </div>
+      {loading ? (
+        <div style={{ padding: '16px', background: 'var(--surface)', borderRadius: 10, border: '1px solid var(--border)', textAlign: 'center' }}>
+          <ThinkingDots color="var(--accent, #00C6E6)" />
+        </div>
+      ) : (recos || []).length === 0 ? null : (
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 8 }}>
+          {(recos || []).map((r, i) => (
+            <div key={i} onClick={() => setActiveModule(r.action || 'home')}
+              style={{ padding: '12px 14px', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 10, cursor: 'pointer', transition: 'border-color 0.12s' }}
+              onMouseEnter={e => e.currentTarget.style.borderColor = typeColors[r.type] + '55'}
+              onMouseLeave={e => e.currentTarget.style.borderColor = 'var(--border)'}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 5 }}>
+                <span style={{ fontSize: 14 }}>{r.icon}</span>
+                <span style={{ fontSize: 8, fontWeight: 700, color: typeColors[r.type] || 'var(--accent)', background: (typeColors[r.type] || '#00C6E6') + '18', padding: '2px 6px', borderRadius: 3, textTransform: 'uppercase', letterSpacing: 1 }}>{r.type}</span>
+              </div>
+              <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text)', lineHeight: 1.3, marginBottom: 4 }}>{r.title}</div>
+              <div style={{ fontSize: 10, color: 'var(--dim)', lineHeight: 1.5 }}>{r.reason}</div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 const SIGNALS = [
   { emoji: '🏘', title: 'Small Multifamily in Transitioning Houston Zips', insight: 'Institutional buyers skip sub-10 unit buildings. AI-driven migration is quietly repricing these before anyone notices.', category: 'Real Estate', color: '#00C6E6', urgency: 'HIGH' },
   { emoji: '🤖', title: 'AI-Augmented BD Professionals', insight: 'First movers who build systematic AI pipelines in BD will have a 10x edge within 18 months. Almost nobody is doing this yet.', category: 'Career Edge', color: '#6366F1', urgency: 'HIGH' },
@@ -109,6 +206,7 @@ export default function HomeDashboard() {
   const [briefLoading, setBriefLoading] = useState(false);
   const [briefDone,    setBriefDone]    = useState(false);
   const [briefError,   setBriefError]   = useState(false);
+  const [onboarded,    setOnboarded]    = useState(() => !!localStorage.getItem(ONBOARDING_KEY));
 
   const topics         = Object.values(graph?.topics || {});
   const totalMin       = graph?.totalTime || 0;
@@ -270,6 +368,15 @@ Be blunt. No hedging. One decisive line per bullet.`;
 
         {/* LEFT COLUMN */}
         <div>
+
+          {/* Onboarding banner — first visit only */}
+          {!onboarded && (
+            <OnboardingBanner onDismiss={() => { setOnboarded(true); localStorage.setItem(ONBOARDING_KEY, '1'); }} />
+          )}
+
+          {/* Recommendations */}
+          <RecommendationsSection graph={graph} projects={projects} setActiveModule={setActiveModule} />
+
           {/* Daily Intelligence Brief */}
           <div style={{
             background: 'var(--surface)',

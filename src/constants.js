@@ -116,6 +116,8 @@ export const NAV_ITEMS = [
   { id: "inbox",     icon: "📥", label: "Inbox",     accent: "#10b981" },
   { id: "decisions", icon: "⚖️", label: "Decisions", accent: "#f59e0b" },
   { id: "coach",     icon: "🧭", label: "Coach",     accent: "#8b5cf6" },
+  { id: "ted",       icon: "🎙", label: "TED",       accent: "#e2231a" },
+  { id: "quiz",      icon: "🧪", label: "Quiz",      accent: "#f59e0b" },
 ];
 
 export const CHAT_MODES = [

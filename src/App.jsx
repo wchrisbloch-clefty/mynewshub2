@@ -17,6 +17,8 @@ import PodcastHub from './modules/PodcastHub.jsx';
 import ContentInbox from './modules/ContentInbox.jsx';
 import DecisionLog from './modules/DecisionLog.jsx';
 import CoachAI from './modules/CoachAI.jsx';
+import TEDHub from './modules/TEDHub.jsx';
+import QuizCenter from './modules/QuizCenter.jsx';
 
 const AppContext = createContext(null);
 export const useApp = () => useContext(AppContext);
@@ -84,6 +86,8 @@ export default function App() {
     inbox:     <ContentInbox />,
     decisions: <DecisionLog />,
     coach:     <CoachAI />,
+    ted:       <TEDHub />,
+    quiz:      <QuizCenter />,
   };
 
   // Tablets show icon-only sidebar automatically
