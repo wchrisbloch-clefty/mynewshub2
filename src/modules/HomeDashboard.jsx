@@ -1,0 +1,439 @@
+import { useState, useEffect } from 'react';
+import { useApp } from '../App.jsx';
+import { callClaude } from '../utils.js';
+import { CB_IDENTITY } from '../constants.js';
+import MD from './shared/MD.jsx';
+import { ThinkingDots } from './shared/Common.jsx';
+
+const SIGNALS = [
+  { emoji: '🏘', title: 'Small Multifamily in Transitioning Houston Zips', insight: 'Institutional buyers skip sub-10 unit buildings. AI-driven migration is quietly repricing these before anyone notices.', category: 'Real Estate', color: '#00C6E6', urgency: 'HIGH' },
+  { emoji: '🤖', title: 'AI-Augmented BD Professionals', insight: 'First movers who build systematic AI pipelines in BD will have a 10x edge within 18 months. Almost nobody is doing this yet.', category: 'Career Edge', color: '#6366F1', urgency: 'HIGH' },
+  { emoji: '📈', title: 'Covered Calls on Dividend Stacks', insight: 'Systematic covered call writing on dividend portfolios adds 3–5% yield with no extra capital. Almost no retail investors act on it.', category: 'Finance', color: '#ffcc44', urgency: 'MED' },
+  { emoji: '⚡', title: 'ERCOT Ancillary Services', insight: 'Texas grid volatility = pricing opportunity in frequency regulation and demand response. Deeply underutilized by non-institutional players.', category: 'Energy/Macro', color: '#ff8844', urgency: 'MED' },
+  { emoji: '🏥', title: 'Longevity Biomarkers Protocol', insight: "Attia's Zone 2 + VO₂Max + muscle mass trifecta: most people optimize none. The compounding return on health at 40+ is asymmetric.", category: 'Longevity', color: '#ff4488', urgency: 'HIGH' },
+  { emoji: '🌐', title: 'Onshoring Infrastructure Play', insight: 'Data centers, chip fabs, and LNG terminals being built at scale. The construction supply chain is the overlooked moat.', category: 'Macro', color: '#4488ff', urgency: 'MED' },
+];
+
+const QUICK_MODULES = [
+  { id: 'learn',    icon: '📚', label: 'Learn',    desc: 'Books, topics, courses',  color: '#00C6E6' },
+  { id: 'research', icon: '🔭', label: 'Research',  desc: 'Truth-first analysis',   color: '#6366F1' },
+  { id: 'podcast',  icon: '🎙️', label: 'Podcasts',  desc: 'AI summaries + listen', color: '#e11d48' },
+  { id: 'projects', icon: '🚀', label: 'Projects',  desc: 'Track & ship',           color: '#ff8844' },
+  { id: 'vault',    icon: '🏛', label: 'Vault',     desc: 'Knowledge base',         color: '#ffcc44' },
+  { id: 'growth',   icon: '📈', label: 'Growth',    desc: 'Goals & synthesis',      color: '#44ffcc' },
+];
+
+function RadarChart({ data, size = 160 }) {
+  if (!data || data.length < 3) return null;
+  const items = data.slice(0, 6);
+  const n = items.length;
+  const cx = size / 2, cy = size / 2;
+  const r = size * 0.36;
+
+  const pt = (i, ratio) => {
+    const a = (i / n) * 2 * Math.PI - Math.PI / 2;
+    return { x: cx + r * ratio * Math.cos(a), y: cy + r * ratio * Math.sin(a) };
+  };
+  const poly = pts => pts.map(p => `${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(' ');
+
+  const outerRing  = items.map((_, i) => pt(i, 1));
+  const dataPoints = items.map((t, i) => pt(i, Math.min((t.confidence || 5) / 10, 1)));
+
+  return (
+    <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} style={{ overflow: 'visible' }}>
+      {[0.33, 0.66, 1].map(lv => (
+        <polygon key={lv} points={poly(items.map((_, i) => pt(i, lv)))}
+          fill="none" stroke="var(--border)" strokeWidth="0.8" />
+      ))}
+      {outerRing.map((p, i) => (
+        <line key={i} x1={cx} y1={cy} x2={p.x} y2={p.y} stroke="var(--border)" strokeWidth="0.8" />
+      ))}
+      <polygon points={poly(dataPoints)}
+        fill="var(--accent-glow, rgba(0,198,230,0.12))"
+        stroke="var(--accent, #00C6E6)" strokeWidth="1.5" strokeLinejoin="round" />
+      {dataPoints.map((p, i) => (
+        <circle key={i} cx={p.x} cy={p.y} r="3.5" fill="var(--accent, #00C6E6)" />
+      ))}
+      {outerRing.map((p, i) => {
+        const name  = items[i].title || '';
+        const label = name.length > 10 ? name.slice(0, 10) + '…' : name;
+        const right = p.x > cx + 3, left = p.x < cx - 3;
+        return (
+          <text key={i}
+            x={p.x + (right ? 7 : left ? -7 : 0)}
+            y={p.y + (p.y < cy - 3 ? -7 : p.y > cy + 3 ? 13 : 4)}
+            textAnchor={right ? 'start' : left ? 'end' : 'middle'}
+            fontSize="7.5" fontFamily="inherit" fill="var(--dim)">
+            {label}
+          </text>
+        );
+      })}
+    </svg>
+  );
+}
+
+function ProgressRing({ confidence = 5, size = 60, label }) {
+  const r      = (size - 8) / 2;
+  const circ   = 2 * Math.PI * r;
+  const filled = circ * Math.min(confidence / 10, 1);
+  const color  = confidence >= 8 ? '#00CC76' : confidence >= 5 ? 'var(--accent, #00C6E6)' : '#ffcc44';
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6 }}>
+      <div style={{ position: 'relative', width: size, height: size }}>
+        <svg width={size} height={size} style={{ transform: 'rotate(-90deg)' }}>
+          <circle cx={size / 2} cy={size / 2} r={r}
+            fill="none" stroke="var(--border)" strokeWidth="5" />
+          <circle cx={size / 2} cy={size / 2} r={r}
+            fill="none" stroke={color} strokeWidth="5"
+            strokeDasharray={`${filled} ${circ - filled}`}
+            strokeLinecap="round" />
+        </svg>
+        <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13, fontWeight: 800, color }}>
+          {confidence}
+        </div>
+      </div>
+      {label && (
+        <div style={{ fontSize: 9, color: 'var(--text-c)', textAlign: 'center', maxWidth: size + 16, lineHeight: 1.3, overflow: 'hidden', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' }}>
+          {label}
+        </div>
+      )}
+    </div>
+  );
+}
+
+export default function HomeDashboard() {
+  const { graph, projects, notes, setActiveModule, isMobile, isTablet, isPhone, isDesktop } = useApp();
+
+  const [brief,        setBrief]        = useState('');
+  const [briefLoading, setBriefLoading] = useState(false);
+  const [briefDone,    setBriefDone]    = useState(false);
+  const [briefError,   setBriefError]   = useState(false);
+
+  const topics         = Object.values(graph?.topics || {});
+  const totalMin       = graph?.totalTime || 0;
+  const activeProjects = projects.filter(p => p.status === 'active');
+  const recentSessions = (graph?.sessions || []).slice(-4).reverse();
+  const recentNotes    = (notes || []).slice(0, 3);
+
+  const ringTopics  = [...topics].sort((a, b) => (b.lastSession || 0) - (a.lastSession || 0)).slice(0, 4);
+  const radarTopics = [...topics].sort((a, b) => (b.confidence || 0) - (a.confidence || 0)).slice(0, 6);
+
+  const hour     = new Date().getHours();
+  const greeting = hour < 12 ? 'Morning' : hour < 17 ? 'Afternoon' : 'Evening';
+  const twoCol   = isDesktop;
+  const pad      = isPhone ? '14px' : isMobile ? '16px' : isTablet ? '22px' : '28px';
+
+  useEffect(() => {
+    const key   = `aether_brief_${new Date().toDateString()}`;
+    const saved = localStorage.getItem(key);
+    if (saved) { setBrief(saved); setBriefDone(true); return; }
+    const t = setTimeout(() => generateBrief(key), 600);
+    return () => clearTimeout(t);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const generateBrief = async (cacheKey) => {
+    if (briefLoading) return;
+    setBriefLoading(true);
+    setBriefError(false);
+    try {
+      const projList  = activeProjects.slice(0, 3).map(p => p.title).join(', ') || 'none yet';
+      const topicList = topics.slice(-3).map(t => t.title).join(', ')            || 'none yet';
+      const prompt = `CB's Daily Intelligence Brief — ${new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}
+
+Give CB 4 tight, decisive bullets. Format exactly:
+**📡 Signal** — [single most important strategic insight for CB today — connect to BD, real estate, energy, or longevity]
+**🌊 Blue Ocean** — [one underpriced opportunity CB should be tracking right now]
+**⚡ Today's Move** — [one concrete action CB should take today — specific, not vague]
+**🧠 Mental Model** — [one framework from CB's library that applies to what's happening right now]
+
+CB's context: projects: ${projList} · recent learning: ${topicList} · streak: ${graph?.streak || 0} days · Houston, TX. BD professional.
+
+Be blunt. No hedging. One decisive line per bullet.`;
+
+      const reply = await callClaude({ system: CB_IDENTITY, messages: [{ role: 'user', content: prompt }], maxTokens: 500 });
+      setBrief(reply);
+      setBriefDone(true);
+      if (cacheKey) localStorage.setItem(cacheKey, reply);
+    } catch {
+      setBriefError(true);
+    }
+    setBriefLoading(false);
+  };
+
+  // ── Right panel (desktop only) ────────────────────────────────────────
+  const rightPanel = (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+
+      {ringTopics.length > 0 && (
+        <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 14, padding: '18px 20px' }}>
+          <div style={{ fontSize: 9, fontWeight: 700, color: 'var(--dim)', letterSpacing: 2, textTransform: 'uppercase', marginBottom: 16 }}>Continue Learning</div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 16 }}>
+            {ringTopics.map((t, i) => (
+              <div key={i} onClick={() => setActiveModule('learn')} style={{ cursor: 'pointer', display: 'flex', justifyContent: 'center' }}>
+                <ProgressRing confidence={t.confidence || 5} size={64} label={t.title} />
+              </div>
+            ))}
+          </div>
+          <div onClick={() => setActiveModule('learn')}
+            style={{ marginTop: 14, fontSize: 11, color: 'var(--accent, #00C6E6)', cursor: 'pointer', fontWeight: 600, textAlign: 'center' }}>
+            Open Learn Module →
+          </div>
+        </div>
+      )}
+
+      {radarTopics.length >= 3 && (
+        <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 14, padding: '18px 20px' }}>
+          <div style={{ fontSize: 9, fontWeight: 700, color: 'var(--dim)', letterSpacing: 2, textTransform: 'uppercase', marginBottom: 14 }}>Skill Mastery</div>
+          <div style={{ display: 'flex', justifyContent: 'center' }}>
+            <RadarChart data={radarTopics} size={160} />
+          </div>
+          <div style={{ marginTop: 12, display: 'flex', flexWrap: 'wrap', gap: 5, justifyContent: 'center' }}>
+            {radarTopics.map((t, i) => (
+              <div key={i} style={{ fontSize: 9, color: 'var(--text-c)', background: 'var(--bg)', border: '1px solid var(--border)', borderRadius: 4, padding: '2px 7px' }}>
+                {(t.title || '').slice(0, 14)} · {t.confidence}/10
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {activeProjects.length > 0 && (
+        <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 14, padding: '18px 20px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+            <div style={{ fontSize: 9, fontWeight: 700, color: 'var(--dim)', letterSpacing: 2, textTransform: 'uppercase' }}>Active Projects</div>
+            <div onClick={() => setActiveModule('projects')} style={{ fontSize: 10, color: '#ff8844', cursor: 'pointer', fontWeight: 600 }}>All →</div>
+          </div>
+          {activeProjects.slice(0, 3).map(p => {
+            const done  = (p.milestones || []).filter(m => m.done).length;
+            const total = (p.milestones || []).length || 1;
+            const pct   = Math.round((done / total) * 100);
+            return (
+              <div key={p.id} onClick={() => setActiveModule('projects')} style={{ cursor: 'pointer', paddingBottom: 10, marginBottom: 10, borderBottom: '1px solid var(--bord2)' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
+                  <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1, marginRight: 8 }}>{p.emoji} {p.title}</div>
+                  <div style={{ fontSize: 11, color: p.color || '#ff8844', fontWeight: 700, flexShrink: 0 }}>{pct}%</div>
+                </div>
+                <div style={{ background: 'var(--border)', borderRadius: 2, height: 3 }}>
+                  <div style={{ width: `${pct}%`, height: '100%', background: p.color || '#ff8844', borderRadius: 2 }} />
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+
+  return (
+    <div style={{ maxWidth: twoCol ? 1200 : '100%', margin: '0 auto', paddingBottom: isMobile ? 80 : 60 }}>
+
+      {/* Greeting */}
+      <div style={{ padding: `${pad} ${pad} 0`, display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: isMobile ? 16 : 20 }}>
+        <div>
+          <div style={{ fontSize: 9, letterSpacing: 3, color: 'var(--dim)', textTransform: 'uppercase', marginBottom: 4 }}>
+            {new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}
+          </div>
+          <div style={{ fontSize: isMobile ? 22 : 28, fontWeight: 800, color: 'var(--text)', fontFamily: "'Fraunces', serif", letterSpacing: -0.5, lineHeight: 1.1 }}>
+            {greeting}, CB.
+          </div>
+          <div style={{ fontSize: isMobile ? 11 : 13, color: 'var(--muted)', marginTop: 5 }}>
+            {topics.length > 0 ? `${topics.length} topics tracked · ${activeProjects.length} projects active` : 'Your intelligence hub is ready.'}
+          </div>
+        </div>
+        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', justifyContent: 'flex-end', paddingTop: 4 }}>
+          {(graph?.streak || 0) > 0 && <div style={{ fontSize: 10, color: 'var(--text-c)', padding: '4px 10px', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 20 }}>🔥 {graph.streak}d</div>}
+          {totalMin > 0 && <div style={{ fontSize: 10, color: 'var(--text-c)', padding: '4px 10px', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 20 }}>⏱ {Math.round(totalMin / 60)}h</div>}
+        </div>
+      </div>
+
+      {/* Mobile: Continue Learning rings */}
+      {isMobile && ringTopics.length > 0 && (
+        <div style={{ marginBottom: 20 }}>
+          <div style={{ padding: `0 ${pad}`, display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+            <div style={{ fontSize: 9, fontWeight: 700, color: 'var(--dim)', letterSpacing: 2, textTransform: 'uppercase' }}>Continue Learning</div>
+            <div onClick={() => setActiveModule('learn')} style={{ fontSize: 10, color: 'var(--accent, #00C6E6)', cursor: 'pointer', fontWeight: 600 }}>Learn →</div>
+          </div>
+          <div style={{ display: 'flex', gap: 20, overflowX: 'auto', scrollbarWidth: 'none', WebkitOverflowScrolling: 'touch', padding: `0 ${pad} 4px` }}>
+            {ringTopics.map((t, i) => (
+              <div key={i} onClick={() => setActiveModule('learn')} style={{ flexShrink: 0, cursor: 'pointer' }}>
+                <ProgressRing confidence={t.confidence || 5} size={62} label={t.title} />
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Main two-column grid */}
+      <div style={{ display: twoCol ? 'grid' : 'block', gridTemplateColumns: twoCol ? '1fr 320px' : undefined, gap: '20px', padding: `0 ${pad}`, alignItems: 'flex-start' }}>
+
+        {/* LEFT COLUMN */}
+        <div>
+          {/* Daily Intelligence Brief */}
+          <div style={{
+            background: 'var(--surface)',
+            border: '1px solid var(--border)',
+            borderTop: '3px solid var(--accent, #00C6E6)',
+            borderRadius: isMobile ? 0 : 14,
+            overflow: 'hidden',
+            marginBottom: isMobile ? 16 : 20,
+            marginLeft: isMobile ? -14 : 0,
+            marginRight: isMobile ? -14 : 0,
+          }}>
+            <div style={{ padding: isMobile ? '14px 16px 12px' : '16px 20px 14px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '1px solid var(--bord2)' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                <div style={{ width: 28, height: 28, borderRadius: 8, background: 'var(--accent-glow, rgba(0,198,230,0.1))', border: '1px solid rgba(0,198,230,0.3)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 14, flexShrink: 0 }}>⚡</div>
+                <div>
+                  <div style={{ fontSize: 12, fontWeight: 800, color: 'var(--text)' }}>Daily Intelligence Brief</div>
+                  <div style={{ fontSize: 9, color: 'var(--dim)', letterSpacing: 1, textTransform: 'uppercase', marginTop: 1 }}>CB-style · auto-generated</div>
+                </div>
+              </div>
+              {briefDone && (
+                <div onClick={() => { setBrief(''); setBriefDone(false); generateBrief(null); }}
+                  style={{ fontSize: 10, padding: '4px 10px', border: '1px solid var(--border)', borderRadius: 6, color: 'var(--dim)', cursor: 'pointer', background: 'var(--bg)' }}>
+                  ↻ Refresh
+                </div>
+              )}
+            </div>
+            <div style={{ padding: isMobile ? '14px 16px 16px' : '16px 20px 18px' }}>
+              {briefLoading && !brief && (
+                <div>
+                  <div style={{ fontSize: 11, color: 'var(--dim)', marginBottom: 12 }}>Generating intelligence brief…</div>
+                  <ThinkingDots color="var(--accent, #00C6E6)" />
+                </div>
+              )}
+              {briefError && (
+                <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                  <div style={{ fontSize: 11, color: 'var(--subtle)' }}>Brief unavailable — check connection.</div>
+                  <div onClick={() => generateBrief(null)} style={{ fontSize: 10, padding: '5px 12px', background: 'var(--accent-glow)', border: '1px solid rgba(0,198,230,0.3)', borderRadius: 6, color: 'var(--accent, #00C6E6)', cursor: 'pointer' }}>Retry</div>
+                </div>
+              )}
+              {brief && <MD text={brief} color="var(--accent, #00C6E6)" />}
+            </div>
+          </div>
+
+          {/* Blue Ocean Signals */}
+          <div style={{ marginBottom: isMobile ? 20 : 24, marginLeft: isMobile ? -14 : 0, marginRight: isMobile ? -14 : 0 }}>
+            <div style={{ padding: isMobile ? '0 14px' : '0', display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+              <div style={{ fontSize: 9, fontWeight: 700, color: 'var(--dim)', letterSpacing: 2.5, textTransform: 'uppercase' }}>🌊 Blue Ocean Signals</div>
+              <div onClick={() => setActiveModule('research')} style={{ fontSize: 10, color: '#6366F1', cursor: 'pointer', fontWeight: 600 }}>Research →</div>
+            </div>
+            {isMobile ? (
+              <div style={{ display: 'flex', gap: 10, overflowX: 'auto', scrollbarWidth: 'none', WebkitOverflowScrolling: 'touch', padding: `0 14px 4px` }}>
+                {SIGNALS.map((s, i) => (
+                  <div key={i} style={{ flexShrink: 0, width: isPhone ? 236 : 268, padding: '14px 16px', background: 'var(--surface)', border: `1px solid ${s.color}22`, borderTop: `2px solid ${s.color}`, borderRadius: 12 }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 8 }}>
+                      <div style={{ fontSize: 10, fontWeight: 700, color: s.color }}>{s.emoji} {s.category}</div>
+                      <span style={{ fontSize: 8, padding: '2px 6px', borderRadius: 4, background: `${s.color}18`, border: `1px solid ${s.color}30`, color: s.color, fontWeight: 800, letterSpacing: 1 }}>{s.urgency}</span>
+                    </div>
+                    <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--text)', marginBottom: 6, lineHeight: 1.35 }}>{s.title}</div>
+                    <div style={{ fontSize: 11, color: 'var(--muted)', lineHeight: 1.6 }}>{s.insight}</div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div style={{ display: 'grid', gridTemplateColumns: isTablet ? '1fr 1fr' : '1fr 1fr 1fr', gap: 10 }}>
+                {SIGNALS.map((s, i) => (
+                  <div key={i} style={{ padding: '14px 16px', background: 'var(--surface)', border: `1px solid ${s.color}22`, borderTop: `2px solid ${s.color}`, borderRadius: 12 }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 8 }}>
+                      <div style={{ fontSize: 10, fontWeight: 700, color: s.color }}>{s.emoji} {s.category}</div>
+                      <span style={{ fontSize: 8, padding: '2px 6px', borderRadius: 4, background: `${s.color}18`, border: `1px solid ${s.color}30`, color: s.color, fontWeight: 800, letterSpacing: 1 }}>{s.urgency}</span>
+                    </div>
+                    <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--text)', marginBottom: 6, lineHeight: 1.35 }}>{s.title}</div>
+                    <div style={{ fontSize: 11, color: 'var(--muted)', lineHeight: 1.6 }}>{s.insight}</div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Mobile: quick access + projects */}
+          {isMobile && (
+            <>
+              <div style={{ marginBottom: 20 }}>
+                <div style={{ fontSize: 9, fontWeight: 700, color: 'var(--dim)', letterSpacing: 2.5, textTransform: 'uppercase', marginBottom: 12 }}>Quick Access</div>
+                <div style={{ display: 'flex', gap: 8, overflowX: 'auto', scrollbarWidth: 'none', paddingBottom: 4 }}>
+                  {QUICK_MODULES.map(m => (
+                    <div key={m.id} onClick={() => setActiveModule(m.id)}
+                      style={{ flexShrink: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6, padding: '12px 14px', background: 'var(--surface)', border: `1px solid ${m.color}22`, borderRadius: 12, cursor: 'pointer', minWidth: 72, WebkitTapHighlightColor: 'transparent' }}>
+                      <div style={{ fontSize: 22 }}>{m.icon}</div>
+                      <div style={{ fontSize: 10, fontWeight: 700, color: m.color, whiteSpace: 'nowrap' }}>{m.label}</div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {activeProjects.length > 0 && (
+                <div style={{ marginBottom: 20 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+                    <div style={{ fontSize: 9, fontWeight: 700, color: 'var(--dim)', letterSpacing: 2.5, textTransform: 'uppercase' }}>🚀 Active Projects</div>
+                    <div onClick={() => setActiveModule('projects')} style={{ fontSize: 10, color: '#ff8844', cursor: 'pointer', fontWeight: 600 }}>View all →</div>
+                  </div>
+                  {activeProjects.slice(0, 3).map(p => {
+                    const done  = (p.milestones || []).filter(m => m.done).length;
+                    const total = (p.milestones || []).length || 1;
+                    const pct   = Math.round((done / total) * 100);
+                    return (
+                      <div key={p.id} onClick={() => setActiveModule('projects')}
+                        style={{ padding: '12px 14px', background: 'var(--surface)', border: `1px solid ${p.color || '#ff8844'}22`, borderRadius: 10, cursor: 'pointer', marginBottom: 8 }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                          <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--text)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1, marginRight: 8 }}>{p.emoji} {p.title}</div>
+                          <div style={{ fontSize: 11, color: p.color || '#ff8844', fontWeight: 700, flexShrink: 0 }}>{pct}%</div>
+                        </div>
+                        <div style={{ background: 'var(--border)', borderRadius: 2, height: 3 }}>
+                          <div style={{ width: `${pct}%`, height: '100%', background: p.color || '#ff8844', borderRadius: 2 }} />
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </>
+          )}
+
+          {/* Empty state */}
+          {recentSessions.length === 0 && recentNotes.length === 0 && activeProjects.length === 0 && (
+            <div style={{ padding: '20px', background: 'var(--surface)', borderRadius: 12, border: '1px dashed var(--border)', textAlign: 'center', marginBottom: 20 }}>
+              <div style={{ fontSize: 11, color: 'var(--subtle)', marginBottom: 16, lineHeight: 1.7 }}>
+                Your hub is fresh. Start anywhere — each module builds your intelligence graph.
+              </div>
+              <div style={{ display: 'flex', gap: 8, justifyContent: 'center', flexWrap: 'wrap' }}>
+                {[{ label: '📚 Start a Book', id: 'learn' }, { label: '🔭 Run Research', id: 'research' }, { label: '🎙️ Browse Podcasts', id: 'podcast' }].map(a => (
+                  <div key={a.id} onClick={() => setActiveModule(a.id)}
+                    style={{ padding: '8px 14px', background: 'var(--bg)', border: '1px solid var(--border)', borderRadius: 8, fontSize: 11, fontWeight: 600, color: 'var(--text-b)', cursor: 'pointer', minHeight: 36, display: 'flex', alignItems: 'center' }}>
+                    {a.label}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* RIGHT PANEL — desktop only */}
+        {twoCol && rightPanel}
+      </div>
+
+      {/* Quick Module Launch — desktop only, full-width below */}
+      {!isMobile && (
+        <div style={{ padding: `16px ${pad} 0` }}>
+          <div style={{ fontSize: 9, fontWeight: 700, color: 'var(--dim)', letterSpacing: 2.5, textTransform: 'uppercase', marginBottom: 12 }}>Quick Access</div>
+          <div style={{ display: 'grid', gridTemplateColumns: isTablet ? 'repeat(3, 1fr)' : 'repeat(6, 1fr)', gap: 10 }}>
+            {QUICK_MODULES.map(m => (
+              <div key={m.id} onClick={() => setActiveModule(m.id)}
+                style={{ display: 'flex', flexDirection: 'column', gap: 8, padding: '14px 16px', background: 'var(--surface)', border: `1px solid ${m.color}20`, borderRadius: 12, cursor: 'pointer', transition: 'border-color 0.15s' }}
+                onMouseEnter={e => e.currentTarget.style.borderColor = `${m.color}55`}
+                onMouseLeave={e => e.currentTarget.style.borderColor = `${m.color}20`}>
+                <div style={{ fontSize: 22 }}>{m.icon}</div>
+                <div>
+                  <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--text)', marginBottom: 2 }}>{m.label}</div>
+                  <div style={{ fontSize: 10, color: 'var(--dim)' }}>{m.desc}</div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
