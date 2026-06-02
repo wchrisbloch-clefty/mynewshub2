@@ -1687,51 +1687,23 @@ body:not(.dark) .pill-bar{
    numerics throughout, terminal-like layout. CSS-only, no functional changes. */
 .fin-header{
   background:var(--surface);border:1px solid var(--border);
-  /* Bloomberg-style: square corners, orange top accent */
-  border-radius:0;
-  border-top:3px solid #fa7800;
+  border-radius:0;border-top:3px solid #fa7800;
   padding:14px 18px 12px;margin-bottom:12px;box-shadow:none;
 }
+.fin-header-slim .fin-header-top{margin-bottom:0;}
 .fin-header-top{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:14px;gap:12px;flex-wrap:wrap;}
 .fin-header-title{
   font-size:20px;font-weight:900;color:var(--text);letter-spacing:-0.5px;
-  /* Bloomberg terminal-like header */
-  text-transform:none;
 }
 .fin-header-sub{font-size:11px;color:var(--text2);margin-top:4px;display:flex;align-items:center;gap:6px;font-variant-numeric:tabular-nums;}
 .fin-status-dot{width:7px;height:7px;border-radius:50%;display:inline-block;}
 .fin-refresh{
   background:transparent;border:1px solid var(--border);color:var(--text2);
   border-radius:0;padding:5px 12px;font-size:10px;font-weight:700;cursor:pointer;font-family:inherit;
-  text-transform:uppercase;letter-spacing:0.06em;
-  transition:all 0.12s;
+  text-transform:uppercase;letter-spacing:0.06em;transition:all 0.12s;
 }
 .fin-refresh:hover{border-color:#fa7800;color:#fa7800;}
 .fin-refresh:disabled{cursor:wait;opacity:0.6;}
-.fin-indices{display:grid;grid-template-columns:repeat(3,1fr);gap:1px;background:var(--border);}
-.fin-index{
-  /* Bloomberg-style flat tile with bottom accent bar */
-  background:var(--surface);border-radius:0;padding:12px 16px;
-  border-left:none;
-  border-bottom:3px solid var(--border);
-}
-.fin-index.up{border-bottom-color:#16a34a;}
-.fin-index.down{border-bottom-color:#dc2626;}
-.fin-index-label{font-size:10px;font-weight:800;color:var(--text3);text-transform:uppercase;letter-spacing:0.1em;margin-bottom:4px;}
-.fin-index-price{
-  font-size:22px;font-weight:700;color:var(--text);
-  font-variant-numeric:tabular-nums;letter-spacing:-0.5px;line-height:1.05;
-  font-family:'SF Mono','Cascadia Code','Consolas',monospace;
-}
-.fin-index-chg{font-size:11px;font-weight:700;margin-top:4px;display:flex;gap:6px;align-items:center;font-variant-numeric:tabular-nums;}
-.fin-index.up .fin-index-chg{color:#16a34a;}
-.fin-index.down .fin-index-chg{color:#dc2626;}
-.fin-index-pct{
-  background:transparent;border:1px solid currentColor;
-  border-radius:0;padding:1px 6px;font-size:10px;font-weight:800;
-  letter-spacing:0.02em;
-}
-.dark .fin-index-pct{background:transparent;}
 .fin-grid{display:grid;grid-template-columns:1fr 280px;gap:12px;align-items:start;}
 .fin-main{display:flex;flex-direction:column;gap:12px;min-width:0;}
 .fin-watchlist,.fin-news{
@@ -1766,17 +1738,43 @@ body:not(.dark) .pill-bar{
   padding:10px 16px;font-size:13px;color:var(--text);
 }
 .fin-sym{font-weight:800;font-size:13px;color:#6366f1;letter-spacing:-0.2px;}
-.fin-name{color:var(--text3);font-size:11px;font-weight:400;}
+.fin-name{color:var(--text3);font-size:11px;font-weight:400;padding-left:0;}
 .fin-px{font-variant-numeric:tabular-nums;text-align:right;font-weight:600;font-size:13px;}
 .fin-up{color:#16a34a;}
 .fin-down{color:#dc2626;}
 .fin-pct-pill{
   display:inline-block;
-  background:rgba(22,163,74,0.12);border-radius:6px;padding:3px 8px;
+  background:rgba(22,163,74,0.12);border-radius:6px;padding:2px 7px;
   font-size:11px;font-weight:700;font-variant-numeric:tabular-nums;
 }
 .fin-down .fin-pct-pill{background:rgba(220,38,38,0.1);}
 .fin-empty{padding:32px;text-align:center;color:var(--text3);font-style:italic;font-size:12px;}
+/* Watchlist compact rows */
+.fin-wl-row{cursor:pointer;transition:background 0.1s;}
+.fin-wl-row:hover,.fin-wl-row.expanded{background:var(--surface2);}
+.fin-wl-row.expanded td{border-bottom:none;}
+/* Chart expansion */
+.fin-chart-row{background:var(--surface2);}
+.fin-chart-cell{padding:0!important;border-bottom:1px solid var(--border);}
+.fin-chart-wrap{padding:10px 16px 14px;}
+.fin-period-pills{display:flex;align-items:center;gap:6px;margin-bottom:10px;flex-wrap:wrap;}
+.fin-period-pill{
+  padding:4px 10px;border-radius:16px;font-size:11px;font-weight:700;
+  background:var(--surface);border:1px solid var(--border);color:var(--text3);
+  cursor:pointer;transition:all 0.12s;font-family:var(--font-sans);
+}
+.fin-period-pill:hover{border-color:#6366f1;color:#6366f1;}
+.fin-period-pill.active{background:#6366f1;color:#fff;border-color:#6366f1;}
+.fin-period-row{display:flex;gap:4px;}
+.fin-period-btn{padding:3px 8px;border-radius:12px;font-size:10px;font-weight:700;background:var(--surface2);border:1px solid var(--border);color:var(--text3);cursor:pointer;font-family:var(--font-sans);}
+.fin-period-btn.active{background:#6366f1;color:#fff;border-color:#6366f1;}
+.fin-chart-frame{width:100%;height:200px;border:none;border-radius:6px;display:block;}
+.fin-chart-ext{
+  margin-left:auto;font-size:11px;font-weight:600;color:var(--text3);
+  text-decoration:none;padding:4px 8px;border:1px solid var(--border);border-radius:12px;
+  transition:all 0.12s;
+}
+.fin-chart-ext:hover{border-color:#fa7800;color:#fa7800;}
 
 /* ═══════════════════════════════════════════
    SOCIAL FOLLOWS (per category)
@@ -5198,10 +5196,7 @@ function Sidebar({cat, arts, kw, health, activeKw, setActiveKw, activeSource, se
 
   const handleTopicClick = (label) => {
     setActiveKw(activeKw === label ? null : label);
-    setTimeout(() => {
-      const feed = document.querySelector('.feed-col');
-      if (feed) feed.scrollIntoView({behavior:'smooth', block:'start'});
-    }, 50);
+    setTimeout(() => window.scrollTo({top: 0, behavior: 'smooth'}), 50);
   };
 
   return (
@@ -6742,6 +6737,7 @@ export default function App() {
     // v24a: 'briefing' is a dedicated page again. No redirect needed.
     setTab(t);setSearch('');setActiveKw(null);setActiveSrc(null);
     setMobileSearchOpen(false);
+    window.scrollTo({top:0, behavior:'instant'}); // always land at top of new page
     // Remember last-viewed news category so the bottom "Feed" tab returns here
     const CAT_TABS = ['general','sports','business','finance','bloom','popculture','comedy'];
     if (CAT_TABS.includes(t)) setLastFeedTab(t);
@@ -6894,7 +6890,12 @@ export default function App() {
     ];
 
     const feedRef = useRef(null);
-    const scrollToFeed = () => feedRef.current?.scrollIntoView({ behavior:'smooth', block:'start' });
+    const scrollToFeed = () => {
+      const el = feedRef.current;
+      if (!el) return;
+      const top = el.getBoundingClientRect().top + window.scrollY - 72;
+      window.scrollTo({ top: Math.max(0, top), behavior: 'smooth' });
+    };
 
     return (
       <div className="page sports-page">
@@ -7221,7 +7222,7 @@ export default function App() {
           <div className="pc-subtabs">
             {PC_SUBTABS.map(t => (
               <button key={t.key} className={`pc-subtab ${pcSubTab===t.key?'active':''}`}
-                onClick={()=>setPcSubTab(t.key)}>
+                onClick={()=>{setPcSubTab(t.key);window.scrollTo({top:0,behavior:'smooth'});}}>
                 {t.emoji} {t.label}
               </button>
             ))}
@@ -7760,16 +7761,11 @@ export default function App() {
   // ─── FINANCE PAGE ──────────────────────────────────────────────────────
   const FinancePage = () => {
     const items=sorted('finance');
-    const marketStatus=useMemo(()=>{
-      const now=new Date();
-      const et=new Date(now.toLocaleString('en-US',{timeZone:'America/New_York'}));
-      const day=et.getDay(),hr=et.getHours(),min=et.getMinutes(),mins=hr*60+min;
-      const isWd=day>=1&&day<=5;
-      if(isWd&&mins>=570&&mins<960)return{state:'open',label:'Markets Open',color:'var(--green)'};
-      if(isWd&&mins>=240&&mins<570)return{state:'pre',label:'Pre-Market',color:'var(--amber)'};
-      if(isWd&&mins>=960&&mins<1200)return{state:'after',label:'After Hours',color:'var(--amber)'};
-      return{state:'closed',label:'Markets Closed',color:'var(--text3)'};
-    },[]);
+    const [expandedSym, setExpandedSym] = useState(null);
+    const [chartPeriod, setChartPeriod] = useState('3M');
+
+    const CHART_PERIODS = ['1D','5D','1M','3M','YTD','1Y'];
+    const periodToTv = {'1D':'1D','5D':'5D','1M':'1M','3M':'3M','YTD':'YTD','1Y':'12M'};
 
     const fmtPrice=n=>n==null?'—':n.toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2});
     const fmtChg=n=>n==null?'':(n>=0?'+':'')+n.toFixed(2);
@@ -7777,7 +7773,7 @@ export default function App() {
 
     return (
       <div className="page">
-        <div className="fin-header">
+        <div className="fin-header fin-header-slim">
           <div className="fin-header-top">
             <div>
               <div className="fin-header-title">📈 Markets</div>
@@ -7792,50 +7788,80 @@ export default function App() {
               </button>
             </div>
           </div>
-          <div className="fin-indices">
-            {INDICES.map(idx=>{
-              const q=marketData[idx.sym];const up=q&&q.chg>=0;
-              return (
-                <div key={idx.sym} className={`fin-index ${q?(up?'up':'down'):''}`}>
-                  <div className="fin-index-label">{idx.label}</div>
-                  <div className="fin-index-price">{q?fmtPrice(q.price):'—'}</div>
-                  <div className="fin-index-chg">
-                    {q?<><span>{up?'▲':'▼'} {fmtChg(q.chg)}</span><span className="fin-index-pct">{fmtPct(q.pct)}</span></>:<span style={{color:'var(--text3)'}}>Loading…</span>}
-                  </div>
-                </div>
-              );
-            })}
-          </div>
         </div>
         <div className="fin-grid">
           <div className="fin-main">
             <section className="fin-watchlist">
               <div className="fin-section-head">
                 <span className="fin-section-title">⭐ My Watchlist</span>
-                <button className="page-customize-btn" onClick={()=>openCustomize('watchlist','finance')}>⚙ Edit</button>
+                <div style={{display:'flex',alignItems:'center',gap:'8px'}}>
+                  {expandedSym && (
+                    <div className="fin-period-row">
+                      {CHART_PERIODS.map(p=>(
+                        <button key={p} className={`fin-period-btn${chartPeriod===p?' active':''}`}
+                          onClick={e=>{e.stopPropagation();setChartPeriod(p);}}>
+                          {p}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                  <button className="page-customize-btn" onClick={()=>openCustomize('watchlist','finance')}>⚙ Edit</button>
+                </div>
               </div>
               <table className="fin-table">
                 <thead><tr>
                   <th style={{textAlign:'left'}}>Symbol</th>
-                  <th style={{textAlign:'left'}}>Name</th>
+                  <th style={{textAlign:'left',paddingLeft:0}}>Name</th>
                   <th style={{textAlign:'right'}}>Price</th>
-                  <th style={{textAlign:'right'}}>Change</th>
+                  <th style={{textAlign:'right'}}>Chg</th>
                   <th style={{textAlign:'right'}}>%</th>
                 </tr></thead>
                 <tbody>
                   {watchlist.length===0&&<tr><td colSpan={5} className="fin-empty">No symbols yet — add some in Customize</td></tr>}
                   {watchlist.map(w=>{
                     const q=marketData[w.sym];const up=q&&q.chg>=0;
+                    const isOpen = expandedSym === w.sym;
                     return (
-                      <tr key={w.sym} onClick={()=>window.open(`https://finance.yahoo.com/quote/${encodeURIComponent(w.sym)}`,'_blank')}>
-                        <td className="fin-sym">{w.sym}</td>
-                        <td className="fin-name">{w.name}</td>
-                        <td className="fin-px">{q?fmtPrice(q.price):<em style={{color:'var(--text3)'}}>—</em>}</td>
-                        <td className={`fin-px ${up?'fin-up':q?'fin-down':''}`}>{q?fmtChg(q.chg):''}</td>
-                        <td className={`fin-px ${up?'fin-up':q?'fin-down':''}`}>
-                          {q&&<span className="fin-pct-pill">{up?'▲':'▼'} {fmtPct(q.pct).replace('+','').replace('-','')}</span>}
-                        </td>
-                      </tr>
+                      <React.Fragment key={w.sym}>
+                        <tr className={`fin-wl-row${isOpen?' expanded':''}`}
+                          onClick={()=>setExpandedSym(isOpen ? null : w.sym)}>
+                          <td className="fin-sym">{w.sym}</td>
+                          <td className="fin-name">{w.name}</td>
+                          <td className="fin-px">{q?fmtPrice(q.price):<em style={{color:'var(--text3)'}}>—</em>}</td>
+                          <td className={`fin-px ${up?'fin-up':q?'fin-down':''}`}>{q?fmtChg(q.chg):''}</td>
+                          <td className={`fin-px ${up?'fin-up':q?'fin-down':''}`}>
+                            {q&&<span className="fin-pct-pill">{up?'▲':'▼'} {fmtPct(q.pct).replace('+','').replace('-','')}</span>}
+                          </td>
+                        </tr>
+                        {isOpen && (
+                          <tr className="fin-chart-row">
+                            <td colSpan={5} className="fin-chart-cell">
+                              <div className="fin-chart-wrap">
+                                <div className="fin-period-pills">
+                                  {CHART_PERIODS.map(p=>(
+                                    <button key={p} className={`fin-period-pill${chartPeriod===p?' active':''}`}
+                                      onClick={e=>{e.stopPropagation();setChartPeriod(p);}}>
+                                      {p}
+                                    </button>
+                                  ))}
+                                  <a className="fin-chart-ext" href={`https://finance.yahoo.com/chart/${w.sym}`}
+                                    target="_blank" rel="noreferrer" onClick={e=>e.stopPropagation()}>
+                                    Yahoo ↗
+                                  </a>
+                                </div>
+                                <iframe
+                                  key={`${w.sym}-${chartPeriod}`}
+                                  className="fin-chart-frame"
+                                  src={`https://www.tradingview.com/mini-symbol-overview/?symbol=${encodeURIComponent(w.sym)}&locale=en&dateRange=${periodToTv[chartPeriod]||'3M'}&colorTheme=${dark?'dark':'light'}&trendLineColor=%231976d2&underLineColor=rgba(55%2C166%2C239%2C0.15)&underLineBottomColor=rgba(255%2C255%2C255%2C0)&isTransparent=false&autosize=true`}
+                                  title={`${w.sym} chart`}
+                                  scrolling="no"
+                                  frameBorder="0"
+                                />
+                              </div>
+                            </td>
+                          </tr>
+                        )}
+                      </React.Fragment>
                     );
                   })}
                 </tbody>
