@@ -73,7 +73,7 @@ export default function Sidebar({ collapsed, onToggle }) {
                 display: 'flex',
                 alignItems: 'center',
                 gap: 12,
-                padding: collapsed ? '13px 0' : '11px 18px',
+                padding: collapsed ? '10px 0' : '9px 18px',
                 justifyContent: collapsed ? 'center' : 'flex-start',
                 background: active ? 'var(--accent-glow, rgba(0,198,230,0.09))' : 'transparent',
                 border: 'none',
@@ -85,7 +85,7 @@ export default function Sidebar({ collapsed, onToggle }) {
                 transition: 'all 0.12s',
                 outline: 'none',
                 position: 'relative',
-                minHeight: 44,
+                minHeight: 40,
               }}
             >
               {active && collapsed && (
