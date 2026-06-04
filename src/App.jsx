@@ -982,16 +982,16 @@ const GLOBAL_CSS = `
   --shadow-lg:0 8px 40px rgba(0,0,0,0.13);
 }
 .dark{
-  /* Warm dark — BBC dark mode feel, not cold blue IDE */
-  --bg:#141210;--surface:#1e1c1a;--surface2:#272422;
-  --border:#2e2b28;--border2:#222020;
-  --text:#f0ede8;--text2:#a8a39d;--text3:#5e5a55;--text4:#303030;
-  --accent:#e8454d;--accent-bg:#2a1518;
-  --navy:#0f1624;--navy-light:#1a2340;
-  --red:#e8454d;--green:#4ade80;--amber:#fbbf24;
-  --shadow-sm:0 1px 4px rgba(0,0,0,0.4);
-  --shadow-md:0 4px 20px rgba(0,0,0,0.5);
-  --shadow-lg:0 8px 40px rgba(0,0,0,0.6);
+  /* Bloomberg / Reuters-inspired: cool slate, not warm brown — high legibility */
+  --bg:#0d1117;--surface:#161d2b;--surface2:#1e2638;
+  --border:#2a3347;--border2:#1e2638;
+  --text:#e2e8f4;--text2:#8892b0;--text3:#4a5570;--text4:#1e2638;
+  --accent:#e84545;--accent-bg:#1a1018;
+  --navy:#080c14;--navy-light:#0f1624;
+  --red:#e84545;--green:#4ade80;--amber:#fbbf24;
+  --shadow-sm:0 1px 4px rgba(0,0,0,0.5);
+  --shadow-md:0 4px 20px rgba(0,0,0,0.6);
+  --shadow-lg:0 8px 40px rgba(0,0,0,0.7);
 }
 
 body{
@@ -2198,8 +2198,8 @@ body:not(.dark) .pill-bar{
   position:relative;
   flex-shrink:0;scroll-snap-align:start;
   background:#162635;border:1px solid #243446;
-  border-radius:8px;padding:11px 14px;
-  min-width:162px;cursor:pointer;
+  border-radius:7px;padding:8px 10px;
+  min-width:130px;cursor:pointer;
   transition:border-color 0.15s, transform 0.1s;
 }
 .sst-tile:hover{border-color:#3b5168;transform:translateY(-1px);}
@@ -2216,20 +2216,20 @@ body:not(.dark) .pill-bar{
 }
 .sst-row{
   display:flex;justify-content:space-between;align-items:center;
-  font-size:13px;color:rgba(255,255,255,0.85);
-  font-variant-numeric:tabular-nums;padding:3px 0;
+  font-size:12px;color:rgba(255,255,255,0.85);
+  font-variant-numeric:tabular-nums;padding:2px 0;
 }
-.sst-team{font-weight:600;letter-spacing:-0.2px;max-width:105px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.sst-team{font-weight:600;letter-spacing:-0.2px;max-width:88px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
 .sst-team.win{color:#fff;font-weight:800;}
 .sst-team.loss{color:rgba(255,255,255,0.4);}
-.sst-score{font-weight:900;font-size:17px;color:#fff;min-width:28px;text-align:right;}
+.sst-score{font-weight:900;font-size:14px;color:#fff;min-width:22px;text-align:right;}
 .sst-score.win{color:#22c55e;}
 .sst-score.loss{color:rgba(255,255,255,0.35);}
 .sst-status{
-  font-size:10px;color:rgba(255,255,255,0.55);
+  font-size:9px;color:rgba(255,255,255,0.55);
   text-transform:uppercase;letter-spacing:0.05em;
-  margin-top:6px;display:flex;align-items:center;gap:5px;
-  border-top:1px solid rgba(255,255,255,0.07);padding-top:6px;
+  margin-top:4px;display:flex;align-items:center;gap:4px;
+  border-top:1px solid rgba(255,255,255,0.07);padding-top:4px;
 }
 .sst-status.live{color:#ef4444;font-weight:700;}
 .sst-status.final{color:rgba(255,255,255,0.4);}
@@ -3505,11 +3505,11 @@ body{overscroll-behavior-y:contain;}
   font-family:'SF Mono','Cascadia Code','Consolas',monospace;letter-spacing:0;font-size:9px;
 }
 
-/* Dark mode: warmer dark (less blue-cold IDE feel) */
+/* Dark mode: Bloomberg slate override */
 .dark{
-  --bg:#141414;--surface:#1c1c1c;--surface2:#242424;
-  --border:#2e2e2e;--border2:#222222;
-  --text:#f0f0f0;--text2:#a0a0a0;--text3:#585858;--text4:#303030;
+  --bg:#0d1117;--surface:#161d2b;--surface2:#1e2638;
+  --border:#2a3347;--border2:#1e2638;
+  --text:#e2e8f4;--text2:#8892b0;--text3:#4a5570;--text4:#1e2638;
   --shadow-sm:0 1px 3px rgba(0,0,0,0.4);
   --shadow-md:0 4px 16px rgba(0,0,0,0.5);
   --shadow-lg:0 8px 32px rgba(0,0,0,0.6);
@@ -3801,11 +3801,11 @@ kbd{display:inline-block;padding:1px 5px;border:1px solid var(--border);border-r
   font-size:32px;font-weight:700;color:var(--text);letter-spacing:-1px;font-variant-numeric:tabular-nums;
 }
 
-/* Dark mode: warmer dark (less blue-cold IDE feel) — OVERRIDE */
+/* Dark mode: Bloomberg slate — final override */
 .dark{
-  --bg:#141210;--surface:#1e1c1a;--surface2:#272422;
-  --border:#2e2b28;--border2:#222020;
-  --text:#f0ede8;--text2:#a8a39d;--text3:#5e5a55;--text4:#303030;
+  --bg:#0d1117;--surface:#161d2b;--surface2:#1e2638;
+  --border:#2a3347;--border2:#1e2638;
+  --text:#e2e8f4;--text2:#8892b0;--text3:#4a5570;--text4:#1e2638;
   --shadow-sm:0 1px 4px rgba(0,0,0,0.4);
   --shadow-md:0 4px 20px rgba(0,0,0,0.5);
   --shadow-lg:0 8px 40px rgba(0,0,0,0.6);
@@ -4831,8 +4831,8 @@ function FeedCard({a, cat, isSaved, onSave, onRead, relatedSources, isRead, user
             <AudioListen text={`${a.title}. ${a.desc || ''}`} title={null} />
           </>
         )}
-        <a className="fc-read-link" href={a.link} target="_blank" rel="noreferrer" onClick={e=>{e.stopPropagation();onRead(a);}}>
-          {readMins ? `${readMins} min · ` : ''}Read →
+        <a className="fc-read-link" href={a.link} target="_blank" rel="noreferrer" onClick={e=>e.stopPropagation()}>
+          {readMins ? `${readMins} min · ` : ''}Full Story ↗
         </a>
       </div>
     </div>
@@ -6153,13 +6153,17 @@ function SportsScoreStrip({ scores, teams }) {
     if (!all.length) return [];
     const isLive = g => g.state === 'in';
     const isFav  = g => !!favoriteInList(g, teams);
-    // Sort: favorite-live > favorite-other > live > recent finals > upcoming
-    const sortKey = g => {
-      const fav = isFav(g) ? 0 : 1;
-      const live = isLive(g) ? 0 : g.state === 'post' ? 1 : 2;
-      return fav * 10 + live;
-    };
-    return [...all].sort((a, b) => sortKey(a) - sortKey(b)).slice(0, 12);
+    // Chronological: live first, upcoming by start time, finals by recency; favs float up within each group
+    return [...all].sort((a, b) => {
+      const favDiff = (isFav(b)?1:0) - (isFav(a)?1:0);
+      if (favDiff !== 0) return favDiff;
+      const stateOrd = g => g.state === 'in' ? 0 : g.state === 'pre' ? 1 : g.state === 'post' ? 2 : 3;
+      const soDiff = stateOrd(a) - stateOrd(b);
+      if (soDiff !== 0) return soDiff;
+      const ta = a.date ? new Date(a.date).getTime() : 0;
+      const tb = b.date ? new Date(b.date).getTime() : 0;
+      return stateOrd(a) === 2 ? tb - ta : ta - tb; // finals newest first; live/upcoming earliest first
+    }).slice(0, 14);
   }, [scores, teams]);
 
   if (tiles.length === 0) return (
@@ -7095,7 +7099,7 @@ export default function App() {
       if (sportTab === 'all') return teams;
       const leagueKey = sportTab;
       const L = LEAGUES.find(x => x.key === leagueKey);
-      if (!L) return teams;
+      if (!L) return []; // golf/racing/cbase have no LEAGUE entry — use keyword filter only
       return teams.filter(t => t.sport === L.sport && t.league === L.league);
     }, [teams, sportTab]);
 
@@ -7359,10 +7363,13 @@ export default function App() {
     const items=useMemo(()=>clusterStories(rawItems),[rawItems]);
     const isLoading=loading[cat];
 
-    // v36: Pop Culture sub-tab state (hooks always declared, only used when cat===popculture)
+    // Sub-tab state — hooks always declared; only active for their respective cats
     const [pcSubTab, setPcSubTab] = useState('all');
     const [pcWebResults, setPcWebResults] = useState([]);
     const [pcWebLoading, setPcWebLoading] = useState(false);
+    const [enSubTab, setEnSubTab] = useState('all');
+    const [enWebResults, setEnWebResults] = useState([]);
+    const [enWebLoading, setEnWebLoading] = useState(false);
 
     const PC_SUBTABS = [
       { key:'all',         label:'All',         emoji:'✨' },
@@ -7378,6 +7385,22 @@ export default function App() {
       comedy: ['comedy','comedian','stand-up','funny','humor','joke','sketch','snl','sitcom','comic','parody','satire'],
     };
 
+    const EN_SUBTABS = [
+      { key:'all',     label:'All',           emoji:'⚡' },
+      { key:'power',   label:'Power',         emoji:'🔌' },
+      { key:'oilgas',  label:'Oil & Gas',     emoji:'🛢️' },
+      { key:'clean',   label:'Clean Energy',  emoji:'🌿' },
+      { key:'markets', label:'Markets',       emoji:'📈' },
+      { key:'policy',  label:'Policy',        emoji:'🏛️' },
+    ];
+    const EN_KWS = {
+      power:   ['power','electric','grid','utility','electricity','megawatt','kilowatt','nuclear','coal','natural gas','transmission','substation','generation','powerplant','baseload'],
+      oilgas:  ['oil','gas','petroleum','crude','refinery','pipeline','opec','brent','wti','shale','drilling','rig','barrel','lng','upstream','downstream','midstream','gasoline'],
+      clean:   ['solar','wind','renewable','clean energy','green','battery','storage','ev','electric vehicle','hydrogen','carbon','emissions','climate','sustainability','net zero','offshore wind'],
+      markets: ['commodity','commodities','futures','spot price','energy prices','gas prices','oil prices','supply','demand','export','import','petrochemical','inflation energy'],
+      policy:  ['policy','regulation','epa','federal','congress','legislation','tariff','subsidy','permit','department of energy','doe','ferc','administration','executive order','climate bill'],
+    };
+
     // Filter items by pop culture sub-tab
     const pcFilteredItems = useMemo(() => {
       if (cat !== 'popculture' || pcSubTab === 'all') return items;
@@ -7387,6 +7410,15 @@ export default function App() {
         return kws.some(k => t.includes(k));
       });
     }, [items, cat, pcSubTab]);
+
+    const enFilteredItems = useMemo(() => {
+      if (cat !== 'bloom' || enSubTab === 'all') return items;
+      const kws = EN_KWS[enSubTab] || [];
+      return items.filter(a => {
+        const t = (a.title + ' ' + (a.desc||'')).toLowerCase();
+        return kws.some(k => t.includes(k));
+      });
+    }, [items, cat, enSubTab]);
 
     // v36: Web results for pop culture sub-tab
     useEffect(() => {
@@ -7400,9 +7432,23 @@ export default function App() {
       fetchWebSearch(q).then(r => { setPcWebResults(r); setPcWebLoading(false); });
     }, [cat, pcSubTab]);
 
-    const heroItems=pcFilteredItems.filter(a=>a.img);
+    // v40: Web results for energy sub-tab
+    useEffect(() => {
+      if (cat !== 'bloom' || enSubTab === 'all') { setEnWebResults([]); return; }
+      const queries = {
+        power:'power grid electricity utility news today', oilgas:'oil gas petroleum crude news today',
+        clean:'clean energy solar wind renewable news today', markets:'energy commodity markets prices today',
+        policy:'energy policy regulation government news today',
+      };
+      const q = queries[enSubTab] || `${enSubTab} energy news today`;
+      setEnWebLoading(true);
+      fetchWebSearch(q).then(r => { setEnWebResults(r); setEnWebLoading(false); });
+    }, [cat, enSubTab]);
+
+    const activeFilteredItems = cat === 'bloom' ? enFilteredItems : pcFilteredItems;
+    const heroItems=activeFilteredItems.filter(a=>a.img);
     const catLead=heroItems[0]||null;
-    const feedItems=catLead?pcFilteredItems.filter(a=>a.link!==catLead.link):pcFilteredItems;
+    const feedItems=catLead?activeFilteredItems.filter(a=>a.link!==catLead.link):activeFilteredItems;
 
     const isHome = cat === 'general';
     const catKws = kw[cat] || [];
@@ -7498,12 +7544,24 @@ export default function App() {
           </div>
         )}
 
-        {/* v36: Pop Culture sub-tabs */}
+        {/* Pop Culture sub-tabs */}
         {cat === 'popculture' && !activeKw && !activeSrc && !search && (
           <div className="pc-subtabs">
             {PC_SUBTABS.map(t => (
               <button key={t.key} className={`pc-subtab ${pcSubTab===t.key?'active':''}`}
                 onClick={()=>{setPcSubTab(t.key);window.scrollTo({top:0,behavior:'smooth'});}}>
+                {t.emoji} {t.label}
+              </button>
+            ))}
+          </div>
+        )}
+
+        {/* Energy sub-tabs */}
+        {cat === 'bloom' && !activeKw && !activeSrc && !search && (
+          <div className="pc-subtabs">
+            {EN_SUBTABS.map(t => (
+              <button key={t.key} className={`pc-subtab ${enSubTab===t.key?'active':''}`}
+                onClick={()=>{setEnSubTab(t.key);window.scrollTo({top:0,behavior:'smooth'});}}>
                 {t.emoji} {t.label}
               </button>
             ))}
@@ -7543,12 +7601,27 @@ export default function App() {
                 :feedItems.slice(activeKw||activeSrc||search?0:3,20).map((a,i)=><FeedCard key={i} a={a} cat={cat} isSaved={isSavedFn(a)} onSave={onSave} onRead={onRead} relatedSources={getRelated(a,cat)} isRead={isReadFn(a)} userKw={kw} userTeams={teams}/>)
             }
 
-            {/* v36: Pop culture sub-tab web results */}
+            {/* Pop culture sub-tab web results */}
             {cat === 'popculture' && pcSubTab !== 'all' && (pcWebResults.length > 0 || pcWebLoading) && (
               <div className="web-fallback">
                 <div className="rail-label" style={{margin:'24px 0 12px'}}>🌐 From the Web</div>
                 {pcWebLoading && <div style={{fontSize:'12px',color:'var(--text3)',fontStyle:'italic',padding:'10px 0'}}>Searching the web…</div>}
                 {pcWebResults.map((r,i) => (
+                  <a key={i} className="web-result" href={r.link} target="_blank" rel="noreferrer">
+                    <div className="web-result-title">{r.title}</div>
+                    {r.desc && <div className="web-result-desc">{r.desc.slice(0,160)}</div>}
+                    <div className="web-result-src">{r.source}{r.pubDate && <span className="web-result-date"> · {fmtDate(r.pubDate)}</span>}</div>
+                  </a>
+                ))}
+              </div>
+            )}
+
+            {/* Energy sub-tab web results */}
+            {cat === 'bloom' && enSubTab !== 'all' && (enWebResults.length > 0 || enWebLoading) && (
+              <div className="web-fallback">
+                <div className="rail-label" style={{margin:'24px 0 12px'}}>🌐 From the Web</div>
+                {enWebLoading && <div style={{fontSize:'12px',color:'var(--text3)',fontStyle:'italic',padding:'10px 0'}}>Searching the web…</div>}
+                {enWebResults.map((r,i) => (
                   <a key={i} className="web-result" href={r.link} target="_blank" rel="noreferrer">
                     <div className="web-result-title">{r.title}</div>
                     {r.desc && <div className="web-result-desc">{r.desc.slice(0,160)}</div>}
