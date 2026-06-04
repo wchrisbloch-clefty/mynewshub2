@@ -4486,10 +4486,152 @@ kbd{display:inline-block;padding:1px 5px;border:1px solid var(--border);border-r
   .fc-read-link{padding:7px 0;font-size:11px;}
   .nav-btn,.nav-btn-blue{min-height:36px;}
   .pc-subtab{min-height:40px;padding:8px 14px;}
-  /* Hero title punch-up on mobile */
-  .gn-lead-title{font-size:22px;}
-  .sports-hero-title{font-size:20px;}
   .fc-title{font-size:15px;line-height:1.35;}
+}
+
+/* ── TOP OF HOUR STRIP ─────────────────────────────────────────── */
+.toh-strip{margin-bottom:28px;}
+.toh-strip-head{
+  display:flex;align-items:center;justify-content:space-between;
+  margin-bottom:14px;
+}
+.toh-strip-label{
+  font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:0.12em;
+  color:var(--text3);
+}
+.toh-grid{
+  display:grid;
+  grid-template-columns:1.65fr 1fr 1fr;
+  gap:14px;
+}
+.toh-card{
+  position:relative;border-radius:10px;overflow:hidden;
+  cursor:pointer;display:block;
+  background:var(--surface2);
+  transition:transform 0.2s,box-shadow 0.2s;
+}
+.toh-card:hover{transform:translateY(-2px);box-shadow:0 12px 40px rgba(0,0,0,0.22);}
+/* Aspect ratio via padding trick */
+.toh-card::before{content:'';display:block;padding-bottom:62%;}
+.toh-card-lead::before{padding-bottom:54%;}
+.toh-img,.toh-img-ph{
+  position:absolute;inset:0;
+  background-size:cover;background-position:center top;
+}
+.toh-img-ph{
+  display:flex;align-items:center;justify-content:center;
+  font-size:48px;
+}
+.toh-grad{
+  position:absolute;inset:0;
+  background:linear-gradient(to top,rgba(0,0,0,0.92) 0%,rgba(0,0,0,0.45) 45%,rgba(0,0,0,0.06) 100%);
+}
+.toh-body{
+  position:absolute;inset:0;
+  padding:14px;
+  display:flex;flex-direction:column;justify-content:flex-end;
+}
+.toh-cat{
+  font-size:9px;font-weight:800;text-transform:uppercase;letter-spacing:0.1em;
+  color:#fff;padding:2px 9px;border-radius:20px;
+  margin-bottom:8px;align-self:flex-start;
+  display:inline-block;
+}
+.toh-title{
+  font-family:var(--font-serif);
+  font-size:15px;font-weight:700;color:#fff;
+  line-height:1.25;margin:0 0 5px;
+  text-shadow:0 1px 4px rgba(0,0,0,0.7);
+  display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden;
+}
+.toh-card-lead .toh-title{font-size:22px;-webkit-line-clamp:4;}
+.toh-meta{
+  font-size:10px;color:rgba(255,255,255,0.6);
+  font-weight:600;font-family:var(--font-sans);
+}
+/* Tablet: 2-col */
+@media(max-width:1000px) and (min-width:641px){
+  .toh-grid{grid-template-columns:1.4fr 1fr;}
+  .toh-card:nth-child(3){display:none;}
+  .toh-card-lead .toh-title{font-size:19px;}
+}
+/* Mobile: horizontal scroll */
+@media(max-width:640px){
+  .toh-strip{margin-bottom:20px;}
+  .toh-grid{
+    display:flex;gap:10px;
+    overflow-x:auto;scroll-snap-type:x mandatory;
+    -webkit-overflow-scrolling:touch;
+    margin:0 -12px;padding:0 12px 8px;
+    scrollbar-width:none;
+  }
+  .toh-grid::-webkit-scrollbar{display:none;}
+  .toh-card,.toh-card-lead{
+    flex-shrink:0;width:72vw;min-width:220px;max-width:280px;
+    scroll-snap-align:start;border-radius:8px;
+  }
+  .toh-card::before,.toh-card-lead::before{padding-bottom:65%;}
+  .toh-card:nth-child(3){display:block;}
+  .toh-title{font-size:14px;}
+  .toh-card-lead .toh-title{font-size:17px;}
+}
+
+/* ── BRIEFING TEASER — editorial dark card ─────────────────────── */
+.briefing-teaser{
+  background:var(--navy);
+  border:none;border-left:none;
+  border-radius:12px;
+  padding:22px 26px;
+  margin-bottom:24px;
+  position:relative;overflow:hidden;
+}
+.briefing-teaser::after{
+  content:'☕';
+  position:absolute;right:20px;top:14px;
+  font-size:36px;opacity:0.1;pointer-events:none;
+}
+.briefing-teaser-head{
+  border-bottom:1px solid rgba(255,255,255,0.1);
+  margin-bottom:14px;padding-bottom:12px;
+}
+.briefing-teaser-label{color:rgba(255,255,255,0.95);font-size:11px;}
+.briefing-teaser-date{color:rgba(255,255,255,0.5);}
+.briefing-teaser-ts{color:rgba(255,255,255,0.35);}
+.briefing-teaser-cta{
+  background:rgba(255,255,255,0.18);
+  color:#fff;border:1px solid rgba(255,255,255,0.25);
+}
+.briefing-teaser-cta:hover{background:rgba(255,255,255,0.3);opacity:1;}
+.briefing-teaser-body{color:rgba(255,255,255,0.9);font-size:15px;line-height:1.6;}
+.briefing-teaser-body strong{color:#fff;}
+.briefing-teaser-empty{color:rgba(255,255,255,0.4);}
+.briefing-teaser-bullets{margin-top:14px;}
+.briefing-teaser-bullets li{color:rgba(255,255,255,0.75);}
+.briefing-teaser-bullets li::before{background:rgba(255,255,255,0.45);}
+.briefing-teaser-bullets li strong{color:#fff;}
+.briefing-teaser-footer{border-top:1px solid rgba(255,255,255,0.08);}
+.briefing-teaser-sources{color:rgba(255,255,255,0.28);}
+.briefing-teaser-cta-link{color:rgba(255,255,255,0.7);}
+.briefing-teaser-cta-link:hover{color:#fff;text-decoration:underline;}
+@media(max-width:640px){
+  .briefing-teaser{padding:16px 18px;border-radius:10px;}
+  .briefing-teaser-body{font-size:14px;}
+  .briefing-teaser-bullets li{font-size:12px;}
+}
+
+/* ── TRENDING SECTION (all category pages) ─────────────────────── */
+.trending-section{
+  display:flex;align-items:center;gap:8px;flex-wrap:wrap;
+  padding:0 0 20px;
+}
+.trending-section-label{
+  font-size:9px;font-weight:800;text-transform:uppercase;letter-spacing:0.1em;
+  color:var(--text3);white-space:nowrap;flex-shrink:0;
+}
+@media(max-width:640px){
+  .trending-section{flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none;padding-bottom:16px;}
+  .trending-section::-webkit-scrollbar{display:none;}
+  .trending-section .trending-chip{flex-shrink:0;}
 }
 `;
 
@@ -6643,7 +6785,7 @@ function TopBar({tab, setTab, search, setSearch, dark, setDark,
                 </div>
               )}
             </div>
-            <button className="nav-btn-brief" onClick={onAnalyze} title="Paste & Brief">📋 Brief</button>
+            <button className="nav-btn-brief" onClick={onAnalyze} title="Paste & Analyze">📋 Analyze</button>
             <button className="nav-btn" onClick={onRefresh} title="Refresh">↺</button>
             <button className="nav-btn" onClick={()=>setDark(d=>!d)} title="Toggle theme">{dark?'☀️':'🌙'}</button>
             <button className="nav-btn-blue" onClick={onCustomize}>Customize</button>
@@ -6844,6 +6986,47 @@ function ChatBot({ arts }) {
         </div>
       )}
     </>
+  );
+}
+
+// ─── TOP OF HOUR STRIP ────────────────────────────────────────────────────────
+function TopOfHourStrip({ catLead, arts, onRead }) {
+  const stories = useMemo(() => {
+    const picks = catLead && catLead.img ? [catLead] : (catLead ? [] : []);
+    const used = new Set(catLead ? [catLead.link] : []);
+    const catOrder = ['sports','business','finance','bloom','popculture','general'];
+    for (const c of catOrder) {
+      if (picks.length >= 3) break;
+      const item = (arts[c]||[]).find(a => a.img && !used.has(a.link));
+      if (item) { picks.push({...item, cat: item.cat||c}); used.add(item.link); }
+    }
+    return picks.slice(0,3);
+  }, [catLead, arts]);
+  if (stories.length < 1) return null;
+  return (
+    <div className="toh-strip">
+      <div className="toh-strip-head">
+        <span className="toh-strip-label">Top Stories</span>
+      </div>
+      <div className="toh-grid">
+        {stories.map((a, i) => {
+          const cc = CATS[a.cat] || CATS.general;
+          return (
+            <article key={i} className={`toh-card${i===0?' toh-card-lead':''}`} onClick={() => onRead(a)}>
+              {a.img
+                ? <div className="toh-img" style={{backgroundImage:`url(${a.img})`}}/>
+                : <div className="toh-img-ph" style={{background:`linear-gradient(135deg,${cc.bg},${cc.color}33)`}}><span>{cc.emoji}</span></div>}
+              <div className="toh-grad"/>
+              <div className="toh-body">
+                <span className="toh-cat" style={{background:cc.color}}>{cc.emoji} {cc.label}</span>
+                <h3 className="toh-title">{a.title}</h3>
+                <div className="toh-meta">{a.source} · {fmtDate(a.pubDate)}</div>
+              </div>
+            </article>
+          );
+        })}
+      </div>
+    </div>
   );
 }
 
@@ -7763,48 +7946,30 @@ export default function App() {
           <ActiveScoresBar scores={scores} onGoToSports={() => handleTabChange('sports')}/>
         )}
 
-        {/* Trending topics — mobile-prominent section above the hero */}
-        {isHome && !activeKw && !activeSrc && !search && (() => {
-          const topics = getTrendingTopics(arts);
-          return topics.length > 0 ? (
-            <div className="trending-section-mobile">
-              <span className="trending-bar-label">🔥 Trending Now</span>
-              <div className="trending-bar" style={{padding:'0',marginTop:'4px'}}>
-                {topics.slice(0, 10).map((t, i) => (
-                  <span key={i} className="trending-chip" onClick={() => setSearch(t)}>{t}</span>
-                ))}
-              </div>
-            </div>
-          ) : null;
-        })()}
-
-        {/* v26: General gets 2-col hero (lead | briefing). Other cats: briefing above if no lead. */}
-        {isHome && !activeKw && !activeSrc && catLead ? (
-          <div className="home-hero-row">
-            <div className="home-hero-main">
-              <article className="gn-lead-solo" onClick={()=>onRead(catLead)}>
-                <div className="gn-lead-img" style={{backgroundImage:`url(${catLead.img})`}}/>
-                <div className="gn-lead-text">
-                  <h1 className="gn-lead-title">{catLead.title}</h1>
-                  {catLead.desc&&<p className="gn-lead-desc">{catLead.desc}</p>}
-                  <div className="gn-lead-meta">
-                    <span className="gn-lead-source" style={{color:cc.color}}>{catLead.source}</span>
-                    <span>·</span><span>{fmtDate(catLead.pubDate)}</span>
-                  </div>
-                </div>
-              </article>
-            </div>
-            <div className="home-hero-side">
-              <BriefingTeaser arts={arts} excludeCats={briefingExclude} onOpenFull={() => handleTabChange('briefing')}/>
-            </div>
-          </div>
-        ) : (
-          isHome && !activeKw && !activeSrc && (
-            <BriefingTeaser arts={arts} excludeCats={briefingExclude} onOpenFull={() => handleTabChange('briefing')}/>
-          )
+        {/* ── HOME: Top of Hour strip (image cards) → Briefing → Trending */}
+        {isHome && !activeKw && !activeSrc && !search && (
+          <TopOfHourStrip catLead={catLead} arts={arts} onRead={onRead}/>
+        )}
+        {isHome && !activeKw && !activeSrc && !search && (
+          <BriefingTeaser arts={arts} excludeCats={briefingExclude} onOpenFull={() => handleTabChange('briefing')}/>
         )}
 
-        {/* Google News grid (non-General categories keep full-width grid) */}
+        {/* ── TRENDING — all pages, scoped to category on non-home */}
+        {!activeKw && !activeSrc && !search && (() => {
+          const trendArts = isHome ? arts : {[cat]: arts[cat]||[]};
+          const topics = getTrendingTopics(trendArts);
+          if (!topics.length) return null;
+          return (
+            <div className="trending-section">
+              <span className="trending-section-label">🔥 {isHome ? 'Trending Now' : `Trending in ${cc.label}`}</span>
+              {topics.slice(0,10).map((t,i) => (
+                <span key={i} className="trending-chip" onClick={()=>setSearch(t)}>{t}</span>
+              ))}
+            </div>
+          );
+        })()}
+
+        {/* Category pages: lead image grid */}
         {!activeKw && !activeSrc && catLead && !isHome && (
           <div className="gn-grid">
             <article className="gn-lead" onClick={()=>onRead(catLead)}>
