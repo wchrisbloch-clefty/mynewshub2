@@ -135,6 +135,10 @@ const DEFAULT_FEEDS = {
     { name:'Thoroughbred Daily News', url:'https://www.thoroughbreddailynews.com/feed/',                         on:true },
     { name:'Horse Race Nation',    url:'https://horseracenation.com/feed/',                                      on:true },
     { name:'Daily Racing Form',    url:'https://www.drf.com/news/rss/news',                                      on:false },
+    { name:'GolfWeek',             url:'https://golfweek.usatoday.com/feed/',                                     on:true },
+    { name:'Golf Digest',          url:'https://www.golfdigest.com/rss/rss-sports',                               on:true },
+    { name:'Golf Channel',         url:'https://www.golfchannel.com/feeds/rss.aspx',                              on:true },
+    { name:'No Laying Up',         url:'https://nolayingup.com/feed/',                                            on:true },
   ],
   business: [
     { name:'Reuters Business',       url:'https://feeds.reuters.com/reuters/businessNews',                      on:true },
@@ -633,8 +637,8 @@ function useSwipe(onSwipe, { threshold = 80, enabled = true } = {}) {
 // → fires onRefresh(). Uses 0.55 resistance curve so the drag doesn't
 // feel 1:1 sluggish, capped at 140px so the indicator never flies off.
 function usePullToRefresh(onRefresh, { threshold = 70, enabled = true } = {}) {
-  const [pulling, setPulling] = useState(false);
   const [distance, setDistance] = useState(0);
+  const distRef = useRef(0); // track distance in ref so touchEnd reads latest value without re-subscribing
   const state = useRef({ startY: 0, active: false });
 
   useEffect(() => {
@@ -648,18 +652,18 @@ function usePullToRefresh(onRefresh, { threshold = 70, enabled = true } = {}) {
       const dy = e.touches[0].clientY - state.current.startY;
       if (dy > 0 && window.scrollY <= 4) {
         const pulled = Math.min(dy * 0.55, 140);
-        setPulling(true);
+        distRef.current = pulled;
         setDistance(pulled);
       } else if (dy < 0) {
-        setPulling(false);
+        distRef.current = 0;
         setDistance(0);
       }
     };
     const onTouchEnd = () => {
       if (!state.current.active) return;
       state.current.active = false;
-      if (distance >= threshold) onRefresh();
-      setPulling(false);
+      if (distRef.current >= threshold) onRefresh();
+      distRef.current = 0;
       setDistance(0);
     };
     window.addEventListener('touchstart', onTouchStart, { passive: true });
@@ -670,9 +674,9 @@ function usePullToRefresh(onRefresh, { threshold = 70, enabled = true } = {}) {
       window.removeEventListener('touchmove', onTouchMove);
       window.removeEventListener('touchend', onTouchEnd);
     };
-  }, [enabled, onRefresh, distance, threshold]);
+  }, [enabled, onRefresh, threshold]); // removed 'distance' — was causing listener re-attachment on every move
 
-  return { pulling, distance };
+  return { distance };
 }
 
 // ─── AI SUMMARY ───────────────────────────────────────────────────────────────
@@ -1069,6 +1073,9 @@ body:not(.dark) .pill-bar{
 /* Editorial: green/red on dark navy pops clearly */
 .pill-chg.up{color:#4ade80;background:rgba(74,222,128,0.12);}
 .pill-chg.down{color:#f87171;background:rgba(248,113,113,0.12);}
+/* Dark mode: pill bar needs stronger contrast — navy bg can blend into dark page */
+.dark .pill-bar{background:rgba(15,23,42,0.98);border-bottom-color:rgba(255,255,255,0.1);}
+.dark .pill-label{color:rgba(255,255,255,0.72);}
 
 /* Old whisper-bar selectors kept as no-ops in case any external CSS still references */
 .whisper-bar,.whisper-inner,.wx-pill,.ticker-row,.ticker-item{display:none;}
@@ -4147,6 +4154,67 @@ kbd{display:inline-block;padding:1px 5px;border:1px solid var(--border);border-r
 }
 .rec-src{font-size:10px;color:var(--text3);margin-top:3px;}
 
+/* ═══ v38: TEAMS SHELF ═══ */
+.teams-shelf{margin-top:32px;padding-top:20px;border-top:2px solid var(--border);}
+.teams-shelf-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;}
+.teams-shelf-label{font-size:12px;font-weight:800;color:var(--text);text-transform:uppercase;letter-spacing:0.06em;}
+.teams-shelf-edit{background:none;border:1px solid var(--border);border-radius:6px;padding:4px 10px;font-size:11px;color:var(--text3);cursor:pointer;font-family:var(--font-sans);}
+.teams-shelf-edit:hover{border-color:var(--accent);color:var(--accent);}
+.teams-shelf-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:10px;}
+.team-card{background:var(--surface);border:1px solid var(--border);border-radius:10px;overflow:hidden;position:relative;transition:box-shadow 0.15s;}
+.team-card:hover{box-shadow:var(--shadow-sm);}
+.team-card.filtered{border-color:#6001d2;box-shadow:0 0 0 2px rgba(96,1,210,0.18);}
+.team-card-btn{width:100%;display:flex;align-items:center;gap:10px;padding:11px 13px;background:none;border:none;cursor:pointer;text-align:left;font-family:var(--font-sans);}
+.team-card-btn:hover{background:var(--surface2);}
+.team-card-emoji{font-size:20px;flex-shrink:0;}
+.team-card-info{flex:1;min-width:0;}
+.team-card-name{display:block;font-size:13px;font-weight:700;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.team-card-league{display:block;font-size:9px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:0.06em;margin-top:1px;}
+.team-card-arrow{font-size:9px;color:var(--text3);flex-shrink:0;}
+.team-card-menu{border-top:1px solid var(--border);display:flex;flex-direction:column;}
+.team-menu-item{display:block;padding:9px 14px;font-size:12px;font-weight:600;color:var(--text2);background:none;border:none;cursor:pointer;font-family:var(--font-sans);text-align:left;text-decoration:none;transition:background 0.1s;}
+.team-menu-item:hover{background:var(--surface2);color:var(--accent);}
+@media(max-width:640px){.teams-shelf-grid{grid-template-columns:repeat(2,1fr);}}
+
+/* ═══ v38: CHAT ANALYZE MODE ═══ */
+.chat-mode-tabs{display:flex;border-bottom:1px solid var(--border);background:var(--surface);}
+.chat-mode-tab{flex:1;padding:10px;font-size:12px;font-weight:700;background:none;border:none;cursor:pointer;color:var(--text3);font-family:var(--font-sans);border-bottom:2px solid transparent;transition:all 0.12s;}
+.chat-mode-tab.active{color:#6001d2;border-bottom-color:#6001d2;}
+.chat-analyze{display:flex;flex-direction:column;gap:10px;padding:14px;flex:1;overflow-y:auto;}
+.chat-analyze-modes{display:flex;gap:6px;flex-wrap:wrap;}
+.chat-analyze-mode-btn{padding:5px 12px;border-radius:16px;font-size:11px;font-weight:700;background:var(--surface2);border:1px solid var(--border);color:var(--text3);cursor:pointer;font-family:var(--font-sans);transition:all 0.12s;}
+.chat-analyze-mode-btn.active{background:#6001d2;color:#fff;border-color:#6001d2;}
+.chat-analyze-input{border:1px solid var(--border);border-radius:8px;padding:10px 12px;font-size:13px;font-family:var(--font-sans);color:var(--text);background:var(--surface2);resize:vertical;min-height:100px;outline:none;transition:border-color 0.12s;}
+.chat-analyze-input:focus{border-color:#6001d2;}
+.chat-analyze-go{background:#6001d2;color:#fff;border:none;border-radius:8px;padding:10px;font-size:13px;font-weight:700;cursor:pointer;font-family:var(--font-sans);transition:background 0.12s;}
+.chat-analyze-go:hover{background:#7c3aed;}
+.chat-analyze-go:disabled{background:var(--border);cursor:not-allowed;}
+.chat-analyze-result{background:var(--surface2);border-radius:8px;padding:12px;border-left:3px solid #6001d2;}
+.chat-analyze-result-label{font-size:9px;font-weight:800;color:#6001d2;text-transform:uppercase;letter-spacing:0.1em;margin-bottom:8px;}
+.chat-analyze-result-text{font-size:13px;color:var(--text);line-height:1.6;white-space:pre-wrap;}
+.chat-analyze-clear{margin-top:8px;background:none;border:1px solid var(--border);border-radius:6px;padding:4px 10px;font-size:11px;color:var(--text3);cursor:pointer;font-family:var(--font-sans);}
+
+/* ═══ v38: MOBILE IMPROVEMENTS ═══ */
+/* gn-card on mobile: compact row layout like Yahoo News */
+@media(max-width:640px){
+  .gn-row{grid-template-columns:1fr;gap:0;}
+  .gn-card{flex-direction:row;gap:12px;padding:12px 0;border-bottom:1px solid var(--border2);border-radius:0;}
+  .gn-card:last-child{border-bottom:none;}
+  .gn-card-img,.gn-card-img-ph{width:100px;height:72px;aspect-ratio:auto;flex-shrink:0;border-radius:6px;}
+  .gn-card-title{font-size:14px;-webkit-line-clamp:3;font-weight:700;}
+  .gn-card-meta{font-size:10px;}
+  /* gn-grid on mobile: single column lead only, no grid */
+  .gn-grid{grid-template-columns:1fr;}
+  .gn-lead-img{aspect-ratio:16/9;height:auto;max-height:200px;}
+  /* trending bar: horizontal scroll on mobile */
+  .trending-bar{flex-wrap:nowrap;overflow-x:auto;padding:10px 0 14px;scrollbar-width:none;}
+  .trending-bar::-webkit-scrollbar{display:none;}
+  .trending-chip{flex-shrink:0;}
+  /* page spacing */
+  .page{padding:12px 12px 24px;}
+  .page-grid{grid-template-columns:1fr;}
+}
+
 /* TRENDING SEARCH BAR — chips when search is empty */
 .trending-bar{
   display:flex;align-items:center;gap:8px;flex-wrap:wrap;
@@ -4195,6 +4263,82 @@ kbd{display:inline-block;padding:1px 5px;border:1px solid var(--border);border-r
   .hs-tile{min-width:120px;padding:9px 11px;}
   .trending-bar{padding:8px 0 12px;}
   .trending-chip{font-size:10px;padding:4px 9px;}
+  /* Mobile trending section — more prominent at top of feed */
+  .trending-section-mobile{
+    background:var(--surface);border:1px solid var(--border);
+    border-radius:10px;padding:12px 14px;margin-bottom:14px;
+  }
+  .trending-section-mobile .trending-bar-label{
+    font-size:10px;color:var(--accent);display:block;margin-bottom:8px;
+  }
+  .trending-section-mobile .trending-chip{font-size:11px;padding:5px 12px;}
+}
+
+/* ── ARTICLE READER OVERLAY ────────────────────────────────────── */
+.article-reader-overlay{
+  position:fixed;inset:0;z-index:2000;
+  background:rgba(0,0,0,0.6);backdrop-filter:blur(4px);
+  display:flex;align-items:flex-start;justify-content:center;
+  padding:20px 16px;overflow-y:auto;
+}
+.article-reader{
+  background:var(--surface);border-radius:14px;
+  width:100%;max-width:720px;
+  box-shadow:0 24px 80px rgba(0,0,0,0.45);
+  overflow:hidden;position:relative;
+  margin:auto;
+}
+.article-reader-img{
+  width:100%;aspect-ratio:16/7;object-fit:cover;
+  background:var(--surface2);
+}
+.article-reader-body{padding:24px 28px 28px;}
+.article-reader-source{
+  font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:0.1em;
+  color:var(--accent);margin-bottom:8px;display:flex;align-items:center;gap:6px;
+}
+.article-reader-date{color:var(--text3);font-weight:400;text-transform:none;letter-spacing:0;}
+.article-reader-title{
+  font-family:var(--font-serif);font-size:clamp(20px,3vw,28px);
+  font-weight:800;line-height:1.25;color:var(--text1);margin:0 0 12px;
+}
+.article-reader-desc{
+  font-size:15px;line-height:1.65;color:var(--text2);
+  border-left:3px solid var(--accent);padding-left:14px;
+  margin:0 0 20px;
+}
+.article-reader-actions{
+  display:flex;gap:8px;flex-wrap:wrap;margin-bottom:20px;
+}
+.article-reader-btn{
+  font-size:12px;font-weight:700;padding:7px 14px;border-radius:6px;
+  border:1px solid var(--border);background:var(--surface2);
+  color:var(--text2);cursor:pointer;transition:all 0.15s;
+}
+.article-reader-btn:hover{border-color:var(--accent);color:var(--accent);}
+.article-reader-btn.primary{
+  background:var(--accent);color:#fff;border-color:var(--accent);
+}
+.article-reader-btn.primary:hover{opacity:0.88;}
+.article-reader-ai-result{
+  background:var(--surface2);border-radius:8px;padding:14px 16px;
+  font-size:13px;line-height:1.6;color:var(--text1);
+  border:1px solid var(--border);margin-top:12px;
+  white-space:pre-wrap;
+}
+.article-reader-close{
+  position:absolute;top:14px;right:14px;
+  width:32px;height:32px;border-radius:50%;
+  background:rgba(0,0,0,0.4);border:none;cursor:pointer;
+  color:#fff;font-size:18px;line-height:1;
+  display:flex;align-items:center;justify-content:center;
+  z-index:1;transition:background 0.15s;
+}
+.article-reader-close:hover{background:rgba(0,0,0,0.7);}
+@media(max-width:640px){
+  .article-reader-overlay{padding:0;}
+  .article-reader{border-radius:0;min-height:100dvh;}
+  .article-reader-body{padding:18px 18px 32px;}
 }
 `;
 
@@ -6367,18 +6511,28 @@ function TopBar({tab, setTab, search, setSearch, dark, setDark,
 // ─── CHATBOT COMPONENT ───────────────────────────────────────────────────────
 function ChatBot({ arts }) {
   const [open, setOpen] = useState(false);
+  const [chatMode, setChatMode] = useState('chat'); // 'chat' | 'analyze'
   const [msgs, setMsgs] = useState([
     { role:'bot', text:"Hi! I'm your AI news assistant. Ask me anything about today's stories, markets, or sports.", time: new Date().toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'}) }
   ]);
   const [input, setInput] = useState('');
+  const [analyzeText, setAnalyzeText] = useState('');
+  const [analyzeMode, setAnalyzeMode] = useState('summary');
+  const [analyzeResult, setAnalyzeResult] = useState('');
   const [loading, setLoading] = useState(false);
   const messagesEndRef = useRef(null);
 
   useEffect(() => {
-    if (open) messagesEndRef.current?.scrollIntoView({ behavior:'smooth' });
-  }, [msgs, open]);
+    if (open && chatMode === 'chat') messagesEndRef.current?.scrollIntoView({ behavior:'smooth' });
+  }, [msgs, open, chatMode]);
 
   const QUICK = ["What's trending today?", "Sports update?", "Markets summary", "Top tech news"];
+  const ANALYZE_MODES = [
+    { key:'summary',   label:'Summarize' },
+    { key:'takeaways', label:'Key Points' },
+    { key:'bias',      label:'Bias Check' },
+    { key:'related',   label:'Related Context' },
+  ];
 
   const buildContext = () => {
     const headlines = [];
@@ -6405,6 +6559,23 @@ function ChatBot({ arts }) {
     setLoading(false);
   };
 
+  const analyze = async () => {
+    const txt = analyzeText.trim();
+    if (!txt || loading) return;
+    setLoading(true);
+    setAnalyzeResult('');
+    const modePrompts = {
+      summary:   'Summarize this article in 3-5 sentences, hitting the key facts.',
+      takeaways: 'List the 5 most important takeaways from this article as bullet points.',
+      bias:      'Analyze the bias and framing in this article. What perspective does it favor? What might it omit?',
+      related:   'What broader context, history, or related topics should a reader understand about this article?',
+    };
+    const prompt = `${modePrompts[analyzeMode]}\n\nARTICLE:\n${txt}`;
+    const { summary, error } = await fetchAISummary({ type:'article', title:'Article Analysis', content:prompt, mode:analyzeMode });
+    setAnalyzeResult(error ? 'Analysis failed — please try again.' : (summary || 'No result.'));
+    setLoading(false);
+  };
+
   return (
     <>
       <button className={`chat-fab ${open?'open':''}`} onClick={() => setOpen(o => !o)} aria-label="Chat assistant">
@@ -6415,42 +6586,124 @@ function ChatBot({ arts }) {
           <div className="chat-header">
             <div>
               <div className="chat-header-title"><span>✨</span> AI News Assistant</div>
-              <div className="chat-header-sub">Powered by Claude · asks about today's news</div>
             </div>
             <button className="chat-close" onClick={() => setOpen(false)}>✕</button>
           </div>
-          <div className="chat-messages">
-            {msgs.map((m, i) => (
-              <div key={i} className={`chat-msg ${m.role}`}>
-                <div className="chat-bubble">{m.text}</div>
-                <span className="chat-msg-time">{m.time}</span>
-              </div>
-            ))}
-            {loading && (
-              <div className="chat-msg bot">
-                <div className="chat-bubble" style={{padding:'10px 14px'}}>
-                  <div className="chat-typing">
-                    <div className="chat-typing-dot"/><div className="chat-typing-dot"/><div className="chat-typing-dot"/>
-                  </div>
-                </div>
-              </div>
-            )}
-            <div ref={messagesEndRef}/>
+          <div className="chat-mode-tabs">
+            <button className={`chat-mode-tab${chatMode==='chat'?' active':''}`} onClick={()=>setChatMode('chat')}>💬 Ask</button>
+            <button className={`chat-mode-tab${chatMode==='analyze'?' active':''}`} onClick={()=>setChatMode('analyze')}>📋 Analyze</button>
           </div>
-          {msgs.length <= 2 && (
-            <div className="chat-quick-btns">
-              {QUICK.map(q => <button key={q} className="chat-quick-btn" onClick={() => send(q)}>{q}</button>)}
+          {chatMode === 'chat' ? (
+            <>
+              <div className="chat-messages">
+                {msgs.map((m, i) => (
+                  <div key={i} className={`chat-msg ${m.role}`}>
+                    <div className="chat-bubble">{m.text}</div>
+                    <span className="chat-msg-time">{m.time}</span>
+                  </div>
+                ))}
+                {loading && (
+                  <div className="chat-msg bot">
+                    <div className="chat-bubble" style={{padding:'10px 14px'}}>
+                      <div className="chat-typing">
+                        <div className="chat-typing-dot"/><div className="chat-typing-dot"/><div className="chat-typing-dot"/>
+                      </div>
+                    </div>
+                  </div>
+                )}
+                <div ref={messagesEndRef}/>
+              </div>
+              {msgs.length <= 2 && (
+                <div className="chat-quick-btns">
+                  {QUICK.map(q => <button key={q} className="chat-quick-btn" onClick={() => send(q)}>{q}</button>)}
+                </div>
+              )}
+              <div className="chat-input-row">
+                <input className="chat-input" placeholder="Ask about today's news…" value={input}
+                  onChange={e => setInput(e.target.value)}
+                  onKeyDown={e => e.key === 'Enter' && send()}/>
+                <button className="chat-send" onClick={() => send()} disabled={!input.trim() || loading}>➤</button>
+              </div>
+            </>
+          ) : (
+            <div className="chat-analyze">
+              <div className="chat-analyze-modes">
+                {ANALYZE_MODES.map(m => (
+                  <button key={m.key} className={`chat-analyze-mode-btn${analyzeMode===m.key?' active':''}`}
+                    onClick={()=>setAnalyzeMode(m.key)}>{m.label}</button>
+                ))}
+              </div>
+              <textarea className="chat-analyze-input"
+                placeholder="Paste article text or URL here…"
+                value={analyzeText}
+                onChange={e=>setAnalyzeText(e.target.value)}
+                rows={5}
+              />
+              <button className="chat-analyze-go" onClick={analyze} disabled={!analyzeText.trim() || loading}>
+                {loading ? 'Analyzing…' : '✨ Analyze'}
+              </button>
+              {analyzeResult && (
+                <div className="chat-analyze-result">
+                  <div className="chat-analyze-result-label">{ANALYZE_MODES.find(m=>m.key===analyzeMode)?.label}</div>
+                  <div className="chat-analyze-result-text">{analyzeResult}</div>
+                  <button className="chat-analyze-clear" onClick={()=>{setAnalyzeResult('');setAnalyzeText('');}}>Clear</button>
+                </div>
+              )}
             </div>
           )}
-          <div className="chat-input-row">
-            <input className="chat-input" placeholder="Ask about today's news…" value={input}
-              onChange={e => setInput(e.target.value)}
-              onKeyDown={e => e.key === 'Enter' && send()}/>
-            <button className="chat-send" onClick={() => send()} disabled={!input.trim() || loading}>➤</button>
-          </div>
         </div>
       )}
     </>
+  );
+}
+
+// ─── ARTICLE READER ───────────────────────────────────────────────────────────
+function ArticleReader({ article, onClose }) {
+  const [aiResult, setAiResult] = useState('');
+  const [aiLoading, setAiLoading] = useState(false);
+  const [aiMode, setAiMode] = useState(null);
+
+  const runAI = async (mode) => {
+    setAiMode(mode);
+    setAiLoading(true);
+    setAiResult('');
+    const result = await fetchAISummary({ type: mode, title: article.title, content: article.desc || article.title, mode: 'groq' });
+    setAiResult(result);
+    setAiLoading(false);
+  };
+
+  return (
+    <div className="article-reader-overlay" onClick={e => { if (e.target === e.currentTarget) onClose(); }}>
+      <div className="article-reader">
+        <button className="article-reader-close" onClick={onClose} aria-label="Close">×</button>
+        {article.img && <img className="article-reader-img" src={article.img} alt="" loading="lazy"/>}
+        <div className="article-reader-body">
+          <div className="article-reader-source">
+            {article.source}
+            {article.pubDate && <span className="article-reader-date">· {fmtDate(article.pubDate)}</span>}
+          </div>
+          <h2 className="article-reader-title">{article.title}</h2>
+          {article.desc && <p className="article-reader-desc">{article.desc}</p>}
+          <div className="article-reader-actions">
+            <a className="article-reader-btn primary" href={article.link} target="_blank" rel="noreferrer" onClick={e=>e.stopPropagation()}>
+              Open Full Article ↗
+            </a>
+            <button className="article-reader-btn" onClick={() => runAI('summary')}>✦ Summarize</button>
+            <button className="article-reader-btn" onClick={() => runAI('takeaways')}>Key Points</button>
+            <button className="article-reader-btn" onClick={() => runAI('bias')}>Bias Check</button>
+          </div>
+          {aiLoading && <div className="article-reader-ai-result" style={{color:'var(--text3)'}}>Analyzing with AI…</div>}
+          {!aiLoading && aiResult && (
+            <div className="article-reader-ai-result">
+              <div style={{fontWeight:700,fontSize:'11px',textTransform:'uppercase',letterSpacing:'0.08em',color:'var(--accent)',marginBottom:'8px'}}>
+                {aiMode === 'summary' ? 'Summary' : aiMode === 'takeaways' ? 'Key Points' : 'Bias Check'}
+              </div>
+              {aiResult}
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
   );
 }
 
@@ -6461,6 +6714,7 @@ export default function App() {
   const [saved, setSaved]       = useState(()=>ld('saved',[]));
   const [clicks, setClicks]     = useState(()=>ld('clicks',{}));
   const [readLinks, setReadLinks] = useState(()=>new Set(ld('readLinks',[])));
+  const [readerArticle, setReaderArticle] = useState(null);
   const [webResults, setWebResults] = useState([]);
   const [webLoading, setWebLoading] = useState(false);
   const [sourceRecs, setSourceRecs] = useState([]);
@@ -6490,6 +6744,8 @@ export default function App() {
   const [scores, setScores]         = useState({});
   const [scoresLoading, setScoresLoading] = useState(false);
   const [searchHistory, setSearchHistory] = useState(()=>ld('searchHistory',[]));
+  const [srcWebResults, setSrcWebResults] = useState([]);
+  const [srcWebLoading, setSrcWebLoading] = useState(false);
 
   // ── v16 mobile + editorial state ──
   const [menuOpen, setMenuOpen]         = useState(false);
@@ -6660,7 +6916,7 @@ export default function App() {
   const onRead  = a=>{
     setClicks(c=>({...c,[a.source]:(c[a.source]||0)+1}));
     if (a.link) setReadLinks(s=>{const n=new Set(s);n.add(a.link);return n;});
-    window.open(a.link,'_blank');
+    setReaderArticle(a);
   };
   const onSave  = a=>{
     const wasSaved = saved.some(x=>x.link===a.link);
@@ -6697,6 +6953,13 @@ export default function App() {
     });
   }, [search]);
 
+  // v38: When a source is active, fetch web results for more coverage from that outlet
+  useEffect(() => {
+    if (!activeSrc) { setSrcWebResults([]); return; }
+    setSrcWebLoading(true);
+    fetchWebSearch(`${activeSrc} news latest`).then(r => { setSrcWebResults(r); setSrcWebLoading(false); });
+  }, [activeSrc]);
+
   // Keyboard shortcuts: J/K navigate articles, B bookmark, / focus search, Escape clear
   useEffect(() => {
     const handler = (e) => {
@@ -6708,12 +6971,13 @@ export default function App() {
         if (inp) inp.focus();
       }
       if (e.key === 'Escape') {
+        if (readerArticle) { setReaderArticle(null); return; }
         setSearch(''); setActiveKw(null); setActiveSrc(null);
       }
     };
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
-  }, []);
+  }, [readerArticle]);
 
   const handleCustomizeSave = ({feeds:nf,kw:nk,alerts:na,urgent:nu,social:ns,watchlist:nw,teams:nt,weatherCities:nwx,hiddenIndices:ni,briefingExclude:nbe})=>{
     setFeeds(nf);sv('feeds',nf);
@@ -6797,6 +7061,7 @@ export default function App() {
   const SportsPage = () => {
     const [sportTab, setSportTab] = useState('all'); // 'all' | 'nfl' | 'nba' | 'mlb' | 'cfb' | 'cbb' | 'cbase'
     const [activeTeam, setActiveTeam] = useState(null); // team obj when filter pill tapped
+    const [teamMenuSym, setTeamMenuSym] = useState(null); // team with open popup menu
     const [sportWebResults, setSportWebResults] = useState([]);
     const [sportWebLoading, setSportWebLoading] = useState(false);
 
@@ -6807,7 +7072,7 @@ export default function App() {
         nfl: 'NFL football news today', nba: 'NBA basketball news today',
         mlb: 'MLB baseball news today', cfb: 'college football news today',
         cbb: 'college basketball news today', cbase: 'college baseball news today',
-        racing: 'horse racing news today',
+        racing: 'horse racing news today', golf: 'PGA Tour golf news today',
       };
       const q = SPORT_TAB_QUERIES[sportTab] || `${sportTab} sports news`;
       setSportWebLoading(true);
@@ -6853,6 +7118,7 @@ export default function App() {
                        : sportTab === 'cbb'    ? ['cbb','college basketball','ncaa','march madness','final four','ncaa tournament','big east','sweet 16']
                        : sportTab === 'cbase'  ? ['college baseball','ncaa baseball','cws','college world series','super regional','sec baseball','acc baseball','big 12 baseball','d1baseball','college world']
                        : sportTab === 'racing' ? ['horse racing','thoroughbred','derby','stakes','jockey','paddock','furlong','harness racing','horse race','breeders cup','kentucky derby','preakness','belmont']
+                       : sportTab === 'golf'   ? ['golf','pga tour','masters','us open golf','british open','ryder cup','tiger woods','golfer','birdie','bogey','fairway','tee shot','pga championship','lpga']
                        : [];
         items = items.filter(a => {
           const t = (a.title + ' ' + (a.desc||'')).toLowerCase();
@@ -6883,10 +7149,11 @@ export default function App() {
       { key:'nfl',    label:'NFL',            emoji:'🏈' },
       { key:'nba',    label:'NBA',            emoji:'🏀' },
       { key:'mlb',    label:'MLB',            emoji:'⚾' },
-      { key:'cfb',    label:'College FB',     emoji:'🏈' },
-      { key:'cbb',    label:'College BB',     emoji:'🏀' },
+      { key:'cfb',    label:'NCAAF',          emoji:'🏈' },
+      { key:'cbb',    label:'NCAAB',          emoji:'🏀' },
       { key:'cbase',  label:'College Baseball',emoji:'⚾' },
       { key:'racing', label:'Horse Racing',   emoji:'🏇' },
+      { key:'golf',   label:'Golf',           emoji:'⛳' },
     ];
 
     const feedRef = useRef(null);
@@ -6911,35 +7178,6 @@ export default function App() {
             </button>
           ))}
         </div>
-
-        {/* ── MY TEAMS — ESPN-style at top for quick team access ── */}
-        {teams.length > 0 && (
-          <div className="team-pills-row" style={{marginBottom:'16px'}}>
-            <span className="team-pills-label">⭐ My Teams</span>
-            <div className="team-pills">
-              {teams.map(t => {
-                const isActive = activeTeam?.team === t.team;
-                return (
-                  <span key={t.team} className={`team-pill-group ${isActive?'active':''}`}>
-                    <button className="team-pill"
-                      onClick={()=>{ setActiveTeam(isActive ? null : t); setSportTab('all'); setTimeout(scrollToFeed,80); }}
-                      title={`Filter to ${t.team}`}>
-                      <span className="team-pill-emoji">{t.emoji}</span>
-                      <span className="team-pill-name">{t.team}</span>
-                    </button>
-                    {t.espnUrl && (
-                      <a className="team-pill-link" href={t.espnUrl} target="_blank" rel="noreferrer" title="Open on ESPN">ESPN</a>
-                    )}
-                    {t.teamUrl && (
-                      <a className="team-pill-link" href={t.teamUrl} target="_blank" rel="noreferrer" title="Open team site">Site</a>
-                    )}
-                  </span>
-                );
-              })}
-              <button className="team-pills-edit" onClick={()=>openCustomize('teams','sports')}>⚙ Edit</button>
-            </div>
-          </div>
-        )}
 
         {/* ── SCOREBOARD STRIP — ESPN dark card style ── */}
         <SportsScoreStrip scores={visibleScores} teams={teams}/>
@@ -7060,6 +7298,47 @@ export default function App() {
                 <LastUpdated timestamp={lastUpdated.sports} onRefresh={() => loadCat('sports')}/>
               </div>
             )}
+            {/* ── MY TEAMS SHELF — sleek card grid at bottom of sports feed ── */}
+            {teams.length > 0 && (
+              <div className="teams-shelf">
+                <div className="teams-shelf-head">
+                  <span className="teams-shelf-label">⭐ My Teams</span>
+                  <button className="teams-shelf-edit" onClick={()=>openCustomize('teams','sports')}>⚙ Edit</button>
+                </div>
+                <div className="teams-shelf-grid">
+                  {teams.map(t => {
+                    const isFiltered = activeTeam?.team === t.team;
+                    const menuOpen = teamMenuSym === t.team;
+                    return (
+                      <div key={t.team} className={`team-card${isFiltered?' filtered':''}`}>
+                        <button className="team-card-btn"
+                          onClick={()=>setTeamMenuSym(menuOpen ? null : t.team)}>
+                          <span className="team-card-emoji">{t.emoji}</span>
+                          <div className="team-card-info">
+                            <span className="team-card-name">{t.team}</span>
+                            <span className="team-card-league">{t.league?.toUpperCase()}</span>
+                          </div>
+                          <span className="team-card-arrow">{menuOpen ? '▴' : '▾'}</span>
+                        </button>
+                        {menuOpen && (
+                          <div className="team-card-menu">
+                            <button className="team-menu-item" onClick={()=>{
+                              setActiveTeam(isFiltered ? null : t); setSportTab('all');
+                              setTeamMenuSym(null); setTimeout(scrollToFeed, 80);
+                            }}>
+                              {isFiltered ? '✕ Clear filter' : '📰 Filter News'}
+                            </button>
+                            {t.espnUrl && <a className="team-menu-item" href={t.espnUrl} target="_blank" rel="noreferrer">ESPN ↗</a>}
+                            {t.teamUrl && <a className="team-menu-item" href={t.teamUrl} target="_blank" rel="noreferrer">Team Site ↗</a>}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
             <SourceFooter cat="sports" feeds={feeds} arts={arts}/>
           </div>
 
@@ -7145,6 +7424,21 @@ export default function App() {
           <ActiveScoresBar scores={scores} onGoToSports={() => handleTabChange('sports')}/>
         )}
 
+        {/* Trending topics — mobile-prominent section above the hero */}
+        {isHome && !activeKw && !activeSrc && !search && (() => {
+          const topics = getTrendingTopics(arts);
+          return topics.length > 0 ? (
+            <div className="trending-section-mobile">
+              <span className="trending-bar-label">🔥 Trending Now</span>
+              <div className="trending-bar" style={{padding:'0',marginTop:'4px'}}>
+                {topics.slice(0, 10).map((t, i) => (
+                  <span key={i} className="trending-chip" onClick={() => setSearch(t)}>{t}</span>
+                ))}
+              </div>
+            </div>
+          ) : null;
+        })()}
+
         {/* v26: General gets 2-col hero (lead | briefing). Other cats: briefing above if no lead. */}
         {isHome && !activeKw && !activeSrc && catLead ? (
           <div className="home-hero-row">
@@ -7203,19 +7497,6 @@ export default function App() {
             </div>
           </div>
         )}
-
-        {/* Trending topics bar — shown when no active filter/search */}
-        {isHome && !activeKw && !activeSrc && !search && (() => {
-          const topics = getTrendingTopics(arts);
-          return topics.length > 0 ? (
-            <div className="trending-bar">
-              <span className="trending-bar-label">Trending</span>
-              {topics.slice(0, 8).map((t, i) => (
-                <span key={i} className="trending-chip" onClick={() => setSearch(t)}>{t}</span>
-              ))}
-            </div>
-          ) : null;
-        })()}
 
         {/* v36: Pop Culture sub-tabs */}
         {cat === 'popculture' && !activeKw && !activeSrc && !search && (
@@ -7316,6 +7597,21 @@ export default function App() {
                     </button>
                   ))}
                 </div>
+              </div>
+            )}
+
+            {/* v38: More from this source — web results when source filter is active */}
+            {activeSrc && (srcWebResults.length > 0 || srcWebLoading) && (
+              <div className="web-fallback">
+                <div className="rail-label" style={{margin:'24px 0 12px'}}>🌐 More from {activeSrc}</div>
+                {srcWebLoading && <div style={{fontSize:'12px',color:'var(--text3)',fontStyle:'italic',padding:'10px 0'}}>Searching the web…</div>}
+                {srcWebResults.map((r,i) => (
+                  <a key={i} className="web-result" href={r.link} target="_blank" rel="noreferrer">
+                    <div className="web-result-title">{r.title}</div>
+                    {r.desc && <div className="web-result-desc">{r.desc.slice(0,160)}</div>}
+                    <div className="web-result-src">{r.source}{r.pubDate && <span className="web-result-date"> · {fmtDate(r.pubDate)}</span>}</div>
+                  </a>
+                ))}
               </div>
             )}
 
@@ -7822,7 +8118,7 @@ export default function App() {
                     const q=marketData[w.sym];const up=q&&q.chg>=0;
                     const isOpen = expandedSym === w.sym;
                     return (
-                      <React.Fragment key={w.sym}>
+                      <Fragment key={w.sym}>
                         <tr className={`fin-wl-row${isOpen?' expanded':''}`}
                           onClick={()=>setExpandedSym(isOpen ? null : w.sym)}>
                           <td className="fin-sym">{w.sym}</td>
@@ -7861,7 +8157,7 @@ export default function App() {
                             </td>
                           </tr>
                         )}
-                      </React.Fragment>
+                      </Fragment>
                     );
                   })}
                 </tbody>
@@ -7974,6 +8270,8 @@ export default function App() {
       </div>
       {/* Floating AI chatbot — available on all pages */}
       <ChatBot arts={arts}/>
+      {/* Inline article reader overlay */}
+      {readerArticle && <ArticleReader article={readerArticle} onClose={() => setReaderArticle(null)}/>}
     </>
   );
 }
