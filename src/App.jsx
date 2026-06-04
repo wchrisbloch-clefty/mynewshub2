@@ -4340,6 +4340,157 @@ kbd{display:inline-block;padding:1px 5px;border:1px solid var(--border);border-r
   .article-reader{border-radius:0;min-height:100dvh;}
   .article-reader-body{padding:18px 18px 32px;}
 }
+
+/* ── PASTE & BRIEF PANEL ───────────────────────────────────────── */
+.analyze-overlay{
+  position:fixed;inset:0;z-index:2100;
+  background:rgba(0,0,0,0.65);backdrop-filter:blur(5px);
+  display:flex;align-items:flex-start;justify-content:center;
+  padding:24px 16px;overflow-y:auto;
+}
+.analyze-panel{
+  background:var(--surface);border-radius:14px;width:100%;max-width:660px;
+  box-shadow:0 24px 80px rgba(0,0,0,0.5);overflow:hidden;margin:auto;
+}
+.analyze-head{
+  display:flex;align-items:center;justify-content:space-between;
+  padding:18px 22px 14px;border-bottom:1px solid var(--border);
+  background:var(--surface);position:sticky;top:0;z-index:1;
+}
+.analyze-title{font-size:16px;font-weight:800;color:var(--text);}
+.analyze-close{background:none;border:none;cursor:pointer;color:var(--text3);font-size:20px;padding:2px 6px;}
+.analyze-close:hover{color:var(--text);}
+.analyze-type-tabs{display:flex;gap:6px;padding:14px 22px 10px;}
+.analyze-type-tab{
+  font-size:12px;font-weight:700;padding:6px 14px;border-radius:20px;
+  border:1px solid var(--border);background:var(--surface2);
+  color:var(--text2);cursor:pointer;transition:all 0.15s;
+}
+.analyze-type-tab.active{background:var(--accent);color:#fff;border-color:var(--accent);}
+.analyze-body{padding:0 22px 22px;}
+.analyze-input{
+  width:100%;background:var(--surface2);border:1px solid var(--border);
+  border-radius:8px;padding:12px 14px;font-size:13px;
+  font-family:var(--font-sans);color:var(--text);resize:vertical;
+  line-height:1.55;margin-bottom:12px;transition:border-color 0.15s;
+}
+.analyze-input:focus{outline:none;border-color:var(--accent);}
+.analyze-url-input{
+  width:100%;background:var(--surface2);border:1px solid var(--border);
+  border-radius:8px;padding:10px 14px;font-size:13px;
+  font-family:var(--font-sans);color:var(--text);margin-bottom:10px;
+  transition:border-color 0.15s;
+}
+.analyze-url-input:focus{outline:none;border-color:var(--accent);}
+.analyze-yt-embed{
+  width:100%;aspect-ratio:16/9;border:none;border-radius:8px;
+  background:#000;margin-bottom:10px;
+}
+.analyze-modes{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px;}
+.analyze-mode-btn{
+  font-size:12px;font-weight:700;padding:6px 13px;border-radius:20px;
+  border:1px solid var(--border);background:var(--surface2);
+  color:var(--text2);cursor:pointer;transition:all 0.15s;
+}
+.analyze-mode-btn.active{border-color:var(--accent);color:var(--accent);background:var(--accent-bg);}
+.analyze-go-btn{
+  width:100%;padding:11px;border-radius:8px;border:none;cursor:pointer;
+  background:var(--accent);color:#fff;font-size:14px;font-weight:800;
+  font-family:var(--font-sans);transition:opacity 0.15s;
+}
+.analyze-go-btn:hover{opacity:0.9;}
+.analyze-go-btn:disabled{opacity:0.45;cursor:default;}
+.analyze-result{
+  margin-top:16px;background:var(--surface2);border-radius:10px;
+  padding:16px;border:1px solid var(--border);
+}
+.analyze-result-label{
+  font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:0.1em;
+  color:var(--accent);margin-bottom:10px;
+}
+.analyze-result-text{font-size:13px;line-height:1.65;color:var(--text);white-space:pre-wrap;}
+.analyze-result-clear{
+  margin-top:12px;font-size:11px;color:var(--text3);background:none;
+  border:1px solid var(--border);border-radius:12px;padding:4px 12px;
+  cursor:pointer;font-family:inherit;
+}
+.analyze-result-clear:hover{color:var(--accent);border-color:var(--accent);}
+/* Brief button in nav */
+.nav-btn-brief{
+  background:var(--surface2);border:1px solid var(--border);color:var(--text2);
+  border-radius:var(--radius-sm);padding:6px 11px;cursor:pointer;
+  font-size:12px;font-weight:700;font-family:var(--font-sans);
+  transition:all 0.15s;white-space:nowrap;
+}
+.nav-btn-brief:hover{border-color:var(--accent);color:var(--accent);}
+@media(max-width:640px){
+  .analyze-overlay{padding:0;}
+  .analyze-panel{border-radius:0;min-height:100dvh;}
+  .analyze-head{padding:14px 16px 12px;}
+  .analyze-type-tabs{padding:10px 16px 8px;}
+  .analyze-body{padding:0 16px 24px;}
+}
+
+/* ── SEARCH AUTOCOMPLETE DROPDOWN ──────────────────────────────── */
+.search-wrap{position:relative;}
+.search-dropdown{
+  position:absolute;top:calc(100% + 4px);left:0;right:0;
+  background:var(--surface);border:1px solid var(--border);
+  border-radius:8px;box-shadow:var(--shadow-md);
+  z-index:500;overflow:hidden;min-width:220px;
+}
+.sd-section-label{
+  font-size:9px;font-weight:800;text-transform:uppercase;letter-spacing:0.1em;
+  color:var(--text3);padding:8px 12px 4px;
+}
+.sd-item{
+  display:flex;align-items:center;gap:8px;width:100%;text-align:left;
+  padding:7px 12px;background:none;border:none;cursor:pointer;
+  font-size:13px;color:var(--text2);font-family:var(--font-sans);
+  transition:background 0.1s;
+}
+.sd-item:hover{background:var(--surface2);color:var(--text);}
+.sd-icon{font-size:12px;color:var(--text3);flex-shrink:0;}
+.sd-clear{
+  font-size:10px;color:var(--text3);padding:6px 12px 8px;
+  background:none;border:none;border-top:1px solid var(--border2);
+  width:100%;text-align:left;cursor:pointer;font-family:inherit;
+}
+.sd-clear:hover{color:var(--accent);}
+
+/* ── ONBOARDING WELCOME CARD ───────────────────────────────────── */
+.onboarding-card{
+  background:linear-gradient(135deg,var(--accent) 0%,#c0392b 100%);
+  border-radius:10px;padding:16px 18px;margin-bottom:16px;
+  display:flex;gap:12px;align-items:flex-start;
+}
+.onboarding-body{flex:1;}
+.onboarding-title{font-size:13px;font-weight:800;color:#fff;margin-bottom:6px;}
+.onboarding-tips{display:flex;flex-direction:column;gap:4px;}
+.onboarding-tip{font-size:12px;color:rgba(255,255,255,0.9);}
+.onboarding-dismiss{
+  background:rgba(255,255,255,0.25);border:none;color:#fff;
+  border-radius:20px;padding:4px 12px;font-size:11px;font-weight:700;
+  cursor:pointer;margin-top:10px;font-family:inherit;transition:background 0.15s;
+}
+.onboarding-dismiss:hover{background:rgba(255,255,255,0.4);}
+.onboarding-x{
+  background:none;border:none;color:rgba(255,255,255,0.7);
+  font-size:18px;cursor:pointer;flex-shrink:0;line-height:1;padding:0;
+}
+.onboarding-x:hover{color:#fff;}
+
+/* ── MOBILE TAP TARGETS ────────────────────────────────────────── */
+@media(max-width:640px){
+  .fc-act{padding:7px 12px;font-size:12px;min-height:36px;}
+  .fc-read-link{padding:7px 0;font-size:11px;}
+  .nav-btn,.nav-btn-blue{min-height:36px;}
+  .pc-subtab{min-height:40px;padding:8px 14px;}
+  /* Hero title punch-up on mobile */
+  .gn-lead-title{font-size:22px;}
+  .sports-hero-title{font-size:20px;}
+  .fc-title{font-size:15px;line-height:1.35;}
+}
 `;
 
 
@@ -6312,7 +6463,9 @@ function LastUpdated({ timestamp, onRefresh }) {
 // the auto-hide-on-scroll-down behavior (mobile only — drives translate).
 function TopBar({tab, setTab, search, setSearch, dark, setDark,
                  onCustomize, onRefresh, breakingItems, onTickerClick,
-                 hidden, mobileSearchOpen, onMobileSearchToggle, weatherCities, hiddenIndices}) {
+                 hidden, mobileSearchOpen, onMobileSearchToggle, weatherCities, hiddenIndices,
+                 onAnalyze, searchHistory, trendingTopics}) {
+  const [searchFocused, setSearchFocused] = useState(false);
   const [wxList, setWxList] = useState([]);
   const [quotes, setQuotes] = useState({});
   const [showBreaking, setShowBreaking] = useState(true);
@@ -6457,7 +6610,40 @@ function TopBar({tab, setTab, search, setSearch, dark, setDark,
             ))}
           </div>
           <div className="nav-right">
-            <input className="search-input" placeholder="Search…" value={search} onChange={e=>setSearch(e.target.value.toLowerCase())}/>
+            <div className="search-wrap">
+              <input className="search-input" placeholder="Search…" value={search}
+                onChange={e=>setSearch(e.target.value.toLowerCase())}
+                onFocus={()=>setSearchFocused(true)}
+                onBlur={()=>setTimeout(()=>setSearchFocused(false),160)}/>
+              {searchFocused && !search && ((searchHistory||[]).length>0||(trendingTopics||[]).length>0) && (
+                <div className="search-dropdown">
+                  {(searchHistory||[]).length>0 && (
+                    <>
+                      <div className="sd-section-label">Recent</div>
+                      {searchHistory.slice(0,4).map((s,i)=>(
+                        <button key={i} className="sd-item" onMouseDown={()=>setSearch(s)}>
+                          <span className="sd-icon">↺</span>{s}
+                        </button>
+                      ))}
+                    </>
+                  )}
+                  {(trendingTopics||[]).length>0 && (
+                    <>
+                      <div className="sd-section-label">Trending</div>
+                      {trendingTopics.slice(0,4).map((t,i)=>(
+                        <button key={i} className="sd-item" onMouseDown={()=>setSearch(t)}>
+                          <span className="sd-icon">🔥</span>{t}
+                        </button>
+                      ))}
+                    </>
+                  )}
+                  {(searchHistory||[]).length>0 && (
+                    <button className="sd-clear" onMouseDown={()=>{/* clear handled by parent */ setSearch('');}}>Clear recent</button>
+                  )}
+                </div>
+              )}
+            </div>
+            <button className="nav-btn-brief" onClick={onAnalyze} title="Paste & Brief">📋 Brief</button>
             <button className="nav-btn" onClick={onRefresh} title="Refresh">↺</button>
             <button className="nav-btn" onClick={()=>setDark(d=>!d)} title="Toggle theme">{dark?'☀️':'🌙'}</button>
             <button className="nav-btn-blue" onClick={onCustomize}>Customize</button>
@@ -6661,6 +6847,92 @@ function ChatBot({ arts }) {
   );
 }
 
+// ─── PASTE & BRIEF PANEL ──────────────────────────────────────────────────────
+function AnalyzePanel({ onClose }) {
+  const [tabType, setTabType] = useState('text'); // 'text' | 'youtube'
+  const [text, setText] = useState('');
+  const [ytUrl, setYtUrl] = useState('');
+  const [ytTranscript, setYtTranscript] = useState('');
+  const [mode, setMode] = useState('summary');
+  const [result, setResult] = useState('');
+  const [loading, setLoading] = useState(false);
+
+  const MODES = [
+    { key:'summary',   label:'Summarize' },
+    { key:'takeaways', label:'Key Points' },
+    { key:'bias',      label:'Bias Check' },
+    { key:'brief',     label:'Full Brief' },
+  ];
+
+  const ytId = useMemo(() => {
+    const m = ytUrl.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/)([^&\s?]+)/);
+    return m ? m[1] : null;
+  }, [ytUrl]);
+
+  const analyze = async () => {
+    const content = tabType === 'youtube'
+      ? (ytTranscript.trim() || (ytId ? `YouTube video ID: ${ytId} — URL: ${ytUrl}` : ytUrl.trim()))
+      : text.trim();
+    if (!content || loading) return;
+    setLoading(true);
+    setResult('');
+    const modePrompts = {
+      summary:   'Summarize this content in 3-5 sentences, hitting the key facts.',
+      takeaways: 'List the 5 most important takeaways as bullet points.',
+      bias:      'Analyze the bias and framing. What perspective does it favor? What might it omit?',
+      brief:     'Write a comprehensive brief covering: 1) Summary 2) Key Facts 3) Why It Matters 4) Notable Quotes or Data.',
+    };
+    const prompt = `${modePrompts[mode]}\n\nCONTENT:\n${content}`;
+    const { summary, error } = await fetchAISummary({ type:'article', title:'Analysis', content:prompt, mode });
+    setResult(error ? 'Analysis failed — try again.' : (summary || 'No result.'));
+    setLoading(false);
+  };
+
+  return (
+    <div className="analyze-overlay" onClick={e => { if (e.target === e.currentTarget) onClose(); }}>
+      <div className="analyze-panel">
+        <div className="analyze-head">
+          <span className="analyze-title">📋 Paste & Brief</span>
+          <button className="analyze-close" onClick={onClose}>✕</button>
+        </div>
+        <div className="analyze-type-tabs">
+          <button className={`analyze-type-tab${tabType==='text'?' active':''}`} onClick={()=>setTabType('text')}>📄 Article / Text</button>
+          <button className={`analyze-type-tab${tabType==='youtube'?' active':''}`} onClick={()=>setTabType('youtube')}>▶ YouTube</button>
+        </div>
+        <div className="analyze-body">
+          {tabType === 'text' ? (
+            <textarea className="analyze-input" placeholder="Paste any article, transcript, or text here…" value={text} onChange={e=>setText(e.target.value)} rows={8}/>
+          ) : (
+            <>
+              <input className="analyze-url-input" placeholder="Paste YouTube URL (e.g. youtube.com/watch?v=…)" value={ytUrl} onChange={e=>setYtUrl(e.target.value)}/>
+              {ytId && (
+                <iframe className="analyze-yt-embed" src={`https://www.youtube-nocookie.com/embed/${ytId}`} allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowFullScreen title="YouTube video"/>
+              )}
+              <textarea className="analyze-input" placeholder="Paste video transcript here for best AI results (optional — without it, AI analyzes the URL/title only)…" value={ytTranscript} onChange={e=>setYtTranscript(e.target.value)} rows={5}/>
+            </>
+          )}
+          <div className="analyze-modes">
+            {MODES.map(m => (
+              <button key={m.key} className={`analyze-mode-btn${mode===m.key?' active':''}`} onClick={()=>setMode(m.key)}>{m.label}</button>
+            ))}
+          </div>
+          <button className="analyze-go-btn" onClick={analyze}
+            disabled={loading || (tabType==='text' && !text.trim()) || (tabType==='youtube' && !ytUrl.trim() && !ytTranscript.trim())}>
+            {loading ? 'Analyzing…' : '✨ Analyze'}
+          </button>
+          {result && (
+            <div className="analyze-result">
+              <div className="analyze-result-label">{MODES.find(m=>m.key===mode)?.label}</div>
+              <div className="analyze-result-text">{result}</div>
+              <button className="analyze-result-clear" onClick={()=>{setResult('');setText('');setYtUrl('');setYtTranscript('');}}>Clear</button>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ─── ARTICLE READER ───────────────────────────────────────────────────────────
 function ArticleReader({ article, onClose }) {
   const [aiResult, setAiResult] = useState('');
@@ -6719,6 +6991,7 @@ export default function App() {
   const [clicks, setClicks]     = useState(()=>ld('clicks',{}));
   const [readLinks, setReadLinks] = useState(()=>new Set(ld('readLinks',[])));
   const [readerArticle, setReaderArticle] = useState(null);
+  const [showAnalyze, setShowAnalyze] = useState(false);
   const [webResults, setWebResults] = useState([]);
   const [webLoading, setWebLoading] = useState(false);
   const [sourceRecs, setSourceRecs] = useState([]);
@@ -6975,13 +7248,14 @@ export default function App() {
         if (inp) inp.focus();
       }
       if (e.key === 'Escape') {
+        if (showAnalyze) { setShowAnalyze(false); return; }
         if (readerArticle) { setReaderArticle(null); return; }
         setSearch(''); setActiveKw(null); setActiveSrc(null);
       }
     };
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
-  }, [readerArticle]);
+  }, [readerArticle, showAnalyze]);
 
   const handleCustomizeSave = ({feeds:nf,kw:nk,alerts:na,urgent:nu,social:ns,watchlist:nw,teams:nt,weatherCities:nwx,hiddenIndices:ni,briefingExclude:nbe})=>{
     setFeeds(nf);sv('feeds',nf);
@@ -7056,6 +7330,7 @@ export default function App() {
   }, [clicks, readLinks, arts]);
 
   const NEWS_CATS = ['general','sports','business','bloom','tech','popculture','comedy'];
+  const homeTrendingTopics = useMemo(() => getTrendingTopics(arts), [arts]);
 
   // ─── FEED PAGE ─────────────────────────────────────────────────────────
   // ─── SPORTS PAGE (v23) — Yahoo Sports rebuild ──────────────────────────
@@ -7358,6 +7633,8 @@ export default function App() {
 
   const FeedPage = ({cat}) => {
     const cc=CATS[cat];
+    const [onboardingDismissed, setOnboardingDismissed] = useState(()=>ld('onboarded',false));
+    const dismissOnboarding = () => { sv('onboarded',true); setOnboardingDismissed(true); };
     // Apply story clustering before sorting so cluster metadata is available
     const rawItems=sorted(cat);
     const items=useMemo(()=>clusterStories(rawItems),[rawItems]);
@@ -7465,6 +7742,22 @@ export default function App() {
 
     return (
       <div className="page">
+        {/* First-run onboarding card */}
+        {isHome && !onboardingDismissed && !activeKw && !activeSrc && !search && (
+          <div className="onboarding-card">
+            <div className="onboarding-body">
+              <div className="onboarding-title">Welcome to MyNewsHub ✦</div>
+              <div className="onboarding-tips">
+                <span className="onboarding-tip">📖 <strong>Click any article</strong> to open the AI reader — Summarize, Key Points, Bias Check</span>
+                <span className="onboarding-tip">📋 <strong>"Brief" button</strong> (top bar) → paste any article, transcript, or YouTube video for a breakdown</span>
+                <span className="onboarding-tip">⚙️ <strong>Customize</strong> → add/remove sources, set keywords, build your feed</span>
+              </div>
+              <button className="onboarding-dismiss" onClick={dismissOnboarding}>Got it, dismiss</button>
+            </div>
+            <button className="onboarding-x" onClick={dismissOnboarding}>✕</button>
+          </div>
+        )}
+
         {/* Scores strip — General and Sports only; Sports has its own strip */}
         {cat === 'general' && !activeKw && !activeSrc && !search && (
           <ActiveScoresBar scores={scores} onGoToSports={() => handleTabChange('sports')}/>
@@ -8295,7 +8588,10 @@ export default function App() {
           mobileSearchOpen={mobileSearchOpen}
           onMobileSearchToggle={() => setMobileSearchOpen(o => !o)}
           weatherCities={weatherCities}
-          hiddenIndices={hiddenIndices}/>
+          hiddenIndices={hiddenIndices}
+          onAnalyze={() => setShowAnalyze(true)}
+          searchHistory={searchHistory}
+          trendingTopics={homeTrendingTopics}/>
 
         {/* Pull-to-refresh indicator (mobile, touch-only) */}
         {isMobile && <PtrIndicator distance={ptrDistance} threshold={70} refreshing={refreshing}/>}
@@ -8345,6 +8641,8 @@ export default function App() {
       <ChatBot arts={arts}/>
       {/* Inline article reader overlay */}
       {readerArticle && <ArticleReader article={readerArticle} onClose={() => setReaderArticle(null)}/>}
+      {/* Paste & Brief panel */}
+      {showAnalyze && <AnalyzePanel onClose={() => setShowAnalyze(false)}/>}
     </>
   );
 }
