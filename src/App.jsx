@@ -135,6 +135,10 @@ const DEFAULT_FEEDS = {
     { name:'Thoroughbred Daily News', url:'https://www.thoroughbreddailynews.com/feed/',                         on:true },
     { name:'Horse Race Nation',    url:'https://horseracenation.com/feed/',                                      on:true },
     { name:'Daily Racing Form',    url:'https://www.drf.com/news/rss/news',                                      on:false },
+    { name:'GolfWeek',             url:'https://golfweek.usatoday.com/feed/',                                     on:true },
+    { name:'Golf Digest',          url:'https://www.golfdigest.com/rss/rss-sports',                               on:true },
+    { name:'Golf Channel',         url:'https://www.golfchannel.com/feeds/rss.aspx',                              on:true },
+    { name:'No Laying Up',         url:'https://nolayingup.com/feed/',                                            on:true },
   ],
   business: [
     { name:'Reuters Business',       url:'https://feeds.reuters.com/reuters/businessNews',                      on:true },
@@ -1069,6 +1073,9 @@ body:not(.dark) .pill-bar{
 /* Editorial: green/red on dark navy pops clearly */
 .pill-chg.up{color:#4ade80;background:rgba(74,222,128,0.12);}
 .pill-chg.down{color:#f87171;background:rgba(248,113,113,0.12);}
+/* Dark mode: pill bar needs stronger contrast — navy bg can blend into dark page */
+.dark .pill-bar{background:rgba(15,23,42,0.98);border-bottom-color:rgba(255,255,255,0.1);}
+.dark .pill-label{color:rgba(255,255,255,0.72);}
 
 /* Old whisper-bar selectors kept as no-ops in case any external CSS still references */
 .whisper-bar,.whisper-inner,.wx-pill,.ticker-row,.ticker-item{display:none;}
@@ -4256,6 +4263,82 @@ kbd{display:inline-block;padding:1px 5px;border:1px solid var(--border);border-r
   .hs-tile{min-width:120px;padding:9px 11px;}
   .trending-bar{padding:8px 0 12px;}
   .trending-chip{font-size:10px;padding:4px 9px;}
+  /* Mobile trending section — more prominent at top of feed */
+  .trending-section-mobile{
+    background:var(--surface);border:1px solid var(--border);
+    border-radius:10px;padding:12px 14px;margin-bottom:14px;
+  }
+  .trending-section-mobile .trending-bar-label{
+    font-size:10px;color:var(--accent);display:block;margin-bottom:8px;
+  }
+  .trending-section-mobile .trending-chip{font-size:11px;padding:5px 12px;}
+}
+
+/* ── ARTICLE READER OVERLAY ────────────────────────────────────── */
+.article-reader-overlay{
+  position:fixed;inset:0;z-index:2000;
+  background:rgba(0,0,0,0.6);backdrop-filter:blur(4px);
+  display:flex;align-items:flex-start;justify-content:center;
+  padding:20px 16px;overflow-y:auto;
+}
+.article-reader{
+  background:var(--surface);border-radius:14px;
+  width:100%;max-width:720px;
+  box-shadow:0 24px 80px rgba(0,0,0,0.45);
+  overflow:hidden;position:relative;
+  margin:auto;
+}
+.article-reader-img{
+  width:100%;aspect-ratio:16/7;object-fit:cover;
+  background:var(--surface2);
+}
+.article-reader-body{padding:24px 28px 28px;}
+.article-reader-source{
+  font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:0.1em;
+  color:var(--accent);margin-bottom:8px;display:flex;align-items:center;gap:6px;
+}
+.article-reader-date{color:var(--text3);font-weight:400;text-transform:none;letter-spacing:0;}
+.article-reader-title{
+  font-family:var(--font-serif);font-size:clamp(20px,3vw,28px);
+  font-weight:800;line-height:1.25;color:var(--text1);margin:0 0 12px;
+}
+.article-reader-desc{
+  font-size:15px;line-height:1.65;color:var(--text2);
+  border-left:3px solid var(--accent);padding-left:14px;
+  margin:0 0 20px;
+}
+.article-reader-actions{
+  display:flex;gap:8px;flex-wrap:wrap;margin-bottom:20px;
+}
+.article-reader-btn{
+  font-size:12px;font-weight:700;padding:7px 14px;border-radius:6px;
+  border:1px solid var(--border);background:var(--surface2);
+  color:var(--text2);cursor:pointer;transition:all 0.15s;
+}
+.article-reader-btn:hover{border-color:var(--accent);color:var(--accent);}
+.article-reader-btn.primary{
+  background:var(--accent);color:#fff;border-color:var(--accent);
+}
+.article-reader-btn.primary:hover{opacity:0.88;}
+.article-reader-ai-result{
+  background:var(--surface2);border-radius:8px;padding:14px 16px;
+  font-size:13px;line-height:1.6;color:var(--text1);
+  border:1px solid var(--border);margin-top:12px;
+  white-space:pre-wrap;
+}
+.article-reader-close{
+  position:absolute;top:14px;right:14px;
+  width:32px;height:32px;border-radius:50%;
+  background:rgba(0,0,0,0.4);border:none;cursor:pointer;
+  color:#fff;font-size:18px;line-height:1;
+  display:flex;align-items:center;justify-content:center;
+  z-index:1;transition:background 0.15s;
+}
+.article-reader-close:hover{background:rgba(0,0,0,0.7);}
+@media(max-width:640px){
+  .article-reader-overlay{padding:0;}
+  .article-reader{border-radius:0;min-height:100dvh;}
+  .article-reader-body{padding:18px 18px 32px;}
 }
 `;
 
@@ -6574,6 +6657,56 @@ function ChatBot({ arts }) {
   );
 }
 
+// ─── ARTICLE READER ───────────────────────────────────────────────────────────
+function ArticleReader({ article, onClose }) {
+  const [aiResult, setAiResult] = useState('');
+  const [aiLoading, setAiLoading] = useState(false);
+  const [aiMode, setAiMode] = useState(null);
+
+  const runAI = async (mode) => {
+    setAiMode(mode);
+    setAiLoading(true);
+    setAiResult('');
+    const result = await fetchAISummary({ type: mode, title: article.title, content: article.desc || article.title, mode: 'groq' });
+    setAiResult(result);
+    setAiLoading(false);
+  };
+
+  return (
+    <div className="article-reader-overlay" onClick={e => { if (e.target === e.currentTarget) onClose(); }}>
+      <div className="article-reader">
+        <button className="article-reader-close" onClick={onClose} aria-label="Close">×</button>
+        {article.img && <img className="article-reader-img" src={article.img} alt="" loading="lazy"/>}
+        <div className="article-reader-body">
+          <div className="article-reader-source">
+            {article.source}
+            {article.pubDate && <span className="article-reader-date">· {fmtDate(article.pubDate)}</span>}
+          </div>
+          <h2 className="article-reader-title">{article.title}</h2>
+          {article.desc && <p className="article-reader-desc">{article.desc}</p>}
+          <div className="article-reader-actions">
+            <a className="article-reader-btn primary" href={article.link} target="_blank" rel="noreferrer" onClick={e=>e.stopPropagation()}>
+              Open Full Article ↗
+            </a>
+            <button className="article-reader-btn" onClick={() => runAI('summary')}>✦ Summarize</button>
+            <button className="article-reader-btn" onClick={() => runAI('takeaways')}>Key Points</button>
+            <button className="article-reader-btn" onClick={() => runAI('bias')}>Bias Check</button>
+          </div>
+          {aiLoading && <div className="article-reader-ai-result" style={{color:'var(--text3)'}}>Analyzing with AI…</div>}
+          {!aiLoading && aiResult && (
+            <div className="article-reader-ai-result">
+              <div style={{fontWeight:700,fontSize:'11px',textTransform:'uppercase',letterSpacing:'0.08em',color:'var(--accent)',marginBottom:'8px'}}>
+                {aiMode === 'summary' ? 'Summary' : aiMode === 'takeaways' ? 'Key Points' : 'Bias Check'}
+              </div>
+              {aiResult}
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function App() {
   const [tab, setTab]           = useState('general');
   const [search, setSearch]     = useState('');
@@ -6581,6 +6714,7 @@ export default function App() {
   const [saved, setSaved]       = useState(()=>ld('saved',[]));
   const [clicks, setClicks]     = useState(()=>ld('clicks',{}));
   const [readLinks, setReadLinks] = useState(()=>new Set(ld('readLinks',[])));
+  const [readerArticle, setReaderArticle] = useState(null);
   const [webResults, setWebResults] = useState([]);
   const [webLoading, setWebLoading] = useState(false);
   const [sourceRecs, setSourceRecs] = useState([]);
@@ -6782,7 +6916,7 @@ export default function App() {
   const onRead  = a=>{
     setClicks(c=>({...c,[a.source]:(c[a.source]||0)+1}));
     if (a.link) setReadLinks(s=>{const n=new Set(s);n.add(a.link);return n;});
-    window.open(a.link,'_blank');
+    setReaderArticle(a);
   };
   const onSave  = a=>{
     const wasSaved = saved.some(x=>x.link===a.link);
@@ -6837,12 +6971,13 @@ export default function App() {
         if (inp) inp.focus();
       }
       if (e.key === 'Escape') {
+        if (readerArticle) { setReaderArticle(null); return; }
         setSearch(''); setActiveKw(null); setActiveSrc(null);
       }
     };
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
-  }, []);
+  }, [readerArticle]);
 
   const handleCustomizeSave = ({feeds:nf,kw:nk,alerts:na,urgent:nu,social:ns,watchlist:nw,teams:nt,weatherCities:nwx,hiddenIndices:ni,briefingExclude:nbe})=>{
     setFeeds(nf);sv('feeds',nf);
@@ -6937,7 +7072,7 @@ export default function App() {
         nfl: 'NFL football news today', nba: 'NBA basketball news today',
         mlb: 'MLB baseball news today', cfb: 'college football news today',
         cbb: 'college basketball news today', cbase: 'college baseball news today',
-        racing: 'horse racing news today',
+        racing: 'horse racing news today', golf: 'PGA Tour golf news today',
       };
       const q = SPORT_TAB_QUERIES[sportTab] || `${sportTab} sports news`;
       setSportWebLoading(true);
@@ -6983,6 +7118,7 @@ export default function App() {
                        : sportTab === 'cbb'    ? ['cbb','college basketball','ncaa','march madness','final four','ncaa tournament','big east','sweet 16']
                        : sportTab === 'cbase'  ? ['college baseball','ncaa baseball','cws','college world series','super regional','sec baseball','acc baseball','big 12 baseball','d1baseball','college world']
                        : sportTab === 'racing' ? ['horse racing','thoroughbred','derby','stakes','jockey','paddock','furlong','harness racing','horse race','breeders cup','kentucky derby','preakness','belmont']
+                       : sportTab === 'golf'   ? ['golf','pga tour','masters','us open golf','british open','ryder cup','tiger woods','golfer','birdie','bogey','fairway','tee shot','pga championship','lpga']
                        : [];
         items = items.filter(a => {
           const t = (a.title + ' ' + (a.desc||'')).toLowerCase();
@@ -7013,10 +7149,11 @@ export default function App() {
       { key:'nfl',    label:'NFL',            emoji:'🏈' },
       { key:'nba',    label:'NBA',            emoji:'🏀' },
       { key:'mlb',    label:'MLB',            emoji:'⚾' },
-      { key:'cfb',    label:'College FB',     emoji:'🏈' },
-      { key:'cbb',    label:'College BB',     emoji:'🏀' },
+      { key:'cfb',    label:'NCAAF',          emoji:'🏈' },
+      { key:'cbb',    label:'NCAAB',          emoji:'🏀' },
       { key:'cbase',  label:'College Baseball',emoji:'⚾' },
       { key:'racing', label:'Horse Racing',   emoji:'🏇' },
+      { key:'golf',   label:'Golf',           emoji:'⛳' },
     ];
 
     const feedRef = useRef(null);
@@ -7287,6 +7424,21 @@ export default function App() {
           <ActiveScoresBar scores={scores} onGoToSports={() => handleTabChange('sports')}/>
         )}
 
+        {/* Trending topics — mobile-prominent section above the hero */}
+        {isHome && !activeKw && !activeSrc && !search && (() => {
+          const topics = getTrendingTopics(arts);
+          return topics.length > 0 ? (
+            <div className="trending-section-mobile">
+              <span className="trending-bar-label">🔥 Trending Now</span>
+              <div className="trending-bar" style={{padding:'0',marginTop:'4px'}}>
+                {topics.slice(0, 10).map((t, i) => (
+                  <span key={i} className="trending-chip" onClick={() => setSearch(t)}>{t}</span>
+                ))}
+              </div>
+            </div>
+          ) : null;
+        })()}
+
         {/* v26: General gets 2-col hero (lead | briefing). Other cats: briefing above if no lead. */}
         {isHome && !activeKw && !activeSrc && catLead ? (
           <div className="home-hero-row">
@@ -7345,19 +7497,6 @@ export default function App() {
             </div>
           </div>
         )}
-
-        {/* Trending topics bar — shown when no active filter/search */}
-        {isHome && !activeKw && !activeSrc && !search && (() => {
-          const topics = getTrendingTopics(arts);
-          return topics.length > 0 ? (
-            <div className="trending-bar">
-              <span className="trending-bar-label">Trending</span>
-              {topics.slice(0, 8).map((t, i) => (
-                <span key={i} className="trending-chip" onClick={() => setSearch(t)}>{t}</span>
-              ))}
-            </div>
-          ) : null;
-        })()}
 
         {/* v36: Pop Culture sub-tabs */}
         {cat === 'popculture' && !activeKw && !activeSrc && !search && (
@@ -8131,6 +8270,8 @@ export default function App() {
       </div>
       {/* Floating AI chatbot — available on all pages */}
       <ChatBot arts={arts}/>
+      {/* Inline article reader overlay */}
+      {readerArticle && <ArticleReader article={readerArticle} onClose={() => setReaderArticle(null)}/>}
     </>
   );
 }
