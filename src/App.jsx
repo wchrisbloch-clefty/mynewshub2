@@ -1184,10 +1184,18 @@ body:not(.dark) .pill-bar{
   font-size:12px;font-family:var(--font-sans);font-weight:600;transition:all 0.12s;
 }
 .nav-btn:hover{border-color:var(--text3);color:var(--text);}
+.nav-icon-btn{
+  background:transparent;border:1px solid var(--border);color:var(--text2);
+  border-radius:var(--radius-sm);width:32px;height:32px;cursor:pointer;
+  display:flex;align-items:center;justify-content:center;
+  transition:all 0.12s;flex-shrink:0;
+}
+.nav-icon-btn:hover{border-color:var(--text3);color:var(--text);background:var(--surface2);}
 .nav-btn-blue{
   background:var(--accent);border:none;color:#fff;
-  border-radius:var(--radius-sm);padding:6px 14px;cursor:pointer;
+  border-radius:var(--radius-sm);padding:6px 13px;cursor:pointer;
   font-size:12px;font-weight:700;font-family:var(--font-sans);transition:opacity 0.12s;letter-spacing:0.02em;
+  display:flex;align-items:center;gap:5px;
 }
 .nav-btn-blue:hover{opacity:0.88;}
 
@@ -1782,6 +1790,16 @@ body:not(.dark) .pill-bar{
   transition:all 0.12s;
 }
 .fin-chart-ext:hover{border-color:#fa7800;color:#fa7800;}
+.fin-chart-links{display:flex;flex-wrap:wrap;gap:8px;padding:8px 0 4px;}
+.fin-chart-link-btn{
+  display:inline-flex;align-items:center;gap:5px;
+  padding:8px 14px;border-radius:7px;font-size:12px;font-weight:600;
+  border:1px solid var(--border);color:var(--text2);background:var(--surface);
+  text-decoration:none;transition:all 0.12s;cursor:pointer;font-family:var(--font-sans);
+}
+.fin-chart-link-btn:hover{border-color:var(--accent);color:var(--accent);}
+.fin-chart-link-btn.primary{background:var(--accent);color:#fff;border-color:var(--accent);font-weight:700;}
+.fin-chart-link-btn.primary:hover{opacity:0.88;}
 
 /* ═══════════════════════════════════════════
    SOCIAL FOLLOWS (per category)
@@ -3027,7 +3045,7 @@ body{overscroll-behavior-y:contain;}
   -webkit-tap-highlight-color:transparent;
 }
 .bottom-tab:active{background:var(--surface2);}
-.bottom-tab-icon{font-size:20px;line-height:1;}
+.bottom-tab-icon{width:22px;height:22px;flex-shrink:0;}
 .bottom-tab-label{font-size:10px;font-weight:600;letter-spacing:0.01em;}
 .bottom-tab.active{color:var(--accent);}
 
@@ -3773,7 +3791,7 @@ kbd{display:inline-block;padding:1px 5px;border:1px solid var(--border);border-r
 }
 .bottom-tab.active{color:var(--accent);}
 .bottom-tab:hover:not(.active){color:var(--text2);}
-.bottom-tab-icon{font-size:18px;line-height:1;}
+.bottom-tab-icon{width:22px;height:22px;flex-shrink:0;}
 
 /* Smooth page transitions */
 .page{
@@ -4421,6 +4439,7 @@ kbd{display:inline-block;padding:1px 5px;border:1px solid var(--border);border-r
   border-radius:var(--radius-sm);padding:6px 11px;cursor:pointer;
   font-size:12px;font-weight:700;font-family:var(--font-sans);
   transition:all 0.15s;white-space:nowrap;
+  display:flex;align-items:center;gap:5px;
 }
 .nav-btn-brief:hover{border-color:var(--accent);color:var(--accent);}
 @media(max-width:640px){
@@ -6247,23 +6266,25 @@ function BottomTabBar({ tab, onTabChange, onMenuOpen, savedCount, lastFeedTab })
   // tabs visually highlight 'Home' so the chip-bar is the way to navigate.
   const inOtherFeed = ['sports','business','finance','bloom','popculture','comedy'].includes(tab);
   const feedTarget = inOtherFeed ? tab : (lastFeedTab && lastFeedTab !== 'general' ? lastFeedTab : 'sports');
-  const tabs = [
-    { key:'home',   emoji:'🏠', label:'Home',   active: tab === 'general', target:'general' },
-    { key:'feed',   emoji:'📰', label:'Feed',   active: inOtherFeed, target: feedTarget },
-    { key:'saved',  emoji:'★',  label:savedCount>0?`Saved (${savedCount})`:'Saved', active: tab === 'saved' },
-    { key:'menu',   emoji:'☰',  label:'More',   isMenu: true },
-  ];
   return (
     <nav className="bottom-tabs">
       <div className="bottom-tabs-inner">
-        {tabs.map(t => (
-          <button key={t.key}
-            className={`bottom-tab ${t.active?'active':''}`}
-            onClick={() => { if (t.isMenu) onMenuOpen(); else onTabChange(t.target || t.key); }}>
-            <span className="bottom-tab-icon">{t.emoji}</span>
-            <span className="bottom-tab-label">{t.label}</span>
-          </button>
-        ))}
+        <button className={`bottom-tab ${tab==='general'?'active':''}`} onClick={()=>onTabChange('general')}>
+          <svg className="bottom-tab-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+          <span className="bottom-tab-label">Home</span>
+        </button>
+        <button className={`bottom-tab ${inOtherFeed?'active':''}`} onClick={()=>onTabChange(feedTarget)}>
+          <svg className="bottom-tab-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>
+          <span className="bottom-tab-label">Feed</span>
+        </button>
+        <button className={`bottom-tab ${tab==='saved'?'active':''}`} onClick={()=>onTabChange('saved')}>
+          <svg className="bottom-tab-icon" viewBox="0 0 24 24" fill={tab==='saved'?'currentColor':'none'} stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg>
+          <span className="bottom-tab-label">{savedCount>0?`Saved (${savedCount})`:'Saved'}</span>
+        </button>
+        <button className="bottom-tab" onClick={onMenuOpen}>
+          <svg className="bottom-tab-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+          <span className="bottom-tab-label">More</span>
+        </button>
       </div>
     </nav>
   );
@@ -6785,10 +6806,23 @@ function TopBar({tab, setTab, search, setSearch, dark, setDark,
                 </div>
               )}
             </div>
-            <button className="nav-btn-brief" onClick={onAnalyze} title="Paste & Analyze">📋 Analyze</button>
-            <button className="nav-btn" onClick={onRefresh} title="Refresh">↺</button>
-            <button className="nav-btn" onClick={()=>setDark(d=>!d)} title="Toggle theme">{dark?'☀️':'🌙'}</button>
-            <button className="nav-btn-blue" onClick={onCustomize}>Customize</button>
+            <button className="nav-btn-brief" onClick={onAnalyze} title="Paste &amp; Analyze">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{flexShrink:0}}><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><rect x="8" y="2" width="8" height="4" rx="1"/><line x1="9" y1="12" x2="15" y2="12"/><line x1="9" y1="16" x2="13" y2="16"/></svg>
+              Analyze
+            </button>
+            <button className="nav-icon-btn" onClick={onRefresh} title="Refresh">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
+            </button>
+            <button className="nav-icon-btn" onClick={()=>setDark(d=>!d)} title="Toggle theme">
+              {dark
+                ? <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>
+                : <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+              }
+            </button>
+            <button className="nav-btn-blue" onClick={onCustomize}>
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{flexShrink:0}}><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06-.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+              Customize
+            </button>
           </div>
         </div>
       </div>
@@ -6801,8 +6835,15 @@ function TopBar({tab, setTab, search, setSearch, dark, setDark,
             <div className="mobile-logo-sub">Daily briefing</div>
           </div>
           <div className="mobile-actions">
-            <button className="mobile-icon-btn" onClick={onMobileSearchToggle} title="Search">🔍</button>
-            <button className="mobile-icon-btn" onClick={onRefresh} title="Refresh">↺</button>
+            <button className="mobile-icon-btn" onClick={onAnalyze} title="Analyze">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><rect x="8" y="2" width="8" height="4" rx="1"/><line x1="9" y1="12" x2="15" y2="12"/><line x1="9" y1="16" x2="13" y2="16"/></svg>
+            </button>
+            <button className="mobile-icon-btn" onClick={onMobileSearchToggle} title="Search">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+            </button>
+            <button className="mobile-icon-btn" onClick={onRefresh} title="Refresh">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
+            </button>
           </div>
         </div>
 
@@ -7568,7 +7609,11 @@ export default function App() {
       let items = allItems;
       if (activeTeam) {
         const m = (activeTeam.match || '').toLowerCase();
-        items = items.filter(a => (a.title + ' ' + (a.desc||'')).toLowerCase().includes(m));
+        const teamShort = (activeTeam.team || '').toLowerCase();
+        items = items.filter(a => {
+          const text = (a.title + ' ' + (a.desc||'')).toLowerCase();
+          return text.includes(m) || (teamShort.length > 3 && text.includes(teamShort));
+        });
       } else if (sportTab !== 'all') {
         // Sport-tab filter: keep articles mentioning any team in this sport,
         // OR keep any article from sport-specific kw (broad fallback).
@@ -8676,14 +8721,17 @@ export default function App() {
                                     Yahoo ↗
                                   </a>
                                 </div>
-                                <iframe
-                                  key={`${w.sym}-${chartPeriod}`}
-                                  className="fin-chart-frame"
-                                  src={`https://www.tradingview.com/mini-symbol-overview/?symbol=${encodeURIComponent(w.sym)}&locale=en&dateRange=${periodToTv[chartPeriod]||'3M'}&colorTheme=${dark?'dark':'light'}&trendLineColor=%231976d2&underLineColor=rgba(55%2C166%2C239%2C0.15)&underLineBottomColor=rgba(255%2C255%2C255%2C0)&isTransparent=false&autosize=true`}
-                                  title={`${w.sym} chart`}
-                                  scrolling="no"
-                                  frameBorder="0"
-                                />
+                                <div className="fin-chart-links">
+                                  <a className="fin-chart-link-btn primary" href={`https://finance.yahoo.com/chart/${w.sym}`} target="_blank" rel="noreferrer" onClick={e=>e.stopPropagation()}>
+                                    📊 Full Chart on Yahoo Finance
+                                  </a>
+                                  <a className="fin-chart-link-btn" href={`https://www.tradingview.com/chart/?symbol=${w.sym}`} target="_blank" rel="noreferrer" onClick={e=>e.stopPropagation()}>
+                                    TradingView ↗
+                                  </a>
+                                  <a className="fin-chart-link-btn" href={`https://www.google.com/finance/quote/${w.sym}`} target="_blank" rel="noreferrer" onClick={e=>e.stopPropagation()}>
+                                    Google Finance ↗
+                                  </a>
+                                </div>
                               </div>
                             </td>
                           </tr>
