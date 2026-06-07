@@ -210,8 +210,8 @@ export default function CoachAI() {
             onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(input); } }}
             rows={1} placeholder="Be honest. The AI can handle it."
             style={{ flex: 1, background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 10, padding: isMobile ? '12px 14px' : '10px 12px', color: 'var(--text-b)', fontSize: isMobile ? 14 : 13, outline: 'none', fontFamily: 'inherit', resize: 'none', maxHeight: 100 }} />
-          <button onClick={() => send(input)} disabled={!input.trim()}
-            style={{ padding: '10px 16px', background: input.trim() ? ACCENT : 'var(--bord2)', border: 'none', borderRadius: 10, color: input.trim() ? '#fff' : 'var(--dim)', fontSize: 13, fontWeight: 800, cursor: 'pointer', flexShrink: 0, minHeight: 42 }}>→</button>
+          <button onClick={() => send(input)} disabled={!input.trim() || loading}
+            style={{ padding: '10px 16px', background: input.trim() && !loading ? ACCENT : 'var(--bord2)', border: 'none', borderRadius: 10, color: input.trim() && !loading ? '#fff' : 'var(--dim)', fontSize: 13, fontWeight: 800, cursor: input.trim() && !loading ? 'pointer' : 'not-allowed', flexShrink: 0, minHeight: 42 }}>→</button>
         </div>
       </div>
     </div>
