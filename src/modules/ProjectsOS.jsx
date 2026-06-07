@@ -1,8 +1,9 @@
 import { useState } from 'react';
 import { useApp } from '../App.jsx';
-import { saveProjects, uid } from '../utils.js';
-import { PROJECT_CATEGORIES, PROJECT_STATUSES } from '../constants.js';
-import { Card, Badge, Label, Btn, Input, Modal } from './shared/Common.jsx';
+import { saveProjects, uid, callClaude } from '../utils.js';
+import { PROJECT_CATEGORIES, PROJECT_STATUSES, CB_IDENTITY } from '../constants.js';
+import { Card, Badge, Label, Btn, Input, Modal, ThinkingDots } from './shared/Common.jsx';
+import MD from './shared/MD.jsx';
 
 export default function ProjectsOS() {
   const { projects, setProjects, isMobile, isPhone } = useApp();
@@ -200,8 +201,28 @@ export default function ProjectsOS() {
 
 function ProjectDetail({ proj, cat, pct, done, onBack, onUpdateMilestone, onAddMilestone, onChangeStatus, onDelete }) {
   const [newMilestone, setNewMilestone] = useState('');
-  const { isMobile } = useApp();
+  const [aiMode, setAiMode] = useState(''); // '' | 'brief' | 'obstacles' | 'blueocean'
+  const [aiResult, setAiResult] = useState('');
+  const [aiLoading, setAiLoading] = useState(false);
+  const { isMobile, setChatPrefill, setChatOpen } = useApp();
   const statusConfig = PROJECT_STATUSES.find(s => s.id === proj.status);
+
+  const runAI = async (mode) => {
+    if (aiMode === mode) { setAiMode(''); return; }
+    setAiMode(mode);
+    if (aiResult && aiMode !== mode) setAiResult('');
+    setAiLoading(true);
+    const prompts = {
+      brief: `Give CB a concise strategic brief for this project. Cover: current status, what's working, biggest risk, and the single most important next action.\n\nProject: ${proj.title}\nDescription: ${proj.description || 'None'}\nStatus: ${proj.status}\nCategory: ${proj.category}\nMilestones (${proj.milestones.length} total, ${done} done): ${proj.milestones.map(m => `${m.done ? '✓' : '○'} ${m.text}`).join(', ') || 'None'}\nPriority: ${proj.priority}`,
+      obstacles: `Identify the top 3 obstacles CB is likely to face executing this project, and give one concrete mitigation for each. Be specific to CB's world (BD professional, Houston TX, long-game operator).\n\nProject: ${proj.title}\nDescription: ${proj.description || 'None'}\nCategory: ${proj.category}`,
+      blueocean: `Give CB a Blue Ocean angle on this project — an uncontested space or contrarian insight that most people executing this type of project miss. What's the asymmetric edge?\n\nProject: ${proj.title}\nDescription: ${proj.description || 'None'}\nCategory: ${proj.category}`,
+    };
+    try {
+      const r = await callClaude({ system: CB_IDENTITY, messages: [{ role: 'user', content: prompts[mode] }], maxTokens: 700 });
+      setAiResult(r);
+    } catch { setAiResult('Network error — try again.'); }
+    setAiLoading(false);
+  };
 
   return (
     <div style={{ padding: isMobile ? '16px 16px 72px' : '24px 28px 80px', maxWidth: 760, margin: '0 auto' }}>
@@ -275,11 +296,40 @@ function ProjectDetail({ proj, cat, pct, done, onBack, onUpdateMilestone, onAddM
       )}
 
       {proj.blueOcean && (
-        <div style={{ padding: '14px 16px', background: '#6366F108', border: '1px solid #6366F130', borderRadius: 10 }}>
+        <div style={{ padding: '14px 16px', background: '#6366F108', border: '1px solid #6366F130', borderRadius: 10, marginBottom: 24 }}>
           <Label color="#6366F1">🌊 Blue Ocean Insight</Label>
           <div style={{ fontSize: 12, color: 'var(--text-c)', lineHeight: 1.7 }}>{proj.blueOcean}</div>
         </div>
       )}
+
+      {/* AI Project Intelligence */}
+      <div style={{ borderTop: '1px solid var(--border)', paddingTop: 20 }}>
+        <Label>✦ AI Project Intelligence</Label>
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 14 }}>
+          {[
+            { id: 'brief',     label: '📋 Strategy Brief' },
+            { id: 'obstacles', label: '⚠ Obstacles & Mitigations' },
+            { id: 'blueocean', label: '🌊 Blue Ocean Angle' },
+          ].map(btn => (
+            <div key={btn.id} onClick={() => runAI(btn.id)}
+              style={{ padding: isMobile ? '10px 16px' : '6px 14px', fontSize: 11, fontWeight: 600, border: `1px solid ${aiMode === btn.id ? proj.color : 'var(--border)'}`, borderRadius: 8, color: aiMode === btn.id ? proj.color : 'var(--subtle)', background: aiMode === btn.id ? `${proj.color}12` : 'var(--surface)', cursor: 'pointer', transition: 'all 0.12s', minHeight: isMobile ? 40 : undefined }}>
+              {btn.label}
+            </div>
+          ))}
+          <div onClick={() => { setChatPrefill(`Tell me more about my project: ${proj.title}. ${proj.description || ''}`); setChatOpen(true); }}
+            style={{ padding: isMobile ? '10px 16px' : '6px 14px', fontSize: 11, fontWeight: 600, border: '1px solid var(--border)', borderRadius: 8, color: 'var(--subtle)', background: 'var(--surface)', cursor: 'pointer', minHeight: isMobile ? 40 : undefined }}>
+            💬 Ask CB AI
+          </div>
+        </div>
+        {(aiMode && (aiLoading || aiResult)) && (
+          <div style={{ padding: '14px 16px', background: `${proj.color}08`, border: `1px solid ${proj.color}25`, borderRadius: 10 }}>
+            <div style={{ fontSize: 8, letterSpacing: 3, color: proj.color, textTransform: 'uppercase', marginBottom: 10 }}>
+              {aiMode === 'brief' ? 'Strategy Brief' : aiMode === 'obstacles' ? 'Obstacles & Mitigations' : 'Blue Ocean Angle'}
+            </div>
+            {aiLoading ? <ThinkingDots color={proj.color} /> : <MD text={aiResult} color={proj.color} />}
+          </div>
+        )}
+      </div>
     </div>
   );
 }
