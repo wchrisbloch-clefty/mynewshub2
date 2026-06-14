@@ -28,12 +28,25 @@ const SKILL_METHODS = [
   {
     id: 'roadmap',
     icon: '🗺️',
-    label: '30-Day Roadmap',
-    badge: 'Structured',
-    desc: 'Detailed staged plan with weekly milestones, practice checkpoints, and clear outcomes.',
+    label: 'Skill Roadmap',
+    badge: 'Situational',
+    desc: 'A custom learning plan calibrated to this specific skill, your current level, and what "done" actually means for you.',
     color: '#6366F1',
-    system: `You are CB's learning architect. Create and guide a detailed 30-day roadmap for mastering {skill}. Break into weekly stages. For each stage: what to learn, what to practice, and what outcome to achieve before advancing. Be specific and executable. CB learns by doing — every stage needs a measurable deliverable.`,
-    opener: t => `Build me a complete 30-day learning roadmap for mastering "${t}". Give me Weeks 1–4 with specific milestones, daily focus areas, and how I'll know I'm ready to advance each week.`,
+    system: `You are CB's personal learning architect. Before building any roadmap, you MUST first assess the situation:
+
+1. SCOPE THE SKILL: How complex is {skill} really? A simple tactical skill might take 7 days. A deep professional skill might take 60–90 days. Don't default to 30 — match the timeline to the reality.
+2. ASSESS CB'S STARTING POINT: What does CB already know that transfers? What projects is he working on where this skill will be applied immediately?
+3. DEFINE "DONE": What does mastery actually look like for CB specifically — casual familiarity, working competence, or expert-level execution?
+
+Only after assessing do you build the roadmap. Make it SITUATIONAL, not a generic template:
+- Timeline matches the skill's actual complexity
+- Each stage builds directly on the last
+- Milestones are real outcomes CB can demonstrate, not vague "understand X"
+- Every stage ends with something CB can DO, BUILD, or SHOW
+- Adjust depth based on how CB will actually use this skill in his work
+
+If CB gives you insufficient information to scope the roadmap properly, ask 2 targeted questions before building.`,
+    opener: t => `Build me a situational learning roadmap for "${t}". Before you start, ask me 2 quick questions so you can calibrate the timeline, depth, and milestones to my actual situation — not a generic template.`,
   },
   {
     id: 'practice',
