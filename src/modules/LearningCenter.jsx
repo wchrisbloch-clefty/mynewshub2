@@ -3,6 +3,7 @@ import { useApp } from '../App.jsx';
 import {
   KNOWN_BOOKS, TYPE_META, SESSION_MODES, ACCEPT_TYPES,
   CONTENT_TYPES, READER_GOALS, DEPTH_LEVELS, READING_PROGRESS_OPTIONS,
+  CB_IDENTITY,
 } from '../constants.js';
 import {
   buildSystem, buildReadingSystem, buildQuizPrompt, callClaude, buildApiMessages,
@@ -12,6 +13,117 @@ import {
 import MD from './shared/MD.jsx';
 import QuizMode from './shared/QuizMode.jsx';
 import { Btn, Input, Textarea, Label, Card, Badge, ThinkingDots, BottomSheet } from './shared/Common.jsx';
+
+const SKILL_METHODS = [
+  {
+    id: 'instructor',
+    icon: '🎓',
+    label: 'Pro Instructor',
+    badge: 'Recommended',
+    desc: 'Expert-led, practical teaching — real application over theory. Beginner to advanced in 30 days.',
+    color: '#00FFB2',
+    system: `You are CB's professional skill instructor with deep real-world experience in {skill}. Teach from beginner to advanced in 30 days. Focus on practical understanding, correct fundamentals, and real application — never theory or academic fluff. Connect everything to CB's actual work context and goals. Every session should produce something CB can DO immediately.`,
+    opener: t => `I want to learn "${t}" — professional instructor mode. First, ask me 2 quick questions to assess where I'm starting. Then give me Lesson 1 focused on the most critical fundamentals I need right.`,
+  },
+  {
+    id: 'roadmap',
+    icon: '🗺️',
+    label: '30-Day Roadmap',
+    badge: 'Structured',
+    desc: 'Detailed staged plan with weekly milestones, practice checkpoints, and clear outcomes.',
+    color: '#6366F1',
+    system: `You are CB's learning architect. Create and guide a detailed 30-day roadmap for mastering {skill}. Break into weekly stages. For each stage: what to learn, what to practice, and what outcome to achieve before advancing. Be specific and executable. CB learns by doing — every stage needs a measurable deliverable.`,
+    opener: t => `Build me a complete 30-day learning roadmap for mastering "${t}". Give me Weeks 1–4 with specific milestones, daily focus areas, and how I'll know I'm ready to advance each week.`,
+  },
+  {
+    id: 'practice',
+    icon: '⚒️',
+    label: 'Learn-by-Doing',
+    badge: 'Hands-On',
+    desc: 'Tasks, drills, and mini-projects that build real muscle memory through action.',
+    color: '#ff8844',
+    system: `Teach CB {skill} through practical exercises and hands-on practice only. Design simple tasks, drills, or mini-projects that force application instead of passive reading. Every response MUST end with a specific task CB can execute right now. No theory without immediate practice. Learning happens through doing.`,
+    opener: t => `Teach me "${t}" by doing — skip the theory. Give me the simplest hands-on task I can do RIGHT NOW to start building real competence. I'll complete it and report back.`,
+  },
+  {
+    id: 'realworld',
+    icon: '🌍',
+    label: 'Real-World Use',
+    badge: 'Applied',
+    desc: 'Realistic scenarios, use cases, and field examples — how it actually works when stakes are real.',
+    color: '#ff4488',
+    system: `Show CB how {skill} works in real-world situations. Give realistic examples, scenarios, and use cases — explain how to apply the skill correctly in each. Anchor everything to CB's business context and active projects. Zero abstract theory — only what works when stakes are real and deadlines exist.`,
+    opener: t => `Show me how "${t}" actually works in the real world. Give me 3 realistic scenarios I might face and walk through exactly how an expert handles each one.`,
+  },
+  {
+    id: 'expert',
+    icon: '🧠',
+    label: 'Expert Mindset',
+    badge: 'Mental Models',
+    desc: 'How top performers think, decide, and see problems differently from average practitioners.',
+    color: '#8b5cf6',
+    system: `Teach CB the expert mindset for {skill}. Explain exactly how top performers think differently — their mental models, decision frameworks, and problem-solving patterns that separate the top 1% from average. What do masters notice that novices miss? What shortcuts, heuristics, and pattern-recognition does real expertise unlock?`,
+    opener: t => `What separates the top 1% in "${t}" from average practitioners? Give me the expert mental model — how they think, what they see, and how they decide differently.`,
+  },
+  {
+    id: 'assessment',
+    icon: '📊',
+    label: 'Skill Assessment',
+    badge: 'Diagnostic',
+    desc: 'Test your current level, identify gaps, and get a prioritized improvement plan.',
+    color: '#ffcc44',
+    system: `Assess CB's current level of {skill}. Ask diagnostic questions or give tasks to measure actual understanding. Be direct about gaps — don't let CB overestimate his level. Push for specific demonstrations of understanding, not vague claims. Then build a prioritized plan to close the gaps in order of impact.`,
+    opener: t => `Test my current level on "${t}". Ask me 5 diagnostic questions to figure out exactly where I stand and what gaps I have — then give me my honest assessment and what to fix first.`,
+  },
+  {
+    id: 'readiness',
+    icon: '🚀',
+    label: 'Final Readiness',
+    badge: 'Real-World Test',
+    desc: "Evaluate whether you're ready to perform confidently when it matters.",
+    color: '#00C6E6',
+    system: `Evaluate whether CB is truly ready to use {skill} in real-world situations. Give a practical challenge or scenario. Based on the response, be completely honest: ready or not ready? If not ready, state exactly what's missing and how to close it. If ready, confirm with a harder stretch challenge. No false confidence.`,
+    opener: t => `Evaluate if I'm truly ready to use "${t}" in the real world. Give me a realistic challenge scenario. Based on how I handle it, tell me honestly — am I ready, or what do I still need to master?`,
+  },
+  {
+    id: 'feynman',
+    icon: '💡',
+    label: 'Feynman Method',
+    badge: 'Nobel Technique',
+    desc: 'Explain it simply enough to teach a child — gaps become immediately obvious.',
+    color: '#00E5A0',
+    system: `Use the Feynman Technique to help CB master {skill}. Ask CB to explain it as if teaching a 12-year-old. Identify exactly where the explanation breaks down or uses jargon as a crutch — those are real knowledge gaps. Fill each gap with a simple, precise, jargon-free explanation. Repeat until CB can explain the entire concept with perfect clarity.`,
+    opener: t => `I want to use the Feynman Technique on "${t}". Ask me to explain it as simply as I can, like I'm teaching a 12-year-old with no background. Then tell me exactly where my explanation breaks down.`,
+  },
+  {
+    id: 'deliberate',
+    icon: '🎯',
+    label: 'Deliberate Practice',
+    badge: 'Ericsson Method',
+    desc: 'Focused practice just beyond your current ability with immediate, specific feedback.',
+    color: '#ff6644',
+    system: `Apply Anders Ericsson's deliberate practice framework to {skill}. First identify CB's current performance ceiling. Design practice challenges operating just beyond comfortable ability — not too easy, not impossible. Give immediate, specific feedback on every attempt. Push into productive discomfort. Track improvement explicitly. Mastery is built at the edge of ability, not inside the comfort zone.`,
+    opener: t => `Apply deliberate practice to "${t}" with me. First identify my current ceiling. Then give me a specific practice challenge that pushes just beyond what I can comfortably do — and give me precise feedback on my performance.`,
+  },
+  {
+    id: 'firstprinciples',
+    icon: '⚗️',
+    label: 'First Principles',
+    badge: 'Musk / Aristotle',
+    desc: 'Break down to fundamental truths, then rebuild understanding from the ground up.',
+    color: '#4488ff',
+    system: `Teach CB {skill} using first principles thinking. Break down to the most fundamental, irreducible truths about this skill. Question every assumption — ask "why" until nothing remains to question. Then rebuild understanding from those foundations. Help CB understand {skill} so deeply he could reconstruct it from scratch if everything was erased.`,
+    opener: t => `Teach me "${t}" from first principles. Break it down to its most fundamental truths — then help me rebuild my understanding from the ground up, questioning every assumption along the way.`,
+  },
+];
+
+function buildSkillMethodSystem(methodId, topic, graph) {
+  const method = SKILL_METHODS.find(m => m.id === methodId) || SKILL_METHODS[0];
+  const systemText = method.system.replace(/\{skill\}/g, topic).replace(/\{topic\}/g, topic);
+  const recentTopics = Object.keys(graph?.topics || {}).slice(0, 5).join(', ');
+  const context = recentTopics ? `\n\nCB's recent learning: ${recentTopics}. Connect to these when relevant.` : '';
+  return `${CB_IDENTITY}\n\nROLE: ${systemText}${context}\n\nIMPORTANT: Be direct and action-oriented. Push for specifics. Don't accept vague answers.`;
+}
 
 const READING_QUICK_PROMPTS = {
   nonfiction:  ["What's the single most important framework?", 'Connect this to my other reading', 'How does this apply to my goals?', 'What is the author getting wrong?', 'Quiz me on this section'],
@@ -56,6 +168,7 @@ export default function LearningCenter() {
   const [quizLoading, setQuizLoading] = useState(false);
   const [searchEnabled, setSearchEnabled] = useState(false);
   const [showAnnotation, setShowAnnotation] = useState(false);
+  const [skillMethod, setSkillMethod] = useState('instructor');
   const [annotationText, setAnnotationText] = useState('');
 
   const fileRef = useRef(null);
@@ -78,7 +191,9 @@ export default function LearningCenter() {
       const apiMessages = await buildApiMessages(newHistory);
       const system = entryMode === 'reading'
         ? buildReadingSystem({ contentType, goal: readerGoal, depth: depthLevel, progress: readingProgress, content: context, graph })
-        : buildSystem(entryMode, sessionMode, context, graph);
+        : (entryMode === 'topic' && sessionMode !== 'socratic')
+          ? buildSkillMethodSystem(skillMethod, context.topic, graph)
+          : buildSystem(entryMode, sessionMode, context, graph);
       const reply = await callClaude({ system, messages: apiMessages, searchEnabled });
       setMessages(prev => [...prev, { role: 'assistant', content: reply }]);
     } catch {
@@ -122,7 +237,7 @@ export default function LearningCenter() {
           chat:      `Let's talk about "${ctx.book?.title}". Sharpest single insight most people miss, then ask what's on my mind.`,
         },
         document: "I've uploaded a document. Analyze completely, teach in CB style, connect to my mental models and goals.",
-        topic:    sMode === 'socratic' ? `Start Socratic mode on: "${ctx.topic}". First question now.` : `I want to learn about "${ctx.topic}". Master expert mode. Full course outline or specific module?`,
+        topic:    sMode === 'socratic' ? `Start Socratic mode on: "${ctx.topic}". First question now.` : (SKILL_METHODS.find(m => m.id === skillMethod)?.opener(ctx.topic) || `I want to learn about "${ctx.topic}". Master expert mode.`),
         youtube:  `YouTube: "${ctx.title}" by ${ctx.channel}. ${ctx.transcriptAvailable ? 'Transcript in context.' : 'No transcript — use your knowledge.'} Teach me now.`,
       };
       opener = eMode === 'book' ? (openers.book[sMode] || openers.book.chat) : openers[eMode];
@@ -130,7 +245,9 @@ export default function LearningCenter() {
     try {
       const system = eMode === 'reading'
         ? buildReadingSystem({ contentType: cType, goal, depth, progress, content: ctx, graph })
-        : buildSystem(eMode, sMode, ctx, graph);
+        : (eMode === 'topic' && sMode !== 'socratic')
+          ? buildSkillMethodSystem(skillMethod, ctx.topic, graph)
+          : buildSystem(eMode, sMode, ctx, graph);
       const reply = await callClaude({ system, messages: [{ role: 'user', content: opener }] });
       setMessages([{ role: 'assistant', content: reply }]);
     } catch {
@@ -445,7 +562,7 @@ export default function LearningCenter() {
       <div style={{ marginBottom: 16 }}>
         <Label>Mode</Label>
         <div style={{ display: 'flex', gap: 8 }}>
-          {[{ id: 'chat', label: 'Course Build' }, { id: 'socratic', label: '🧠 Quiz Me' }].map(m => (
+          {[{ id: 'chat', label: 'Teach Me' }, { id: 'socratic', label: '🧠 Quiz Me' }].map(m => (
             <div key={m.id} onClick={() => setSessionMode(m.id)}
               style={{ flex: 1, padding: '10px', border: `1px solid ${sessionMode === m.id ? '#ff8844' : 'var(--bord2)'}`, borderRadius: 8, textAlign: 'center', fontSize: 11, color: sessionMode === m.id ? '#ff8844' : 'var(--subtle)', cursor: 'pointer', background: sessionMode === m.id ? '#ff884408' : 'transparent' }}>
               {m.label}
@@ -453,6 +570,34 @@ export default function LearningCenter() {
           ))}
         </div>
       </div>
+
+      {sessionMode === 'chat' && (
+        <div style={{ marginBottom: 20 }}>
+          <Label>Learning Method</Label>
+          <div style={{ display: 'grid', gridTemplateColumns: isPhone ? '1fr 1fr' : 'repeat(3, 1fr)', gap: 7, marginBottom: 8 }}>
+            {SKILL_METHODS.map(m => {
+              const active = skillMethod === m.id;
+              return (
+                <div key={m.id} onClick={() => setSkillMethod(m.id)}
+                  style={{ padding: '10px 11px', borderRadius: 9, border: `1px solid ${active ? m.color : 'var(--bord2)'}`, background: active ? `${m.color}10` : 'var(--surface)', cursor: 'pointer', transition: 'all 0.12s' }}>
+                  <div style={{ fontSize: 18, marginBottom: 3 }}>{m.icon}</div>
+                  <div style={{ fontSize: 10, fontWeight: 700, color: active ? m.color : 'var(--text)', marginBottom: 2, lineHeight: 1.2 }}>{m.label}</div>
+                  {m.badge && <div style={{ fontSize: 8, color: active ? m.color : 'var(--dim)', letterSpacing: 0.8, textTransform: 'uppercase' }}>{m.badge}</div>}
+                </div>
+              );
+            })}
+          </div>
+          {(() => {
+            const sel = SKILL_METHODS.find(m => m.id === skillMethod);
+            return sel ? (
+              <div style={{ padding: '9px 12px', background: `${sel.color}08`, border: `1px solid ${sel.color}20`, borderRadius: 8, fontSize: 11, color: 'var(--subtle)', lineHeight: 1.6 }}>
+                <span style={{ color: sel.color, fontWeight: 700 }}>{sel.icon} {sel.label}:</span> {sel.desc}
+              </div>
+            ) : null;
+          })()}
+        </div>
+      )}
+
       <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 20 }}>
         {['ERCOT energy markets', 'Real estate underwriting', 'Semiconductor supply chain', 'Options basics', 'Negotiation psychology', 'Longevity & biohacking', 'AI agents', 'Dividend investing'].map(s => (
           <div key={s} onClick={() => setTopicInput(s)} style={{ fontSize: 10, padding: '4px 10px', background: 'var(--surface)', border: '1px solid var(--border)', color: 'var(--muted)', borderRadius: 20, cursor: 'pointer' }}>{s}</div>
@@ -497,8 +642,12 @@ export default function LearningCenter() {
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <div>
               <div style={{ fontSize: 9, letterSpacing: 3, color: accentColor, textTransform: 'uppercase', marginBottom: 3 }}>
-                {entryMode === 'reading' ? `${currentContentType.icon} ${currentContentType.label}` : `${sessionModeLabel?.icon} ${sessionModeLabel?.label}`}
-                {sessionTitle ? ` · ${sessionTitle.slice(0, isMobile ? 24 : 40)}${sessionTitle.length > (isMobile ? 24 : 40) ? '...' : ''}` : ''}
+                {entryMode === 'reading'
+                  ? `${currentContentType.icon} ${currentContentType.label}`
+                  : entryMode === 'topic' && sessionMode !== 'socratic'
+                    ? `${SKILL_METHODS.find(m => m.id === skillMethod)?.icon || '🎓'} ${SKILL_METHODS.find(m => m.id === skillMethod)?.label || 'Learn'}`
+                    : `${sessionModeLabel?.icon} ${sessionModeLabel?.label}`}
+                {sessionTitle ? ` · ${sessionTitle.slice(0, isMobile ? 22 : 38)}${sessionTitle.length > (isMobile ? 22 : 38) ? '...' : ''}` : ''}
               </div>
               <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
                 {entryMode === 'reading' && (
