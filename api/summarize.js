@@ -11,7 +11,7 @@
 
 const MAX_INPUT       = 3000;
 const MAX_INPUT_LARGE = 5000; // briefing-gen mode
-const TOKENS = { summary: 250, takeaways: 600, explain: 500, briefing: 400, 'briefing-gen': 700 };
+const TOKENS = { summary: 250, takeaways: 600, explain: 500, briefing: 400, 'briefing-gen': 700, chat: 300, bias: 400, related: 400, brief: 300 };
 
 // ── Body parser ──────────────────────────────────────────────────────────────
 async function readBody(req) {
@@ -41,6 +41,18 @@ function buildSystem(type, mode) {
   }
   if (mode === 'explain') {
     return `You are an expert news analyst. Explain this ${verb} for someone who wants full context.\n\nStructure your response as:\n**Background** — Context that makes this story important\n**Key Players** — Who is involved and their role\n**What's Happening** — The core development in plain language\n**Wider Impact** — Economic, political, or global implications\n**What to Watch** — One specific development to follow\n\nBe specific. Include names, numbers, and dates. No filler.`;
+  }
+  if (mode === 'chat') {
+    return 'You are MyNewsHub\'s AI news assistant. The user will provide their question along with current news headlines for context. Answer conversationally in 2-4 sentences, referencing specific headlines when helpful. Be direct and informative.';
+  }
+  if (mode === 'bias') {
+    return `Analyze the framing and perspective in this ${verb}. Note what angle it takes, what it emphasizes or omits, and what perspective it favors. Be specific and balanced in your assessment. 3-5 sentences.`;
+  }
+  if (mode === 'related') {
+    return `Provide broader context for this ${verb}. What background, history, or related trends should a reader understand? What does this connect to? 3-5 sentences.`;
+  }
+  if (mode === 'brief') {
+    return `Write a punchy one-paragraph brief on this ${verb}. Lead with the most important fact, include key names and numbers, end with what to watch. No headers.`;
   }
   return `Summarize this ${verb} in 2-3 concise sentences. Be direct and factual. Skip filler like "this article discusses" — start with the actual content.`;
 }
@@ -210,7 +222,7 @@ export default async function handler(req, res) {
     return res.status(400).json({ error: 'title required' });
   }
 
-  const validModes = ['summary', 'takeaways', 'explain', 'briefing', 'briefing-gen'];
+  const validModes = ['summary', 'takeaways', 'explain', 'briefing', 'briefing-gen', 'chat', 'bias', 'related', 'brief'];
   const m = validModes.includes(mode) ? mode : 'summary';
   const maxTokens = TOKENS[m] || 250;
   const maxInput = m === 'briefing-gen' ? MAX_INPUT_LARGE : MAX_INPUT;
