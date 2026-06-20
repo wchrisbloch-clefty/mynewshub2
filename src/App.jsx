@@ -1071,8 +1071,8 @@ body:not(.dark) .pill-bar{
   padding:2px 7px;border-radius:2px;flex-shrink:0;
 }
 /* Editorial: green/red on dark navy pops clearly */
-.pill-chg.up{color:#4ade80;background:rgba(74,222,128,0.12);}
-.pill-chg.down{color:#f87171;background:rgba(248,113,113,0.12);}
+.pill-chg.up{color:#00B37E;background:rgba(0,179,126,0.12);}
+.pill-chg.down{color:#E5383B;background:rgba(229,56,59,0.12);}
 /* Dark mode: pill bar needs stronger contrast — navy bg can blend into dark page */
 .dark .pill-bar{background:rgba(15,23,42,0.98);border-bottom-color:rgba(255,255,255,0.1);}
 .dark .pill-label{color:rgba(255,255,255,0.72);}
@@ -1086,7 +1086,7 @@ body:not(.dark) .pill-bar{
 ═══════════════════════════════════════════ */
 .breaking-bar{
   background:var(--accent);
-  height:28px;display:flex;align-items:center;overflow:hidden;
+  height:22px;display:flex;align-items:center;overflow:hidden;
   border-bottom:1px solid rgba(0,0,0,0.15);
 }
 .breaking-bar.hidden{display:none;}
@@ -1101,13 +1101,13 @@ body:not(.dark) .pill-bar{
 .breaking-ticker{flex:1;overflow:hidden;margin:0 12px;}
 .breaking-ticker-inner{
   display:inline-flex;gap:60px;
-  animation:ticker-scroll 80s linear infinite;white-space:nowrap;
+  animation:ticker-scroll 72s linear infinite;white-space:nowrap;
 }
 .breaking-ticker-inner:hover{animation-play-state:paused;}
 @keyframes ticker-scroll{0%{transform:translateX(0);}100%{transform:translateX(-50%);}}
 .breaking-item{
   font-family:var(--font-sans);
-  font-size:11px;color:rgba(255,255,255,0.95);font-weight:600;
+  font-size:11px;color:#ffffff;font-weight:600;
   cursor:pointer;display:inline-flex;align-items:center;gap:8px;
 }
 .breaking-item:hover{color:#fff;text-decoration:underline;}
@@ -1203,7 +1203,7 @@ body:not(.dark) .pill-bar{
    PAGE SHELL
 ═══════════════════════════════════════════ */
 .page{max-width:1400px;margin:0 auto;padding:28px 24px;}
-.page-grid{display:grid;grid-template-columns:1fr 320px;gap:32px;align-items:start;}
+.page-grid{display:grid;grid-template-columns:1fr 280px;gap:40px;align-items:start;}
 .feed-col{display:flex;flex-direction:column;gap:0;}
 
 /* Page header row: label + customize button */
@@ -1237,42 +1237,26 @@ body:not(.dark) .pill-bar{
 ═══════════════════════════════════════════ */
 .fc{
   background:transparent;border:none;
-  padding:20px 0 20px 16px;cursor:pointer;
+  padding:18px 0;cursor:pointer;
   transition:background 0.15s;border-radius:0;
   border-bottom:1px solid var(--border2);
-  /* BBC-style: left category accent rule — 3px, muted by default */
-  border-left:3px solid var(--border2);
-  margin-left:0;
 }
 .fc:last-child{border-bottom:none;}
-.fc:hover{
-  background:var(--surface2);
-  border-left-color:var(--accent); /* accent rule lights up on hover */
-}
+.fc:hover{background:var(--surface2);}
 .fc:active{transform:scale(0.999);}
-
-/* Category-specific left rule colors — BBC section identity */
-.fc.general:hover{border-left-color:var(--navy);}
-.fc.sports:hover{border-left-color:#b45309;}
-.fc.business:hover{border-left-color:#1a6b2a;}
-.fc.finance:hover{border-left-color:#6d28d9;}
-.fc.bloom:hover{border-left-color:#0369a1;}
-.fc.popculture:hover{border-left-color:#be185d;}
-.fc.comedy:hover{border-left-color:#7c3aed;}
 
 .fc-meta{display:flex;align-items:center;gap:8px;margin-bottom:10px;flex-wrap:wrap;}
 .fc-source{
-  /* BBC: source label = ALL-CAPS, small, high-contrast */
   font-family:var(--font-sans);
-  font-size:10px;font-weight:800;letter-spacing:0.08em;text-transform:uppercase;
+  font-size:11px;font-weight:700;letter-spacing:0.06em;text-transform:uppercase;
 }
 .fc-dot{color:var(--text4);font-size:10px;}
-.fc-date{font-size:10px;color:var(--text3);font-variant-numeric:tabular-nums;margin-left:auto;white-space:nowrap;}
+.fc-date{font-size:11px;color:var(--text3);font-variant-numeric:tabular-nums;margin-left:auto;white-space:nowrap;}
 .fc-date-fresh{color:#16a34a;font-weight:700;}
 .fc-date-recent{color:var(--accent);}
 .fc-topic{
-  font-size:9px;font-weight:700;border-radius:2px;padding:2px 7px;
-  letter-spacing:0.06em;text-transform:uppercase;font-family:var(--font-sans);
+  font-size:10px;font-weight:700;border-radius:20px;padding:2px 9px;
+  letter-spacing:0.03em;text-transform:uppercase;font-family:var(--font-sans);
 }
 .fc-alert-badge{
   font-size:9px;font-weight:900;background:var(--accent);color:#fff;
@@ -1283,12 +1267,12 @@ body:not(.dark) .pill-bar{
 
 .fc-body{display:flex;gap:16px;align-items:flex-start;}
 .fc-thumb{
-  width:108px;height:72px;border-radius:var(--radius-sm);
+  width:160px;height:107px;border-radius:4px;
   object-fit:cover;flex-shrink:0;background:var(--surface2);
 }
 .fc-thumb-ph{
-  width:108px;height:72px;border-radius:var(--radius-sm);flex-shrink:0;
-  display:flex;align-items:center;justify-content:center;font-size:20px;background:var(--surface2);
+  width:160px;height:107px;border-radius:4px;flex-shrink:0;
+  display:flex;align-items:center;justify-content:center;font-size:24px;background:var(--surface2);
 }
 .fc-text{flex:1;min-width:0;}
 .fc-title{
@@ -1319,6 +1303,13 @@ body:not(.dark) .pill-bar{
 .fc-act.saved{border-color:var(--amber);color:var(--amber);background:#fffbeb;}
 .fc-act.ai-on{border-color:#7c3aed;color:#7c3aed;background:#f5f3ff;}
 .fc-act.disc-on{border-color:#0ea5e9;color:#0ea5e9;background:#f0f9ff;}
+.fc-save-btn{display:flex;align-items:center;gap:5px;}
+.fc-ellipsis-btn{padding:4px 9px;font-size:16px;letter-spacing:1px;line-height:1;}
+.fc-expanded-actions{
+  display:flex;align-items:center;gap:6px;flex-wrap:wrap;
+  padding-top:8px;width:100%;
+  animation:fade-in 0.12s ease-out;
+}
 .fc-read-link{
   margin-left:auto;font-size:10px;color:var(--text3);
   text-decoration:none;font-weight:600;display:flex;align-items:center;gap:2px;
@@ -1365,7 +1356,10 @@ body:not(.dark) .pill-bar{
    No card boxes. Section labels + list only.
    Scoreboard keeps its box (it's a widget).
 ═══════════════════════════════════════════ */
-.sidebar{display:flex;flex-direction:column;gap:28px;min-width:0;}
+.sidebar{
+  display:flex;flex-direction:column;gap:24px;min-width:0;
+  border-left:1px solid var(--border2);padding-left:28px;
+}
 
 /* Ghost sidebar section */
 .gs-section{display:flex;flex-direction:column;gap:0;}
@@ -1410,8 +1404,8 @@ body:not(.dark) .pill-bar{
   padding-bottom:9px;border-bottom:2px solid var(--border);margin-bottom:12px;
 }
 .sidebar-sec-label{
-  font-size:9px;font-weight:800;color:var(--text3);
-  text-transform:uppercase;letter-spacing:0.12em;
+  font-size:10px;font-weight:800;color:var(--text3);
+  text-transform:uppercase;letter-spacing:0.14em;
 }
 .sidebar-sec-action{
   background:none;border:none;color:var(--accent);cursor:pointer;
@@ -1458,8 +1452,8 @@ body:not(.dark) .pill-bar{
 }
 .trend-row:hover{opacity:0.7;}
 .trend-num{
-  font-size:16px;font-weight:900;color:var(--text4);
-  min-width:20px;line-height:1;flex-shrink:0;font-variant-numeric:tabular-nums;
+  font-size:15px;font-weight:900;color:var(--accent);
+  min-width:18px;line-height:1.3;flex-shrink:0;font-variant-numeric:tabular-nums;
 }
 .trend-body{flex:1;min-width:0;}
 .trend-title{
@@ -2002,17 +1996,18 @@ body:not(.dark) .pill-bar{
 }
 .gn-card:hover{opacity:0.9;}
 .gn-card-img{
-  width:100%;aspect-ratio:16/7;
+  width:100%;height:200px;
   background-size:cover;background-position:center top;
-  border-radius:6px;background-color:var(--surface2);
+  border-radius:4px;background-color:var(--surface2);
 }
 .gn-card-img-ph{
-  width:100%;aspect-ratio:16/7;
-  background:var(--surface2);border-radius:6px;
+  width:100%;height:200px;
+  background:var(--surface2);border-radius:4px;
 }
 .gn-card-title{
-  font-size:15px;font-weight:800;line-height:1.28;
-  letter-spacing:-0.3px;color:var(--text);margin:0;overflow-wrap:break-word;
+  font-family:var(--font-serif);
+  font-size:16px;font-weight:700;line-height:1.25;
+  letter-spacing:-0.2px;color:var(--text);margin:0;overflow-wrap:break-word;
   display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden;
 }
 .gn-card-meta{
@@ -3005,12 +3000,19 @@ body{overscroll-behavior-y:contain;}
   -webkit-overflow-scrolling:touch;
   scroll-snap-type:x proximity;
   border-top:1px solid var(--border2);
+  position:relative;
 }
 .chip-bar::-webkit-scrollbar{display:none;}
+.chip-bar-wrap{position:relative;}
+.chip-bar-wrap::after{
+  content:'';position:absolute;right:0;top:0;bottom:0;width:40px;
+  background:linear-gradient(to left,var(--bg) 0%,transparent 100%);
+  pointer-events:none;z-index:2;
+}
 .chip{
   flex-shrink:0;scroll-snap-align:start;
   background:none;border:none;
-  padding:8px 14px;margin:0 2px;
+  padding:7px 14px;margin:0 2px;
   font-size:13px;font-weight:600;font-family:inherit;
   color:var(--text3);cursor:pointer;white-space:nowrap;
   border-radius:20px;min-height:32px;
@@ -3019,7 +3021,8 @@ body{overscroll-behavior-y:contain;}
   -webkit-tap-highlight-color:transparent;
 }
 .chip:active{background:var(--surface2);}
-.chip.active{color:#fff;font-weight:700;}
+.chip.active{color:#fff;font-weight:700;background:#1a1a1a;}
+.dark .chip.active{background:rgba(255,255,255,0.15);}
 
 /* Mobile search slide-in */
 .mobile-search{display:none;padding:8px 12px;border-top:1px solid var(--border2);}
@@ -4096,6 +4099,29 @@ kbd{display:inline-block;padding:1px 5px;border:1px solid var(--border);border-r
 /* ═══ v36: RECOMMENDATIONS / FOR YOU ═══ */
 .rec-section{border-top:2px solid var(--border);}
 .sidebar-briefing-wrap{margin-top:20px;}
+.briefing-sb-row{
+  display:flex;align-items:flex-start;gap:10px;
+  padding:7px 0;border-bottom:1px solid var(--border2);
+  cursor:pointer;transition:opacity 0.12s;
+}
+.briefing-sb-row:last-child{border-bottom:none;}
+.briefing-sb-row:hover{opacity:0.72;}
+.briefing-sb-num{
+  font-size:14px;font-weight:900;color:var(--accent);
+  min-width:18px;line-height:1.3;flex-shrink:0;font-variant-numeric:tabular-nums;
+}
+.briefing-sb-text{
+  font-size:12px;font-weight:500;color:var(--text2);line-height:1.4;
+  display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;
+}
+.briefing-sb-cat{font-style:normal;font-weight:800;color:var(--text);}
+.briefing-sb-body{font-size:12px;color:var(--text3);line-height:1.5;cursor:pointer;}
+.briefing-sb-body:hover{color:var(--text2);}
+.briefing-sb-gen{
+  font-size:11px;color:var(--accent);background:none;border:none;
+  cursor:pointer;padding:6px 0;font-family:inherit;font-weight:600;
+}
+.briefing-sb-gen:hover{text-decoration:underline;}
 .rec-section-sub{font-size:10px;color:var(--text3);margin-left:6px;}
 .rec-row{
   display:flex;align-items:flex-start;gap:10px;
@@ -4448,6 +4474,9 @@ kbd{display:inline-block;padding:1px 5px;border:1px solid var(--border);border-r
   .nav-btn,.nav-btn-blue{min-height:36px;}
   .pc-subtab{min-height:40px;padding:8px 14px;}
   .fc-title{font-size:15px;line-height:1.35;}
+  .fc-thumb,.fc-thumb-ph{width:96px;height:72px;border-radius:4px;float:right;margin-left:12px;margin-bottom:4px;}
+  .fc-body{display:block;overflow:hidden;}
+  .fc-body::after{content:'';display:table;clear:both;}
 }
 
 /* ── TOP OF HOUR STRIP ─────────────────────────────────────────── */
@@ -4807,7 +4836,7 @@ function FeedCard({a, cat, isSaved, onSave, onRead, relatedSources, isRead, user
   const [showDisc, setShowDisc] = useState(false);
   const [disc, setDisc] = useState(null);
   const [loadingDisc, setLoadingDisc] = useState(false);
-  const [mobileActionsOpen, setMobileActionsOpen] = useState(false);
+  const [actionsOpen, setActionsOpen] = useState(false);
   const isMobile = typeof window !== 'undefined' && window.innerWidth <= 640;
   const cc = CATS[cat]||CATS.general;
   const topKw = a.matchedKw?.[0]||null;
@@ -4984,50 +5013,32 @@ function FeedCard({a, cat, isSaved, onSave, onRead, relatedSources, isRead, user
         </div>
       )}
       <div className="fc-actions" onClick={e=>e.stopPropagation()}>
-        <button className={`fc-act ${isSaved?'saved':''}`} onClick={e=>{e.stopPropagation();onSave(a);}}>
-          {isSaved?'★ Saved':'☆ Save'}
+        <button className={`fc-act fc-save-btn ${isSaved?'saved':''}`} onClick={e=>{e.stopPropagation();onSave(a);}}>
+          {isSaved
+            ? <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" strokeWidth="2"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg>
+            : <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg>
+          }
+          {isSaved ? 'Saved' : 'Save'}
         </button>
-        {isMobile ? (
-          <>
-            <button className="fc-act fc-mobile-more-btn" onClick={e=>{e.stopPropagation();setMobileActionsOpen(o=>!o);}}>
-              {mobileActionsOpen ? '✕ Less' : '⋯ More'}
-            </button>
-            {mobileActionsOpen && (
-              <>
-                <button className={`fc-act ${aiState!=='closed'?'ai-on':''}`} onClick={handleAI} disabled={loadingAI}>
-                  ✦ {loadingAI?'Thinking...':aiState==='closed'?'AI Summary':'Hide AI'}
-                </button>
-                <button className={`fc-act ${showDisc?'disc-on':''}`} onClick={handleDisc} disabled={loadingDisc}>
-                  💬 {loadingDisc?'Searching...':showDisc?'Hide':'Pulse'}
-                </button>
-                <button className={`fc-act ${showExplain?'explain-on':''}`} onClick={handleExplain} disabled={loadingExplain}>
-                  🧠 {loadingExplain?'Analyzing…':showExplain?'Hide':'Explain'}
-                </button>
-                {navigator.share !== undefined && (
-                  <button className="fc-act" onClick={handleShare} title="Share article">↗ Share</button>
-                )}
-                <AudioListen text={`${a.title}. ${a.desc || ''}`} title={null} />
-              </>
-            )}
-          </>
-        ) : (
-          <>
+        <button className="fc-act fc-ellipsis-btn" onClick={e=>{e.stopPropagation();setActionsOpen(o=>!o);}}>
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><circle cx="5" cy="12" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="19" cy="12" r="2"/></svg>
+        </button>
+        {actionsOpen && (
+          <div className="fc-expanded-actions">
             <button className={`fc-act ${aiState!=='closed'?'ai-on':''}`} onClick={handleAI} disabled={loadingAI}>
               ✦ {loadingAI?'Thinking...':aiState==='closed'?'AI Summary':'Hide AI'}
             </button>
             <button className={`fc-act ${showDisc?'disc-on':''}`} onClick={handleDisc} disabled={loadingDisc}>
-              💬 {loadingDisc?'Searching...':showDisc?'Hide':'Pulse'}
+              {loadingDisc?'Searching...':showDisc?'Hide Pulse':'Pulse'}
             </button>
             <button className={`fc-act ${showExplain?'explain-on':''}`} onClick={handleExplain} disabled={loadingExplain}>
-              🧠 {loadingExplain?'Analyzing…':showExplain?'Hide':'Explain'}
+              {loadingExplain?'Analyzing…':showExplain?'Hide':'Explain'}
             </button>
             {navigator.share !== undefined && (
-              <button className="fc-act" onClick={handleShare} title="Share article">
-                ↗ Share
-              </button>
+              <button className="fc-act" onClick={handleShare}>Share ↗</button>
             )}
             <AudioListen text={`${a.title}. ${a.desc || ''}`} title={null} />
-          </>
+          </div>
         )}
         <a className="fc-read-link" href={a.link} target="_blank" rel="noreferrer" onClick={e=>e.stopPropagation()}>
           {readMins ? `${readMins} min · ` : ''}Full Story ↗
@@ -5279,7 +5290,7 @@ Output ONLY the paragraph followed by the bullets. No headers, no labels, no clo
 // Generates its own copy independently from the full briefing — they auto-
 // share state via the same fetchAISummary cache when the prompt matches.
 // Time-aware: regenerates if >90min stale, like the full version.
-function BriefingTeaser({arts, excludeCats, onOpenFull}) {
+function BriefingTeaser({arts, excludeCats, onOpenFull, compact}) {
   const effectiveExclude = excludeCats || BRIEFING_EXCLUDE_CATS;
   const [body, setBody]       = useState('');
   const [bullets, setBullets] = useState([]);
@@ -5387,11 +5398,41 @@ OUTPUT: 3-sentence paragraph followed by exactly 3 bullets (- markers). No heade
     return `${Math.floor(age/60)}h ago`;
   }, [ts]);
 
+  if (compact) {
+    return (
+      <div className="sidebar-section">
+        <div className="sidebar-sec-head">
+          <button className="sidebar-sec-collapse" style={{cursor:'default',userSelect:'none'}}>
+            <span className="sidebar-sec-label">Today's Briefing</span>
+          </button>
+          <button className="sidebar-sec-action" onClick={onOpenFull}>View all →</button>
+        </div>
+        {loading && !body && <div style={{fontSize:'11px',color:'var(--text3)',fontStyle:'italic',padding:'4px 0'}}>Synthesizing headlines…</div>}
+        {error && <div style={{fontSize:'11px',color:'var(--text3)',padding:'4px 0'}}>{error}</div>}
+        {bullets.length > 0
+          ? bullets.slice(0, 5).map((b, i) => (
+              <div key={i} className="briefing-sb-row" onClick={onOpenFull}>
+                <span className="briefing-sb-num">{i + 1}</span>
+                <span className="briefing-sb-text" dangerouslySetInnerHTML={{__html: b.replace(/\*\*([^*]+)\*\*/g,'<strong>$1</strong>').replace(/^[A-Za-z &]+:\s*/,'<em class="briefing-sb-cat">$&</em>')}}/>
+              </div>
+            ))
+          : body && (
+              <p className="briefing-sb-body" onClick={onOpenFull}
+                dangerouslySetInnerHTML={{__html: body.replace(/\*\*([^*]+)\*\*/g,'<strong>$1</strong>').slice(0,220)+'…'}}/>
+            )
+        }
+        {!loading && !body && !error && bullets.length === 0 && (
+          <button className="briefing-sb-gen" onClick={onOpenFull}>Generate today's briefing →</button>
+        )}
+      </div>
+    );
+  }
+
   return (
     <section className="briefing-teaser">
       <div className="briefing-teaser-head">
         <div className="briefing-teaser-label-row">
-          <span className="briefing-teaser-label">☕ Today's Briefing</span>
+          <span className="briefing-teaser-label">Today's Briefing</span>
           <span className="briefing-teaser-date">{dateStr}</span>
           {tsLabel && <span className="briefing-teaser-ts">Updated {tsLabel}</span>}
         </div>
@@ -5413,7 +5454,7 @@ OUTPUT: 3-sentence paragraph followed by exactly 3 bullets (- markers). No heade
       )}
       <div className="briefing-teaser-footer">
         <span className="briefing-teaser-sources">
-          ☕ {BRIEFING_PRIORITY_SOURCES.join(' · ')}
+          {BRIEFING_PRIORITY_SOURCES.join(' · ')}
         </span>
         <button className="briefing-teaser-cta-link" onClick={onOpenFull}>Full briefing →</button>
       </div>
@@ -6753,6 +6794,7 @@ function TopBar({tab, setTab, search, setSearch, dark, setDark,
             />
           </div>
         )}
+        <div className="chip-bar-wrap">
         <div className="chip-bar" ref={chipBarRef}>
           {MOBILE_CHIPS.map(c => {
             const isActive = tab === c.key;
@@ -6765,6 +6807,7 @@ function TopBar({tab, setTab, search, setSearch, dark, setDark,
               </button>
             );
           })}
+        </div>
         </div>
       </div>
     </div>
