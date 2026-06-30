@@ -512,6 +512,25 @@ async function fetchAllScores() {
   }));
   return results;
 }
+// v46: An ESPN league counts as "active / in-season" only when it has a game
+// that is live, finished within ~2 days, or scheduled within ~1.5 days. Out-of-
+// season leagues (e.g. NCAA football in summer) return games weeks away — those
+// are filtered out so the scoreboard never shows dormant leagues like NCAA.
+function isGameActive(g) {
+  if (!g) return false;
+  if (g.state === 'in') return true;
+  const t = new Date(g.date).getTime();
+  if (isNaN(t)) return g.state === 'post';
+  const now = Date.now();
+  if (g.state === 'post') return now - t < 48 * 3600 * 1000;  // final within 2d
+  if (g.state === 'pre')  return t - now < 36 * 3600 * 1000;  // upcoming within 1.5d
+  return Math.abs(now - t) < 36 * 3600 * 1000;
+}
+// Returns only the LEAGUES that currently have at least one active game.
+function activeLeagues(scores) {
+  return LEAGUES.filter(L => (scores[L.key] || []).some(isGameActive));
+}
+
 function favoriteIn(game) {
   if (!game) return null;
   const txt=((game.homeName||'')+' '+(game.awayName||'')+' '+(game.short||'')+' '+(game.name||'')).toLowerCase();
@@ -1322,6 +1341,18 @@ body:not(.dark) .pill-bar{
 .fc-summary{background:var(--surface2);border-radius:8px;padding:10px 12px;}
 .fc-summary-lbl{font-size:9px;font-weight:700;color:#7c3aed;text-transform:uppercase;letter-spacing:0.08em;margin-bottom:5px;}
 .fc-summary-text{font-size:12px;color:var(--text2);line-height:1.6;}
+/* v46: AI skeleton + error/retry so the panel never renders blank */
+@keyframes shimmer{0%{background-position:-200px 0;}100%{background-position:calc(200px + 100%) 0;}}
+.fc-ai-skeleton{display:flex;flex-direction:column;gap:6px;padding:2px 0;}
+.fc-ai-skeleton span{display:block;height:9px;width:100%;border-radius:4px;
+  background:linear-gradient(90deg,var(--border2) 0px,var(--surface) 80px,var(--border2) 160px);
+  background-size:200px 100%;animation:shimmer 1.2s ease-in-out infinite;}
+.fc-ai-error{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;}
+.fc-ai-error-msg{font-size:11px;color:var(--text3);line-height:1.4;}
+.fc-ai-retry{font-size:11px;font-weight:700;color:#7c3aed;background:var(--surface);
+  border:1px solid #7c3aed;border-radius:14px;padding:3px 12px;cursor:pointer;
+  font-family:inherit;flex-shrink:0;transition:background 0.12s,color 0.12s;}
+.fc-ai-retry:hover{background:#7c3aed;color:#fff;}
 .fc-takeaways{background:var(--surface2);border-radius:8px;padding:12px 14px;border-left:2px solid #7c3aed;}
 .fc-takeaways-lbl{font-size:9px;font-weight:700;color:#4f46e5;text-transform:uppercase;letter-spacing:0.08em;margin-bottom:8px;}
 .takeaways-list{display:flex;flex-direction:column;gap:8px;}
@@ -1490,8 +1521,13 @@ body:not(.dark) .pill-bar{
   display:flex;align-items:center;justify-content:space-between;
 }
 .sb-box-title{font-size:11px;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:0.07em;}
-.sb-box-sub{font-size:9px;color:var(--text3);text-transform:uppercase;letter-spacing:0.05em;}
-.sb-empty{padding:12px 14px;font-size:11px;color:var(--text3);text-align:center;font-style:italic;}
+.sb-box-sub{font-size:9px;color:var(--text3);text-transform:uppercase;letter-spacing:0.05em;display:flex;align-items:center;gap:8px;}
+.sb-box-head-btn{width:100%;background:none;border:none;border-bottom:1px solid var(--border2);cursor:pointer;font-family:inherit;}
+.sb-box-head-btn:hover{background:var(--bg);}
+.sb-collapse-chev{font-size:10px;color:var(--text3);}
+.sb-live-pill{background:var(--red);color:#fff;border-radius:10px;padding:1px 7px;font-size:9px;font-weight:800;letter-spacing:0.04em;animation:score-pulse 2s ease-in-out infinite;}
+.sb-league-live{color:var(--red);font-weight:800;font-size:9px;}
+.sb-empty{padding:14px;font-size:11px;color:var(--text3);text-align:center;font-style:italic;}
 .sb-league{border-bottom:1px solid var(--border2);}
 .sb-league:last-child{border-bottom:none;}
 .sb-league-head{
@@ -3042,7 +3078,7 @@ body{overscroll-behavior-y:contain;}
   z-index:400;height:56px;
   padding-bottom:env(safe-area-inset-bottom, 0);
 }
-.bottom-tabs-inner{display:grid;grid-template-columns:repeat(4,1fr);height:100%;}
+.bottom-tabs-inner{display:grid;grid-template-columns:repeat(5,1fr);height:100%;}
 .bottom-tab{
   background:none;border:none;
   display:flex;flex-direction:column;align-items:center;justify-content:center;
@@ -4623,6 +4659,113 @@ kbd{display:inline-block;padding:1px 5px;border:1px solid var(--border);border-r
   .trending-section::-webkit-scrollbar{display:none;}
   .trending-section .trending-chip{flex-shrink:0;}
 }
+
+/* ═══════════ v46 — SOURCES PAGE ═══════════ */
+.sources-hero{
+  display:flex;align-items:flex-end;justify-content:space-between;gap:16px;
+  padding:8px 0 18px;border-bottom:1px solid var(--border2);margin-bottom:20px;flex-wrap:wrap;
+}
+.sources-title{font-family:var(--font-serif);font-size:30px;font-weight:800;color:var(--text);margin:0;letter-spacing:-0.5px;}
+.sources-sub{font-size:12px;color:var(--text3);margin:4px 0 0;}
+.sources-manage-btn{
+  background:var(--accent);color:#fff;border:none;border-radius:8px;
+  padding:9px 16px;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit;
+  transition:opacity 0.12s;white-space:nowrap;
+}
+.sources-manage-btn:hover{opacity:0.88;}
+.sources-search{
+  width:100%;background:var(--surface);border:1px solid var(--border);border-radius:10px;
+  padding:11px 14px;font-size:13px;font-family:inherit;color:var(--text);margin-bottom:22px;
+  -webkit-appearance:none;
+}
+.sources-search:focus{outline:none;border-color:var(--accent);}
+.sources-cat-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:18px;}
+.sources-cat{background:var(--surface);border:1px solid var(--border);border-radius:12px;overflow:hidden;}
+.sources-cat-head{
+  width:100%;display:flex;align-items:center;gap:9px;
+  padding:12px 14px;background:var(--surface2);border:none;border-left:4px solid var(--accent);
+  cursor:pointer;font-family:inherit;text-align:left;transition:background 0.12s;
+}
+.sources-cat-head:hover{background:var(--bg);}
+.sources-cat-emoji{font-size:16px;}
+.sources-cat-label{font-size:13px;font-weight:800;text-transform:uppercase;letter-spacing:0.04em;}
+.sources-cat-count{margin-left:auto;font-size:11px;font-weight:800;color:var(--text3);background:var(--bg);border-radius:10px;padding:2px 9px;}
+.sources-list{display:flex;flex-direction:column;}
+.source-row{
+  display:flex;align-items:center;gap:10px;padding:10px 14px;
+  border-top:1px solid var(--border2);text-decoration:none;color:var(--text);
+  transition:background 0.1s;
+}
+.source-row:first-child{border-top:none;}
+.source-row:hover{background:var(--surface2);}
+.source-row.source-off{opacity:0.5;}
+.source-status{width:7px;height:7px;border-radius:50%;flex-shrink:0;}
+.source-status.on{background:var(--green,#16a34a);box-shadow:0 0 0 3px rgba(22,163,74,0.14);}
+.source-status.off{background:var(--text4);}
+.source-name{font-size:13px;font-weight:600;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.source-count{font-size:10px;font-weight:800;color:var(--accent);background:var(--surface2);border-radius:8px;padding:1px 7px;flex-shrink:0;}
+.source-ext{font-size:11px;color:var(--text3);flex-shrink:0;}
+
+/* ═══════════ v46 — "RIGHT NOW" HOMEPAGE BAND ═══════════ */
+.right-now-band{
+  display:flex;align-items:center;gap:12px;flex-wrap:wrap;
+  padding:10px 14px;margin-bottom:18px;border-radius:10px;
+  background:linear-gradient(90deg,rgba(229,56,59,0.08),transparent);
+  border:1px solid var(--border2);border-left:3px solid var(--red,#E5383B);
+}
+.rn-live{display:inline-flex;align-items:center;gap:6px;font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:0.08em;color:var(--red,#E5383B);}
+.rn-live-dot{width:8px;height:8px;border-radius:50%;background:var(--red,#E5383B);animation:score-pulse 1.6s ease-in-out infinite;}
+.rn-fresh{font-size:12px;color:var(--text2);font-weight:600;}
+.rn-fresh strong{color:var(--text);font-weight:800;}
+.rn-updated{margin-left:auto;font-size:11px;color:var(--text3);}
+
+/* ═══════════ v46 — STICKY SHRINK HEADER ═══════════ */
+.topbar-wrap{transition:box-shadow 0.2s;}
+.topbar-wrap.shrunk .pill-bar{max-height:0;padding-top:0;padding-bottom:0;overflow:hidden;opacity:0;transition:all 0.22s ease;}
+.topbar-wrap.shrunk .logo-tag,.topbar-wrap.shrunk .mobile-logo-sub{display:none;}
+.topbar-wrap.shrunk .nav-bar-inner{padding-top:6px;padding-bottom:6px;}
+.topbar-wrap.shrunk{box-shadow:0 2px 12px rgba(0,0,0,0.08);}
+.pill-bar{transition:max-height 0.22s ease,opacity 0.22s ease;}
+
+/* ═══════════ v46 — SUB-TAB / TOPIC PILLS (mobile-tactile) ═══════════ */
+@media(max-width:768px){
+  .en-subtabs,.pc-subtabs,.sport-tabs{
+    flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none;
+    -webkit-overflow-scrolling:touch;scroll-snap-type:x proximity;
+    gap:8px;padding-bottom:6px;
+  }
+  .en-subtabs::-webkit-scrollbar,.pc-subtabs::-webkit-scrollbar,.sport-tabs::-webkit-scrollbar{display:none;}
+  .en-subtab,.pc-subtab,.sport-tab{flex-shrink:0;scroll-snap-align:start;transition:transform 0.12s,background 0.15s;}
+  .en-subtab:active,.pc-subtab:active,.sport-tab:active{transform:scale(0.94);}
+}
+
+/* ═══════════ v46 — MOBILE FOOTPRINT TIGHTENING ═══════════ */
+@media(max-width:640px){
+  .pill-bar{padding:5px 0;}
+  .pill-bar-inner{gap:7px;padding:0 12px;}
+  .pill{padding:4px 9px;}
+  .mobile-header{padding:7px 14px;}
+  .mobile-logo{font-size:18px;}
+  .mobile-logo-sub{font-size:9px;}
+  .mobile-actions{gap:4px;}
+  .mobile-icon-btn{padding:7px;}
+  .chip-bar{height:40px;}
+  .chip{padding:6px 13px;min-height:30px;}
+  .bottom-tab-label{font-size:8.5px;}
+  .bottom-tab-icon{width:19px;height:19px;}
+  .sources-title{font-size:24px;}
+  .sources-cat-grid{grid-template-columns:1fr;gap:14px;}
+}
+
+/* ═══════════ v46 — CARD MICRO-ANIM ═══════════ */
+.gn-card{transition:transform 0.16s ease,box-shadow 0.16s ease;}
+.gn-card:hover{transform:translateY(-2px);box-shadow:0 6px 20px rgba(0,0,0,0.10);}
+.gn-card-img{overflow:hidden;}
+.gn-lead-img{transition:transform 0.5s ease;}
+.gn-lead:hover .gn-lead-img{transform:scale(1.03);}
+.gn-lead{overflow:hidden;}
+.fc-thumb{transition:transform 0.3s ease;}
+.fc:hover .fc-thumb{transform:scale(1.03);}
 `;
 
 
@@ -4748,7 +4891,7 @@ function ActiveScoresBar({ scores, onGoToSports }) {
   const activeLeagues = useMemo(() => {
     return Object.entries(scores)
       .map(([key, games]) => {
-        const active = (games || []).filter(g => g.state === 'in' || g.state === 'post');
+        const active = (games || []).filter(isGameActive);
         return { key, games: active.slice(0, 4) };
       })
       .filter(l => l.games.length > 0);
@@ -4845,27 +4988,43 @@ function FeedCard({a, cat, isSaved, onSave, onRead, relatedSources, isRead, user
   const clusterCount = a._clusterSize > 1 ? a._clusterSize : 0;
   const whyLines = whyItMatters(a, userKw, userTeams);
 
-  const handleAI = async (e) => {
+  // v46: Hardened AI fetch — never leaves a blank panel. Tracks whether *any*
+  // content came back; if not, surfaces an explicit error with a retry button
+  // instead of rendering an empty white box (the silent-failure bug).
+  const runAI = async () => {
+    setAiErr('');
+    setLoadingAI(true);
+    const tasks = [];
+    if (!summary)   tasks.push(fetchAISummary({type:'article',title:a.title,content:a.desc||'',mode:'summary'}).then(r=>({k:'s',...r})));
+    if (!takeaways) tasks.push(fetchAISummary({type:'article',title:a.title,content:a.desc||'',mode:'takeaways'}).then(r=>({k:'t',...r})));
+    let gotAny = false, lastErr = '';
+    try {
+      const results = await Promise.all(tasks);
+      for (const r of results) {
+        if (r.summary) {
+          gotAny = true;
+          if (r.k==='s') setSummary(r.summary); else setTakeaways(r.summary);
+        } else if (r.error) {
+          lastErr = r.error;
+        }
+      }
+    } catch { lastErr = 'Network error'; }
+    if (!gotAny && !summary && !takeaways) setAiErr(lastErr || 'AI summary is unavailable right now.');
+    setLoadingAI(false);
+  };
+
+  const handleAI = (e) => {
     e.stopPropagation();
     if (aiState !== 'closed') { setAiState('closed'); return; }
     setAiState('open');
-    const needSummary = !summary;
-    const needTakeaways = !takeaways;
-    if (!needSummary && !needTakeaways) return;
-    setLoadingAI(true);
-    const tasks = [];
-    if (needSummary) tasks.push(fetchAISummary({type:'article',title:a.title,content:a.desc||'',mode:'summary'}).then(r=>({k:'s',...r})));
-    if (needTakeaways) tasks.push(fetchAISummary({type:'article',title:a.title,content:a.desc||'',mode:'takeaways'}).then(r=>({k:'t',...r})));
-    const results = await Promise.all(tasks);
-    for (const r of results) {
-      if (r.summary) {
-        if (r.k==='s') setSummary(r.summary);
-        else setTakeaways(r.summary);
-      } else if (r.error) {
-        setAiErr(r.error);
-      }
-    }
-    setLoadingAI(false);
+    if (summary && takeaways) return;
+    runAI();
+  };
+
+  const retryAI = (e) => {
+    e.stopPropagation();
+    setSummary(''); setTakeaways(''); setAiErr('');
+    runAI();
   };
 
   const handleExplain = async (e) => {
@@ -4956,19 +5115,27 @@ function FeedCard({a, cat, isSaved, onSave, onRead, relatedSources, isRead, user
           <div className="fc-summary">
             <div className="fc-summary-lbl">✦ What Happened</div>
             {loadingAI && !summary
-              ? <div style={{fontSize:'11px',color:'var(--text3)',fontStyle:'italic'}}>Generating summary...</div>
+              ? <div className="fc-ai-skeleton"><span/><span/><span style={{width:'70%'}}/></div>
               : aiErr && !summary
-                ? <div style={{fontSize:'11px',color:'var(--red)'}}>{aiErr}</div>
-                : <div className="fc-summary-text">{summary}</div>}
+                ? <div className="fc-ai-error">
+                    <span className="fc-ai-error-msg">⚠ {aiErr}</span>
+                    <button className="fc-ai-retry" onClick={retryAI}>↻ Retry</button>
+                  </div>
+                : summary
+                  ? <div className="fc-summary-text">{summary}</div>
+                  : <div className="fc-ai-error">
+                      <span className="fc-ai-error-msg">No summary available for this story.</span>
+                      <button className="fc-ai-retry" onClick={retryAI}>↻ Retry</button>
+                    </div>}
           </div>
           {/* Key points (3 bullets) */}
           <div className="fc-takeaways">
             <div className="fc-takeaways-lbl">📋 Key Points</div>
             {loadingAI && !takeaways
-              ? <div style={{fontSize:'11px',color:'var(--text3)',fontStyle:'italic'}}>Analyzing article...</div>
-              : aiErr && !takeaways
-                ? <div style={{fontSize:'11px',color:'var(--red)'}}>{aiErr}</div>
-                : <TakeawaysContent text={takeaways}/>}
+              ? <div className="fc-ai-skeleton"><span/><span style={{width:'85%'}}/></div>
+              : takeaways
+                ? <TakeawaysContent text={takeaways}/>
+                : <div style={{fontSize:'11px',color:'var(--text3)'}}>—</div>}
           </div>
           {/* Why It Matters — only renders if relevant */}
           {whyLines.length > 0 && (
@@ -5464,6 +5631,7 @@ OUTPUT: 3-sentence paragraph followed by exactly 3 bullets (- markers). No heade
 
 // ─── SCOREBOARD ───────────────────────────────────────────────────────────────
 function Scoreboard({scores, loading, compact=false}) {
+  const [collapsed, setCollapsed] = useState(false);
   const [expanded, setExpanded] = useState(() => {
     const init={};
     LEAGUES.forEach(L=>{init[L.key]=['nfl','nba','mlb'].includes(L.key);});
@@ -5502,19 +5670,36 @@ function Scoreboard({scores, loading, compact=false}) {
     return <div className="sb-box"><div className="sb-box-head"><span className="sb-box-title">🏆 Scoreboard</span></div><div className="sb-empty">Loading scores…</div></div>;
   }
 
+  // v46: Only in-season leagues with active games (live / recent final / upcoming).
+  const leaguesToShow = activeLeagues(scores);
+  const totalLive = leaguesToShow.reduce((n,L)=>n+(scores[L.key]||[]).filter(g=>g.state==='in').length,0);
+
+  if (leaguesToShow.length === 0) {
+    return (
+      <div className="sb-box">
+        <div className="sb-box-head"><span className="sb-box-title">🏆 Scoreboard</span></div>
+        <div className="sb-empty">No live or upcoming games right now.</div>
+      </div>
+    );
+  }
+
   return (
     <div className="sb-box">
-      <div className="sb-box-head">
+      <button className="sb-box-head sb-box-head-btn" onClick={()=>setCollapsed(c=>!c)}>
         <span className="sb-box-title">🏆 Scoreboard</span>
-        <span className="sb-box-sub">Today · ESPN</span>
-      </div>
-      {LEAGUES.map(L => {
-        const games = scores[L.key]||[];
+        <span className="sb-box-sub">
+          {totalLive>0 && <span className="sb-live-pill">● {totalLive} LIVE</span>}
+          <span className="sb-collapse-chev">{collapsed?'▸':'▾'}</span>
+        </span>
+      </button>
+      {!collapsed && leaguesToShow.map(L => {
+        const games = (scores[L.key]||[]).filter(isGameActive);
         const sorted = [...games].sort((a,b)=>{
           const fa=favoriteIn(a)?0:1, fb=favoriteIn(b)?0:1;
           return fa!==fb ? fa-fb : 0;
         });
         const favCount = sorted.filter(g=>favoriteIn(g)).length;
+        const liveCount = sorted.filter(g=>g.state==='in').length;
         const isOpen = expanded[L.key];
         const visible = compact
           ? sorted.filter(g=>favoriteIn(g)).concat(sorted.filter(g=>!favoriteIn(g)).slice(0,2)).slice(0,4)
@@ -5524,13 +5709,13 @@ function Scoreboard({scores, loading, compact=false}) {
             <button className="sb-league-head" onClick={()=>setExpanded(s=>({...s,[L.key]:!s[L.key]}))}>
               <span style={{color:L.accent,fontWeight:700}}>{L.emoji} {L.label}</span>
               <span className="sb-league-meta">
-                {games.length===0
-                  ? <span style={{color:'var(--text3)',fontStyle:'italic'}}>No games today</span>
-                  : <><span>{games.length} {games.length===1?'game':'games'}</span>{favCount>0&&<span className="sb-league-fav">★ {favCount}</span>}</>}
+                {liveCount>0 && <span className="sb-league-live">● {liveCount}</span>}
+                <span>{sorted.length} {sorted.length===1?'game':'games'}</span>
+                {favCount>0&&<span className="sb-league-fav">★ {favCount}</span>}
               </span>
               <span className="sb-chevron">{isOpen?'▾':'▸'}</span>
             </button>
-            {isOpen&&games.length>0&&(
+            {isOpen&&sorted.length>0&&(
               <div className="sb-games">
                 {visible.map(g=>renderGame(g,favoriteIn(g)))}
                 {compact&&sorted.length>visible.length&&<div className="sb-more">+{sorted.length-visible.length} more games</div>}
@@ -6209,6 +6394,10 @@ function BottomTabBar({ tab, onTabChange, onMenuOpen, savedCount, lastFeedTab })
           <svg className="bottom-tab-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>
           <span className="bottom-tab-label">Feed</span>
         </button>
+        <button className={`bottom-tab ${tab==='sources'?'active':''}`} onClick={()=>onTabChange('sources')}>
+          <svg className="bottom-tab-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>
+          <span className="bottom-tab-label">Sources</span>
+        </button>
         <button className={`bottom-tab ${tab==='saved'?'active':''}`} onClick={()=>onTabChange('saved')}>
           <svg className="bottom-tab-icon" viewBox="0 0 24 24" fill={tab==='saved'?'currentColor':'none'} stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg>
           <span className="bottom-tab-label">{savedCount>0?`Saved (${savedCount})`:'Saved'}</span>
@@ -6352,7 +6541,7 @@ function TrendingCarousel({ arts, kw, onRead }) {
 function MiniScoreboardStrip({ scores, onOpen }) {
   // Flatten all games across leagues; prioritize favorites + live games
   const games = useMemo(() => {
-    const all = Object.values(scores || {}).flat();
+    const all = Object.values(scores || {}).flat().filter(isGameActive);
     if (!all.length) return [];
     const isLive = g => g.state === 'in';
     const isFav  = g => (typeof favoriteIn === 'function' ? !!favoriteIn(g) : false);
@@ -6395,7 +6584,7 @@ function MiniScoreboardStrip({ scores, onOpen }) {
 // Click any tile → opens ESPN game page.
 function SportsScoreStrip({ scores, teams }) {
   const tiles = useMemo(() => {
-    const all = Object.values(scores || {}).flat();
+    const all = Object.values(scores || {}).flat().filter(isGameActive);
     if (!all.length) return [];
     const isLive = g => g.state === 'in';
     const isFav  = g => !!favoriteInList(g, teams);
@@ -6558,7 +6747,7 @@ function LastUpdated({ timestamp, onRefresh }) {
 // the auto-hide-on-scroll-down behavior (mobile only — drives translate).
 function TopBar({tab, setTab, search, setSearch, dark, setDark,
                  onCustomize, onRefresh, breakingItems, onTickerClick,
-                 hidden, mobileSearchOpen, onMobileSearchToggle, weatherCities, hiddenIndices,
+                 hidden, shrunk, mobileSearchOpen, onMobileSearchToggle, weatherCities, hiddenIndices,
                  onAnalyze, searchHistory, trendingTopics}) {
   const [searchFocused, setSearchFocused] = useState(false);
   const [wxList, setWxList] = useState([]);
@@ -6586,8 +6775,8 @@ function TopBar({tab, setTab, search, setSearch, dark, setDark,
   const tickerItems = hasBreaking?[...breakingItems,...breakingItems]:[];
 
   // v24a: Desktop nav per user: General · Business · Markets · Bloom · Sports · Pop Culture · Briefing · Podcasts · Saved
-  const ALL_TABS = ['general','business','finance','bloom','tech','sports','popculture','briefing','podcasts','saved'];
-  const TAB_LABELS = {bloom:'Energy',finance:'Markets',tech:'AI & Tech',popculture:'Pop Culture',podcasts:'Podcasts',saved:'Saved',briefing:'Briefing'};
+  const ALL_TABS = ['general','business','finance','bloom','tech','sports','popculture','briefing','podcasts','sources','saved'];
+  const TAB_LABELS = {bloom:'Energy',finance:'Markets',tech:'AI & Tech',popculture:'Pop Culture',podcasts:'Podcasts',sources:'Sources',saved:'Saved',briefing:'Briefing'};
   const TAB_CLASS  = {general:'t-general',sports:'t-sports',business:'t-business',finance:'t-finance',bloom:'t-bloom',tech:'t-tech',popculture:'t-popculture',podcasts:'t-podcasts'};
 
   // v24a Mobile chip bar per user: General · Business · Markets · Energy · Sports · Pop Culture
@@ -6613,7 +6802,7 @@ function TopBar({tab, setTab, search, setSearch, dark, setDark,
   }, [tab]);
 
   return (
-    <div className={`topbar-wrap ${hidden?'hidden':''}`}>
+    <div className={`topbar-wrap ${hidden?'hidden':''} ${shrunk?'shrunk':''}`}>
       {/* v25: Pill bar — replaces the cramped whisper bar. Bigger pills with
           color-coded change indicators. Horizontal scroll on narrow viewports.
           Shows weather + indices + tickers in priority order. */}
@@ -7198,6 +7387,18 @@ export default function App() {
   const [lastFeedTab, setLastFeedTab]   = useState('general');
   const isMobile                        = useIsMobile();
   const headerHidden                    = useScrollDirection(isMobile);
+  const [headerShrunk, setHeaderShrunk] = useState(false);
+
+  // v46: Smart sticky header — collapses the pill/ticker rail past 60px scroll.
+  useEffect(()=>{
+    let raf = 0;
+    const onScroll = () => {
+      if (raf) return;
+      raf = requestAnimationFrame(() => { setHeaderShrunk(window.scrollY > 60); raf = 0; });
+    };
+    window.addEventListener('scroll', onScroll, {passive:true});
+    return () => { window.removeEventListener('scroll', onScroll); if (raf) cancelAnimationFrame(raf); };
+  },[]);
 
   useEffect(()=>{sv('dark',dark);document.body.className=dark?'dark':'';},[dark]);
   useEffect(()=>{sv('saved',saved);},[saved]);
@@ -7928,6 +8129,24 @@ export default function App() {
           </div>
         )}
 
+        {/* v46: "Right Now" live band — recency + live-games pulse for breaking energy */}
+        {isHome && !activeKw && !activeSrc && !search && (() => {
+          const allHome = Object.values(arts).flat();
+          const fresh = allHome.filter(a => a.pubDate && (Date.now()-new Date(a.pubDate)) < 3600*1000).length;
+          const liveGames = Object.values(scores||{}).flat().filter(g=>g.state==='in').length;
+          const newest = allHome.reduce((mx,a)=>{const t=a.pubDate?new Date(a.pubDate).getTime():0; return t>mx?t:mx;},0);
+          if (!allHome.length) return null;
+          const ago = (() => {const m=Math.floor((Date.now()-newest)/60000); return m<1?'just now':m<60?`${m}m ago`:`${Math.floor(m/60)}h ago`;})();
+          return (
+            <div className="right-now-band">
+              <span className="rn-live"><span className="rn-live-dot"/>Right Now</span>
+              {fresh>0 && <span className="rn-fresh"><strong>{fresh}</strong> {fresh===1?'story':'stories'} in the last hour</span>}
+              {liveGames>0 && <span className="rn-fresh">·&nbsp;<strong>{liveGames}</strong> live {liveGames===1?'game':'games'}</span>}
+              {newest>0 && <span className="rn-updated">Updated {ago}</span>}
+            </div>
+          );
+        })()}
+
         {/* Scores strip — General and Sports only; Sports has its own strip */}
         {cat === 'general' && !activeKw && !activeSrc && !search && (
           <ActiveScoresBar scores={scores} onGoToSports={() => handleTabChange('sports')}/>
@@ -8576,6 +8795,67 @@ export default function App() {
     </div>
   );
 
+  // ─── SOURCES PAGE (v46) ─────────────────────────────────────────────────
+  // Dedicated destination surfacing every feed powering the hub, grouped by
+  // category, with live article counts, on/off status, and outbound links.
+  const SourcesPage = () => {
+    const [q, setQ] = useState('');
+    const counts = useMemo(() => {
+      const m = {};
+      Object.values(arts).flat().forEach(a => { if (a.source) m[a.source] = (m[a.source]||0)+1; });
+      return m;
+    }, []);
+    const CAT_ORDER = ['general','business','finance','bloom','tech','sports','popculture','comedy'];
+    const ql = q.trim().toLowerCase();
+    let totalSources = 0, activeSources = 0;
+    CAT_ORDER.forEach(c => (feeds[c]||[]).forEach(f => { totalSources++; if (f.on) activeSources++; }));
+    return (
+      <div className="page">
+        <div className="sources-hero">
+          <div>
+            <h1 className="sources-title">News Sources</h1>
+            <p className="sources-sub">{activeSources} active · {totalSources} feeds powering your hub</p>
+          </div>
+          <button className="sources-manage-btn" onClick={()=>openCustomize('sources','general')}>⚙ Manage feeds</button>
+        </div>
+        <input className="sources-search" placeholder="Filter sources…" value={q} onChange={e=>setQ(e.target.value)}/>
+        <div className="sources-cat-grid">
+          {CAT_ORDER.map(c => {
+            const cc = CATS[c]||CATS.general;
+            const list = (feeds[c]||[]).filter(f => !ql || f.name.toLowerCase().includes(ql));
+            if (!list.length) return null;
+            const sorted = [...list].sort((a,b)=>(counts[b.name]||0)-(counts[a.name]||0));
+            return (
+              <div key={c} className="sources-cat">
+                <button className="sources-cat-head" style={{borderLeftColor:cc.color}} onClick={()=>handleTabChange(c)}>
+                  <span className="sources-cat-emoji">{cc.emoji}</span>
+                  <span className="sources-cat-label" style={{color:cc.color}}>{cc.label}</span>
+                  <span className="sources-cat-count">{list.length}</span>
+                </button>
+                <div className="sources-list">
+                  {sorted.map(f => {
+                    const url = SOURCE_URLS[f.name];
+                    const n = counts[f.name]||0;
+                    return (
+                      <a key={f.name} className={`source-row ${f.on?'':'source-off'}`}
+                         href={url||'#'} target="_blank" rel="noreferrer"
+                         onClick={e=>{ if(!url) e.preventDefault(); }}>
+                        <span className={`source-status ${f.on?'on':'off'}`} title={f.on?'Active':'Disabled'}/>
+                        <span className="source-name">{f.name}</span>
+                        {n>0 && <span className="source-count" title={`${n} articles loaded`}>{n}</span>}
+                        {url && <span className="source-ext">↗</span>}
+                      </a>
+                    );
+                  })}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    );
+  };
+
   // ─── FINANCE PAGE ──────────────────────────────────────────────────────
   const FinancePage = () => {
     const items=sorted('finance');
@@ -8743,7 +9023,7 @@ export default function App() {
           dark={dark} setDark={setDark}
           onCustomize={()=>openCustomize('keywords','general')} onRefresh={refreshAll}
           breakingItems={breakingItems} onTickerClick={handleTickerClick}
-          hidden={headerHidden}
+          hidden={headerHidden} shrunk={headerShrunk}
           mobileSearchOpen={mobileSearchOpen}
           onMobileSearchToggle={() => setMobileSearchOpen(o => !o)}
           weatherCities={weatherCities}
@@ -8762,6 +9042,7 @@ export default function App() {
         {NEWS_CATS.filter(c=>c!=='sports').includes(tab)&&<FeedPage cat={tab}/>}
         {tab==='finance'&&<FinancePage/>}
         {tab==='podcasts'&&<PodcastsPage/>}
+        {tab==='sources'&&<SourcesPage/>}
         {tab==='saved'&&<SavedPage/>}
 
         {/* Mobile overflow menu sheet */}
