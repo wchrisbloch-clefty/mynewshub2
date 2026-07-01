@@ -4757,6 +4757,57 @@ kbd{display:inline-block;padding:1px 5px;border:1px solid var(--border);border-r
   .sources-cat-grid{grid-template-columns:1fr;gap:14px;}
 }
 
+/* ═══════════ v46 — "N NEW STORIES" PILL ═══════════ */
+.new-stories-pill{
+  position:sticky;top:64px;z-index:120;left:50%;
+  display:flex;align-items:center;gap:7px;width:max-content;margin:0 auto 14px;
+  transform:translateX(-50%);
+  background:var(--accent);color:#fff;border:none;
+  border-radius:22px;padding:8px 18px;font-size:12.5px;font-weight:800;
+  font-family:inherit;cursor:pointer;letter-spacing:0.02em;
+  box-shadow:0 4px 16px rgba(0,0,0,0.22);
+  animation:nsp-drop 0.28s cubic-bezier(0.2,0.9,0.3,1.2);
+}
+.new-stories-pill:hover{opacity:0.92;}
+.nsp-dot{width:7px;height:7px;border-radius:50%;background:#fff;animation:score-pulse 1.5s ease-in-out infinite;}
+@keyframes nsp-drop{0%{opacity:0;transform:translate(-50%,-10px);}100%{opacity:1;transform:translate(-50%,0);}}
+
+/* ═══════════ v46 — MY TEAMS RAIL (Sports) ═══════════ */
+.my-teams-module{margin:0 0 20px;}
+.my-teams-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;}
+.my-teams-title{font-size:12px;font-weight:800;text-transform:uppercase;letter-spacing:0.08em;color:var(--text);}
+.my-teams-edit{background:none;border:none;color:var(--accent);font-size:11px;font-weight:700;cursor:pointer;font-family:inherit;}
+.my-teams-scroll{
+  display:flex;gap:12px;overflow-x:auto;scrollbar-width:none;
+  -webkit-overflow-scrolling:touch;scroll-snap-type:x proximity;padding-bottom:4px;
+}
+.my-teams-scroll::-webkit-scrollbar{display:none;}
+.my-team-card{
+  flex:0 0 220px;scroll-snap-align:start;cursor:pointer;
+  background:var(--surface);border:1px solid var(--border);border-radius:10px;overflow:hidden;
+  transition:transform 0.14s,box-shadow 0.14s;
+}
+.my-team-card:hover{transform:translateY(-2px);box-shadow:0 6px 18px rgba(0,0,0,0.10);}
+.my-team-img{width:100%;height:110px;background-size:cover;background-position:center;background-color:var(--surface2);
+  display:flex;align-items:center;justify-content:center;font-size:26px;}
+.my-team-img.ph{background:var(--surface2);}
+.my-team-card-body{padding:10px 12px;display:flex;flex-direction:column;gap:4px;}
+.my-team-src{font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:0.05em;}
+.my-team-title{font-family:var(--font-serif);font-size:13.5px;font-weight:700;line-height:1.3;color:var(--text);
+  display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden;}
+@media(max-width:640px){
+  .my-team-card{flex-basis:180px;}
+  .my-team-img{height:95px;}
+}
+
+/* ═══════════ v46 — STICKY SPORTS SCORE STRIP (mobile) ═══════════ */
+@media(max-width:640px){
+  .sports-page .sports-score-strip{
+    position:sticky;top:0;z-index:110;
+    box-shadow:0 3px 10px rgba(0,0,0,0.25);
+  }
+}
+
 /* ═══════════ v46 — CARD MICRO-ANIM ═══════════ */
 .gn-card{transition:transform 0.16s ease,box-shadow 0.16s ease;}
 .gn-card:hover{transform:translateY(-2px);box-shadow:0 6px 20px rgba(0,0,0,0.10);}
@@ -7364,6 +7415,8 @@ export default function App() {
   const [marketLoading, setMarketLoading] = useState(false);
   const [social, setSocial]     = useState(()=>ld('social',DEFAULT_SOCIAL));
   const [arts, setArts]         = useState({general:[],sports:[],business:[],finance:[],bloom:[],tech:[],popculture:[],comedy:[]});
+  const artsRef = useRef(arts); artsRef.current = arts;               // live mirror for background poll
+  const [pendingNew, setPendingNew] = useState({});                    // v46: staged fresh articles for "N new stories" pill
   const [loading, setLoading]   = useState({general:false,sports:false,business:false,finance:false,bloom:false,tech:false,popculture:false,comedy:false});
   const [health, setHealth]     = useState({});
   const [podEps, setPodEps]     = useState({});
@@ -7507,9 +7560,36 @@ export default function App() {
     setHealth(h=>({...h,...hUpdates}));
     results.sort((a,b)=>new Date(b.pubDate)-new Date(a.pubDate));
     setArts(a=>({...a,[cat]:results}));
+    setPendingNew(p=>({...p,[cat]:[]}));   // fresh load supersedes any staged items
     setLastUpdated(prev => ({...prev, [cat]: Date.now()}));
     setLoading(l=>({...l,[cat]:false}));
   },[feeds]);
+
+  // v46: Lean read-only fetch used by the background poll — same feed logic as
+  // loadCat but does NOT touch arts/health; returns a sorted article array.
+  const fetchCatArticles = useCallback(async (cat)=>{
+    const results=[];
+    await Promise.allSettled((feeds[cat]||[]).filter(f=>f.on).map(async f=>{
+      const {items}=await fetchRSS(f.url);
+      items.forEach(i=>{if(i.title&&i.link)results.push({...i,source:f.name,cat});});
+    }));
+    results.sort((a,b)=>new Date(b.pubDate)-new Date(a.pubDate));
+    return results;
+  },[feeds]);
+
+  // v46: "N new stories" — prepend staged articles for a category and jump to top.
+  const applyPending = useCallback((cat)=>{
+    setArts(a=>{
+      const add=pendingNew[cat]||[];
+      if(!add.length) return a;
+      const existing=new Set((a[cat]||[]).map(x=>x.link));
+      const merged=[...add.filter(x=>!existing.has(x.link)),...(a[cat]||[])];
+      merged.sort((x,y)=>new Date(y.pubDate)-new Date(x.pubDate));
+      return {...a,[cat]:merged};
+    });
+    setPendingNew(p=>({...p,[cat]:[]}));
+    window.scrollTo({top:0,behavior:'smooth'});
+  },[pendingNew]);
 
   const loadPod = useCallback(async (pod)=>{
     setPodLoading(l=>({...l,[pod.name]:true}));
@@ -7534,6 +7614,7 @@ export default function App() {
   },[watchlist]);
 
   const refreshAll = useCallback(async ()=>{
+    setPendingNew({});
     setArts({general:[],sports:[],business:[],finance:[],bloom:[],popculture:[],comedy:[]});
     setLoading({general:false,sports:false,business:false,finance:false,bloom:false,popculture:false,comedy:false});
     setHealth({});setPodEps({});setPodLoading({});
@@ -7556,6 +7637,26 @@ export default function App() {
     return ()=>clearInterval(iv);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   },[]);
+
+  // v46: Background poll for the *current* news category — stages fresh articles
+  // into pendingNew (surfaced as a "N new stories" pill) instead of silently
+  // swapping the feed out from under the reader (Yahoo-style refresh affordance).
+  useEffect(()=>{
+    const NEWS=['general','sports','business','bloom','tech','popculture','comedy'];
+    if(!NEWS.includes(tab)) return;
+    const cat=tab;
+    const poll=async()=>{
+      if(typeof document!=='undefined'&&document.hidden) return;
+      if(!(artsRef.current[cat]||[]).length) return; // wait until first load done
+      const fresh=await fetchCatArticles(cat);
+      const existing=new Set((artsRef.current[cat]||[]).map(a=>a.link));
+      const newer=fresh.filter(a=>a.link&&!existing.has(a.link));
+      if(newer.length) setPendingNew(p=>({...p,[cat]:newer}));
+    };
+    const iv=setInterval(poll,180000); // 3 min
+    return ()=>clearInterval(iv);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  },[tab,fetchCatArticles]);
 
   const onRead  = a=>{
     setClicks(c=>({...c,[a.source]:(c[a.source]||0)+1}));
@@ -7817,6 +7918,13 @@ export default function App() {
     return (
       <div className="page sports-page">
 
+        {/* v46: "N new stories" pill */}
+        {(pendingNew.sports||[]).length > 0 && (
+          <button className="new-stories-pill" onClick={()=>applyPending('sports')}>
+            <span className="nsp-dot"/> ↑ {pendingNew.sports.length} new {pendingNew.sports.length===1?'story':'stories'}
+          </button>
+        )}
+
         {/* ── SPORT TABS — ESPN pill-style ── */}
         <div className="sport-tabs">
           {SPORT_TABS.map(t => (
@@ -7831,6 +7939,38 @@ export default function App() {
 
         {/* ── SCOREBOARD STRIP — ESPN dark card style ── */}
         <SportsScoreStrip scores={visibleScores} teams={teams}/>
+
+        {/* v46: MY TEAMS — Yahoo-style personalized rail of followed-team headlines */}
+        {sportTab === 'all' && !activeTeam && !activeSrc && !search && (() => {
+          const favMatches = teams.map(t => (t.match||'').toLowerCase()).filter(Boolean);
+          if (!favMatches.length) return null;
+          const myTeamArts = allItems.filter(a => {
+            const t = (a.title+' '+(a.desc||'')).toLowerCase();
+            return favMatches.some(m => t.includes(m));
+          }).slice(0, 10);
+          if (myTeamArts.length < 2) return null;
+          return (
+            <div className="my-teams-module">
+              <div className="my-teams-head">
+                <span className="my-teams-title">⭐ My Teams</span>
+                <button className="my-teams-edit" onClick={()=>openCustomize('teams','sports')}>Edit</button>
+              </div>
+              <div className="my-teams-scroll">
+                {myTeamArts.map((a,i) => (
+                  <div key={i} className="my-team-card" onClick={()=>onRead(a)}>
+                    {a.img
+                      ? <div className="my-team-img" style={{backgroundImage:`url(${a.img})`}}/>
+                      : <div className="my-team-img ph">{cc.emoji}</div>}
+                    <div className="my-team-card-body">
+                      <span className="my-team-src" style={{color:cc.color}}>{a.source}</span>
+                      <span className="my-team-title">{a.title}</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          );
+        })()}
 
         {/* ── LEAGUE HEADER — ESPN hero banner (only when league tab active) ── */}
         {sportTab !== 'all' && (() => {
@@ -8113,6 +8253,12 @@ export default function App() {
 
     return (
       <div className="page">
+        {/* v46: "N new stories" pill — background poll staged fresh articles */}
+        {(pendingNew[cat]||[]).length > 0 && (
+          <button className="new-stories-pill" onClick={()=>applyPending(cat)}>
+            <span className="nsp-dot"/> ↑ {pendingNew[cat].length} new {pendingNew[cat].length===1?'story':'stories'}
+          </button>
+        )}
         {/* First-run onboarding card */}
         {isHome && !onboardingDismissed && !activeKw && !activeSrc && !search && (
           <div className="onboarding-card">
