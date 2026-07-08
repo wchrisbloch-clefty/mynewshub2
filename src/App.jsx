@@ -37,6 +37,10 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { useState, useEffect, useCallback, useMemo, useRef, Fragment } from 'react';
+// Extracted, dependency-isolated capability modules (see src/modules/*/README.md)
+import { clusterStories, hotClusterTopics, heatScore, TREND_STOP } from './modules/clustering';
+import { retrieveFeedContext, buildFeedContextBlock } from './modules/retrieval';
+import { XPulse } from './modules/x-pulse';
 
 // ─── CATEGORIES ───────────────────────────────────────────────────────────────
 const CATS = {
@@ -856,12 +860,7 @@ async function fetchWebSearch(query) {
 }
 
 // ─── TRENDING TOPICS — derived from loaded article titles ────────────────────
-const TREND_STOP = new Set([
-  'the','and','for','that','with','this','from','have','will','are','was','were',
-  'been','about','into','than','they','their','what','when','where','which','who',
-  'said','says','after','before','would','could','should','there','these','those',
-  'report','update','first','last','more','also','just','news','new','amid',
-]);
+// TREND_STOP, clusterStories, hotClusterTopics, heatScore now live in ./modules/clustering
 function getTrendingTopics(arts, limit = 10) {
   const counts = {};
   Object.values(arts).flat().forEach(a => {
@@ -884,122 +883,7 @@ function getTrendingTopics(arts, limit = 10) {
     .map(([k]) => k);
 }
 
-// Phase 5 #2: derive "Trending Now" topics from the CURRENT feed's hottest
-// clusters (heat = cluster breadth × 12 + freshness), not a fixed list. Each label
-// is a salient token from a hot cluster's title (proper noun preferred) so tapping
-// it filters the feed via the existing substring search. Works in any category.
-function hotClusterTopics(items, n = 5) {
-  const scored = [...(items || [])].map(a => {
-    const ageH = a.pubDate ? (Date.now() - new Date(a.pubDate)) / 3600000 : 999;
-    return { a, heat: (a._clusterSize || 1) * 12 + Math.max(0, 48 - ageH) };
-  }).sort((x, y) => y.heat - x.heat);
-  const seen = new Set(), out = [];
-  for (const { a } of scored) {
-    const tokens = (a.title || '').split(/\s+/).map(w => w.replace(/[^A-Za-z0-9]/g, ''));
-    let label = tokens.find(w => w.length > 3 && /^[A-Z]/.test(w) && !TREND_STOP.has(w.toLowerCase()));
-    if (!label) label = tokens.filter(w => w.length > 4 && !TREND_STOP.has(w.toLowerCase())).sort((x, y) => y.length - x.length)[0];
-    if (!label) continue;
-    const key = label.toLowerCase();
-    if (seen.has(key)) continue;
-    seen.add(key); out.push(label);
-    if (out.length >= n) break;
-  }
-  return out;
-}
-
-// ─── GROUNDED RETRIEVAL (Phase 6) — STANDALONE, REUSABLE ──────────────────────
-// Pure module with no chat/component dependency: give it a question + the app's
-// per-category article arrays and it classifies intent, selects the relevant
-// clustered items (via clusterStories/hotClusterTopics), and returns structured
-// context — each item carrying source, timestamp, cluster size, and link. Can be
-// lifted out and reused anywhere (chat, a "for you" rail, etc.).
-const RETRIEVAL_CATS = {
-  finance:['finance','market','markets','stock','stocks','wall street','nasdaq','dow','s&p','crypto','bitcoin','earnings','fed','interest rate','rates','inflation','treasury'],
-  bloom:['energy','power grid','grid','oil','gas','solar','wind','nuclear','utility','utilities','electricity','ercot','renewable','battery'],
-  tech:['tech','technology','artificial intelligence','software','startup','chip','chips','semiconductor','nvidia','openai','gadget'],
-  sports:['sport','sports','nfl','nba','mlb','ncaa','ncaaf','ncaab','football','basketball','baseball','college football','college basketball','golf','racing','playoff'],
-  business:['business','economy','economic','company','companies','corporate','trade','tariff','merger','layoffs'],
-  popculture:['pop culture','celebrity','movie','movies','music','tv show','entertainment','hollywood','box office'],
-  comedy:['satire','onion','babylon bee'],
-  general:['world','breaking','politics','election','headline'],
-};
-const Q_STOP = new Set(['what','whats','how','when','where','who','why','the','are','you','me','up','on','about','tell','give','latest','news','update','catch','today','now','going','with','into','and','for','any','all','get','show','anything','happening','trending','summary','recap','story','stories','this','that','from','was','were','has','have','can']);
-
-function detectRetrievalCategory(q) {
-  const t = ' ' + q.toLowerCase() + ' ';
-  let best = null, bestHits = 0;
-  for (const [cat, kws] of Object.entries(RETRIEVAL_CATS)) {
-    const hits = kws.filter(k => t.includes(k)).length;
-    if (hits > bestHits) { bestHits = hits; best = cat; }
-  }
-  return best;
-}
-function detectRetrievalIntent(q) {
-  const t = q.toLowerCase();
-  if (/how (are|is|'?s)? ?(the )?markets?|markets? (summary|recap|update|today|doing)|market (summary|recap|update)/.test(t)) return 'markets';
-  if (/trending|what'?s hot|what'?s happening|top (stories|news)|what'?s new|biggest (stories|news)/.test(t)) return 'trending';
-  if (/catch me up|latest on|update on|tell me about|what happened|going on with|what'?s the latest|recap of|fill me in/.test(t)) return 'entity';
-  return 'general';
-}
-function extractQueryKeywords(q) {
-  return (q || '').toLowerCase().replace(/[^a-z0-9\s]/g, ' ').split(/\s+/).filter(w => w.length > 2 && !Q_STOP.has(w));
-}
-function slimFeedItem(a) {
-  const ageH = a.pubDate ? (Date.now() - new Date(a.pubDate)) / 3600000 : null;
-  const ageLabel = ageH == null ? '' : ageH < 1 ? `${Math.max(1, Math.round(ageH * 60))}m ago` : ageH < 24 ? `${Math.round(ageH)}h ago` : `${Math.round(ageH / 24)}d ago`;
-  return { title: a.title, source: a.source || '', link: a.link || '', clusterSize: a._clusterSize || 1, sources: a._clusterSources || [], ageLabel };
-}
-function retrieveFeedContext(question, arts) {
-  const q = (question || '').trim();
-  const intent = detectRetrievalIntent(q);
-  const category = detectRetrievalCategory(q);
-  const kws = extractQueryKeywords(q);
-  // Scope + cap the pool (most recent first) so clustering stays cheap.
-  const rawPool = category ? (arts[category] || []) : Object.values(arts || {}).flat();
-  const pool = [...rawPool].sort((a, b) => new Date(b.pubDate || 0) - new Date(a.pubDate || 0)).slice(0, 150);
-
-  if (intent === 'trending') {
-    const clustered = clusterStories(pool);
-    const topics = hotClusterTopics(clustered, 5);
-    const hot = clustered.map(a => {
-      const ageH = a.pubDate ? (Date.now() - new Date(a.pubDate)) / 3600000 : 999;
-      return { a, heat: (a._clusterSize || 1) * 12 + Math.max(0, 48 - ageH) };
-    }).sort((x, y) => y.heat - x.heat).slice(0, 6).map(x => slimFeedItem(x.a));
-    return { intent, category, topics, clusters: hot, deepLink: category ? `/${category}` : null };
-  }
-
-  // entity / general: keyword-filter, cluster, rank by relevance + size + recency.
-  const matched = kws.length
-    ? pool.filter(a => { const t = (a.title + ' ' + (a.desc || '')).toLowerCase(); return kws.some(k => t.includes(k)); })
-    : pool;
-  const clustered = clusterStories(matched);
-  const ranked = clustered.map(a => {
-    const t = (a.title + ' ' + (a.desc || '')).toLowerCase();
-    const kwHits = kws.filter(k => t.includes(k)).length;
-    const ageH = a.pubDate ? (Date.now() - new Date(a.pubDate)) / 3600000 : 999;
-    return { a, score: kwHits * 20 + (a._clusterSize || 1) * 8 + Math.max(0, 48 - ageH) };
-  }).sort((x, y) => y.score - x.score).slice(0, 8).map(x => slimFeedItem(x.a));
-
-  // Optional deep link: a sports entity that matches a team chip → team page.
-  let deepLink = category ? `/${category}` : null;
-  if (kws.length) {
-    for (const [lg, names] of Object.entries(TEAM_CHIPS)) {
-      const hit = names.find(n => { const w = n.toLowerCase().split(' '); return w.some(x => kws.includes(x)) || kws.some(k => k.length > 3 && n.toLowerCase().includes(k)); });
-      if (hit) { deepLink = `/sports/${lg}/${teamSlug(hit)}`; break; }
-    }
-  }
-  return { intent, category, entities: kws, clusters: ranked, deepLink };
-}
-// Format retrieved context into a compact, model-ready block.
-function buildFeedContextBlock(ctx) {
-  if (ctx.intent === 'trending' && ctx.topics?.length) {
-    let s = `TRENDING TOPICS${ctx.category ? ` in ${ctx.category}` : ''}: ${ctx.topics.join(', ')}.\nTOP CLUSTERS:\n`;
-    s += ctx.clusters.map((c, i) => `${i + 1}. "${c.title}" — ${c.source}${c.clusterSize > 1 ? ` (+${c.clusterSize - 1} more sources)` : ''}, ${c.ageLabel}`).join('\n');
-    return s;
-  }
-  if (!ctx.clusters?.length) return '';
-  return "RELEVANT STORIES FROM TODAY'S FEED:\n" + ctx.clusters.map((c, i) => `${i + 1}. "${c.title}" — ${c.source}${c.clusterSize > 1 ? ` · ${c.clusterSize} sources` : ''}, ${c.ageLabel}`).join('\n');
-}
+// retrieval (retrieveFeedContext / buildFeedContextBlock) now lives in ./modules/retrieval
 
 // Source recommendations based on search query
 function suggestSourcesForQuery(query) {
@@ -1075,52 +959,7 @@ function whyItMatters(article, userKw, userTeams) {
 // Groups articles covering the same story. Uses bigram Jaccard similarity on
 // titles (threshold 0.28) within a 6-hour window. Returns articles with a
 // `_clusterSize` and `_clusterSources` so the card can show "3 sources covering this".
-function clusterStories(articles) {
-  function bigrams(str) {
-    const words = str.toLowerCase().replace(/[^a-z0-9 ]/g, '').split(/\s+/).filter(w => w.length > 2);
-    const bg = new Set();
-    for (let i = 0; i < words.length - 1; i++) bg.add(words[i] + '_' + words[i+1]);
-    return bg;
-  }
-  function jaccard(a, b) {
-    if (!a.size || !b.size) return 0;
-    let inter = 0;
-    for (const k of a) if (b.has(k)) inter++;
-    return inter / (a.size + b.size - inter);
-  }
-
-  const sixHoursMs = 6 * 60 * 60 * 1000;
-  const clustered = new Set();
-  const result = [];
-
-  for (let i = 0; i < articles.length; i++) {
-    if (clustered.has(i)) continue;
-    const a = articles[i];
-    const bgA = bigrams(a.title);
-    const cluster = [a];
-    const clusterSources = new Set([a.source]);
-
-    for (let j = i + 1; j < articles.length; j++) {
-      if (clustered.has(j)) continue;
-      const b = articles[j];
-      const timeDiff = Math.abs(new Date(a.pubDate) - new Date(b.pubDate));
-      if (timeDiff > sixHoursMs) continue;
-      if (jaccard(bgA, bigrams(b.title)) >= 0.28) {
-        clustered.add(j);
-        cluster.push(b);
-        clusterSources.add(b.source);
-      }
-    }
-
-    clustered.add(i);
-    result.push({
-      ...a,
-      _clusterSize: cluster.length,
-      _clusterSources: [...clusterSources].slice(0, 5),
-    });
-  }
-  return result;
-}
+// clusterStories now lives in ./modules/clustering
 
 // ─── NEWSHUB UPGRADE — PHASE 1 ────────────────────────────────────────────────
 // Presentation layer built on the existing clusterStories() dedup. No routing/API
@@ -1133,11 +972,7 @@ function StateOfPlay({ items, cat, onRead }) {
   const cc = CATS[cat] || CATS.general;
   const top = useMemo(() => {
     return [...(items || [])]
-      .map(a => {
-        const ageH = a.pubDate ? (Date.now() - new Date(a.pubDate)) / 3600000 : 999;
-        const freshness = Math.max(0, 48 - ageH);           // 0–48 recency points
-        return { a, score: (a._clusterSize || 1) * 12 + freshness };
-      })
+      .map(a => ({ a, score: heatScore(a) }))   // shared heat = clusterSize*12 + recency
       .sort((x, y) => y.score - x.score)
       .slice(0, 5)
       .map(x => x.a);
@@ -7445,7 +7280,15 @@ function ChatBot({ arts, onNavigate }) {
     setInput('');
     setLoading(true);
 
-    const ctx = retrieveFeedContext(q, arts);
+    // Inject NewsHub's entity→route mapping so the retrieval module stays app-agnostic.
+    const resolveDeepLink = ({ entities }) => {
+      for (const [lg, names] of Object.entries(TEAM_CHIPS)) {
+        const hit = names.find(n => { const w = n.toLowerCase().split(' '); return w.some(x => entities.includes(x)) || entities.some(k => k.length > 3 && n.toLowerCase().includes(k)); });
+        if (hit) return `/sports/${lg}/${teamSlug(hit)}`;
+      }
+      return null;
+    };
+    const ctx = retrieveFeedContext(q, arts, { resolveDeepLink });
     let contextBlock = '';
     let deepLink = ctx.deepLink;
 
@@ -7460,7 +7303,7 @@ function ChatBot({ arts, onNavigate }) {
           if (idx) { contextBlock = `LIVE MARKETS SNAPSHOT:\nIndices: ${idx}\nTop gainers: ${g || '—'}\nTop losers: ${l || '—'}`; deepLink = '/finance'; }
         }
       } catch {}
-      if (!contextBlock) contextBlock = buildFeedContextBlock(retrieveFeedContext(q, arts)); // fall back to feed
+      if (!contextBlock) contextBlock = buildFeedContextBlock(retrieveFeedContext(q, arts, { resolveDeepLink })); // fall back to feed
     } else {
       contextBlock = buildFeedContextBlock(ctx);
     }
@@ -7712,53 +7555,7 @@ function AnalyzePanel({ onClose }) {
 }
 
 // ─── ARTICLE READER ───────────────────────────────────────────────────────────
-// ─── X PULSE (Phase 4) ────────────────────────────────────────────────────────
-// Inline street-level X reaction for a topic. Fetches AFTER paint (deferred), with
-// an 8s cap, and renders NOTHING on any error / timeout / empty result — it can
-// never block or delay the feed.
-function XPulse({ topic, variant }) {
-  const [data, setData] = useState(null);
-  useEffect(() => {
-    if (!topic) return;
-    let alive = true;
-    // Defer so the feed paints first; XPulse never sits on the critical path.
-    const defer = setTimeout(async () => {
-      const ctrl = new AbortController();
-      const to = setTimeout(() => ctrl.abort(), 8000);
-      try {
-        const r = await fetch(`/api/x-pulse?topic=${encodeURIComponent(topic)}`, { signal: ctrl.signal });
-        if (r.ok) {
-          const d = await r.json();
-          if (alive && d && Array.isArray(d.takes) && d.takes.length) setData(d);
-        }
-      } catch { /* fail silently */ }
-      finally { clearTimeout(to); }
-    }, 400);
-    return () => { alive = false; clearTimeout(defer); };
-  }, [topic]);
-
-  if (!data || !data.takes?.length) return null;
-  const s = data.sentiment || 'n/a';
-  const sentClass = s === 'bullish' ? 'xp-bull' : s === 'bearish' ? 'xp-bear' : 'xp-neutral';
-  const sentLabel = s === 'bullish' ? 'Bullish' : s === 'bearish' ? 'Bearish' : s === 'mixed' ? 'Mixed' : 'Neutral';
-  return (
-    <div className={`x-pulse ${variant === 'reader' ? 'x-pulse-reader' : ''}`} onClick={e => e.stopPropagation()}>
-      <div className="xp-head">
-        <span className="xp-badge">𝕏 Pulse</span>
-        <span className={`xp-sent ${sentClass}`}>{sentLabel}</span>
-        <span className="xp-note">street-level reaction · unverified</span>
-      </div>
-      <div className="xp-takes">
-        {data.takes.slice(0, 3).map((t, i) => (
-          <a key={i} className="xp-take" href={t.url} target="_blank" rel="noreferrer" onClick={e => e.stopPropagation()}>
-            <span className="xp-handle">{t.handle || '@x'}</span>
-            <span className="xp-text">{t.text}</span>
-          </a>
-        ))}
-      </div>
-    </div>
-  );
-}
+// XPulse component now lives in ./modules/x-pulse
 
 function ArticleReader({ article, onClose }) {
   const [aiResult, setAiResult] = useState('');
