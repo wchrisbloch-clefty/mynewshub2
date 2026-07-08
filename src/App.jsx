@@ -401,6 +401,12 @@ async function fetchWithTimeout(url, ms=8000) {
   try { return await fetch(url, {signal:ctrl.signal}); } finally { clearTimeout(timer); }
 }
 async function fetchRSS(url) {
+  // Phase 2: first-party /api/feed proxy (parses server-side, keeps any key off
+  // the client bundle). Falls back to /api/rss and public CORS proxies below.
+  try {
+    const r = await fetchWithTimeout(`/api/feed?url=${encodeURIComponent(url)}`, 10000);
+    if (r.ok) { const d = await r.json(); if (d.items?.length) return {items:d.items, reason:''}; }
+  } catch {}
   try {
     const r = await fetchWithTimeout(`/api/rss?url=${encodeURIComponent(url)}`, 10000);
     if (r.ok) { const items = parseXML(await r.text()); if (items.length) return {items, reason:''}; }
@@ -529,6 +535,19 @@ function isGameActive(g) {
 // Returns only the LEAGUES that currently have at least one active game.
 function activeLeagues(scores) {
   return LEAGUES.filter(L => (scores[L.key] || []).some(isGameActive));
+}
+
+// ─── URL ROUTING (Phase 2) ────────────────────────────────────────────────────
+// The URL path is the single source of truth for the feed: /:category/:subcategory?
+// parseRoute() reads it; navigate() (in App) writes it via history.pushState.
+const ROUTE_CATS = ['general','business','finance','bloom','tech','sports','popculture','comedy','briefing','podcasts','sources','saved'];
+function parseRoute() {
+  if (typeof window === 'undefined') return { category:'general', subcategory:null };
+  const parts = window.location.pathname.split('/').filter(Boolean);
+  let category = (parts[0] || 'general').toLowerCase();
+  if (!ROUTE_CATS.includes(category)) category = 'general';
+  const subcategory = parts[1] ? decodeURIComponent(parts[1]).toLowerCase() : null;
+  return { category, subcategory };
 }
 
 function favoriteIn(game) {
@@ -7518,7 +7537,8 @@ function ArticleReader({ article, onClose }) {
 }
 
 export default function App() {
-  const [tab, setTab]           = useState('general');
+  const [tab, setTab]           = useState(()=>parseRoute().category);
+  const [subcat, setSubcat]     = useState(()=>parseRoute().subcategory); // URL-driven subcategory
   const [search, setSearch]     = useState('');
   const [dark, setDark]         = useState(()=>ld('dark',false));
   const [saved, setSaved]       = useState(()=>ld('saved',[]));
@@ -7871,17 +7891,39 @@ export default function App() {
     setPanelInitial({tab:initialTab,cat:initialCat});setShowPanel(true);
   };
 
-  const handleTabChange = t=>{
-    // v24a: 'briefing' is a dedicated page again. No redirect needed.
-    setTab(t);setSearch('');setActiveKw(null);setActiveSrc(null);
+  // Phase 2: apply a route (category + optional subcategory) to app state and
+  // refetch the feed. Called both by navigate() (user clicks) and popstate (back).
+  const applyRoute = (category, subcategory) => {
+    setTab(category); setSubcat(subcategory || null);
+    setSearch('');setActiveKw(null);setActiveSrc(null);
     setMobileSearchOpen(false);
-    window.scrollTo({top:0, behavior:'instant'}); // always land at top of new page
-    // Remember last-viewed news category so the bottom "Feed" tab returns here
-    const CAT_TABS = ['general','sports','business','finance','bloom','popculture','comedy'];
-    if (CAT_TABS.includes(t)) setLastFeedTab(t);
-    if(!['today','saved','podcasts','social'].includes(t)&&!(arts[t]||[]).length)loadCat(t);
-    if(t==='finance')loadMarketData();
+    window.scrollTo({top:0, behavior:'instant'});
+    const CAT_TABS = ['general','sports','business','finance','bloom','popculture','comedy','tech'];
+    if (CAT_TABS.includes(category)) setLastFeedTab(category);
+    // Refetch feed whenever the category changes (or first visit).
+    if(!['saved','podcasts','social','sources'].includes(category)&&!(arts[category]||[]).length)loadCat(category);
+    if(category==='finance')loadMarketData();
   };
+
+  // Phase 2: the URL is the single source of truth. navigate() writes the path,
+  // then applies it. Subcategory chips call this instead of setting local state.
+  const navigate = (category, subcategory=null) => {
+    const path = subcategory ? `/${category}/${encodeURIComponent(subcategory)}` : `/${category}`;
+    if (typeof window!=='undefined' && window.location.pathname !== path) {
+      window.history.pushState({category,subcategory}, '', path);
+    }
+    applyRoute(category, subcategory);
+  };
+
+  const handleTabChange = t => navigate(t, null);
+
+  // Phase 2: back/forward buttons re-apply the URL as source of truth.
+  useEffect(()=>{
+    const onPop = () => { const r = parseRoute(); applyRoute(r.category, r.subcategory); };
+    window.addEventListener('popstate', onPop);
+    return () => window.removeEventListener('popstate', onPop);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  },[]);
 
   // Pull-to-refresh wiring (mobile only — hook gates itself by scrollY=0 too)
   const { distance: ptrDistance } = usePullToRefresh(
@@ -7934,7 +7976,9 @@ export default function App() {
   // NBA/MLB/CFB/CBB), favorite team pills with external links, then prioritized
   // stories feed. Yahoo Sports' actual layout pattern.
   const SportsPage = () => {
-    const [sportTab, setSportTab] = useState('all'); // 'all' | 'nfl' | 'nba' | 'mlb' | 'cfb' | 'cbb' | 'cbase'
+    // Phase 2: subcategory comes from the URL (never local state). Chips navigate.
+    const sportTab = subcat || 'all'; // 'all' | 'nfl' | 'nba' | 'mlb' | 'cfb' | 'cbb' | 'cbase' | 'racing' | 'golf'
+    const setSportTab = (key) => navigate('sports', key === 'all' ? null : key);
     const [activeTeam, setActiveTeam] = useState(null); // team obj when filter pill tapped
     const [teamMenuSym, setTeamMenuSym] = useState(null); // team with open popup menu
     const [sportWebResults, setSportWebResults] = useState([]);
@@ -8279,11 +8323,13 @@ export default function App() {
     const items=useMemo(()=>clusterStories(rawItems),[rawItems]);
     const isLoading=loading[cat];
 
-    // Sub-tab state — hooks always declared; only active for their respective cats
-    const [pcSubTab, setPcSubTab] = useState('all');
+    // Phase 2: subcategory is URL-driven (never local state). Chips navigate.
+    const pcSubTab = cat === 'popculture' ? (subcat || 'all') : 'all';
+    const setPcSubTab = (key) => navigate('popculture', key === 'all' ? null : key);
+    const enSubTab = cat === 'bloom' ? (subcat || 'all') : 'all';
+    const setEnSubTab = (key) => navigate('bloom', key === 'all' ? null : key);
     const [pcWebResults, setPcWebResults] = useState([]);
     const [pcWebLoading, setPcWebLoading] = useState(false);
-    const [enSubTab, setEnSubTab] = useState('all');
     const [enWebResults, setEnWebResults] = useState([]);
     const [enWebLoading, setEnWebLoading] = useState(false);
 
