@@ -5012,6 +5012,26 @@ kbd{display:inline-block;padding:1px 5px;border:1px solid var(--border);border-r
   .mkt-mover-cols{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;}
   .mkt-mover-col{display:block!important;margin-bottom:0;}
 }
+
+/* ═══════════ PHASE 4 — X PULSE ═══════════ */
+.x-pulse{border:1px solid var(--border);background:var(--surface);border-radius:10px;padding:12px 14px;margin:14px 0;}
+.x-pulse-reader{margin:16px 0 0;background:var(--surface2);}
+.xp-head{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:9px;}
+.xp-badge{font-family:var(--font-archivo);font-weight:800;font-size:11px;letter-spacing:0.03em;color:var(--text);
+  background:var(--surface2);border:1px solid var(--border2);border-radius:6px;padding:2px 8px;}
+.xp-sent{font-family:var(--font-publicsans);font-size:10px;font-weight:800;text-transform:uppercase;
+  letter-spacing:0.05em;border-radius:20px;padding:2px 9px;}
+.xp-bull{color:#16a34a;background:rgba(22,163,74,0.12);}
+.xp-bear{color:#dc2626;background:rgba(220,38,38,0.12);}
+.xp-neutral{color:var(--text3);background:var(--surface2);}
+.xp-note{font-family:var(--font-publicsans);font-size:10px;color:var(--text4);margin-left:auto;font-style:italic;}
+.xp-takes{display:flex;flex-direction:column;gap:7px;}
+.xp-take{display:flex;flex-direction:column;gap:2px;text-decoration:none;padding:7px 10px;border-radius:8px;
+  background:var(--bg);border:1px solid var(--border2);transition:border-color 0.12s;}
+.xp-take:hover{border-color:var(--accent);}
+.xp-handle{font-family:var(--font-publicsans);font-size:11px;font-weight:700;color:var(--accent);}
+.xp-text{font-family:var(--font-publicsans);font-size:12px;line-height:1.45;color:var(--text2);}
+@media(max-width:640px){ .xp-note{width:100%;margin-left:0;} }
 `;
 
 
@@ -7535,6 +7555,54 @@ function AnalyzePanel({ onClose }) {
 }
 
 // ─── ARTICLE READER ───────────────────────────────────────────────────────────
+// ─── X PULSE (Phase 4) ────────────────────────────────────────────────────────
+// Inline street-level X reaction for a topic. Fetches AFTER paint (deferred), with
+// an 8s cap, and renders NOTHING on any error / timeout / empty result — it can
+// never block or delay the feed.
+function XPulse({ topic, variant }) {
+  const [data, setData] = useState(null);
+  useEffect(() => {
+    if (!topic) return;
+    let alive = true;
+    // Defer so the feed paints first; XPulse never sits on the critical path.
+    const defer = setTimeout(async () => {
+      const ctrl = new AbortController();
+      const to = setTimeout(() => ctrl.abort(), 8000);
+      try {
+        const r = await fetch(`/api/x-pulse?topic=${encodeURIComponent(topic)}`, { signal: ctrl.signal });
+        if (r.ok) {
+          const d = await r.json();
+          if (alive && d && Array.isArray(d.takes) && d.takes.length) setData(d);
+        }
+      } catch { /* fail silently */ }
+      finally { clearTimeout(to); }
+    }, 400);
+    return () => { alive = false; clearTimeout(defer); };
+  }, [topic]);
+
+  if (!data || !data.takes?.length) return null;
+  const s = data.sentiment || 'n/a';
+  const sentClass = s === 'bullish' ? 'xp-bull' : s === 'bearish' ? 'xp-bear' : 'xp-neutral';
+  const sentLabel = s === 'bullish' ? 'Bullish' : s === 'bearish' ? 'Bearish' : s === 'mixed' ? 'Mixed' : 'Neutral';
+  return (
+    <div className={`x-pulse ${variant === 'reader' ? 'x-pulse-reader' : ''}`} onClick={e => e.stopPropagation()}>
+      <div className="xp-head">
+        <span className="xp-badge">𝕏 Pulse</span>
+        <span className={`xp-sent ${sentClass}`}>{sentLabel}</span>
+        <span className="xp-note">street-level reaction · unverified</span>
+      </div>
+      <div className="xp-takes">
+        {data.takes.slice(0, 3).map((t, i) => (
+          <a key={i} className="xp-take" href={t.url} target="_blank" rel="noreferrer" onClick={e => e.stopPropagation()}>
+            <span className="xp-handle">{t.handle || '@x'}</span>
+            <span className="xp-text">{t.text}</span>
+          </a>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 function ArticleReader({ article, onClose }) {
   const [aiResult, setAiResult] = useState('');
   const [aiLoading, setAiLoading] = useState(false);
@@ -7578,6 +7646,8 @@ function ArticleReader({ article, onClose }) {
               {aiResult}
             </div>
           )}
+          {/* Phase 4: inline X Pulse under the summary (fails silently) */}
+          <XPulse topic={article.title} variant="reader"/>
         </div>
       </div>
     </div>
@@ -8641,7 +8711,12 @@ export default function App() {
               :feedItems.length===0
                 ?<div className="empty-state"><div className="empty-icon">📭</div><div className="empty-msg">{activeKw||activeSrc?'No articles match this filter':search?`No internal results for "${search}"`:'No articles loaded yet'}</div><button className="refresh-btn" onClick={refreshAll}>Refresh</button></div>
                 :<div className="snap-feed">
-                  {feedItems.slice(activeKw||activeSrc||search?0:3,20).map((a,i)=><SnapshotCard key={a.link||i} a={a} cat={cat} isSaved={isSavedFn(a)} onSave={onSave} onRead={onRead}/>)}
+                  {feedItems.slice(activeKw||activeSrc||search?0:3,20).map((a,i)=>(
+                    <Fragment key={a.link||i}>
+                      <SnapshotCard a={a} cat={cat} isSaved={isSavedFn(a)} onSave={onSave} onRead={onRead}/>
+                      {i===2 && <XPulse topic={cc?.label||cat} variant="feed"/>}
+                    </Fragment>
+                  ))}
                  </div>
             }
 
@@ -9432,7 +9507,10 @@ export default function App() {
                 ?<div className="empty-state"><div className="empty-icon">📈</div><div className="empty-msg">Loading Markets news…</div></div>
                 :<div className="snap-feed" style={{padding:'12px 0 0'}}>
                     {newsItems.slice(0, 15).map((a, i) => (
-                      <SnapshotCard key={a.link||i} a={a} cat="finance" isSaved={isSavedFn(a)} onSave={onSave} onRead={onRead}/>
+                      <Fragment key={a.link||i}>
+                        <SnapshotCard a={a} cat="finance" isSaved={isSavedFn(a)} onSave={onSave} onRead={onRead}/>
+                        {i===2 && <XPulse topic="Markets" variant="feed"/>}
+                      </Fragment>
                     ))}
                   </div>
               }
