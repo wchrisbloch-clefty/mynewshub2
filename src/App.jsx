@@ -645,6 +645,12 @@ function useSwipe(onSwipe, { threshold = 80, enabled = true } = {}) {
   const state = useRef({ x: 0, y: 0, active: false, cancelled: false });
   const onTouchStart = (e) => {
     if (!enabled) return;
+    // Don't hijack gestures that begin inside a horizontally-scrollable rail —
+    // let those scroll natively instead of triggering category navigation.
+    if (e.target?.closest?.('.sport-tabs, .pc-subtabs, .chip-bar, .mkt-rail-inner, .my-teams-scroll, .trending-section, .snap-feed')) {
+      state.current = { x: 0, y: 0, active: false, cancelled: true };
+      return;
+    }
     const t = e.touches[0];
     state.current = { x: t.clientX, y: t.clientY, active: true, cancelled: false };
   };
@@ -2398,10 +2404,11 @@ body:not(.dark) .pill-bar{
 
 /* SPORT TABS — ESPN-style larger tabs */
 .sport-tabs{
-  display:flex;gap:6px;
+  display:flex;flex-wrap:nowrap;gap:6px;
   padding:0 0 14px 0;
   margin-bottom:16px;
   overflow-x:auto;scrollbar-width:none;
+  -webkit-overflow-scrolling:touch;touch-action:pan-x;
 }
 .sport-tabs::-webkit-scrollbar{display:none;}
 .sport-tab{
@@ -7605,15 +7612,20 @@ function XPulse({ topic, variant }) {
 
 function ArticleReader({ article, onClose }) {
   const [aiResult, setAiResult] = useState('');
+  const [aiErr, setAiErr] = useState('');
   const [aiLoading, setAiLoading] = useState(false);
   const [aiMode, setAiMode] = useState(null);
 
+  // Fix: pass the real mode (summary/takeaways/bias) and read the {summary,error}
+  // object fetchAISummary returns — previously it sent mode:'groq' (invalid) and
+  // rendered the object itself, producing a blank panel.
   const runAI = async (mode) => {
     setAiMode(mode);
     setAiLoading(true);
-    setAiResult('');
-    const result = await fetchAISummary({ type: mode, title: article.title, content: article.desc || article.title, mode: 'groq' });
-    setAiResult(result);
+    setAiResult(''); setAiErr('');
+    const { summary, error } = await fetchAISummary({ type: 'article', title: article.title, content: article.desc || article.title, mode });
+    if (summary) setAiResult(summary);
+    else setAiErr(error || 'Could not generate that right now — try again.');
     setAiLoading(false);
   };
 
@@ -7638,12 +7650,17 @@ function ArticleReader({ article, onClose }) {
             <button className="article-reader-btn" onClick={() => runAI('bias')}>Bias Check</button>
           </div>
           {aiLoading && <div className="article-reader-ai-result" style={{color:'var(--text3)'}}>Analyzing with AI…</div>}
+          {!aiLoading && aiErr && (
+            <div className="article-reader-ai-result" style={{color:'var(--red)'}}>
+              {aiErr} <button className="article-reader-btn" style={{marginLeft:'8px'}} onClick={()=>runAI(aiMode||'summary')}>↻ Retry</button>
+            </div>
+          )}
           {!aiLoading && aiResult && (
             <div className="article-reader-ai-result">
               <div style={{fontWeight:700,fontSize:'11px',textTransform:'uppercase',letterSpacing:'0.08em',color:'var(--accent)',marginBottom:'8px'}}>
                 {aiMode === 'summary' ? 'Summary' : aiMode === 'takeaways' ? 'Key Points' : 'Bias Check'}
               </div>
-              {aiResult}
+              {aiMode === 'takeaways' ? <TakeawaysContent text={aiResult}/> : aiResult}
             </div>
           )}
           {/* Phase 4: inline X Pulse under the summary (fails silently) */}
@@ -8183,7 +8200,11 @@ export default function App() {
     // Hero = first article with image
     const heroItems = sportItems.filter(a => a.img);
     const lead = heroItems[0] || null;
-    const feedItems = lead ? sportItems.filter(a => a.link !== lead.link) : sportItems;
+    // Exclude the hero by object identity (not link equality): in sparse/out-of-
+    // season sets like NCAAF the lead's link can collide with or duplicate other
+    // entries, which previously collapsed the whole feed while the count stayed high.
+    let feedItems = lead ? sportItems.filter(a => a !== lead) : sportItems;
+    if (feedItems.length === 0 && sportItems.length > 0) feedItems = sportItems; // never blank when stories exist
 
     const SPORT_TABS = [
       { key:'all',    label:'All' },
@@ -8196,6 +8217,13 @@ export default function App() {
       { key:'racing', label:'Horse Racing',   emoji:'🏇' },
       { key:'golf',   label:'Golf',           emoji:'⛳' },
     ];
+
+    // Keep the active subcategory chip scrolled into view (on load + on change).
+    const sportTabsRef = useRef(null);
+    useEffect(() => {
+      const el = sportTabsRef.current?.querySelector('.sport-tab.active');
+      if (el?.scrollIntoView) el.scrollIntoView({ inline:'center', block:'nearest', behavior:'smooth' });
+    }, [sportTab]);
 
     const feedRef = useRef(null);
     const scrollToFeed = () => {
@@ -8216,7 +8244,7 @@ export default function App() {
         )}
 
         {/* ── SPORT TABS — ESPN pill-style ── */}
-        <div className="sport-tabs">
+        <div className="sport-tabs" ref={sportTabsRef}>
           {SPORT_TABS.map(t => (
             <button key={t.key}
               className={`sport-tab ${sportTab===t.key?'active':''}`}
