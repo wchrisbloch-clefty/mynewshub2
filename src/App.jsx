@@ -968,6 +968,89 @@ function clusterStories(articles) {
   return result;
 }
 
+// ─── NEWSHUB UPGRADE — PHASE 1 ────────────────────────────────────────────────
+// Presentation layer built on the existing clusterStories() dedup. No routing/API
+// changes: both components derive purely from the already-clustered article list.
+
+// STATE OF PLAY — a scannable strip at the top of every category summarizing what
+// is driving the day. Ranks clustered stories by coverage breadth (#sources) and
+// freshness, then lists the top few as numbered headlines.
+function StateOfPlay({ items, cat, onRead }) {
+  const cc = CATS[cat] || CATS.general;
+  const top = useMemo(() => {
+    return [...(items || [])]
+      .map(a => {
+        const ageH = a.pubDate ? (Date.now() - new Date(a.pubDate)) / 3600000 : 999;
+        const freshness = Math.max(0, 48 - ageH);           // 0–48 recency points
+        return { a, score: (a._clusterSize || 1) * 12 + freshness };
+      })
+      .sort((x, y) => y.score - x.score)
+      .slice(0, 5)
+      .map(x => x.a);
+  }, [items]);
+
+  if (top.length < 3) return null;
+
+  return (
+    <section className="sop-strip">
+      <div className="sop-head">
+        <span className="sop-label" style={{ borderColor: cc.color, color: cc.color }}>State of Play</span>
+        <span className="sop-sub">{cc.label} — what’s driving the day</span>
+      </div>
+      <div className="sop-list">
+        {top.map((a, i) => (
+          <button key={a.link || i} className="sop-item" onClick={() => onRead(a)}>
+            <span className="sop-num" style={{ color: cc.color }}>{String(i + 1).padStart(2, '0')}</span>
+            <span className="sop-item-title">{a.title}</span>
+            <span className="sop-item-meta">
+              {a._clusterSize > 1 && <span className="sop-item-sources">{a._clusterSize} sources</span>}
+              <span className="sop-item-time">{fmtDate(a.pubDate)}</span>
+            </span>
+          </button>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+// SNAPSHOT CARD — a deduped story card. Shows the lead article of a cluster with
+// an Archivo headline, Public Sans snippet, source-count row, and a Save action.
+// Click opens the full ArticleReader (which retains AI Summarize / Key Points /
+// Bias), so no inline AI is lost in the snapshot presentation.
+function SnapshotCard({ a, cat, isSaved, onSave, onRead }) {
+  const cc = CATS[cat] || CATS.general;
+  const [imgErr, setImgErr] = useState(false);
+  const topKw = a.matchedKw?.[0] || null;
+  const multi = a._clusterSize > 1;
+  return (
+    <article className={`snap-card ${a.isAlert ? 'snap-breaking' : ''}`} onClick={() => onRead(a)}>
+      <span className="snap-accent" style={{ background: cc.color }} />
+      <div className="snap-main">
+        <div className="snap-meta">
+          <span className="snap-source" style={{ color: cc.color }}>{a.source}</span>
+          {a.isAlert && <span className="snap-live">● LIVE</span>}
+          {topKw && <span className="snap-tag" style={{ background: cc.bg, color: cc.color }}>{topKw}</span>}
+          <span className="snap-time">{fmtDate(a.pubDate)}</span>
+        </div>
+        <h3 className="snap-title">{a.title}</h3>
+        {a.desc && <p className="snap-snippet">{a.desc}</p>}
+        <div className="snap-foot">
+          {multi
+            ? <span className="snap-sources" title={a._clusterSources?.join(', ')}>
+                <strong>{a._clusterSize} sources</strong> · {a._clusterSources?.slice(0, 3).join(' · ')}
+              </span>
+            : <span className="snap-single">{a.source}</span>}
+          <button className={`snap-save ${isSaved ? 'saved' : ''}`}
+            onClick={e => { e.stopPropagation(); onSave(a); }} aria-label={isSaved ? 'Saved' : 'Save'}>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill={isSaved ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth="2"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg>
+          </button>
+        </div>
+      </div>
+      {a.img && !imgErr && <img className="snap-thumb" src={a.img} loading="lazy" alt="" onError={() => setImgErr(true)} />}
+    </article>
+  );
+}
+
 // ─── GLOBAL CSS ───────────────────────────────────────────────────────────────
 // Ghost design principles:
 //   • Cards invisible at rest — no border, no shadow, no background
@@ -979,13 +1062,16 @@ function clusterStories(articles) {
 //   • Scoreboard keeps structural box (it IS a widget, not editorial content)
 const GLOBAL_CSS = `
 /* TIME Magazine + BBC News editorial typography — Playfair Display for serif headlines */
-@import url('https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,700;0,900;1,700&family=Inter:wght@300;400;500;600;700;800;900&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,700;0,900;1,700&family=Inter:wght@300;400;500;600;700;800;900&family=Archivo:wght@700;800&family=Public+Sans:wght@400;500;600;700&display=swap');
 
 *{box-sizing:border-box;margin:0;padding:0;}
 :root{
   /* Editorial type scale — TIME/BBC north star */
   --font-serif:'Playfair Display',Georgia,'Times New Roman',serif;
   --font-sans:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,sans-serif;
+  /* NewsHub upgrade (Phase 1) — Archivo headlines, Public Sans body */
+  --font-archivo:'Archivo','Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
+  --font-publicsans:'Public Sans','Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
 
   /* BBC News / TIME palette — warm newsprint white, deep navy, crimson */
   --bg:#f8f7f4;--surface:#ffffff;--surface2:#f2f0ec;
@@ -4817,6 +4903,48 @@ kbd{display:inline-block;padding:1px 5px;border:1px solid var(--border);border-r
 .gn-lead{overflow:hidden;}
 .fc-thumb{transition:transform 0.3s ease;}
 .fc:hover .fc-thumb{transform:scale(1.03);}
+
+/* ═══════════ NEWSHUB UPGRADE — PHASE 1 (newshub.css) ═══════════ */
+/* State of Play strip */
+.sop-strip{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:14px 16px;margin-bottom:22px;}
+.sop-head{display:flex;align-items:baseline;gap:10px;margin-bottom:8px;flex-wrap:wrap;}
+.sop-label{font-family:var(--font-archivo);font-weight:800;font-size:12px;text-transform:uppercase;letter-spacing:0.08em;border-left:3px solid;padding-left:8px;}
+.sop-sub{font-family:var(--font-publicsans);font-size:12px;color:var(--text3);}
+.sop-list{display:flex;flex-direction:column;}
+.sop-item{display:flex;align-items:center;gap:12px;padding:9px 0;border:none;border-top:1px solid var(--border2);background:none;cursor:pointer;text-align:left;font-family:inherit;width:100%;transition:opacity 0.12s;}
+.sop-item:first-of-type{border-top:none;}
+.sop-item:hover{opacity:0.68;}
+.sop-num{font-family:var(--font-archivo);font-weight:800;font-size:15px;min-width:24px;font-variant-numeric:tabular-nums;flex-shrink:0;}
+.sop-item-title{font-family:var(--font-archivo);font-weight:700;font-size:14px;line-height:1.3;color:var(--text);flex:1;min-width:0;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;}
+.sop-item-meta{display:flex;align-items:center;gap:8px;flex-shrink:0;}
+.sop-item-sources{font-family:var(--font-publicsans);font-size:10px;font-weight:700;color:var(--accent);background:var(--surface2);border-radius:10px;padding:2px 8px;white-space:nowrap;}
+.sop-item-time{font-family:var(--font-publicsans);font-size:11px;color:var(--text3);white-space:nowrap;}
+/* Snapshot cards */
+.snap-feed{display:flex;flex-direction:column;gap:14px;}
+.snap-card{display:flex;background:var(--surface);border:1px solid var(--border);border-radius:10px;overflow:hidden;cursor:pointer;transition:transform 0.14s,box-shadow 0.14s;}
+.snap-card:hover{transform:translateY(-2px);box-shadow:0 6px 20px rgba(0,0,0,0.09);}
+.snap-accent{width:4px;flex-shrink:0;}
+.snap-breaking .snap-accent{background:var(--red)!important;}
+.snap-main{flex:1;min-width:0;padding:14px 16px;}
+.snap-meta{display:flex;align-items:center;gap:8px;margin-bottom:7px;flex-wrap:wrap;}
+.snap-source{font-family:var(--font-publicsans);font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.05em;}
+.snap-live{font-family:var(--font-publicsans);font-size:9px;font-weight:800;color:#fff;background:var(--red);border-radius:4px;padding:2px 6px;letter-spacing:0.06em;}
+.snap-tag{font-family:var(--font-publicsans);font-size:10px;font-weight:700;border-radius:20px;padding:2px 9px;text-transform:uppercase;letter-spacing:0.03em;}
+.snap-time{font-family:var(--font-publicsans);font-size:11px;color:var(--text3);margin-left:auto;}
+.snap-title{font-family:var(--font-archivo);font-weight:800;font-size:18px;line-height:1.22;letter-spacing:-0.2px;color:var(--text);margin:0 0 6px;}
+.snap-snippet{font-family:var(--font-publicsans);font-size:13px;line-height:1.5;color:var(--text2);margin:0 0 10px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;}
+.snap-foot{display:flex;align-items:center;justify-content:space-between;gap:10px;}
+.snap-sources{font-family:var(--font-publicsans);font-size:11px;color:var(--text3);min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.snap-sources strong{color:var(--accent);font-weight:700;}
+.snap-single{font-family:var(--font-publicsans);font-size:11px;color:var(--text3);}
+.snap-save{background:none;border:1px solid var(--border);border-radius:8px;padding:5px 8px;cursor:pointer;color:var(--text3);flex-shrink:0;display:flex;align-items:center;transition:color 0.12s,border-color 0.12s;}
+.snap-save:hover,.snap-save.saved{color:var(--accent);border-color:var(--accent);}
+.snap-thumb{width:150px;flex-shrink:0;object-fit:cover;background:var(--surface2);align-self:stretch;}
+@media(max-width:640px){
+  .snap-thumb{width:104px;}
+  .snap-title{font-size:16px;}
+  .sop-strip{padding:12px 14px;}
+}
 `;
 
 
@@ -8298,6 +8426,11 @@ export default function App() {
           <ActiveScoresBar scores={scores} onGoToSports={() => handleTabChange('sports')}/>
         )}
 
+        {/* ── STATE OF PLAY strip (Phase 1) — top of every category ── */}
+        {!activeKw && !activeSrc && !search && (
+          <StateOfPlay items={activeFilteredItems} cat={cat} onRead={onRead}/>
+        )}
+
         {/* ── HOME: Top of Hour strip (image cards) → Briefing → Trending */}
         {isHome && !activeKw && !activeSrc && !search && (
           <TopOfHourStrip catLead={catLead} arts={arts} onRead={onRead}/>
@@ -8413,7 +8546,9 @@ export default function App() {
               ?<div className="empty-state"><div className="empty-icon">{cc.emoji}</div><div className="empty-msg">Loading {cc.label}…</div></div>
               :feedItems.length===0
                 ?<div className="empty-state"><div className="empty-icon">📭</div><div className="empty-msg">{activeKw||activeSrc?'No articles match this filter':search?`No internal results for "${search}"`:'No articles loaded yet'}</div><button className="refresh-btn" onClick={refreshAll}>Refresh</button></div>
-                :feedItems.slice(activeKw||activeSrc||search?0:3,20).map((a,i)=><FeedCard key={i} a={a} cat={cat} isSaved={isSavedFn(a)} onSave={onSave} onRead={onRead} relatedSources={getRelated(a,cat)} isRead={isReadFn(a)} userKw={kw} userTeams={teams}/>)
+                :<div className="snap-feed">
+                  {feedItems.slice(activeKw||activeSrc||search?0:3,20).map((a,i)=><SnapshotCard key={a.link||i} a={a} cat={cat} isSaved={isSavedFn(a)} onSave={onSave} onRead={onRead}/>)}
+                 </div>
             }
 
             {/* Pop culture sub-tab web results */}
