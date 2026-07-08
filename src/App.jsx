@@ -287,6 +287,17 @@ const LEAGUES = [
   { key:'cbb', label:'College BB',sport:'basketball', league:'mens-college-basketball', emoji:'🏀', accent:'#d97706' },
 ];
 
+// Tier 3 (Phase 5): ~20 major programs per league for the team-chip rail.
+// slug = name lowercased + hyphenated; query = name lowercased (substring match).
+const TEAM_CHIPS = {
+  nfl: ['Chiefs','Eagles','Cowboys','49ers','Bills','Ravens','Lions','Dolphins','Packers','Bengals','Jets','Steelers','Vikings','Texans','Jaguars','Chargers','Rams','Seahawks','Patriots','Giants'],
+  nba: ['Celtics','Lakers','Warriors','Nuggets','Bucks','Heat','Knicks','76ers','Suns','Mavericks','Timberwolves','Thunder','Cavaliers','Clippers','Rockets','Pacers','Kings','Magic','Bulls','Nets'],
+  mlb: ['Dodgers','Yankees','Braves','Astros','Phillies','Orioles','Rangers','Cubs','Mets','Red Sox','Padres','Guardians','Brewers','Cardinals','Twins','Mariners','Blue Jays','Rays','Tigers','Royals'],
+  cfb: ['Georgia','Alabama','Ohio State','Michigan','Texas','Oregon','Clemson','Notre Dame','Penn State','LSU','Tennessee','Florida State','USC','Oklahoma','Ole Miss','Kentucky','Auburn','Miami','Washington','Utah'],
+  cbb: ['UConn','Kansas','Duke','Kentucky','North Carolina','Purdue','Houston','Gonzaga','Arizona','Tennessee','Baylor','Michigan State','UCLA','Marquette','Auburn','Creighton','Illinois','Alabama','Indiana','Villanova'],
+};
+const teamSlug = (name) => name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+
 const SK = 'v26_';
 const OLD_SKS = ['v25b_','v25a_','v24_','v23_'];
 
@@ -547,7 +558,8 @@ function parseRoute() {
   let category = (parts[0] || 'general').toLowerCase();
   if (!ROUTE_CATS.includes(category)) category = 'general';
   const subcategory = parts[1] ? decodeURIComponent(parts[1]).toLowerCase() : null;
-  return { category, subcategory };
+  const tertiary = parts[2] ? decodeURIComponent(parts[2]).toLowerCase() : null; // Tier 3: team slug
+  return { category, subcategory, tertiary };
 }
 
 function favoriteIn(game) {
@@ -870,6 +882,29 @@ function getTrendingTopics(arts, limit = 10) {
     .sort((a, b) => b[1] - a[1])
     .slice(0, limit)
     .map(([k]) => k);
+}
+
+// Phase 5 #2: derive "Trending Now" topics from the CURRENT feed's hottest
+// clusters (heat = cluster breadth × 12 + freshness), not a fixed list. Each label
+// is a salient token from a hot cluster's title (proper noun preferred) so tapping
+// it filters the feed via the existing substring search. Works in any category.
+function hotClusterTopics(items, n = 5) {
+  const scored = [...(items || [])].map(a => {
+    const ageH = a.pubDate ? (Date.now() - new Date(a.pubDate)) / 3600000 : 999;
+    return { a, heat: (a._clusterSize || 1) * 12 + Math.max(0, 48 - ageH) };
+  }).sort((x, y) => y.heat - x.heat);
+  const seen = new Set(), out = [];
+  for (const { a } of scored) {
+    const tokens = (a.title || '').split(/\s+/).map(w => w.replace(/[^A-Za-z0-9]/g, ''));
+    let label = tokens.find(w => w.length > 3 && /^[A-Z]/.test(w) && !TREND_STOP.has(w.toLowerCase()));
+    if (!label) label = tokens.filter(w => w.length > 4 && !TREND_STOP.has(w.toLowerCase())).sort((x, y) => y.length - x.length)[0];
+    if (!label) continue;
+    const key = label.toLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key); out.push(label);
+    if (out.length >= n) break;
+  }
+  return out;
 }
 
 // Source recommendations based on search query
@@ -4363,7 +4398,7 @@ kbd{display:inline-block;padding:1px 5px;border:1px solid var(--border);border-r
   flex-shrink:0;
 }
 .trending-chip{
-  font-size:11px;font-weight:600;color:var(--text2);
+  font-size:11px;font-weight:600;color:var(--text2);font-family:inherit;
   background:var(--surface2);border:1px solid var(--border);
   border-radius:20px;padding:4px 11px;cursor:pointer;
   transition:all 0.12s;white-space:nowrap;
@@ -7674,6 +7709,13 @@ function ArticleReader({ article, onClose }) {
 export default function App() {
   const [tab, setTab]           = useState(()=>parseRoute().category);
   const [subcat, setSubcat]     = useState(()=>parseRoute().subcategory); // URL-driven subcategory
+  const [tertiary, setTertiary] = useState(()=>parseRoute().tertiary);    // URL-driven team (Tier 3)
+  const [myTeams, setMyTeams]   = useState(()=>ld('myTeams', []));        // followed teams {name,league,slug}
+  const toggleMyTeam = (t) => setMyTeams(prev => {
+    const exists = prev.some(x => x.slug === t.slug && x.league === t.league);
+    const next = exists ? prev.filter(x => !(x.slug === t.slug && x.league === t.league)) : [...prev, t];
+    sv('myTeams', next); return next;
+  });
   const [search, setSearch]     = useState('');
   const [dark, setDark]         = useState(()=>ld('dark',false));
   const [saved, setSaved]       = useState(()=>ld('saved',[]));
@@ -8028,8 +8070,8 @@ export default function App() {
 
   // Phase 2: apply a route (category + optional subcategory) to app state and
   // refetch the feed. Called both by navigate() (user clicks) and popstate (back).
-  const applyRoute = (category, subcategory) => {
-    setTab(category); setSubcat(subcategory || null);
+  const applyRoute = (category, subcategory, tertiary) => {
+    setTab(category); setSubcat(subcategory || null); setTertiary(tertiary || null);
     setSearch('');setActiveKw(null);setActiveSrc(null);
     setMobileSearchOpen(false);
     window.scrollTo({top:0, behavior:'instant'});
@@ -8040,21 +8082,23 @@ export default function App() {
     if(category==='finance')loadMarketData();
   };
 
-  // Phase 2: the URL is the single source of truth. navigate() writes the path,
-  // then applies it. Subcategory chips call this instead of setting local state.
-  const navigate = (category, subcategory=null) => {
-    const path = subcategory ? `/${category}/${encodeURIComponent(subcategory)}` : `/${category}`;
+  // Phase 2/5: the URL is the single source of truth. navigate() writes the path
+  // (/:category/:subcategory?/:team?), then applies it. Chips call this, never local state.
+  const navigate = (category, subcategory=null, tertiary=null) => {
+    let path = `/${category}`;
+    if (subcategory) path += `/${encodeURIComponent(subcategory)}`;
+    if (subcategory && tertiary) path += `/${encodeURIComponent(tertiary)}`;
     if (typeof window!=='undefined' && window.location.pathname !== path) {
-      window.history.pushState({category,subcategory}, '', path);
+      window.history.pushState({category,subcategory,tertiary}, '', path);
     }
-    applyRoute(category, subcategory);
+    applyRoute(category, subcategory, tertiary);
   };
 
-  const handleTabChange = t => navigate(t, null);
+  const handleTabChange = t => navigate(t, null, null);
 
   // Phase 2: back/forward buttons re-apply the URL as source of truth.
   useEffect(()=>{
-    const onPop = () => { const r = parseRoute(); applyRoute(r.category, r.subcategory); };
+    const onPop = () => { const r = parseRoute(); applyRoute(r.category, r.subcategory, r.tertiary); };
     window.addEventListener('popstate', onPop);
     return () => window.removeEventListener('popstate', onPop);
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -8114,6 +8158,12 @@ export default function App() {
     // Phase 2: subcategory comes from the URL (never local state). Chips navigate.
     const sportTab = subcat || 'all'; // 'all' | 'nfl' | 'nba' | 'mlb' | 'cfb' | 'cbb' | 'cbase' | 'racing' | 'golf'
     const setSportTab = (key) => navigate('sports', key === 'all' ? null : key);
+    // Tier 3: team page driven by the URL's 3rd segment (/sports/:league/:team).
+    const teamName = (sportTab !== 'all' && tertiary)
+      ? ((TEAM_CHIPS[sportTab] || []).find(n => teamSlug(n) === tertiary)
+         || tertiary.replace(/-/g, ' ').replace(/\b\w/g, c => c.toUpperCase()))
+      : null;
+    const teamFollowed = !!(tertiary && myTeams.some(x => x.slug === tertiary && x.league === sportTab));
     const [activeTeam, setActiveTeam] = useState(null); // team obj when filter pill tapped
     const [teamMenuSym, setTeamMenuSym] = useState(null); // team with open popup menu
     const [sportWebResults, setSportWebResults] = useState([]);
@@ -8198,6 +8248,14 @@ export default function App() {
     }, [allItems, activeTeam, sportTab, teams, visibleTeams]);
 
     // Hero = first article with image
+    // Tier 3: team feed reuses the Phase 2 engine (narrower query) + clusterStories.
+    const teamItems = useMemo(() => {
+      if (!teamName) return [];
+      const q = teamName.toLowerCase();
+      return clusterStories(allItems.filter(a => (a.title + ' ' + (a.desc||'')).toLowerCase().includes(q)));
+    }, [teamName, allItems]);
+    const teamHero = teamItems.find(a => a.img) || null;
+
     const heroItems = sportItems.filter(a => a.img);
     const lead = heroItems[0] || null;
     // Exclude the hero by object identity (not link equality): in sparse/out-of-
@@ -8255,8 +8313,65 @@ export default function App() {
           ))}
         </div>
 
+        {/* ── TEAM CHIP RAIL (Tier 3) — reuses sport-tabs styling ── */}
+        {TEAM_CHIPS[sportTab] && (
+          <div className="sport-tabs" style={{marginTop:'-4px'}}>
+            <button className={`sport-tab ${!teamName?'active':''}`} onClick={()=>navigate('sports', sportTab)}>
+              All {SPORT_TABS.find(s=>s.key===sportTab)?.label||''}
+            </button>
+            {TEAM_CHIPS[sportTab].map(n => {
+              const s = teamSlug(n);
+              return (
+                <button key={s} className={`sport-tab ${tertiary===s?'active':''}`} onClick={()=>navigate('sports', sportTab, s)}>
+                  {n}
+                </button>
+              );
+            })}
+          </div>
+        )}
+
+        {/* ── TEAM PAGE (Tier 3) — StateOfPlay + SnapshotCards + XPulse, follow star ── */}
+        {teamName && (
+          <>
+            <div className="sport-league-header">
+              <div className="sport-league-header-left">
+                <span className="sport-league-emoji">{SPORT_TABS.find(s=>s.key===sportTab)?.emoji||'🏆'}</span>
+                <div>
+                  <h2 className="sport-league-title">{teamName}</h2>
+                  <div className="sport-league-count">{teamItems.length} {teamItems.length===1?'story':'stories'} · {sportTab.toUpperCase()}</div>
+                </div>
+              </div>
+              <div style={{display:'flex',gap:'8px',alignItems:'center'}}>
+                <button className="sport-league-all-btn" onClick={()=>toggleMyTeam({name:teamName, league:sportTab, slug:tertiary})}>
+                  {teamFollowed ? '★ Following' : '☆ Follow'}
+                </button>
+                <button className="sport-league-all-btn" onClick={()=>navigate('sports', sportTab)}>← All {SPORT_TABS.find(s=>s.key===sportTab)?.label}</button>
+              </div>
+            </div>
+            <div className="page-grid">
+              <div className="feed-col">
+                <StateOfPlay items={teamItems} cat="sports" onRead={onRead}/>
+                {teamItems.length === 0
+                  ? <div className="empty-state"><div className="empty-icon">🏆</div><div className="empty-msg">No recent stories for {teamName}</div><button className="refresh-btn" onClick={()=>loadCat('sports')}>Refresh</button></div>
+                  : <div className="snap-feed">
+                      {teamItems.slice(0,20).map((a,i)=>(
+                        <Fragment key={a.link||i}>
+                          <SnapshotCard a={a} cat="sports" isSaved={isSavedFn(a)} onSave={onSave} onRead={onRead}/>
+                          {i===2 && <XPulse topic={teamName} variant="feed"/>}
+                        </Fragment>
+                      ))}
+                    </div>}
+              </div>
+              <Sidebar cat="sports" arts={arts} kw={kw} health={health}
+                activeKw={activeKw} setActiveKw={k=>{setActiveKw(k);setActiveSrc(null);}}
+                activeSource={activeSrc} setActiveSource={s=>{setActiveSrc(s);setActiveKw(null);}}
+                onRead={onRead} scores={scores} scoresLoading={scoresLoading} showScoreboard={false}/>
+            </div>
+          </>
+        )}
+
         {/* ── SCOREBOARD STRIP — ESPN dark card style ── */}
-        <SportsScoreStrip scores={visibleScores} teams={teams}/>
+        {!teamName && <SportsScoreStrip scores={visibleScores} teams={teams}/>}
 
         {/* v46: MY TEAMS — Yahoo-style personalized rail of followed-team headlines */}
         {sportTab === 'all' && !activeTeam && !activeSrc && !search && (() => {
@@ -8291,7 +8406,7 @@ export default function App() {
         })()}
 
         {/* ── LEAGUE HEADER — ESPN hero banner (only when league tab active) ── */}
-        {sportTab !== 'all' && (() => {
+        {sportTab !== 'all' && !teamName && (() => {
           const lt = SPORT_TABS.find(st => st.key === sportTab);
           return (
             <div className="sport-league-header">
@@ -8328,7 +8443,7 @@ export default function App() {
         )}
 
         {/* ── HERO + FEED ── */}
-        <div className="page-grid" ref={feedRef}>
+        {!teamName && <div className="page-grid" ref={feedRef}>
           <div className="feed-col">
             {/* Hero lead article */}
             {lead && (
@@ -8455,7 +8570,7 @@ export default function App() {
             activeSource={activeSrc} setActiveSource={s=>{setActiveSrc(s);setActiveKw(null);}}
             onRead={onRead} scores={scores} scoresLoading={scoresLoading}
             showScoreboard={false} recommended={recommended}/>
-        </div>
+        </div>}
       </div>
     );
   };
@@ -8579,6 +8694,39 @@ export default function App() {
             <span className="nsp-dot"/> ↑ {pendingNew[cat].length} new {pendingNew[cat].length===1?'story':'stories'}
           </button>
         )}
+        {/* Tier 3: MY TEAMS on Home — latest 1-2 stories per followed team */}
+        {isHome && myTeams.length > 0 && !activeKw && !activeSrc && !search && (() => {
+          const rows = myTeams.flatMap(t => {
+            const q = t.name.toLowerCase();
+            return (arts.sports || [])
+              .filter(a => (a.title + ' ' + (a.desc||'')).toLowerCase().includes(q))
+              .slice(0, 2)
+              .map(a => ({ t, a }));
+          });
+          if (!rows.length) return null;
+          return (
+            <div className="my-teams-module">
+              <div className="my-teams-head">
+                <span className="my-teams-title">⭐ My Teams</span>
+                <button className="my-teams-edit" onClick={()=>handleTabChange('sports')}>All sports →</button>
+              </div>
+              <div className="my-teams-scroll">
+                {rows.map(({t, a}, i) => (
+                  <div key={t.slug + i} className="my-team-card"
+                    onClick={()=>navigate('sports', t.league, t.slug)}>
+                    {a.img
+                      ? <div className="my-team-img" style={{backgroundImage:`url(${a.img})`}}/>
+                      : <div className="my-team-img ph">🏆</div>}
+                    <div className="my-team-card-body">
+                      <span className="my-team-src" style={{color:CATS.sports.color}}>{t.name} · {t.league.toUpperCase()}</span>
+                      <span className="my-team-title">{a.title}</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          );
+        })()}
         {/* First-run onboarding card */}
         {isHome && !onboardingDismissed && !activeKw && !activeSrc && !search && (
           <div className="onboarding-card">
@@ -8623,24 +8771,25 @@ export default function App() {
           <StateOfPlay items={activeFilteredItems} cat={cat} onRead={onRead}/>
         )}
 
-        {/* ── HOME: Top of Hour strip (image cards) → Briefing → Trending */}
-        {isHome && !activeKw && !activeSrc && !search && (
-          <TopOfHourStrip catLead={catLead} arts={arts} onRead={onRead}/>
-        )}
-        {/* ── TRENDING — all pages, scoped to category on non-home */}
+        {/* ── TRENDING NOW (Phase 5 #2) — hottest clusters as tappable filter pills,
+              directly under State of Play, in every category incl. those with no subcats ── */}
         {!activeKw && !activeSrc && !search && (() => {
-          const trendArts = isHome ? arts : {[cat]: arts[cat]||[]};
-          const topics = getTrendingTopics(trendArts);
-          if (!topics.length) return null;
+          const topics = hotClusterTopics(activeFilteredItems, 5);
+          if (topics.length < 2) return null;
           return (
-            <div className="trending-section">
-              <span className="trending-section-label">🔥 {isHome ? 'Trending Now' : `Trending in ${cc.label}`}</span>
-              {topics.slice(0,10).map((t,i) => (
-                <span key={i} className="trending-chip" onClick={()=>setSearch(t)}>{t}</span>
+            <div className="trending-section trending-now-row">
+              <span className="trending-section-label">🔥 Trending Now</span>
+              {topics.map((t, i) => (
+                <button key={i} className="trending-chip" onClick={()=>setSearch(t.toLowerCase())}>{t}</button>
               ))}
             </div>
           );
         })()}
+
+        {/* ── HOME: Top of Hour strip (image cards) ── */}
+        {isHome && !activeKw && !activeSrc && !search && (
+          <TopOfHourStrip catLead={catLead} arts={arts} onRead={onRead}/>
+        )}
 
         {/* Category pages: lead image grid */}
         {!activeKw && !activeSrc && catLead && !isHome && (
