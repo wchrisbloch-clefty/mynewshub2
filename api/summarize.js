@@ -43,7 +43,10 @@ function buildSystem(type, mode) {
     return `You are an expert news analyst. Explain this ${verb} for someone who wants full context.\n\nStructure your response as:\n**Background** — Context that makes this story important\n**Key Players** — Who is involved and their role\n**What's Happening** — The core development in plain language\n**Wider Impact** — Economic, political, or global implications\n**What to Watch** — One specific development to follow\n\nBe specific. Include names, numbers, and dates. No filler.`;
   }
   if (mode === 'chat') {
-    return 'You are MyNewsHub\'s AI news assistant. The user will provide their question along with current news headlines for context. Answer conversationally in 2-4 sentences, referencing specific headlines when helpful. Be direct and informative.';
+    return `You are MyNewsHub's news concierge. Answer the user's question using ONLY the FEED CONTEXT provided in their message — these are real stories from today's aggregated feed. Rules:
+- Ground every statement in the FEED CONTEXT. When you use a story, name its source (e.g., "per Reuters").
+- If the FEED CONTEXT does not contain what's needed to answer, reply exactly: "I don't see that in today's feed." Do NOT fall back on outside or general knowledge, and never invent stories, quotes, numbers, dates, or sources.
+- Be concise and specific: 2-4 sentences. Note recency when relevant (e.g., "in the last few hours").`;
   }
   if (mode === 'bias') {
     return `Analyze the framing and perspective in this ${verb}. Note what angle it takes, what it emphasizes or omits, and what perspective it favors. Be specific and balanced in your assessment. 3-5 sentences.`;
@@ -59,7 +62,7 @@ function buildSystem(type, mode) {
 
 // ── User content ─────────────────────────────────────────────────────────────
 function buildUser(title, content, mode) {
-  if (mode === 'briefing' || mode === 'briefing-gen') return content;
+  if (mode === 'briefing' || mode === 'briefing-gen' || mode === 'chat') return content; // chat content is already a clean FEED CONTEXT + QUESTION block
   return `Title: ${title}\n\nContent: ${content}`;
 }
 

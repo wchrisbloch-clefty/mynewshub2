@@ -907,6 +907,100 @@ function hotClusterTopics(items, n = 5) {
   return out;
 }
 
+// ─── GROUNDED RETRIEVAL (Phase 6) — STANDALONE, REUSABLE ──────────────────────
+// Pure module with no chat/component dependency: give it a question + the app's
+// per-category article arrays and it classifies intent, selects the relevant
+// clustered items (via clusterStories/hotClusterTopics), and returns structured
+// context — each item carrying source, timestamp, cluster size, and link. Can be
+// lifted out and reused anywhere (chat, a "for you" rail, etc.).
+const RETRIEVAL_CATS = {
+  finance:['finance','market','markets','stock','stocks','wall street','nasdaq','dow','s&p','crypto','bitcoin','earnings','fed','interest rate','rates','inflation','treasury'],
+  bloom:['energy','power grid','grid','oil','gas','solar','wind','nuclear','utility','utilities','electricity','ercot','renewable','battery'],
+  tech:['tech','technology','artificial intelligence','software','startup','chip','chips','semiconductor','nvidia','openai','gadget'],
+  sports:['sport','sports','nfl','nba','mlb','ncaa','ncaaf','ncaab','football','basketball','baseball','college football','college basketball','golf','racing','playoff'],
+  business:['business','economy','economic','company','companies','corporate','trade','tariff','merger','layoffs'],
+  popculture:['pop culture','celebrity','movie','movies','music','tv show','entertainment','hollywood','box office'],
+  comedy:['satire','onion','babylon bee'],
+  general:['world','breaking','politics','election','headline'],
+};
+const Q_STOP = new Set(['what','whats','how','when','where','who','why','the','are','you','me','up','on','about','tell','give','latest','news','update','catch','today','now','going','with','into','and','for','any','all','get','show','anything','happening','trending','summary','recap','story','stories','this','that','from','was','were','has','have','can']);
+
+function detectRetrievalCategory(q) {
+  const t = ' ' + q.toLowerCase() + ' ';
+  let best = null, bestHits = 0;
+  for (const [cat, kws] of Object.entries(RETRIEVAL_CATS)) {
+    const hits = kws.filter(k => t.includes(k)).length;
+    if (hits > bestHits) { bestHits = hits; best = cat; }
+  }
+  return best;
+}
+function detectRetrievalIntent(q) {
+  const t = q.toLowerCase();
+  if (/how (are|is|'?s)? ?(the )?markets?|markets? (summary|recap|update|today|doing)|market (summary|recap|update)/.test(t)) return 'markets';
+  if (/trending|what'?s hot|what'?s happening|top (stories|news)|what'?s new|biggest (stories|news)/.test(t)) return 'trending';
+  if (/catch me up|latest on|update on|tell me about|what happened|going on with|what'?s the latest|recap of|fill me in/.test(t)) return 'entity';
+  return 'general';
+}
+function extractQueryKeywords(q) {
+  return (q || '').toLowerCase().replace(/[^a-z0-9\s]/g, ' ').split(/\s+/).filter(w => w.length > 2 && !Q_STOP.has(w));
+}
+function slimFeedItem(a) {
+  const ageH = a.pubDate ? (Date.now() - new Date(a.pubDate)) / 3600000 : null;
+  const ageLabel = ageH == null ? '' : ageH < 1 ? `${Math.max(1, Math.round(ageH * 60))}m ago` : ageH < 24 ? `${Math.round(ageH)}h ago` : `${Math.round(ageH / 24)}d ago`;
+  return { title: a.title, source: a.source || '', link: a.link || '', clusterSize: a._clusterSize || 1, sources: a._clusterSources || [], ageLabel };
+}
+function retrieveFeedContext(question, arts) {
+  const q = (question || '').trim();
+  const intent = detectRetrievalIntent(q);
+  const category = detectRetrievalCategory(q);
+  const kws = extractQueryKeywords(q);
+  // Scope + cap the pool (most recent first) so clustering stays cheap.
+  const rawPool = category ? (arts[category] || []) : Object.values(arts || {}).flat();
+  const pool = [...rawPool].sort((a, b) => new Date(b.pubDate || 0) - new Date(a.pubDate || 0)).slice(0, 150);
+
+  if (intent === 'trending') {
+    const clustered = clusterStories(pool);
+    const topics = hotClusterTopics(clustered, 5);
+    const hot = clustered.map(a => {
+      const ageH = a.pubDate ? (Date.now() - new Date(a.pubDate)) / 3600000 : 999;
+      return { a, heat: (a._clusterSize || 1) * 12 + Math.max(0, 48 - ageH) };
+    }).sort((x, y) => y.heat - x.heat).slice(0, 6).map(x => slimFeedItem(x.a));
+    return { intent, category, topics, clusters: hot, deepLink: category ? `/${category}` : null };
+  }
+
+  // entity / general: keyword-filter, cluster, rank by relevance + size + recency.
+  const matched = kws.length
+    ? pool.filter(a => { const t = (a.title + ' ' + (a.desc || '')).toLowerCase(); return kws.some(k => t.includes(k)); })
+    : pool;
+  const clustered = clusterStories(matched);
+  const ranked = clustered.map(a => {
+    const t = (a.title + ' ' + (a.desc || '')).toLowerCase();
+    const kwHits = kws.filter(k => t.includes(k)).length;
+    const ageH = a.pubDate ? (Date.now() - new Date(a.pubDate)) / 3600000 : 999;
+    return { a, score: kwHits * 20 + (a._clusterSize || 1) * 8 + Math.max(0, 48 - ageH) };
+  }).sort((x, y) => y.score - x.score).slice(0, 8).map(x => slimFeedItem(x.a));
+
+  // Optional deep link: a sports entity that matches a team chip → team page.
+  let deepLink = category ? `/${category}` : null;
+  if (kws.length) {
+    for (const [lg, names] of Object.entries(TEAM_CHIPS)) {
+      const hit = names.find(n => { const w = n.toLowerCase().split(' '); return w.some(x => kws.includes(x)) || kws.some(k => k.length > 3 && n.toLowerCase().includes(k)); });
+      if (hit) { deepLink = `/sports/${lg}/${teamSlug(hit)}`; break; }
+    }
+  }
+  return { intent, category, entities: kws, clusters: ranked, deepLink };
+}
+// Format retrieved context into a compact, model-ready block.
+function buildFeedContextBlock(ctx) {
+  if (ctx.intent === 'trending' && ctx.topics?.length) {
+    let s = `TRENDING TOPICS${ctx.category ? ` in ${ctx.category}` : ''}: ${ctx.topics.join(', ')}.\nTOP CLUSTERS:\n`;
+    s += ctx.clusters.map((c, i) => `${i + 1}. "${c.title}" — ${c.source}${c.clusterSize > 1 ? ` (+${c.clusterSize - 1} more sources)` : ''}, ${c.ageLabel}`).join('\n');
+    return s;
+  }
+  if (!ctx.clusters?.length) return '';
+  return "RELEVANT STORIES FROM TODAY'S FEED:\n" + ctx.clusters.map((c, i) => `${i + 1}. "${c.title}" — ${c.source}${c.clusterSize > 1 ? ` · ${c.clusterSize} sources` : ''}, ${c.ageLabel}`).join('\n');
+}
+
 // Source recommendations based on search query
 function suggestSourcesForQuery(query) {
   const q = query.toLowerCase();
@@ -4219,6 +4313,8 @@ kbd{display:inline-block;padding:1px 5px;border:1px solid var(--border);border-r
   border-radius:4px 16px 16px 16px;
 }
 .chat-msg-time{font-size:9px;color:var(--text3);padding:0 4px;}
+.chat-deeplink{align-self:flex-start;margin:4px 0 0;background:var(--surface2);border:1px solid var(--border);border-radius:14px;padding:4px 11px;font-size:11px;font-weight:700;color:var(--accent);cursor:pointer;font-family:inherit;transition:background 0.12s;}
+.chat-deeplink:hover{background:var(--accent);color:#fff;border-color:var(--accent);}
 .chat-typing{display:flex;gap:4px;padding:8px 12px;align-items:center;}
 .chat-typing-dot{
   width:7px;height:7px;border-radius:50%;background:var(--text3);
@@ -7313,7 +7409,7 @@ function TopBar({tab, setTab, search, setSearch, dark, setDark,
 
 // ─── MAIN APP ─────────────────────────────────────────────────────────────────
 // ─── CHATBOT COMPONENT ───────────────────────────────────────────────────────
-function ChatBot({ arts }) {
+function ChatBot({ arts, onNavigate }) {
   const [open, setOpen] = useState(false);
   const [chatMode, setChatMode] = useState('chat'); // 'chat' | 'analyze'
   const [msgs, setMsgs] = useState([
@@ -7338,16 +7434,9 @@ function ChatBot({ arts }) {
     { key:'related',   label:'Related Context' },
   ];
 
-  const buildContext = () => {
-    const headlines = [];
-    Object.entries(arts).forEach(([cat, items]) => {
-      (items || []).slice(0, 5).forEach(a => {
-        headlines.push(`[${cat.toUpperCase()}] ${a.title}`);
-      });
-    });
-    return headlines.slice(0, 40).join('\n');
-  };
-
+  // Phase 6: grounded concierge. Retrieve relevant clustered feed data for the
+  // question (standalone retrieveFeedContext), hand ONLY that to the model, and
+  // let the backend chat system prompt enforce "answer only from the feed".
   const send = async (text) => {
     const q = (text || input).trim();
     if (!q || loading) return;
@@ -7355,14 +7444,37 @@ function ChatBot({ arts }) {
     setMsgs(m => [...m, { role:'user', text:q, time:t }]);
     setInput('');
     setLoading(true);
-    const ctx = buildContext();
-    const prompt = `You are a smart news briefing assistant. Current headlines:\n${ctx}\n\nUser question: ${q}\n\nAnswer concisely in 2-4 sentences, referencing specific stories when relevant.`;
-    const { summary, error } = await fetchAISummary({ type:'article', title:'User Question', content:prompt, mode:'chat' });
+
+    const ctx = retrieveFeedContext(q, arts);
+    let contextBlock = '';
+    let deepLink = ctx.deepLink;
+
+    if (ctx.intent === 'markets') {
+      try {
+        const r = await fetch('/api/markets', { signal: AbortSignal.timeout(9000) });
+        if (r.ok) {
+          const d = await r.json();
+          const idx = (d.indices || []).map(i => `${i.name} ${i.price} (${(i.pct||0) >= 0 ? '+' : ''}${(i.pct||0).toFixed(2)}%)`).join(', ');
+          const g = (d.gainers || []).slice(0, 3).map(m => `${m.symbol} ${(m.pct||0) >= 0 ? '+' : ''}${(m.pct||0).toFixed(1)}%`).join(', ');
+          const l = (d.losers || []).slice(0, 3).map(m => `${m.symbol} ${(m.pct||0).toFixed(1)}%`).join(', ');
+          if (idx) { contextBlock = `LIVE MARKETS SNAPSHOT:\nIndices: ${idx}\nTop gainers: ${g || '—'}\nTop losers: ${l || '—'}`; deepLink = '/finance'; }
+        }
+      } catch {}
+      if (!contextBlock) contextBlock = buildFeedContextBlock(retrieveFeedContext(q, arts)); // fall back to feed
+    } else {
+      contextBlock = buildFeedContextBlock(ctx);
+    }
+
+    const content = contextBlock
+      ? `FEED CONTEXT:\n${contextBlock}\n\nQUESTION: ${q}`
+      : `FEED CONTEXT: (no matching stories found in today's feed)\n\nQUESTION: ${q}`;
+
+    const { summary, error } = await fetchAISummary({ type:'article', title:'concierge', content, mode:'chat' });
     const t2 = new Date().toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'});
     const botText = error
       ? (error.includes('No AI provider') ? '⚙️ AI not configured — add GROQ_API_KEY in Vercel env vars, then redeploy.' : 'Sorry, I couldn\'t reach the AI right now. Try again in a moment.')
       : (summary || 'No response.');
-    setMsgs(m => [...m, { role:'bot', text: botText, time:t2 }]);
+    setMsgs(m => [...m, { role:'bot', text: botText, time:t2, link: (!error && contextBlock) ? deepLink : null }]);
     setLoading(false);
   };
 
@@ -7409,6 +7521,9 @@ function ChatBot({ arts }) {
                 {msgs.map((m, i) => (
                   <div key={i} className={`chat-msg ${m.role}`}>
                     <div className="chat-bubble">{m.text}</div>
+                    {m.link && onNavigate && (
+                      <button className="chat-deeplink" onClick={()=>{ onNavigate(m.link); setOpen(false); }}>Open in app →</button>
+                    )}
                     <span className="chat-msg-time">{m.time}</span>
                   </div>
                 ))}
@@ -9769,7 +9884,7 @@ export default function App() {
           onClose={()=>setShowPanel(false)} onSave={handleCustomizeSave}/>}
       </div>
       {/* Floating AI chatbot — available on all pages */}
-      <ChatBot arts={arts}/>
+      <ChatBot arts={arts} onNavigate={(path)=>{ const p=(path||'').split('/').filter(Boolean); navigate(p[0]||'general', p[1]||null, p[2]||null); }}/>
       {/* Inline article reader overlay */}
       {readerArticle && <ArticleReader article={readerArticle} onClose={() => setReaderArticle(null)}/>}
       {/* Paste & Brief panel */}
