@@ -4964,6 +4964,54 @@ kbd{display:inline-block;padding:1px 5px;border:1px solid var(--border);border-r
   .snap-title{font-size:16px;}
   .sop-strip{padding:12px 14px;}
 }
+
+/* ═══════════ PHASE 3 — MARKETS FACELIFT ═══════════ */
+.sk-line{display:block;height:10px;margin:3px 0;border-radius:4px;
+  background:linear-gradient(90deg,var(--border2) 0px,var(--surface) 80px,var(--border2) 160px);
+  background-size:200px 100%;animation:shimmer 1.2s ease-in-out infinite;}
+/* (a) sticky ticker rail */
+.mkt-rail{position:sticky;top:0;z-index:80;background:var(--surface);border:1px solid var(--border);
+  border-radius:10px;margin-bottom:16px;overflow:hidden;}
+/* ≤640px the header auto-hides on scroll (top:0 is correct); above that it stays,
+   so offset the rail to sit just below the (shrunk) header. */
+@media(min-width:641px){ .mkt-rail{top:56px;} }
+.mkt-rail-inner{display:flex;overflow-x:auto;scrollbar-width:none;-webkit-overflow-scrolling:touch;}
+.mkt-rail-inner::-webkit-scrollbar{display:none;}
+.mkt-rail-item{flex-shrink:0;display:flex;flex-direction:column;gap:2px;padding:9px 18px;
+  border-right:1px solid var(--border2);min-width:128px;}
+.mkt-rail-name{font-family:var(--font-publicsans);font-size:11px;font-weight:700;color:var(--text3);
+  text-transform:uppercase;letter-spacing:0.04em;}
+.mkt-rail-px{font-family:var(--font-archivo);font-size:16px;font-weight:800;color:var(--text);font-variant-numeric:tabular-nums;}
+.mkt-rail-pct{font-family:var(--font-publicsans);font-size:12px;font-weight:700;font-variant-numeric:tabular-nums;}
+.mkt-fail{background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:10px 14px;
+  font-size:12px;color:var(--text3);margin-bottom:16px;font-family:var(--font-publicsans);}
+/* (b) movers */
+.mkt-movers-section{margin-bottom:22px;}
+.mkt-mover-tabs{display:flex;gap:6px;margin-bottom:12px;}
+.mkt-mover-tab{flex:1;padding:9px;border:1px solid var(--border);background:var(--surface);border-radius:8px;
+  font-family:var(--font-publicsans);font-size:12px;font-weight:700;color:var(--text3);cursor:pointer;transition:all 0.12s;}
+.mkt-mover-tab.active{background:var(--accent);color:#fff;border-color:var(--accent);}
+.mkt-mover-cols{display:block;}
+.mkt-mover-col{display:none;background:var(--surface);border:1px solid var(--border);border-radius:10px;overflow:hidden;margin-bottom:12px;}
+.mkt-mover-col.active{display:block;}
+.mkt-mover-head{font-family:var(--font-archivo);font-weight:800;font-size:12px;text-transform:uppercase;
+  letter-spacing:0.05em;color:var(--text2);padding:10px 14px;border-bottom:1px solid var(--border2);background:var(--surface2);}
+.mkt-mover-row{display:flex;align-items:center;gap:10px;padding:9px 14px;border-top:1px solid var(--border2);
+  text-decoration:none;color:var(--text);}
+.mkt-mover-row:first-of-type{border-top:none;}
+.mkt-mover-row:hover{background:var(--surface2);}
+.mkt-mover-sym{font-family:var(--font-archivo);font-weight:800;font-size:12px;min-width:52px;flex-shrink:0;}
+.mkt-mover-name{font-family:var(--font-publicsans);font-size:11px;color:var(--text3);flex:1;min-width:0;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.mkt-mover-px{font-family:var(--font-publicsans);font-size:12px;font-variant-numeric:tabular-nums;color:var(--text2);flex-shrink:0;}
+.mkt-mover-pct{font-family:var(--font-publicsans);font-size:12px;font-weight:700;font-variant-numeric:tabular-nums;
+  min-width:74px;text-align:right;flex-shrink:0;}
+.mkt-mover-empty{padding:14px;text-align:center;color:var(--text3);font-size:12px;}
+@media(min-width:1024px){
+  .mkt-mover-tabs{display:none;}
+  .mkt-mover-cols{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;}
+  .mkt-mover-col{display:block!important;margin-bottom:0;}
+}
 `;
 
 
@@ -9196,6 +9244,48 @@ export default function App() {
     const fmtChg=n=>n==null?'':(n>=0?'+':'')+n.toFixed(2);
     const fmtPct=n=>n==null?'':(n>=0?'+':'')+n.toFixed(2)+'%';
 
+    // Phase 3: single consolidated FMP payload (one request), auto-refresh 60s when visible.
+    const [mkt, setMkt] = useState(null);
+    const [mktLoading, setMktLoading] = useState(true);
+    const [mktErr, setMktErr] = useState(false);
+    const [moverTab, setMoverTab] = useState('gainers');
+    const loadMarkets = useCallback(async () => {
+      try {
+        const r = await fetch('/api/markets', { signal: AbortSignal.timeout(12000) });
+        if (!r.ok) throw new Error('http');
+        const d = await r.json();
+        setMkt(d); setMktErr(!!d.error && !(d.indices||[]).length);
+      } catch { setMktErr(true); }
+      finally { setMktLoading(false); }
+    }, []);
+    useEffect(() => {
+      loadMarkets();
+      const iv = setInterval(() => { if (!document.hidden) loadMarkets(); }, 60000);
+      const onVis = () => { if (!document.hidden) loadMarkets(); };
+      document.addEventListener('visibilitychange', onVis);
+      return () => { clearInterval(iv); document.removeEventListener('visibilitychange', onVis); };
+    }, [loadMarkets]);
+    // (c) Finance news → clusterStories dedup → SnapshotCards. FMP payload, RSS fallback.
+    const newsItems = useMemo(() => {
+      const fmpNews = (mkt?.news||[]).map(n => ({
+        title:n.title, link:n.url, desc:n.text||'', source:n.site||'Markets', pubDate:n.publishedDate, img:n.image||'',
+      })).filter(a=>a.title&&a.link);
+      return clusterStories(fmpNews.length ? fmpNews : items);
+    }, [mkt, items]);
+    const Movers = ({title, list, kind}) => (
+      <div className={`mkt-mover-col ${moverTab===kind?'active':''}`}>
+        <div className="mkt-mover-head">{title}</div>
+        {(list||[]).map(m => { const up=(m.pct||0)>=0; return (
+          <a key={m.symbol} className="mkt-mover-row" href={`https://finance.yahoo.com/quote/${encodeURIComponent(m.symbol)}`} target="_blank" rel="noreferrer">
+            <span className="mkt-mover-sym">{m.symbol}</span>
+            <span className="mkt-mover-name">{m.name}</span>
+            <span className="mkt-mover-px">{fmtPrice(m.price)}</span>
+            <span className={`mkt-mover-pct ${up?'fin-up':'fin-down'}`}>{up?'▲':'▼'} {Math.abs(m.pct||0).toFixed(2)}%</span>
+          </a>); })}
+        {(!list||!list.length) && <div className="mkt-mover-empty">—</div>}
+      </div>
+    );
+
     return (
       <div className="page">
         <div className="fin-header fin-header-slim">
@@ -9203,19 +9293,57 @@ export default function App() {
             <div>
               <div className="fin-header-title">📈 Markets</div>
               <div className="fin-header-sub">
-                <span style={{color:'var(--text3)'}}>Quotes via Yahoo Finance · 5min delay</span>
+                <span style={{color:'var(--text3)'}}>
+                  {mktErr ? 'Live data unavailable — latest news below' : `Live via Financial Modeling Prep${mkt?.asOf?` · updated ${fmtDate(mkt.asOf)}`:''}`}
+                </span>
               </div>
             </div>
             <div style={{display:'flex',alignItems:'center',gap:'12px'}}>
-              {lastUpdated.finance && <LastUpdated timestamp={lastUpdated.finance} onRefresh={() => loadCat('finance')}/>}
-              <button className="fin-refresh" onClick={loadMarketData} disabled={marketLoading}>
-                {marketLoading?'⟳ Loading…':'↺ Refresh'}
+              <button className="fin-refresh" onClick={loadMarkets} disabled={mktLoading}>
+                {mktLoading?'⟳ Loading…':'↺ Refresh'}
               </button>
             </div>
           </div>
         </div>
+        {/* (a) STICKY TICKER RAIL — indices, price, % green/red, tabular nums */}
+        {mktLoading && !mkt
+          ? <div className="mkt-rail"><div className="mkt-rail-inner">{Array.from({length:5}).map((_,i)=>(
+              <div key={i} className="mkt-rail-item"><span className="sk-line" style={{width:'56px'}}/><span className="sk-line" style={{width:'72px'}}/></div>
+            ))}</div></div>
+          : (mkt?.indices||[]).length>0 && (
+            <div className="mkt-rail"><div className="mkt-rail-inner">
+              {mkt.indices.map(ix => { const up=(ix.pct||0)>=0; return (
+                <div key={ix.symbol} className="mkt-rail-item">
+                  <span className="mkt-rail-name">{ix.name}</span>
+                  <span className="mkt-rail-px">{fmtPrice(ix.price)}</span>
+                  <span className={`mkt-rail-pct ${up?'fin-up':'fin-down'}`}>{up?'▲':'▼'} {Math.abs(ix.pct||0).toFixed(2)}%</span>
+                </div>); })}
+            </div></div>
+          )}
+
+        {mktErr && <div className="mkt-fail">Live market data is temporarily unavailable. Latest markets news is below.</div>}
+
         <div className="fin-grid">
           <div className="fin-main">
+            {/* (b) MOVERS — 3 tabs on mobile, 3 columns at ≥1024px */}
+            <section className="mkt-movers-section">
+              <div className="mkt-mover-tabs">
+                {[['gainers','Gainers'],['losers','Losers'],['actives','Most Active']].map(([k,l])=>(
+                  <button key={k} className={`mkt-mover-tab ${moverTab===k?'active':''}`} onClick={()=>setMoverTab(k)}>{l}</button>
+                ))}
+              </div>
+              {mktLoading && !mkt
+                ? <div className="mkt-mover-cols">{Array.from({length:3}).map((_,i)=>(
+                    <div key={i} className={`mkt-mover-col ${i===0?'active':''}`}><div className="mkt-mover-head">&nbsp;</div>
+                      {Array.from({length:6}).map((_,j)=><div key={j} className="mkt-mover-row"><span className="sk-line"/></div>)}
+                    </div>))}</div>
+                : <div className="mkt-mover-cols">
+                    <Movers title="Gainers" list={mkt?.gainers} kind="gainers"/>
+                    <Movers title="Losers" list={mkt?.losers} kind="losers"/>
+                    <Movers title="Most Active" list={mkt?.actives} kind="actives"/>
+                  </div>}
+            </section>
+
             <section className="fin-watchlist">
               <div className="fin-section-head">
                 <span className="fin-section-title">My Watchlist</span>
@@ -9300,32 +9428,13 @@ export default function App() {
                 <span className="fin-section-title">Markets News</span>
                 <button className="page-customize-btn" onClick={()=>openCustomize('sources','finance')}>⚙ Sources</button>
               </div>
-              {loading.finance&&!items.length
-                ?<div className="empty-state"><div className="empty-icon">📈</div><div className="empty-msg">Loading Markets…</div></div>
-                :items.length===0
-                  ?<div className="empty-state"><div className="empty-icon">📭</div><div className="empty-msg">No articles loaded yet</div><button className="refresh-btn" onClick={refreshAll}>Refresh</button></div>
-                  :<>
-                    {/* v25b: gn-grid 3-col for first 3 visual cards */}
-                    <div className="gn-row" style={{padding:'14px 14px 0'}}>
-                      {items.slice(0, 6).filter(a=>a.img).slice(0, 3).concat(
-                        items.slice(0, 6).filter(a=>!a.img)
-                      ).slice(0, 3).map((a, i) => (
-                        <article key={i} className="gn-card finance" onClick={()=>onRead(a)}>
-                          {a.img
-                            ? <div className="gn-card-img" style={{backgroundImage:`url(${a.img})`}}/>
-                            : <div className="gn-card-img-ph"/>}
-                          <h3 className="gn-card-title">{a.title}</h3>
-                          <div className="gn-card-meta">
-                            <span className="gn-card-source" style={{color:'#fa7800'}}>{a.source}</span>
-                            <span>·</span><span>{fmtDate(a.pubDate)}</span>
-                          </div>
-                        </article>
-                      ))}
-                    </div>
-                    {items.slice(3, 15).map((a, i) => (
-                      <FeedCard key={i} a={a} cat="finance" isSaved={isSavedFn(a)} onSave={onSave} onRead={onRead} relatedSources={getRelated(a,'finance')} isRead={isReadFn(a)} userKw={kw} userTeams={teams}/>
+              {newsItems.length===0
+                ?<div className="empty-state"><div className="empty-icon">📈</div><div className="empty-msg">Loading Markets news…</div></div>
+                :<div className="snap-feed" style={{padding:'12px 0 0'}}>
+                    {newsItems.slice(0, 15).map((a, i) => (
+                      <SnapshotCard key={a.link||i} a={a} cat="finance" isSaved={isSavedFn(a)} onSave={onSave} onRead={onRead}/>
                     ))}
-                  </>
+                  </div>
               }
               <SocialFollows cat="finance" social={social}/>
               <SourceFooter cat="finance" feeds={feeds} arts={arts}/>
