@@ -43,7 +43,9 @@ Rules:
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${key}` },
       body: JSON.stringify({
-        model: 'grok-3-latest',
+        // grok-3-mini is the model proven to authenticate with this key (also used
+        // by /api/summarize). Live Search is enabled per-request via search_parameters.
+        model: 'grok-3-mini',
         messages: [{ role: 'user', content: prompt }],
         temperature: 0.2,
         max_tokens: 800,
@@ -51,15 +53,32 @@ Rules:
       }),
       signal: AbortSignal.timeout(8000),
     });
-    if (!r.ok) return res.status(200).json(empty);
+
+    if (!r.ok) {
+      const body = await r.text().catch(() => '');
+      console.error(`[x-pulse] xAI HTTP ${r.status} for "${topic}":`, body.slice(0, 400));
+      return res.status(200).json(empty);
+    }
 
     const d = await r.json();
     const content = stripFences(d?.choices?.[0]?.message?.content || '');
+    if (!content) {
+      console.error(`[x-pulse] empty content for "${topic}":`, JSON.stringify(d).slice(0, 400));
+      return res.status(200).json(empty);
+    }
+
     const m = content.match(/\{[\s\S]*\}/);
-    if (!m) return res.status(200).json(empty);
+    if (!m) {
+      console.error(`[x-pulse] no JSON object in content for "${topic}":`, content.slice(0, 300));
+      return res.status(200).json(empty);
+    }
 
     let parsed;
-    try { parsed = JSON.parse(m[0]); } catch { return res.status(200).json(empty); }
+    try { parsed = JSON.parse(m[0]); }
+    catch (e) {
+      console.error(`[x-pulse] JSON parse failed for "${topic}": ${e.message} ::`, m[0].slice(0, 300));
+      return res.status(200).json(empty);
+    }
 
     const validSent = ['bullish', 'bearish', 'mixed', 'n/a'];
     const takes = (Array.isArray(parsed.takes) ? parsed.takes : [])
@@ -67,13 +86,16 @@ Rules:
       .slice(0, 5)
       .map(t => ({ text: String(t.text).slice(0, 200), handle: (t.handle || '').toString(), url: String(t.url) }));
 
+    if (!takes.length) console.error(`[x-pulse] parsed but 0 valid takes for "${topic}"`);
+
     const data = {
       sentiment: takes.length && validSent.includes(parsed.sentiment) ? parsed.sentiment : 'n/a',
       takes,
     };
     cache.set(ck, { at: Date.now(), data });
     return res.status(200).json(data);
-  } catch {
+  } catch (err) {
+    console.error(`[x-pulse] exception for "${topic}": ${err?.name} ${err?.message}`);
     return res.status(200).json(empty);
   }
 }

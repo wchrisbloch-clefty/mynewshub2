@@ -11,7 +11,7 @@
 
 const MAX_INPUT       = 3000;
 const MAX_INPUT_LARGE = 5000; // briefing-gen mode
-const TOKENS = { summary: 250, takeaways: 600, explain: 500, briefing: 400, 'briefing-gen': 700, chat: 300, bias: 400, related: 400, brief: 300 };
+const TOKENS = { summary: 320, takeaways: 700, explain: 500, briefing: 400, 'briefing-gen': 700, chat: 300, bias: 400, related: 400, brief: 300 };
 
 // ── Body parser ──────────────────────────────────────────────────────────────
 async function readBody(req) {
@@ -37,7 +37,7 @@ function buildSystem(type, mode) {
     return 'You are a sharp morning news briefing writer. Given headlines from multiple news categories, write ONE punchy sentence per category summarizing the single most important story. Be direct, specific, include names and numbers. No filler.\n\nFormat each line as:\nCategory: One sentence summary';
   }
   if (mode === 'takeaways') {
-    return `Analyze this ${verb} and extract 3-5 key takeaways. For each takeaway, write a bold short headline followed by a one-sentence explanation. Be specific — include names, numbers, and concrete details. Skip generic observations.\n\nFormat each as:\n**1. [Headline]** — [Explanation]\n**2. [Headline]** — [Explanation]\n(etc.)`;
+    return `Extract 4-6 key points from this ${verb}. Each point MUST contain a concrete, specific detail drawn from the text that is NOT already stated in the headline — a proper name, a number, a dollar amount, a date/time, a statistic, a direct quote, or a stated consequence/next step. Across the points, cover the who, what, when, where, why, and how. Never restate or paraphrase the headline, and skip anything generic or obvious.\n\nFormat each as:\n**1. [Specific point]** — [One sentence carrying the concrete detail]\n**2. [Specific point]** — [One sentence carrying the concrete detail]\n(continue to 4-6)`;
   }
   if (mode === 'explain') {
     return `You are an expert news analyst. Explain this ${verb} for someone who wants full context.\n\nStructure your response as:\n**Background** — Context that makes this story important\n**Key Players** — Who is involved and their role\n**What's Happening** — The core development in plain language\n**Wider Impact** — Economic, political, or global implications\n**What to Watch** — One specific development to follow\n\nBe specific. Include names, numbers, and dates. No filler.`;
@@ -54,7 +54,7 @@ function buildSystem(type, mode) {
   if (mode === 'brief') {
     return `Write a punchy one-paragraph brief on this ${verb}. Lead with the most important fact, include key names and numbers, end with what to watch. No headers.`;
   }
-  return `Summarize this ${verb} in 2-3 concise sentences. Be direct and factual. Skip filler like "this article discusses" — start with the actual content.`;
+  return `Write a 3-4 sentence summary of this ${verb}. Sentence 1: the core event — what specifically happened, naming the key people/organizations and any pivotal number. Sentences 2-3: the context and why it matters — the cause, the stakes, or the significance beyond the headline. Final sentence: what happens next or the specific thing to watch. Be concrete and factual, ground every sentence in the article's details, and never merely paraphrase the headline. No filler, no "this article discusses".`;
 }
 
 // ── User content ─────────────────────────────────────────────────────────────
