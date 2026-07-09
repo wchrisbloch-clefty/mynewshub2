@@ -38,9 +38,11 @@
 
 import { useState, useEffect, useCallback, useMemo, useRef, Fragment } from 'react';
 // Extracted, dependency-isolated capability modules (see src/modules/*/README.md)
-import { clusterStories, hotClusterTopics, heatScore, TREND_STOP } from './modules/clustering';
+import { clusterStories, hotClusterTopics, TREND_STOP } from './modules/clustering';
 import { retrieveFeedContext, buildFeedContextBlock } from './modules/retrieval';
 import { XPulse } from './modules/x-pulse';
+import { StateOfPlay } from './modules/state-of-play';
+import { SnapshotCard } from './modules/snapshot-card';
 
 // ─── CATEGORIES ───────────────────────────────────────────────────────────────
 const CATS = {
@@ -961,84 +963,7 @@ function whyItMatters(article, userKw, userTeams) {
 // `_clusterSize` and `_clusterSources` so the card can show "3 sources covering this".
 // clusterStories now lives in ./modules/clustering
 
-// ─── NEWSHUB UPGRADE — PHASE 1 ────────────────────────────────────────────────
-// Presentation layer built on the existing clusterStories() dedup. No routing/API
-// changes: both components derive purely from the already-clustered article list.
-
-// STATE OF PLAY — a scannable strip at the top of every category summarizing what
-// is driving the day. Ranks clustered stories by coverage breadth (#sources) and
-// freshness, then lists the top few as numbered headlines.
-function StateOfPlay({ items, cat, onRead }) {
-  const cc = CATS[cat] || CATS.general;
-  const top = useMemo(() => {
-    return [...(items || [])]
-      .map(a => ({ a, score: heatScore(a) }))   // shared heat = clusterSize*12 + recency
-      .sort((x, y) => y.score - x.score)
-      .slice(0, 5)
-      .map(x => x.a);
-  }, [items]);
-
-  if (top.length < 3) return null;
-
-  return (
-    <section className="sop-strip">
-      <div className="sop-head">
-        <span className="sop-label" style={{ borderColor: cc.color, color: cc.color }}>State of Play</span>
-        <span className="sop-sub">{cc.label} — what’s driving the day</span>
-      </div>
-      <div className="sop-list">
-        {top.map((a, i) => (
-          <button key={a.link || i} className="sop-item" onClick={() => onRead(a)}>
-            <span className="sop-num" style={{ color: cc.color }}>{String(i + 1).padStart(2, '0')}</span>
-            <span className="sop-item-title">{a.title}</span>
-            <span className="sop-item-meta">
-              {a._clusterSize > 1 && <span className="sop-item-sources">{a._clusterSize} sources</span>}
-              <span className="sop-item-time">{fmtDate(a.pubDate)}</span>
-            </span>
-          </button>
-        ))}
-      </div>
-    </section>
-  );
-}
-
-// SNAPSHOT CARD — a deduped story card. Shows the lead article of a cluster with
-// an Archivo headline, Public Sans snippet, source-count row, and a Save action.
-// Click opens the full ArticleReader (which retains AI Summarize / Key Points /
-// Bias), so no inline AI is lost in the snapshot presentation.
-function SnapshotCard({ a, cat, isSaved, onSave, onRead }) {
-  const cc = CATS[cat] || CATS.general;
-  const [imgErr, setImgErr] = useState(false);
-  const topKw = a.matchedKw?.[0] || null;
-  const multi = a._clusterSize > 1;
-  return (
-    <article className={`snap-card ${a.isAlert ? 'snap-breaking' : ''}`} onClick={() => onRead(a)}>
-      <span className="snap-accent" style={{ background: cc.color }} />
-      <div className="snap-main">
-        <div className="snap-meta">
-          <span className="snap-source" style={{ color: cc.color }}>{a.source}</span>
-          {a.isAlert && <span className="snap-live">● LIVE</span>}
-          {topKw && <span className="snap-tag" style={{ background: cc.bg, color: cc.color }}>{topKw}</span>}
-          <span className="snap-time">{fmtDate(a.pubDate)}</span>
-        </div>
-        <h3 className="snap-title">{a.title}</h3>
-        {a.desc && <p className="snap-snippet">{a.desc}</p>}
-        <div className="snap-foot">
-          {multi
-            ? <span className="snap-sources" title={a._clusterSources?.join(', ')}>
-                <strong>{a._clusterSize} sources</strong> · {a._clusterSources?.slice(0, 3).join(' · ')}
-              </span>
-            : <span className="snap-single">{a.source}</span>}
-          <button className={`snap-save ${isSaved ? 'saved' : ''}`}
-            onClick={e => { e.stopPropagation(); onSave(a); }} aria-label={isSaved ? 'Saved' : 'Save'}>
-            <svg width="14" height="14" viewBox="0 0 24 24" fill={isSaved ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth="2"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg>
-          </button>
-        </div>
-      </div>
-      {a.img && !imgErr && <img className="snap-thumb" src={a.img} loading="lazy" alt="" onError={() => setImgErr(true)} />}
-    </article>
-  );
-}
+// StateOfPlay + SnapshotCard components now live in ./modules/state-of-play and ./modules/snapshot-card
 
 // ─── GLOBAL CSS ───────────────────────────────────────────────────────────────
 // Ghost design principles:
@@ -1050,44 +975,10 @@ function SnapshotCard({ a, cat, isSaved, onSave, onRead }) {
 //   • Sidebar: no card boxes — section label + list only
 //   • Scoreboard keeps structural box (it IS a widget, not editorial content)
 const GLOBAL_CSS = `
-/* TIME Magazine + BBC News editorial typography — Playfair Display for serif headlines */
-@import url('https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,700;0,900;1,700&family=Inter:wght@300;400;500;600;700;800;900&family=Archivo:wght@700;800&family=Public+Sans:wght@400;500;600;700&display=swap');
+/* Design tokens (:root / .dark variables + font @import) now live in
+   src/styles/tokens.css, imported at the app root. */
 
 *{box-sizing:border-box;margin:0;padding:0;}
-:root{
-  /* Editorial type scale — TIME/BBC north star */
-  --font-serif:'Playfair Display',Georgia,'Times New Roman',serif;
-  --font-sans:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,sans-serif;
-  /* NewsHub upgrade (Phase 1) — Archivo headlines, Public Sans body */
-  --font-archivo:'Archivo','Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
-  --font-publicsans:'Public Sans','Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
-
-  /* BBC News / TIME palette — warm newsprint white, deep navy, crimson */
-  --bg:#f8f7f4;--surface:#ffffff;--surface2:#f2f0ec;
-  --border:#d6d3ce;--border2:#e8e5e0;
-  --text:#1a1a1a;--text2:#3d3a36;--text3:#7c7870;--text4:#c0bdb8;
-  /* TIME crimson as primary accent — authoritative, editorial */
-  --accent:#c41d25;--accent-bg:#fdf2f2;
-  --navy:#0a1628;--navy-light:#1d2d4a;
-  --red:#c41d25;--green:#1a6b2a;--amber:#b45309;
-  --radius:6px;--radius-sm:3px;
-  --shadow-sm:0 1px 4px rgba(0,0,0,0.06);
-  --shadow-md:0 4px 20px rgba(0,0,0,0.09);
-  --shadow-lg:0 8px 40px rgba(0,0,0,0.13);
-}
-.dark{
-  /* Bloomberg / Reuters-inspired: cool slate, not warm brown — high legibility */
-  --bg:#0d1117;--surface:#161d2b;--surface2:#1e2638;
-  --border:#2a3347;--border2:#1e2638;
-  --text:#e2e8f4;--text2:#8892b0;--text3:#4a5570;--text4:#1e2638;
-  --accent:#e84545;--accent-bg:#1a1018;
-  --navy:#080c14;--navy-light:#0f1624;
-  --red:#e84545;--green:#4ade80;--amber:#fbbf24;
-  --shadow-sm:0 1px 4px rgba(0,0,0,0.5);
-  --shadow-md:0 4px 20px rgba(0,0,0,0.6);
-  --shadow-lg:0 8px 40px rgba(0,0,0,0.7);
-}
-
 body{
   background:var(--bg);
   font-family:var(--font-sans);
@@ -4896,48 +4787,7 @@ kbd{display:inline-block;padding:1px 5px;border:1px solid var(--border);border-r
 .fc-thumb{transition:transform 0.3s ease;}
 .fc:hover .fc-thumb{transform:scale(1.03);}
 
-/* ═══════════ NEWSHUB UPGRADE — PHASE 1 (newshub.css) ═══════════ */
-/* State of Play strip */
-.sop-strip{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:14px 16px;margin-bottom:22px;}
-.sop-head{display:flex;align-items:baseline;gap:10px;margin-bottom:8px;flex-wrap:wrap;}
-.sop-label{font-family:var(--font-archivo);font-weight:800;font-size:12px;text-transform:uppercase;letter-spacing:0.08em;border-left:3px solid;padding-left:8px;}
-.sop-sub{font-family:var(--font-publicsans);font-size:12px;color:var(--text3);}
-.sop-list{display:flex;flex-direction:column;}
-.sop-item{display:flex;align-items:center;gap:12px;padding:9px 0;border:none;border-top:1px solid var(--border2);background:none;cursor:pointer;text-align:left;font-family:inherit;width:100%;transition:opacity 0.12s;}
-.sop-item:first-of-type{border-top:none;}
-.sop-item:hover{opacity:0.68;}
-.sop-num{font-family:var(--font-archivo);font-weight:800;font-size:15px;min-width:24px;font-variant-numeric:tabular-nums;flex-shrink:0;}
-.sop-item-title{font-family:var(--font-archivo);font-weight:700;font-size:14px;line-height:1.3;color:var(--text);flex:1;min-width:0;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;}
-.sop-item-meta{display:flex;align-items:center;gap:8px;flex-shrink:0;}
-.sop-item-sources{font-family:var(--font-publicsans);font-size:10px;font-weight:700;color:var(--accent);background:var(--surface2);border-radius:10px;padding:2px 8px;white-space:nowrap;}
-.sop-item-time{font-family:var(--font-publicsans);font-size:11px;color:var(--text3);white-space:nowrap;}
-/* Snapshot cards */
-.snap-feed{display:flex;flex-direction:column;gap:14px;}
-.snap-card{display:flex;background:var(--surface);border:1px solid var(--border);border-radius:10px;overflow:hidden;cursor:pointer;transition:transform 0.14s,box-shadow 0.14s;}
-.snap-card:hover{transform:translateY(-2px);box-shadow:0 6px 20px rgba(0,0,0,0.09);}
-.snap-accent{width:4px;flex-shrink:0;}
-.snap-breaking .snap-accent{background:var(--red)!important;}
-.snap-main{flex:1;min-width:0;padding:14px 16px;}
-.snap-meta{display:flex;align-items:center;gap:8px;margin-bottom:7px;flex-wrap:wrap;}
-.snap-source{font-family:var(--font-publicsans);font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.05em;}
-.snap-live{font-family:var(--font-publicsans);font-size:9px;font-weight:800;color:#fff;background:var(--red);border-radius:4px;padding:2px 6px;letter-spacing:0.06em;}
-.snap-tag{font-family:var(--font-publicsans);font-size:10px;font-weight:700;border-radius:20px;padding:2px 9px;text-transform:uppercase;letter-spacing:0.03em;}
-.snap-time{font-family:var(--font-publicsans);font-size:11px;color:var(--text3);margin-left:auto;}
-.snap-title{font-family:var(--font-archivo);font-weight:800;font-size:18px;line-height:1.22;letter-spacing:-0.2px;color:var(--text);margin:0 0 6px;}
-.snap-snippet{font-family:var(--font-publicsans);font-size:13px;line-height:1.5;color:var(--text2);margin:0 0 10px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;}
-.snap-foot{display:flex;align-items:center;justify-content:space-between;gap:10px;}
-.snap-sources{font-family:var(--font-publicsans);font-size:11px;color:var(--text3);min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
-.snap-sources strong{color:var(--accent);font-weight:700;}
-.snap-single{font-family:var(--font-publicsans);font-size:11px;color:var(--text3);}
-.snap-save{background:none;border:1px solid var(--border);border-radius:8px;padding:5px 8px;cursor:pointer;color:var(--text3);flex-shrink:0;display:flex;align-items:center;transition:color 0.12s,border-color 0.12s;}
-.snap-save:hover,.snap-save.saved{color:var(--accent);border-color:var(--accent);}
-.snap-thumb{width:150px;flex-shrink:0;object-fit:cover;background:var(--surface2);align-self:stretch;}
-@media(max-width:640px){
-  .snap-thumb{width:104px;}
-  .snap-title{font-size:16px;}
-  .sop-strip{padding:12px 14px;}
-}
-
+/* State of Play + Snapshot styles moved to their module CSS (src/modules/state-of-play, snapshot-card) */
 /* ═══════════ PHASE 3 — MARKETS FACELIFT ═══════════ */
 .sk-line{display:block;height:10px;margin:3px 0;border-radius:4px;
   background:linear-gradient(90deg,var(--border2) 0px,var(--surface) 80px,var(--border2) 160px);
@@ -4986,25 +4836,7 @@ kbd{display:inline-block;padding:1px 5px;border:1px solid var(--border);border-r
   .mkt-mover-col{display:block!important;margin-bottom:0;}
 }
 
-/* ═══════════ PHASE 4 — X PULSE ═══════════ */
-.x-pulse{border:1px solid var(--border);background:var(--surface);border-radius:10px;padding:12px 14px;margin:14px 0;}
-.x-pulse-reader{margin:16px 0 0;background:var(--surface2);}
-.xp-head{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:9px;}
-.xp-badge{font-family:var(--font-archivo);font-weight:800;font-size:11px;letter-spacing:0.03em;color:var(--text);
-  background:var(--surface2);border:1px solid var(--border2);border-radius:6px;padding:2px 8px;}
-.xp-sent{font-family:var(--font-publicsans);font-size:10px;font-weight:800;text-transform:uppercase;
-  letter-spacing:0.05em;border-radius:20px;padding:2px 9px;}
-.xp-bull{color:#16a34a;background:rgba(22,163,74,0.12);}
-.xp-bear{color:#dc2626;background:rgba(220,38,38,0.12);}
-.xp-neutral{color:var(--text3);background:var(--surface2);}
-.xp-note{font-family:var(--font-publicsans);font-size:10px;color:var(--text4);margin-left:auto;font-style:italic;}
-.xp-takes{display:flex;flex-direction:column;gap:7px;}
-.xp-take{display:flex;flex-direction:column;gap:2px;text-decoration:none;padding:7px 10px;border-radius:8px;
-  background:var(--bg);border:1px solid var(--border2);transition:border-color 0.12s;}
-.xp-take:hover{border-color:var(--accent);}
-.xp-handle{font-family:var(--font-publicsans);font-size:11px;font-weight:700;color:var(--accent);}
-.xp-text{font-family:var(--font-publicsans);font-size:12px;line-height:1.45;color:var(--text2);}
-@media(max-width:640px){ .xp-note{width:100%;margin-left:0;} }
+/* X Pulse styles moved to src/modules/x-pulse/XPulse.css */
 `;
 
 
@@ -8262,13 +8094,13 @@ export default function App() {
             </div>
             <div className="page-grid">
               <div className="feed-col">
-                <StateOfPlay items={teamItems} cat="sports" onRead={onRead}/>
+                <StateOfPlay items={teamItems} meta={CATS.sports} onRead={onRead} formatDate={fmtDate}/>
                 {teamItems.length === 0
                   ? <div className="empty-state"><div className="empty-icon">🏆</div><div className="empty-msg">No recent stories for {teamName}</div><button className="refresh-btn" onClick={()=>loadCat('sports')}>Refresh</button></div>
                   : <div className="snap-feed">
                       {teamItems.slice(0,20).map((a,i)=>(
                         <Fragment key={a.link||i}>
-                          <SnapshotCard a={a} cat="sports" isSaved={isSavedFn(a)} onSave={onSave} onRead={onRead}/>
+                          <SnapshotCard a={a} meta={CATS.sports} isSaved={isSavedFn(a)} onSave={onSave} onRead={onRead} formatDate={fmtDate}/>
                           {i===2 && <XPulse topic={teamName} variant="feed"/>}
                         </Fragment>
                       ))}
@@ -8680,7 +8512,7 @@ export default function App() {
 
         {/* ── STATE OF PLAY strip (Phase 1) — top of every category ── */}
         {!activeKw && !activeSrc && !search && (
-          <StateOfPlay items={activeFilteredItems} cat={cat} onRead={onRead}/>
+          <StateOfPlay items={activeFilteredItems} meta={CATS[cat]||CATS.general} onRead={onRead} formatDate={fmtDate}/>
         )}
 
         {/* ── TRENDING NOW (Phase 5 #2) — hottest clusters as tappable filter pills,
@@ -8802,7 +8634,7 @@ export default function App() {
                 :<div className="snap-feed">
                   {feedItems.slice(activeKw||activeSrc||search?0:3,20).map((a,i)=>(
                     <Fragment key={a.link||i}>
-                      <SnapshotCard a={a} cat={cat} isSaved={isSavedFn(a)} onSave={onSave} onRead={onRead}/>
+                      <SnapshotCard a={a} meta={CATS[cat]||CATS.general} isSaved={isSavedFn(a)} onSave={onSave} onRead={onRead} formatDate={fmtDate}/>
                       {i===2 && <XPulse topic={cc?.label||cat} variant="feed"/>}
                     </Fragment>
                   ))}
@@ -9597,7 +9429,7 @@ export default function App() {
                 :<div className="snap-feed" style={{padding:'12px 0 0'}}>
                     {newsItems.slice(0, 15).map((a, i) => (
                       <Fragment key={a.link||i}>
-                        <SnapshotCard a={a} cat="finance" isSaved={isSavedFn(a)} onSave={onSave} onRead={onRead}/>
+                        <SnapshotCard a={a} meta={CATS.finance} isSaved={isSavedFn(a)} onSave={onSave} onRead={onRead} formatDate={fmtDate}/>
                         {i===2 && <XPulse topic="Markets" variant="feed"/>}
                       </Fragment>
                     ))}
