@@ -38,7 +38,7 @@
 
 import { useState, useEffect, useCallback, useMemo, useRef, Fragment } from 'react';
 // Extracted, dependency-isolated capability modules (see src/modules/*/README.md)
-import { clusterStories, hotClusterTopics, TREND_STOP } from './modules/clustering';
+import { clusterStories, hotClusterTopics, TREND_STOP, decodeEntities, capByPublisher } from './modules/clustering';
 import { retrieveFeedContext, buildFeedContextBlock } from './modules/retrieval';
 import { XPulse } from './modules/x-pulse';
 import { StateOfPlay } from './modules/state-of-play';
@@ -177,8 +177,7 @@ const DEFAULT_FEEDS = {
     { name:'Utility Dive',          url:'https://www.utilitydive.com/feeds/news/',                               on:true },
     { name:'Data Center Dynamics',  url:'https://www.datacenterdynamics.com/en/rss/',                            on:true },
     { name:'Power Magazine',        url:'https://www.powermag.com/feed/',                                        on:true },
-    { name:'Reuters Business',      url:'https://feeds.reuters.com/reuters/businessNews',                        on:true },
-    { name:'CNBC Energy',           url:'https://www.cnbc.com/id/10000664/device/rss/rss.html',                  on:true },
+    { name:'CNBC Energy',           url:'https://www.cnbc.com/id/19836768/device/rss/rss.html',                  on:true },
     { name:'MIT Tech Review',       url:'https://www.technologyreview.com/feed/',                                on:true },
     { name:'Canary Media',          url:'https://www.canarymedia.com/rss',                                       on:true },
     { name:'Rigzone',               url:'https://www.rigzone.com/news/rss/rigzone_latest.aspx',                   on:true },
@@ -405,9 +404,9 @@ function parseXML(txt) {
   if (!items.length) return [];
   return items.map(i => {
     const descRaw = i.querySelector('description')?.textContent || i.querySelector('summary')?.textContent || '';
-    const desc = descRaw.replace(/<[^>]*>/g,'').replace(/&amp;/g,'&').replace(/&nbsp;/g,' ').trim().slice(0,300);
+    const desc = decodeEntities(descRaw.replace(/<[^>]*>/g,'')).replace(/\s+/g,' ').trim().slice(0,300);
     return {
-      title:   (i.querySelector('title')?.textContent || '').trim(),
+      title:   decodeEntities((i.querySelector('title')?.textContent || '').trim()),
       link:    i.querySelector('link')?.textContent || '',
       desc, pubDate: i.querySelector('pubDate')?.textContent || '',
       img:     extractImage(i, descRaw),
@@ -437,8 +436,8 @@ async function fetchRSS(url) {
       const d = await r.json();
       if (d.items?.length > 0) return {
         items: d.items.map(i => ({
-          title:(i.title||'').trim(), link:i.link,
-          desc:(i.description||i.content||'').replace(/<[^>]*>/g,'').replace(/&amp;/g,'&').replace(/&nbsp;/g,' ').trim().slice(0,300),
+          title:decodeEntities((i.title||'').trim()), link:i.link,
+          desc:decodeEntities((i.description||i.content||'').replace(/<[^>]*>/g,'')).replace(/\s+/g,' ').trim().slice(0,300),
           pubDate:i.pubDate, img:extractImageFromJson(i), duration:i.itunes_duration||'',
         })), reason:'',
       };
@@ -542,8 +541,20 @@ async function fetchAllScores() {
 // that is live, finished within ~2 days, or scheduled within ~1.5 days. Out-of-
 // season leagues (e.g. NCAA football in summer) return games weeks away — those
 // are filtered out so the scoreboard never shows dormant leagues like NCAA.
-function isGameActive(g) {
+// A game must have real team data, and a FINAL/LIVE game must have real scores —
+// otherwise it's bad ESPN data (e.g. "FINAL 0–0") and must be suppressed, not shown.
+function isGameValid(g) {
   if (!g) return false;
+  if (!(g.homeName || g.homeAbbr) || !(g.awayName || g.awayAbbr)) return false;
+  if (g.state === 'post' || g.state === 'in') {
+    const h = g.homeScore, aw = g.awayScore;
+    if (h === '' || h == null || aw === '' || aw == null) return false;
+    if (g.state === 'post' && (parseInt(h) || 0) === 0 && (parseInt(aw) || 0) === 0) return false;
+  }
+  return true;
+}
+function isGameActive(g) {
+  if (!isGameValid(g)) return false;
   if (g.state === 'in') return true;
   const t = new Date(g.date).getTime();
   if (isNaN(t)) return g.state === 'post';
@@ -4558,6 +4569,9 @@ kbd{display:inline-block;padding:1px 5px;border:1px solid var(--border);border-r
 }
 .rn-live{display:inline-flex;align-items:center;gap:6px;font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:0.08em;color:var(--red,#E5383B);}
 .rn-live-dot{width:8px;height:8px;border-radius:50%;background:var(--red,#E5383B);animation:score-pulse 1.6s ease-in-out infinite;}
+/* stale surface: neutral, no live pulse */
+.right-now-band.rn-stale{background:none;border-left-color:var(--border);}
+.rn-static{color:var(--text3);}
 .rn-fresh{font-size:12px;color:var(--text2);font-weight:600;}
 .rn-fresh strong{color:var(--text);font-weight:800;}
 .rn-updated{margin-left:auto;font-size:11px;color:var(--text3);}
@@ -8135,13 +8149,18 @@ export default function App() {
         {isHome && !activeKw && !activeSrc && !search && (() => {
           const allHome = Object.values(arts).flat();
           const fresh = allHome.filter(a => a.pubDate && (Date.now()-new Date(a.pubDate)) < 3600*1000).length;
-          const liveGames = Object.values(scores||{}).flat().filter(g=>g.state==='in').length;
+          const liveGames = Object.values(scores||{}).flat().filter(g=>g.state==='in' && isGameValid(g)).length;
           const newest = allHome.reduce((mx,a)=>{const t=a.pubDate?new Date(a.pubDate).getTime():0; return t>mx?t:mx;},0);
           if (!allHome.length) return null;
-          const ago = (() => {const m=Math.floor((Date.now()-newest)/60000); return m<1?'just now':m<60?`${m}m ago`:`${Math.floor(m/60)}h ago`;})();
+          const ageMin = Math.floor((Date.now()-newest)/60000);
+          // Only claim "live" when something genuinely arrived recently. Never label a stale surface as live.
+          const isLive = newest>0 && ageMin <= 30;
+          const ago = ageMin<1?'just now':ageMin<60?`${ageMin}m ago`:`${Math.floor(ageMin/60)}h ago`;
           return (
-            <div className="right-now-band">
-              <span className="rn-live"><span className="rn-live-dot"/>Right Now</span>
+            <div className={`right-now-band ${isLive?'':'rn-stale'}`}>
+              {isLive
+                ? <span className="rn-live"><span className="rn-live-dot"/>Right Now</span>
+                : <span className="rn-live rn-static">Latest</span>}
               {fresh>0 && <span className="rn-fresh"><strong>{fresh}</strong> {fresh===1?'story':'stories'} in the last hour</span>}
               {liveGames>0 && <span className="rn-fresh">·&nbsp;<strong>{liveGames}</strong> live {liveGames===1?'game':'games'}</span>}
               {newest>0 && <span className="rn-updated">Updated {ago}</span>}

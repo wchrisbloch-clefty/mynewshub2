@@ -13,7 +13,7 @@
 // design tokens (src/styles/tokens.css).
 
 import { useMemo } from 'react';
-import { heatScore } from '../clustering';
+import { rankClusters } from '../clustering';
 import './StateOfPlay.css';
 
 const defaultFormatDate = d => { try { return new Date(d).toLocaleString(); } catch { return ''; } };
@@ -21,13 +21,8 @@ const defaultFormatDate = d => { try { return new Date(d).toLocaleString(); } ca
 export function StateOfPlay({ items, meta = {}, onRead, formatDate = defaultFormatDate }) {
   const color = meta.color;
   const label = meta.label || '';
-  const top = useMemo(() => {
-    return [...(items || [])]
-      .map(a => ({ a, score: heatScore(a) }))
-      .sort((x, y) => y.score - x.score)
-      .slice(0, 5)
-      .map(x => x.a);
-  }, [items]);
+  // Ranked by heat, capped at 2 per publisher (no single-source flood).
+  const top = useMemo(() => rankClusters(items, { max: 2, limit: 5 }), [items]);
 
   if (top.length < 3) return null;
 

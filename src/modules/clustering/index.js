@@ -4,10 +4,13 @@
 // "heat" (coverage breadth + freshness), and extracts trending topic labels.
 //
 // Public interface:
-//   clusterStories(articles)        -> articles[] each annotated with _clusterSize + _clusterSources
-//   heatScore(article)              -> number (higher = hotter): clusterSize*12 + recency(0..48)
-//   hotClusterTopics(items, n?)     -> string[] of salient topic labels, hottest first
-//   TREND_STOP                      -> Set<string> shared stopwords
+//   clusterStories(articles)              -> articles[] annotated with _clusterSize + _clusterSources
+//   heatScore(article)                    -> number (clusterSize*12 + recency 0..48)
+//   rankClusters(items, {max?,limit?})    -> items sorted by heat, capped ≤max per publisher
+//   capByPublisher(items, max?)           -> items with ≤max per publisher (order preserved)
+//   hotClusterTopics(items, n?)           -> topic labels ranked by entity frequency×heat
+//   decodeEntities(str)                   -> HTML-entity-decoded string
+//   TREND_STOP                            -> Set<string> shared stopwords
 //
 // Input article shape (only these fields are read): { title, source, pubDate }.
 // clusterStories preserves every other field via spread.
@@ -76,21 +79,96 @@ export function clusterStories(articles) {
   return result;
 }
 
-// Derives up to n trending topic labels from the hottest clusters. Each label is a
-// salient token from a hot cluster's title (a capitalized proper noun preferred,
-// else the longest meaningful word), de-duplicated. Works on any clustered list.
-export function hotClusterTopics(items, n = 5) {
-  const scored = [...(items || [])].map(a => ({ a, heat: heatScore(a) })).sort((x, y) => y.heat - x.heat);
-  const seen = new Set(), out = [];
-  for (const { a } of scored) {
-    const tokens = (a.title || '').split(/\s+/).map(w => w.replace(/[^A-Za-z0-9]/g, ''));
-    let label = tokens.find(w => w.length > 3 && /^[A-Z]/.test(w) && !TREND_STOP.has(w.toLowerCase()));
-    if (!label) label = tokens.filter(w => w.length > 4 && !TREND_STOP.has(w.toLowerCase())).sort((x, y) => y.length - x.length)[0];
-    if (!label) continue;
-    const key = label.toLowerCase();
-    if (seen.has(key)) continue;
-    seen.add(key); out.push(label);
-    if (out.length >= n) break;
+// Decode HTML entities (numeric + named) so titles/topics never render raw
+// &#8217; / &quot; / &#8230; etc. Safe on already-decoded strings.
+export function decodeEntities(str = '') {
+  if (!str) return str;
+  return String(str)
+    .replace(/&#x([0-9a-fA-F]+);/g, (_, h) => { try { return String.fromCodePoint(parseInt(h, 16)); } catch { return _; } })
+    .replace(/&#(\d+);/g, (_, d) => { try { return String.fromCodePoint(parseInt(d, 10)); } catch { return _; } })
+    .replace(/&quot;/g, '"').replace(/&apos;/g, "'")
+    .replace(/&lsquo;/g, '‘').replace(/&rsquo;/g, '’')
+    .replace(/&ldquo;/g, '“').replace(/&rdquo;/g, '”')
+    .replace(/&hellip;/g, '…').replace(/&mdash;/g, '—').replace(/&ndash;/g, '–')
+    .replace(/&nbsp;/g, ' ').replace(/&lt;/g, '<').replace(/&gt;/g, '>')
+    .replace(/&amp;/g, '&'); // amp last so it doesn't double-decode
+}
+
+// Cap how many items any single publisher contributes to a ranked list (prevents a
+// single-source flood, e.g. 7 of 8 from one outlet). Preserves input order.
+export function capByPublisher(items, max = 2) {
+  const counts = new Map(), out = [];
+  for (const a of items || []) {
+    const p = (a.source || '').toLowerCase();
+    const c = counts.get(p) || 0;
+    if (c >= max) continue;
+    counts.set(p, c + 1);
+    out.push(a);
   }
   return out;
+}
+
+// Rank clusters by heat, then apply the per-publisher cap. This is the correct
+// primitive for any "ranked list" (Trending, State of Play, Top Stories).
+export function rankClusters(items, { max = 2, limit } = {}) {
+  const ranked = [...(items || [])].sort((a, b) => heatScore(b) - heatScore(a));
+  const capped = capByPublisher(ranked, max);
+  return limit ? capped.slice(0, limit) : capped;
+}
+
+// Pull candidate entities from a headline: multi-word Capitalized proper-noun
+// phrases (e.g. "Graham Platner", "Jim Cramer") plus long salient words. Used only
+// for trending — never derived from word POSITION.
+function extractEntities(title) {
+  const clean = decodeEntities(title || '');
+  const out = [];
+  const phraseRe = /([A-Z][a-zA-Z0-9.&]+(?:\s+(?:of|the|and|for|&)\s+|\s+)?(?:[A-Z][a-zA-Z0-9.&]+)?(?:\s+[A-Z][a-zA-Z0-9.&]+)*)/g;
+  let m;
+  while ((m = phraseRe.exec(clean))) {
+    const phrase = m[1].trim().replace(/\s+/g, ' ');
+    const words = phrase.split(' ').filter(Boolean);
+    if (words.length >= 2) out.push(phrase);
+    else if (phrase.length > 3 && !TREND_STOP.has(phrase.toLowerCase())) out.push(phrase);
+  }
+  for (const w of clean.toLowerCase().replace(/[^a-z0-9\s]/g, ' ').split(/\s+/)) {
+    if (w.length > 6 && !TREND_STOP.has(w)) out.push(w);
+  }
+  return [...new Set(out)];
+}
+
+// Trending topics ranked by REAL cluster heat: entity/topic frequency across the
+// clusters, weighted by each cluster's source-count + recency. Case-normalized and
+// overlap-merged ("houston"+"houston texans" -> one; "platner"+"graham platner" -> one).
+export function hotClusterTopics(items, n = 5) {
+  const stats = new Map(); // lowercaseKey -> { label, weight, count }
+  for (const a of items || []) {
+    const w = heatScore(a); // source breadth + recency already baked in
+    for (const ent of extractEntities(a.title)) {
+      const key = ent.toLowerCase();
+      const cur = stats.get(key) || { label: ent, weight: 0, count: 0 };
+      if (ent.length > cur.label.length) cur.label = ent; // keep most specific surface form
+      cur.weight += w; cur.count += 1;
+      stats.set(key, cur);
+    }
+  }
+  // Merge overlapping entities: fold a shorter key into a longer one that contains
+  // it as a whole word (case-insensitive).
+  const keys = [...stats.keys()].sort((a, b) => b.length - a.length);
+  for (const k of keys) {
+    if (!stats.has(k)) continue;
+    for (const k2 of keys) {
+      if (k2 === k || !stats.has(k2) || k2.length >= k.length) continue;
+      const re = new RegExp(`\\b${k2.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`);
+      if (re.test(k)) {
+        const a = stats.get(k), b = stats.get(k2);
+        a.weight += b.weight; a.count += b.count;
+        stats.delete(k2);
+      }
+    }
+  }
+  return [...stats.values()]
+    .filter(s => s.count >= 2 || s.weight >= 24) // must recur or be genuinely hot
+    .sort((a, b) => b.weight - a.weight)
+    .slice(0, n)
+    .map(s => s.label);
 }
