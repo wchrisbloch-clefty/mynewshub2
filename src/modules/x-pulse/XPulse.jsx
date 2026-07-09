@@ -13,6 +13,7 @@
 // Styling: .x-pulse / .xp-* classes (currently in the host app's global stylesheet).
 
 import { useState, useEffect } from 'react';
+import './XPulse.css';
 
 export function XPulse({ topic, variant, endpoint = '/api/x-pulse' }) {
   const [data, setData] = useState(null);

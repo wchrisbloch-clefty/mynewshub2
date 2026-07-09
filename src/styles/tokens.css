@@ -1,0 +1,44 @@
+/* ─── DESIGN TOKENS ───────────────────────────────────────────────────────────
+   The single importable source of truth for colors, fonts, spacing, radii, and
+   shadows. Components consume these via var(--…) and never hardcode theme values,
+   so any co-located component renders correctly with just its own CSS + this file.
+   Import once at the app root (see src/index.jsx). Values are byte-identical to the
+   originals that lived in App.jsx's GLOBAL_CSS. */
+
+@import url('https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,700;0,900;1,700&family=Inter:wght@300;400;500;600;700;800;900&family=Archivo:wght@700;800&family=Public+Sans:wght@400;500;600;700&display=swap');
+
+:root{
+  /* Editorial type scale — TIME/BBC north star */
+  --font-serif:'Playfair Display',Georgia,'Times New Roman',serif;
+  --font-sans:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,sans-serif;
+  /* NewsHub upgrade (Phase 1) — Archivo headlines, Public Sans body */
+  --font-archivo:'Archivo','Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
+  --font-publicsans:'Public Sans','Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
+
+  /* BBC News / TIME palette — warm newsprint white, deep navy, crimson */
+  --bg:#f8f7f4;--surface:#ffffff;--surface2:#f2f0ec;
+  --border:#d6d3ce;--border2:#e8e5e0;
+  --text:#1a1a1a;--text2:#3d3a36;--text3:#7c7870;--text4:#c0bdb8;
+  /* TIME crimson as primary accent — authoritative, editorial */
+  --accent:#c41d25;--accent-bg:#fdf2f2;
+  --navy:#0a1628;--navy-light:#1d2d4a;
+  --red:#c41d25;--green:#1a6b2a;--amber:#b45309;
+  /* Semantic sentiment / market direction (identical in light & dark by design) */
+  --pos:#16a34a;--neg:#dc2626;
+  --radius:6px;--radius-sm:3px;
+  --shadow-sm:0 1px 4px rgba(0,0,0,0.06);
+  --shadow-md:0 4px 20px rgba(0,0,0,0.09);
+  --shadow-lg:0 8px 40px rgba(0,0,0,0.13);
+}
+.dark{
+  /* Bloomberg / Reuters-inspired: cool slate, not warm brown — high legibility */
+  --bg:#0d1117;--surface:#161d2b;--surface2:#1e2638;
+  --border:#2a3347;--border2:#1e2638;
+  --text:#e2e8f4;--text2:#8892b0;--text3:#4a5570;--text4:#1e2638;
+  --accent:#e84545;--accent-bg:#1a1018;
+  --navy:#080c14;--navy-light:#0f1624;
+  --red:#e84545;--green:#4ade80;--amber:#fbbf24;
+  --shadow-sm:0 1px 4px rgba(0,0,0,0.5);
+  --shadow-md:0 4px 20px rgba(0,0,0,0.6);
+  --shadow-lg:0 8px 40px rgba(0,0,0,0.7);
+}
