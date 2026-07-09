@@ -45,6 +45,7 @@ import { StateOfPlay } from './modules/state-of-play';
 import { SnapshotCard } from './modules/snapshot-card';
 import { MarketsSurface, useMarkets } from './modules/markets-surface';
 import { parseRoute, buildPath } from './modules/routing';
+import { ChatBot } from './modules/concierge';
 
 // ─── CATEGORIES ───────────────────────────────────────────────────────────────
 const CATS = {
@@ -3968,108 +3969,7 @@ kbd{display:inline-block;padding:1px 5px;border:1px solid var(--border);border-r
   transition:all 0.12s;
 }
 .search-results-clear:hover{color:var(--accent);border-color:var(--accent);}
-
-/* ── CHATBOT ─────────────────────────────────────────────────── */
-.chat-fab{
-  position:fixed;bottom:calc(70px + env(safe-area-inset-bottom, 0));right:20px;
-  width:52px;height:52px;border-radius:50%;
-  background:linear-gradient(135deg,#6001d2,#9333ea);
-  color:#fff;border:none;cursor:pointer;
-  display:flex;align-items:center;justify-content:center;font-size:22px;
-  box-shadow:0 4px 20px rgba(96,1,210,0.45);
-  z-index:200;transition:transform 0.15s,box-shadow 0.15s;
-}
-.chat-fab:hover{transform:scale(1.08);box-shadow:0 6px 28px rgba(96,1,210,0.6);}
-.chat-fab.open{background:linear-gradient(135deg,#444,#222);}
-@media (min-width:641px){
-  .chat-fab{bottom:24px;}
-}
-.chat-drawer{
-  position:fixed;bottom:0;right:20px;
-  width:360px;max-height:540px;
-  background:var(--surface);border:1px solid var(--border);
-  border-radius:16px 16px 0 0;
-  box-shadow:0 -8px 40px rgba(0,0,0,0.18);
-  z-index:199;display:flex;flex-direction:column;
-  overflow:hidden;
-  animation:chat-slide-up 0.25s ease;
-}
-@media (max-width:640px){
-  .chat-drawer{right:0;left:0;width:100%;border-radius:20px 20px 0 0;max-height:70vh;}
-}
-@keyframes chat-slide-up{from{transform:translateY(60px);opacity:0;}to{transform:translateY(0);opacity:1;}}
-.chat-header{
-  display:flex;align-items:center;justify-content:space-between;
-  padding:14px 16px;
-  background:linear-gradient(135deg,#6001d2,#9333ea);
-  color:#fff;flex-shrink:0;
-}
-.chat-header-title{font-size:14px;font-weight:700;display:flex;align-items:center;gap:8px;}
-.chat-header-title span{font-size:18px;}
-.chat-header-sub{font-size:10px;color:rgba(255,255,255,0.7);margin-top:1px;}
-.chat-close{background:none;border:none;color:rgba(255,255,255,0.8);cursor:pointer;font-size:18px;padding:4px;}
-.chat-messages{
-  flex:1;overflow-y:auto;padding:14px 14px 8px;
-  display:flex;flex-direction:column;gap:10px;
-  scrollbar-width:thin;
-}
-.chat-msg{
-  display:flex;flex-direction:column;gap:2px;
-  max-width:88%;
-}
-.chat-msg.user{align-self:flex-end;}
-.chat-msg.bot{align-self:flex-start;}
-.chat-bubble{
-  padding:9px 13px;border-radius:16px;font-size:13px;line-height:1.5;
-}
-.chat-msg.user .chat-bubble{
-  background:#6001d2;color:#fff;border-radius:16px 16px 4px 16px;
-}
-.chat-msg.bot .chat-bubble{
-  background:var(--surface2);color:var(--text);border:1px solid var(--border);
-  border-radius:4px 16px 16px 16px;
-}
-.chat-msg-time{font-size:9px;color:var(--text3);padding:0 4px;}
-.chat-deeplink{align-self:flex-start;margin:4px 0 0;background:var(--surface2);border:1px solid var(--border);border-radius:14px;padding:4px 11px;font-size:11px;font-weight:700;color:var(--accent);cursor:pointer;font-family:inherit;transition:background 0.12s;}
-.chat-deeplink:hover{background:var(--accent);color:#fff;border-color:var(--accent);}
-.chat-typing{display:flex;gap:4px;padding:8px 12px;align-items:center;}
-.chat-typing-dot{
-  width:7px;height:7px;border-radius:50%;background:var(--text3);
-  animation:typing-bounce 1.2s ease-in-out infinite;
-}
-.chat-typing-dot:nth-child(2){animation-delay:0.2s;}
-.chat-typing-dot:nth-child(3){animation-delay:0.4s;}
-@keyframes typing-bounce{0%,100%{transform:translateY(0);}40%{transform:translateY(-6px);}}
-.chat-quick-btns{
-  display:flex;gap:6px;flex-wrap:wrap;
-  padding:6px 14px 10px;border-top:1px solid var(--border2);
-}
-.chat-quick-btn{
-  font-size:11px;font-weight:600;padding:5px 11px;
-  background:var(--surface2);border:1px solid var(--border);
-  border-radius:14px;cursor:pointer;font-family:inherit;color:var(--text2);
-  transition:all 0.12s;white-space:nowrap;
-}
-.chat-quick-btn:hover{background:#6001d2;color:#fff;border-color:#6001d2;}
-.chat-input-row{
-  display:flex;gap:8px;padding:10px 14px;
-  border-top:1px solid var(--border);flex-shrink:0;
-}
-.chat-input{
-  flex:1;padding:9px 12px;font-size:13px;font-family:inherit;
-  background:var(--surface2);border:1px solid var(--border);
-  border-radius:20px;color:var(--text);outline:none;
-  transition:border-color 0.12s;
-}
-.chat-input:focus{border-color:#6001d2;}
-.chat-send{
-  width:36px;height:36px;border-radius:50%;
-  background:#6001d2;color:#fff;border:none;cursor:pointer;
-  display:flex;align-items:center;justify-content:center;font-size:16px;
-  flex-shrink:0;transition:background 0.12s;align-self:center;
-}
-.chat-send:hover{background:#7c3aed;}
-.chat-send:disabled{background:var(--border);cursor:not-allowed;}
+/* chat styles moved to src/modules/concierge/Concierge.css */
 
 /* ═══ v36: POP CULTURE SUB-TABS ═══ */
 .pc-subtabs{
@@ -4160,24 +4060,7 @@ kbd{display:inline-block;padding:1px 5px;border:1px solid var(--border);border-r
 .team-menu-item{display:block;padding:9px 14px;font-size:12px;font-weight:600;color:var(--text2);background:none;border:none;cursor:pointer;font-family:var(--font-sans);text-align:left;text-decoration:none;transition:background 0.1s;}
 .team-menu-item:hover{background:var(--surface2);color:var(--accent);}
 @media(max-width:640px){.teams-shelf-grid{grid-template-columns:repeat(2,1fr);}}
-
-/* ═══ v38: CHAT ANALYZE MODE ═══ */
-.chat-mode-tabs{display:flex;border-bottom:1px solid var(--border);background:var(--surface);}
-.chat-mode-tab{flex:1;padding:10px;font-size:12px;font-weight:700;background:none;border:none;cursor:pointer;color:var(--text3);font-family:var(--font-sans);border-bottom:2px solid transparent;transition:all 0.12s;}
-.chat-mode-tab.active{color:#6001d2;border-bottom-color:#6001d2;}
-.chat-analyze{display:flex;flex-direction:column;gap:10px;padding:14px;flex:1;overflow-y:auto;}
-.chat-analyze-modes{display:flex;gap:6px;flex-wrap:wrap;}
-.chat-analyze-mode-btn{padding:5px 12px;border-radius:16px;font-size:11px;font-weight:700;background:var(--surface2);border:1px solid var(--border);color:var(--text3);cursor:pointer;font-family:var(--font-sans);transition:all 0.12s;}
-.chat-analyze-mode-btn.active{background:#6001d2;color:#fff;border-color:#6001d2;}
-.chat-analyze-input{border:1px solid var(--border);border-radius:8px;padding:10px 12px;font-size:13px;font-family:var(--font-sans);color:var(--text);background:var(--surface2);resize:vertical;min-height:100px;outline:none;transition:border-color 0.12s;}
-.chat-analyze-input:focus{border-color:#6001d2;}
-.chat-analyze-go{background:#6001d2;color:#fff;border:none;border-radius:8px;padding:10px;font-size:13px;font-weight:700;cursor:pointer;font-family:var(--font-sans);transition:background 0.12s;}
-.chat-analyze-go:hover{background:#7c3aed;}
-.chat-analyze-go:disabled{background:var(--border);cursor:not-allowed;}
-.chat-analyze-result{background:var(--surface2);border-radius:8px;padding:12px;border-left:3px solid #6001d2;}
-.chat-analyze-result-label{font-size:9px;font-weight:800;color:#6001d2;text-transform:uppercase;letter-spacing:0.1em;margin-bottom:8px;}
-.chat-analyze-result-text{font-size:13px;color:var(--text);line-height:1.6;white-space:pre-wrap;}
-.chat-analyze-clear{margin-top:8px;background:none;border:1px solid var(--border);border-radius:6px;padding:4px 10px;font-size:11px;color:var(--text3);cursor:pointer;font-family:var(--font-sans);}
+/* chat analyze styles moved to src/modules/concierge/Concierge.css */
 
 /* ═══ v38: MOBILE IMPROVEMENTS ═══ */
 /* gn-card on mobile: compact row layout like Yahoo News */
@@ -7020,189 +6903,7 @@ function TopBar({tab, setTab, search, setSearch, dark, setDark,
 }
 
 // ─── MAIN APP ─────────────────────────────────────────────────────────────────
-// ─── CHATBOT COMPONENT ───────────────────────────────────────────────────────
-function ChatBot({ arts, onNavigate }) {
-  const [open, setOpen] = useState(false);
-  const [chatMode, setChatMode] = useState('chat'); // 'chat' | 'analyze'
-  const [msgs, setMsgs] = useState([
-    { role:'bot', text:"Hi! I'm your AI news assistant. Ask me anything about today's stories, markets, or sports.", time: new Date().toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'}) }
-  ]);
-  const [input, setInput] = useState('');
-  const [analyzeText, setAnalyzeText] = useState('');
-  const [analyzeMode, setAnalyzeMode] = useState('summary');
-  const [analyzeResult, setAnalyzeResult] = useState('');
-  const [loading, setLoading] = useState(false);
-  const messagesEndRef = useRef(null);
-
-  useEffect(() => {
-    if (open && chatMode === 'chat') messagesEndRef.current?.scrollIntoView({ behavior:'smooth' });
-  }, [msgs, open, chatMode]);
-
-  const QUICK = ["What's trending today?", "Sports update?", "Markets summary", "Top tech news"];
-  const ANALYZE_MODES = [
-    { key:'summary',   label:'Summarize' },
-    { key:'takeaways', label:'Key Points' },
-    { key:'bias',      label:'Bias Check' },
-    { key:'related',   label:'Related Context' },
-  ];
-
-  // Phase 6: grounded concierge. Retrieve relevant clustered feed data for the
-  // question (standalone retrieveFeedContext), hand ONLY that to the model, and
-  // let the backend chat system prompt enforce "answer only from the feed".
-  const send = async (text) => {
-    const q = (text || input).trim();
-    if (!q || loading) return;
-    const t = new Date().toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'});
-    setMsgs(m => [...m, { role:'user', text:q, time:t }]);
-    setInput('');
-    setLoading(true);
-
-    // Inject NewsHub's entity→route mapping so the retrieval module stays app-agnostic.
-    const resolveDeepLink = ({ entities }) => {
-      for (const [lg, names] of Object.entries(TEAM_CHIPS)) {
-        const hit = names.find(n => { const w = n.toLowerCase().split(' '); return w.some(x => entities.includes(x)) || entities.some(k => k.length > 3 && n.toLowerCase().includes(k)); });
-        if (hit) return `/sports/${lg}/${teamSlug(hit)}`;
-      }
-      return null;
-    };
-    const ctx = retrieveFeedContext(q, arts, { resolveDeepLink });
-    let contextBlock = '';
-    let deepLink = ctx.deepLink;
-
-    if (ctx.intent === 'markets') {
-      try {
-        const r = await fetch('/api/markets', { signal: AbortSignal.timeout(9000) });
-        if (r.ok) {
-          const d = await r.json();
-          const idx = (d.indices || []).map(i => `${i.name} ${i.price} (${(i.pct||0) >= 0 ? '+' : ''}${(i.pct||0).toFixed(2)}%)`).join(', ');
-          const g = (d.gainers || []).slice(0, 3).map(m => `${m.symbol} ${(m.pct||0) >= 0 ? '+' : ''}${(m.pct||0).toFixed(1)}%`).join(', ');
-          const l = (d.losers || []).slice(0, 3).map(m => `${m.symbol} ${(m.pct||0).toFixed(1)}%`).join(', ');
-          if (idx) { contextBlock = `LIVE MARKETS SNAPSHOT:\nIndices: ${idx}\nTop gainers: ${g || '—'}\nTop losers: ${l || '—'}`; deepLink = '/finance'; }
-        }
-      } catch {}
-      if (!contextBlock) contextBlock = buildFeedContextBlock(retrieveFeedContext(q, arts, { resolveDeepLink })); // fall back to feed
-    } else {
-      contextBlock = buildFeedContextBlock(ctx);
-    }
-
-    const content = contextBlock
-      ? `FEED CONTEXT:\n${contextBlock}\n\nQUESTION: ${q}`
-      : `FEED CONTEXT: (no matching stories found in today's feed)\n\nQUESTION: ${q}`;
-
-    const { summary, error } = await fetchAISummary({ type:'article', title:'concierge', content, mode:'chat' });
-    const t2 = new Date().toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'});
-    const botText = error
-      ? (error.includes('No AI provider') ? '⚙️ AI not configured — add GROQ_API_KEY in Vercel env vars, then redeploy.' : 'Sorry, I couldn\'t reach the AI right now. Try again in a moment.')
-      : (summary || 'No response.');
-    setMsgs(m => [...m, { role:'bot', text: botText, time:t2, link: (!error && contextBlock) ? deepLink : null }]);
-    setLoading(false);
-  };
-
-  const analyze = async () => {
-    const txt = analyzeText.trim();
-    if (!txt || loading) return;
-    setLoading(true);
-    setAnalyzeResult('');
-    const modePrompts = {
-      summary:   'Summarize this article in 3-5 sentences, hitting the key facts.',
-      takeaways: 'List the 5 most important takeaways from this article as bullet points.',
-      bias:      'Analyze the bias and framing in this article. What perspective does it favor? What might it omit?',
-      related:   'What broader context, history, or related topics should a reader understand about this article?',
-    };
-    const prompt = `${modePrompts[analyzeMode]}\n\nARTICLE:\n${txt}`;
-    const { summary, error } = await fetchAISummary({ type:'article', title:'Article Analysis', content:prompt, mode:analyzeMode });
-    setAnalyzeResult(error ? 'Analysis failed — please try again.' : (summary || 'No result.'));
-    setLoading(false);
-  };
-
-  return (
-    <>
-      <button className={`chat-fab ${open?'open':''}`} onClick={() => setOpen(o => !o)} aria-label="Chat assistant">
-        {open
-          ? <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-          : <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
-        }
-      </button>
-      {open && (
-        <div className="chat-drawer">
-          <div className="chat-header">
-            <div>
-              <div className="chat-header-title">AI News Assistant</div>
-            </div>
-            <button className="chat-close" onClick={() => setOpen(false)}>✕</button>
-          </div>
-          <div className="chat-mode-tabs">
-            <button className={`chat-mode-tab${chatMode==='chat'?' active':''}`} onClick={()=>setChatMode('chat')}>Ask</button>
-            <button className={`chat-mode-tab${chatMode==='analyze'?' active':''}`} onClick={()=>setChatMode('analyze')}>Analyze</button>
-          </div>
-          {chatMode === 'chat' ? (
-            <>
-              <div className="chat-messages">
-                {msgs.map((m, i) => (
-                  <div key={i} className={`chat-msg ${m.role}`}>
-                    <div className="chat-bubble">{m.text}</div>
-                    {m.link && onNavigate && (
-                      <button className="chat-deeplink" onClick={()=>{ onNavigate(m.link); setOpen(false); }}>Open in app →</button>
-                    )}
-                    <span className="chat-msg-time">{m.time}</span>
-                  </div>
-                ))}
-                {loading && (
-                  <div className="chat-msg bot">
-                    <div className="chat-bubble" style={{padding:'10px 14px'}}>
-                      <div className="chat-typing">
-                        <div className="chat-typing-dot"/><div className="chat-typing-dot"/><div className="chat-typing-dot"/>
-                      </div>
-                    </div>
-                  </div>
-                )}
-                <div ref={messagesEndRef}/>
-              </div>
-              {msgs.length <= 2 && (
-                <div className="chat-quick-btns">
-                  {QUICK.map(q => <button key={q} className="chat-quick-btn" onClick={() => send(q)}>{q}</button>)}
-                </div>
-              )}
-              <div className="chat-input-row">
-                <input className="chat-input" placeholder="Ask about today's news…" value={input}
-                  onChange={e => setInput(e.target.value)}
-                  onKeyDown={e => e.key === 'Enter' && send()}/>
-                <button className="chat-send" onClick={() => send()} disabled={!input.trim() || loading}>
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
-                </button>
-              </div>
-            </>
-          ) : (
-            <div className="chat-analyze">
-              <div className="chat-analyze-modes">
-                {ANALYZE_MODES.map(m => (
-                  <button key={m.key} className={`chat-analyze-mode-btn${analyzeMode===m.key?' active':''}`}
-                    onClick={()=>setAnalyzeMode(m.key)}>{m.label}</button>
-                ))}
-              </div>
-              <textarea className="chat-analyze-input"
-                placeholder="Paste article text or URL here…"
-                value={analyzeText}
-                onChange={e=>setAnalyzeText(e.target.value)}
-                rows={5}
-              />
-              <button className="chat-analyze-go" onClick={analyze} disabled={!analyzeText.trim() || loading}>
-                {loading ? 'Analyzing…' : 'Analyze'}
-              </button>
-              {analyzeResult && (
-                <div className="chat-analyze-result">
-                  <div className="chat-analyze-result-label">{ANALYZE_MODES.find(m=>m.key===analyzeMode)?.label}</div>
-                  <div className="chat-analyze-result-text">{analyzeResult}</div>
-                  <button className="chat-analyze-clear" onClick={()=>{setAnalyzeResult('');setAnalyzeText('');}}>Clear</button>
-                </div>
-              )}
-            </div>
-          )}
-        </div>
-      )}
-    </>
-  );
-}
+// ChatBot now lives in ./modules/concierge
 
 // ─── TOP OF HOUR STRIP ────────────────────────────────────────────────────────
 function TopOfHourStrip({ catLead, arts, onRead }) {
@@ -9390,7 +9091,10 @@ export default function App() {
           onClose={()=>setShowPanel(false)} onSave={handleCustomizeSave}/>}
       </div>
       {/* Floating AI chatbot — available on all pages */}
-      <ChatBot arts={arts} onNavigate={(path)=>{ const p=(path||'').split('/').filter(Boolean); navigate(p[0]||'general', p[1]||null, p[2]||null); }}/>
+      <ChatBot arts={arts}
+        onNavigate={(path)=>{ const p=(path||'').split('/').filter(Boolean); navigate(p[0]||'general', p[1]||null, p[2]||null); }}
+        fetchSummary={fetchAISummary}
+        resolveDeepLink={({entities})=>{ for(const [lg,names] of Object.entries(TEAM_CHIPS)){ const hit=names.find(n=>{const w=n.toLowerCase().split(' ');return w.some(x=>entities.includes(x))||entities.some(k=>k.length>3&&n.toLowerCase().includes(k));}); if(hit) return `/sports/${lg}/${teamSlug(hit)}`; } return null; }}/>
       {/* Inline article reader overlay */}
       {readerArticle && <ArticleReader article={readerArticle} onClose={() => setReaderArticle(null)}/>}
       {/* Paste & Brief panel */}
