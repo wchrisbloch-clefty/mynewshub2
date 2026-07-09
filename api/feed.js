@@ -1,10 +1,19 @@
-// api/feed.js — Vercel serverless proxy for RSS / news feeds (Phase 2).
+// api/feed.js — Vercel serverless RSS/news proxy.
 //
-// Why: the client used to hit third-party CORS proxies directly. This first-party
-// proxy fetches + parses feeds server-side and keeps any provider key OUT of the
-// browser bundle. If NEWS_API_KEY (an rss2json key) is set in the Vercel env it is
-// used server-side for higher rate limits; otherwise the feed is fetched + parsed
-// directly. Response is normalized JSON: { items: [...] }.
+// Fetches + parses feeds server-side (keeps any key off the client) and returns
+// normalized JSON: { items, error?, status }. Fails LOUDLY: every failure is
+// logged server-side with the source host + status, and the upstream status is
+// returned so the client can count degraded sources. A single bad feed can never
+// throw the request — parsing is guarded.
+
+// A real browser UA + Accept headers. Many publishers 403 default/bot agents
+// (the old "NewsBot/1.0" was being blocked across the board).
+const UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36';
+const FEED_HEADERS = {
+  'User-Agent': UA,
+  'Accept': 'application/rss+xml, application/atom+xml, application/xml, text/xml, */*',
+  'Accept-Language': 'en-US,en;q=0.9',
+};
 
 function decodeEntities(s = '') {
   return s
@@ -37,49 +46,52 @@ function parseFeed(xml) {
   return items;
 }
 
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+const hostOf = u => { try { return new URL(u).host; } catch { return u; } };
+
+// Fetch with retry+backoff on transient failures (network / 5xx / 429). Permanent
+// statuses (401/402/403/404) are NOT retried — retrying can't fix them.
+async function fetchFeed(target) {
+  const backoffs = [0, 400, 1200];
+  let last = { status: 0, err: 'unknown' };
+  for (let i = 0; i < backoffs.length; i++) {
+    if (backoffs[i]) await sleep(backoffs[i]);
+    try {
+      const r = await fetch(target, { headers: FEED_HEADERS, redirect: 'follow', signal: AbortSignal.timeout(9000) });
+      if (r.ok) return { ok: true, text: await r.text() };
+      last = { status: r.status, err: `HTTP ${r.status}` };
+      if ([401, 402, 403, 404, 410].includes(r.status)) break; // permanent — stop retrying
+    } catch (e) {
+      last = { status: 0, err: e?.name === 'TimeoutError' ? 'timeout' : (e?.message || 'network') };
+    }
+  }
+  return { ok: false, ...last };
+}
+
 export default async function handler(req, res) {
   const { url } = req.query;
-  if (!url) return res.status(400).json({ error: 'No url provided', items: [] });
-  const target = decodeURIComponent(url);
-
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Cache-Control', 's-maxage=300, stale-while-revalidate=600');
+  if (!url) return res.status(400).json({ error: 'No url provided', items: [], status: 400 });
+  const target = decodeURIComponent(url);
+  const host = hostOf(target);
 
-  const key = process.env.NEWS_API_KEY; // server-side only — never shipped to the client
   try {
-    if (key) {
-      const r = await fetch(
-        `https://api.rss2json.com/v1/api.json?rss_url=${encodeURIComponent(target)}&api_key=${key}&count=20`,
-        { signal: AbortSignal.timeout(9000) }
-      );
-      if (r.ok) {
-        const d = await r.json();
-        if (d.items?.length) {
-          return res.status(200).json({
-            items: d.items.map(i => ({
-              title: (i.title || '').trim(),
-              link: i.link,
-              desc: (i.description || i.content || '').replace(/<[^>]*>/g, '').replace(/&nbsp;/g, ' ').trim().slice(0, 300),
-              pubDate: i.pubDate,
-              img: i.thumbnail || i.enclosure?.link || '',
-              duration: i.itunes_duration || '',
-            })),
-          });
-        }
-      }
+    const r = await fetchFeed(target);
+    if (!r.ok) {
+      console.error(`[feed] ${host} FAIL status=${r.status} (${r.err})`);
+      // 200 to the client with the real status so it can count/report degradation;
+      // the client still falls through to its own fallbacks on empty items.
+      return res.status(200).json({ items: [], error: r.err, status: r.status });
     }
-
-    const r = await fetch(target, {
-      headers: {
-        'User-Agent': 'Mozilla/5.0 (compatible; NewsBot/1.0)',
-        'Accept': 'application/rss+xml, application/xml, text/xml, */*',
-      },
-      signal: AbortSignal.timeout(9000),
-    });
-    if (!r.ok) return res.status(r.status).json({ error: `Upstream ${r.status}`, items: [] });
-    const xml = await r.text();
-    return res.status(200).json({ items: parseFeed(xml) });
+    let items = [];
+    try { items = parseFeed(r.text); }
+    catch (e) { console.error(`[feed] ${host} PARSE-ERROR ${e?.message}`); items = []; }
+    if (!items.length) console.error(`[feed] ${host} EMPTY (0 items parsed)`);
+    return res.status(200).json({ items, status: 200 });
   } catch (err) {
-    return res.status(500).json({ error: err.message, items: [] });
+    // Must never take the request down. Log + report, never 500 the client.
+    console.error(`[feed] ${host} EXCEPTION ${err?.message}`);
+    return res.status(200).json({ items: [], error: err?.message || 'exception', status: 0 });
   }
 }

@@ -100,7 +100,7 @@ const DEFAULT_KW = {
 const DEFAULT_FEEDS = {
   general: [
     { name:'BBC News',          url:'https://feeds.bbci.co.uk/news/rss.xml',                                    on:true },
-    { name:'Reuters Top News',  url:'https://feeds.reuters.com/reuters/topNews',                                on:true },
+    { name:'NPR News',          url:'https://feeds.npr.org/1001/rss.xml',                                       on:true },
     { name:'CNBC Top News',     url:'https://www.cnbc.com/id/100003114/device/rss/rss.html',                    on:true },
     { name:'Fox News',          url:'https://moxie.foxnews.com/google-publisher/latest.xml',                    on:true },
     { name:'NY Post',           url:'https://nypost.com/feed/',                                                 on:true },
@@ -150,8 +150,8 @@ const DEFAULT_FEEDS = {
     { name:'No Laying Up',         url:'https://nolayingup.com/feed/',                                            on:true },
   ],
   business: [
-    { name:'Reuters Business',       url:'https://feeds.reuters.com/reuters/businessNews',                      on:true },
-    { name:'CNBC Energy',            url:'https://www.cnbc.com/id/10000664/device/rss/rss.html',                on:true },
+    { name:'NPR Business',           url:'https://feeds.npr.org/1006/rss.xml',                                  on:true },
+    { name:'CNBC Business',          url:'https://www.cnbc.com/id/10001147/device/rss/rss.html',                on:true },
     { name:'Oilprice.com',           url:'https://oilprice.com/rss/main',                                       on:true },
     { name:'Utility Dive',           url:'https://www.utilitydive.com/feeds/news/',                             on:true },
     { name:'Data Center Dynamics',   url:'https://www.datacenterdynamics.com/en/rss/',                          on:true },
@@ -420,38 +420,27 @@ async function fetchWithTimeout(url, ms=8000) {
   try { return await fetch(url, {signal:ctrl.signal}); } finally { clearTimeout(timer); }
 }
 async function fetchRSS(url) {
-  // Phase 2: first-party /api/feed proxy (parses server-side, keeps any key off
-  // the client bundle). Falls back to /api/rss and public CORS proxies below.
+  // Primary: first-party /api/feed proxy (browser UA + retry, parses server-side).
+  // It always returns 200 with { items, error?, status } so we can surface the real
+  // upstream status for the health indicator instead of guessing.
+  let lastStatus = 0;
   try {
-    const r = await fetchWithTimeout(`/api/feed?url=${encodeURIComponent(url)}`, 10000);
-    if (r.ok) { const d = await r.json(); if (d.items?.length) return {items:d.items, reason:''}; }
+    const r = await fetchWithTimeout(`/api/feed?url=${encodeURIComponent(url)}`, 12000);
+    if (r.ok) { const d = await r.json(); if (d.items?.length) return {items:d.items, reason:'', status:200}; if (d.status) lastStatus = d.status; }
   } catch {}
+  // Fallback: /api/rss (raw XML, same browser UA) → client parse.
   try {
     const r = await fetchWithTimeout(`/api/rss?url=${encodeURIComponent(url)}`, 10000);
-    if (r.ok) { const items = parseXML(await r.text()); if (items.length) return {items, reason:''}; }
+    if (r.ok) { const items = parseXML(await r.text()); if (items.length) return {items, reason:'', status:200}; if (!r.ok) lastStatus = r.status; }
+    else lastStatus = r.status;
   } catch {}
-  try {
-    const r = await fetchWithTimeout(`https://api.rss2json.com/v1/api.json?rss_url=${encodeURIComponent(url)}&count=15`);
-    if (r.ok) {
-      const d = await r.json();
-      if (d.items?.length > 0) return {
-        items: d.items.map(i => ({
-          title:decodeEntities((i.title||'').trim()), link:i.link,
-          desc:decodeEntities((i.description||i.content||'').replace(/<[^>]*>/g,'')).replace(/\s+/g,' ').trim().slice(0,300),
-          pubDate:i.pubDate, img:extractImageFromJson(i), duration:i.itunes_duration||'',
-        })), reason:'',
-      };
-    }
-  } catch {}
+  // Last resort: public CORS proxies (rss2json removed — its free tier 402s and
+  // was the dominant console-error source).
   try {
     const r = await fetchWithTimeout(`https://api.allorigins.win/get?url=${encodeURIComponent(url)}`);
-    if (r.ok) { const d = await r.json(); if (d.contents) { const items = parseXML(d.contents); if (items.length) return {items, reason:''}; } }
+    if (r.ok) { const d = await r.json(); if (d.contents) { const items = parseXML(d.contents); if (items.length) return {items, reason:'', status:200}; } }
   } catch {}
-  try {
-    const r = await fetchWithTimeout(`https://corsproxy.io/?${encodeURIComponent(url)}`);
-    if (r.ok) { const items = parseXML(await r.text()); if (items.length) return {items, reason:''}; }
-  } catch {}
-  return {items:[], reason:'All proxies failed'};
+  return {items:[], reason:`unavailable${lastStatus?` (${lastStatus})`:''}`, status:lastStatus};
 }
 
 // ─── FORMATTERS ───────────────────────────────────────────────────────────────
@@ -1199,6 +1188,12 @@ body:not(.dark) .pill-bar{
   display:flex;align-items:center;justify-content:space-between;
   margin-bottom:28px;
 }
+.feed-degraded{
+  font-size:10px;font-weight:700;color:var(--amber,#b45309);font-family:var(--font-sans);
+  background:rgba(180,83,9,0.1);border:1px solid rgba(180,83,9,0.3);border-radius:14px;
+  padding:3px 10px;cursor:pointer;white-space:nowrap;
+}
+.feed-degraded:hover{background:rgba(180,83,9,0.18);}
 .page-header{
   font-size:11px;font-weight:700;color:var(--text3);
   text-transform:uppercase;letter-spacing:0.1em;
@@ -7148,6 +7143,7 @@ export default function App() {
   const [pendingNew, setPendingNew] = useState({});                    // v46: staged fresh articles for "N new stories" pill
   const [loading, setLoading]   = useState({general:false,sports:false,business:false,finance:false,bloom:false,tech:false,popculture:false,comedy:false});
   const [health, setHealth]     = useState({});
+  const [feedHealth, setFeedHealth] = useState({}); // source -> { code, ok, reason } for the degradation indicator/report
   const [podEps, setPodEps]     = useState({});
   const [podLoading, setPodLoading] = useState({});
   const [activePod, setActivePod]   = useState(null);
@@ -7280,13 +7276,16 @@ export default function App() {
 
   const loadCat = useCallback(async (cat)=>{
     setLoading(l=>({...l,[cat]:true}));
-    const results=[],hUpdates={};
+    const results=[],hUpdates={},fhUpdates={};
     await Promise.allSettled((feeds[cat]||[]).filter(f=>f.on).map(async f=>{
-      const t0=Date.now();const{items}=await fetchRSS(f.url);const ms=Date.now()-t0;
-      hUpdates[f.name]=items.length>0?(ms<4000?'green':'yellow'):'red';
+      const t0=Date.now();const{items,status,reason}=await fetchRSS(f.url);const ms=Date.now()-t0;
+      const ok=items.length>0;
+      hUpdates[f.name]=ok?(ms<4000?'green':'yellow'):'red';
+      fhUpdates[f.name]={code:status||0, ok, reason:reason||''};
       items.forEach(i=>{if(i.title&&i.link)results.push({...i,source:f.name,cat});});
     }));
     setHealth(h=>({...h,...hUpdates}));
+    setFeedHealth(h=>({...h,...fhUpdates}));
     results.sort((a,b)=>new Date(b.pubDate)-new Date(a.pubDate));
     setArts(a=>({...a,[cat]:results}));
     setPendingNew(p=>({...p,[cat]:[]}));   // fresh load supersedes any staged items
@@ -8250,7 +8249,13 @@ export default function App() {
                 {cc.emoji} {cc.label}{feedItems.length>0?` — ${feedItems.length} articles`:''}
                 {lastUpdated[cat] && <span style={{marginLeft:'10px'}}><LastUpdated timestamp={lastUpdated[cat]} onRefresh={() => loadCat(cat)}/></span>}
               </span>
-              <button className="page-customize-btn" onClick={()=>openCustomize('sources',cat)}>⚙ Customize</button>
+              <div style={{display:'flex',alignItems:'center',gap:'10px'}}>
+                {(() => {
+                  const down = (feeds[cat]||[]).filter(f=>f.on && feedHealth[f.name] && !feedHealth[f.name].ok).length;
+                  return down>0 ? <button className="feed-degraded" title="Some sources failed to load — open Customize to review" onClick={()=>openCustomize('sources',cat)}>⚠ {down} source{down===1?'':'s'} unavailable</button> : null;
+                })()}
+                <button className="page-customize-btn" onClick={()=>openCustomize('sources',cat)}>⚙ Customize</button>
+              </div>
             </div>
             {cat === 'bloom' && !activeKw && !activeSrc && !search && (
               <div className="pc-subtabs" style={{marginBottom:'8px',marginTop:'0'}}>
