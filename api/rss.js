@@ -5,13 +5,17 @@ export default async function handler(req, res) {
   try {
     const response = await fetch(decodeURIComponent(url), {
       headers: {
-        'User-Agent': 'Mozilla/5.0 (compatible; NewsBot/1.0)',
-        'Accept': 'application/rss+xml, application/xml, text/xml, */*',
+        // Real browser UA — default/bot agents get 403'd by many publishers.
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
+        'Accept': 'application/rss+xml, application/atom+xml, application/xml, text/xml, */*',
+        'Accept-Language': 'en-US,en;q=0.9',
       },
+      redirect: 'follow',
       signal: AbortSignal.timeout(8000),
     });
 
     if (!response.ok) {
+      try { const h = new URL(decodeURIComponent(url)).host; console.error(`[rss] ${h} FAIL ${response.status}`); } catch {}
       return res.status(response.status).json({ error: `Upstream ${response.status}` });
     }
 
