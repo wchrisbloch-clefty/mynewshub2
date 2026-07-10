@@ -39,6 +39,7 @@
 import { useState, useEffect, useCallback, useMemo, useRef, Fragment } from 'react';
 // Extracted, dependency-isolated capability modules (see src/modules/*/README.md)
 import { clusterStories, hotClusterTopics, TREND_STOP, decodeEntities, capByPublisher } from './modules/clustering';
+import { extractContent, extractionFallbackMessage } from './modules/extractor';
 import { retrieveFeedContext, buildFeedContextBlock } from './modules/retrieval';
 import { XPulse } from './modules/x-pulse';
 import { StateOfPlay } from './modules/state-of-play';
@@ -734,12 +735,21 @@ function usePullToRefresh(onRefresh, { threshold = 70, enabled = true } = {}) {
 }
 
 // ─── AI SUMMARY ───────────────────────────────────────────────────────────────
-async function fetchAISummary({type, title, content, mode='summary'}) {
+const EXTRACT_MODES = new Set(['summary','takeaways','explain','bias','related','brief']);
+async function fetchAISummary({type, title, content, mode='summary', url}) {
+  // Extract-first: run summarization on the REAL source body, never the RSS blurb.
+  // If extraction fails/too-short, refuse to invent — surface an honest fallback.
+  let body = content;
+  if (url && EXTRACT_MODES.has(mode)) {
+    const ex = await extractContent(url);
+    if (ex && ex.text) body = ex.text;
+    else return { summary:'', error: extractionFallbackMessage(ex && ex.error), unavailable:true };
+  }
   try {
     const r = await fetch('/api/summarize', {
       method:'POST', headers:{'Content-Type':'application/json'},
-      body: JSON.stringify({type,title,content,mode}),
-      signal: AbortSignal.timeout(mode==='briefing-gen'?25000:mode==='takeaways'?18000:20000),
+      body: JSON.stringify({type,title,content:body,mode}),
+      signal: AbortSignal.timeout(mode==='briefing-gen'?25000:mode==='takeaways'?18000:22000),
     });
     if (!r.ok) {
       const e=await r.json().catch(()=>({}));
@@ -4908,8 +4918,8 @@ function FeedCard({a, cat, isSaved, onSave, onRead, relatedSources, isRead, user
     setAiErr('');
     setLoadingAI(true);
     const tasks = [];
-    if (!summary)   tasks.push(fetchAISummary({type:'article',title:a.title,content:a.desc||'',mode:'summary'}).then(r=>({k:'s',...r})));
-    if (!takeaways) tasks.push(fetchAISummary({type:'article',title:a.title,content:a.desc||'',mode:'takeaways'}).then(r=>({k:'t',...r})));
+    if (!summary)   tasks.push(fetchAISummary({type:'article',title:a.title,content:a.desc||'',mode:'summary',url:a.link}).then(r=>({k:'s',...r})));
+    if (!takeaways) tasks.push(fetchAISummary({type:'article',title:a.title,content:a.desc||'',mode:'takeaways',url:a.link}).then(r=>({k:'t',...r})));
     let gotAny = false, lastErr = '';
     try {
       const results = await Promise.all(tasks);
@@ -5139,7 +5149,7 @@ function TodayItem({a, cc, onRead}) {
     if (showSum) { setShowSum(false); return; }
     if (sum||err) { setShowSum(true); return; }
     setShowSum(true); setLoading(true);
-    const {summary, error} = await fetchAISummary({type:'article',title:a.title,content:a.desc||''});
+    const {summary, error} = await fetchAISummary({type:'article',title:a.title,content:a.desc||'',url:a.link});
     if (summary) setSum(summary); else setErr(error||'Summary unavailable');
     setLoading(false);
   };
@@ -6781,7 +6791,7 @@ function TopBar({tab, setTab, search, setSearch, dark, setDark,
             <div className="breaking-ticker-inner">
               {tickerItems.map((item,i)=>(
                 <span key={i} className="breaking-item" onClick={()=>item.link&&window.open(item.link,'_blank')}>
-                  {item.title} <span style={{opacity:0.6,fontSize:'10px'}}>· {item.source}</span>
+                  {decodeEntities(item.title)} <span style={{opacity:0.6,fontSize:'10px'}}>· {item.source}</span>
                   <span className="breaking-sep">◆</span>
                 </span>
               ))}
@@ -7062,7 +7072,7 @@ function ArticleReader({ article, onClose }) {
     setAiMode(mode);
     setAiLoading(true);
     setAiResult(''); setAiErr('');
-    const { summary, error } = await fetchAISummary({ type: 'article', title: article.title, content: article.desc || article.title, mode });
+    const { summary, error } = await fetchAISummary({ type: 'article', title: article.title, content: article.desc || article.title, mode, url: article.link });
     if (summary) setAiResult(summary);
     else setAiErr(error || 'Could not generate that right now — try again.');
     setAiLoading(false);
@@ -8498,7 +8508,7 @@ export default function App() {
       if (showSum) { setShowSum(false); return; }
       if (sum||sumErr) { setShowSum(true); return; }
       setShowSum(true); setLoadSum(true);
-      const {summary,error} = await fetchAISummary({type:'article',title:a.title,content:a.desc||''});
+      const {summary,error} = await fetchAISummary({type:'article',title:a.title,content:a.desc||'',url:a.link});
       if (summary) setSum(summary); else setSumErr(error||'Unavailable');
       setLoadSum(false);
     };
@@ -8508,7 +8518,7 @@ export default function App() {
       if (showEx) { setShowEx(false); return; }
       if (exText) { setShowEx(true); return; }
       setShowEx(true); setLoadEx(true);
-      const {summary:text} = await fetchAISummary({type:'article',title:a.title,content:a.desc||'',mode:'explain'});
+      const {summary:text} = await fetchAISummary({type:'article',title:a.title,content:a.desc||'',mode:'explain',url:a.link});
       setExText(text||'Could not explain.');
       setLoadEx(false);
     };
@@ -8703,7 +8713,7 @@ export default function App() {
           {podAiState!=='closed'&&(
             <div className="fc-ai-panel" style={{margin:'10px 0 0'}}>
               <div className="fc-summary">
-                <div className="fc-summary-lbl">✦ AI Summary</div>
+                <div className="fc-summary-lbl">✦ Summary · from show notes</div>
                 {loadPod&&!podSum?<div style={{fontSize:'11px',color:'var(--text3)',fontStyle:'italic'}}>Generating summary…</div>
                 :podErr&&!podSum?<div style={{fontSize:'11px',color:'var(--red)'}}>{podErr}</div>
                 :<div className="fc-summary-text">{podSum}</div>}
@@ -8720,9 +8730,11 @@ export default function App() {
           )}
           <div className="pod-actions">
             <button className="pod-btn" onClick={()=>ep.link&&window.open(ep.link,'_blank')}>Listen</button>
-            <button className={`pod-btn ${podAiState!=='closed'?'ai-on':''}`} onClick={handlePodAI} disabled={loadPod}>
-              ✦ {loadPod?'Thinking…':podAiState==='closed'?'AI Summary':'Hide AI'}
-            </button>
+            {(ep.desc||'').length >= 500 && (
+              <button className={`pod-btn ${podAiState!=='closed'?'ai-on':''}`} onClick={handlePodAI} disabled={loadPod}>
+                ✦ {loadPod?'Thinking…':podAiState==='closed'?'AI Summary':'Hide AI'}
+              </button>
+            )}
             <button className={`pod-btn ${sv2?'saved':''}`} onClick={()=>onSave({...ep,link:ep.link||ep.show+idx,source:ep.show,cat:'podcasts'})}>{sv2?'★ Saved':'☆ Save'}</button>
           </div>
         </div>
