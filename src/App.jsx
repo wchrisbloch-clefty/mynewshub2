@@ -49,16 +49,24 @@ import { parseRoute, buildPath } from './modules/routing';
 import { ChatBot } from './modules/concierge';
 
 // ─── CATEGORIES ───────────────────────────────────────────────────────────────
+// One brand accent across all sections — hierarchy comes from type, not colour-coded
+// boxes (editorial-premium, FT/NBC). Section identity is the label text itself.
 const CATS = {
-  general:    { label:'News',         color:'#1d4ed8', bg:'#eff6ff', emoji:'' },
-  sports:     { label:'Sports',       color:'#d97706', bg:'#fef3c7', emoji:'' },
-  business:   { label:'Business',     color:'#16a34a', bg:'#f0fdf4', emoji:'' },
-  finance:    { label:'Markets',      color:'#7c3aed', bg:'#f5f3ff', emoji:'' },
-  bloom:      { label:'Energy',       color:'#0369a1', bg:'#e0f2fe', emoji:'' },
-  tech:       { label:'AI & Tech',    color:'#6366f1', bg:'#eef2ff', emoji:'' },
-  popculture: { label:'Pop Culture',  color:'#db2777', bg:'#fdf2f8', emoji:'' },
-  comedy:     { label:'Comedy',       color:'#a855f7', bg:'#faf5ff', emoji:'' },
+  general:    { label:'News',         color:'var(--accent)', bg:'var(--accent-bg)', emoji:'' },
+  sports:     { label:'Sports',       color:'var(--accent)', bg:'var(--accent-bg)', emoji:'' },
+  business:   { label:'Business',     color:'var(--accent)', bg:'var(--accent-bg)', emoji:'' },
+  finance:    { label:'Markets',      color:'var(--accent)', bg:'var(--accent-bg)', emoji:'' },
+  bloom:      { label:'Energy',       color:'var(--accent)', bg:'var(--accent-bg)', emoji:'' },
+  tech:       { label:'AI & Tech',    color:'var(--accent)', bg:'var(--accent-bg)', emoji:'' },
+  popculture: { label:'Pop Culture',  color:'var(--accent)', bg:'var(--accent-bg)', emoji:'' },
+  comedy:     { label:'Comedy',       color:'var(--accent)', bg:'var(--accent-bg)', emoji:'' },
 };
+
+// One consistent line-icon (Feather stroke) for settings/customize affordances —
+// inherits text colour, single stroke weight. Replaces the old gear emoji in chrome.
+const IconGear = ({size=13}) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" style={{flexShrink:0,verticalAlign:'-2px'}} aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+);
 
 // Order for mobile swipe-left/right navigation between categories.
 // Matches the mobile chip bar order so swiping feels like advancing the chips.
@@ -281,11 +289,11 @@ const SCORE_TEAMS = [
 ];
 
 const LEAGUES = [
-  { key:'nfl', label:'NFL',       sport:'football',   league:'nfl',                     emoji:'', accent:'#1d4ed8' },
-  { key:'nba', label:'NBA',       sport:'basketball', league:'nba',                     emoji:'', accent:'#dc2626' },
-  { key:'mlb', label:'MLB',       sport:'baseball',   league:'mlb',                     emoji:'', accent:'#1d4ed8' },
-  { key:'cfb', label:'College FB',sport:'football',   league:'college-football',        emoji:'', accent:'#7c3aed' },
-  { key:'cbb', label:'College BB',sport:'basketball', league:'mens-college-basketball', emoji:'', accent:'#d97706' },
+  { key:'nfl', label:'NFL',       sport:'football',   league:'nfl',                     emoji:'', accent:'var(--accent)' },
+  { key:'nba', label:'NBA',       sport:'basketball', league:'nba',                     emoji:'', accent:'var(--accent)' },
+  { key:'mlb', label:'MLB',       sport:'baseball',   league:'mlb',                     emoji:'', accent:'var(--accent)' },
+  { key:'cfb', label:'College FB',sport:'football',   league:'college-football',        emoji:'', accent:'var(--accent)' },
+  { key:'cbb', label:'College BB',sport:'basketball', league:'mens-college-basketball', emoji:'', accent:'var(--accent)' },
 ];
 
 // Tier 3 (Phase 5): ~20 major programs per league for the team-chip rail.
@@ -585,7 +593,7 @@ const SOCIAL_META = {
   twitter:   {label:'X / Twitter', color:'#000000', bg:'#f4f4f5', icon:'𝕏'},
   linkedin:  {label:'LinkedIn',    color:'#0a66c2', bg:'#e8f2fb', icon:'in'},
   instagram: {label:'Instagram',   color:'#e1306c', bg:'#fdeff5', icon:'IG'},
-  youtube:   {label:'YouTube',     color:'#ff0000', bg:'#fee',    icon:'▶'},
+  youtube:   {label:'YouTube',     color:'var(--text2)', bg:'var(--surface2)',    icon:'▶'},
 };
 
 // ─── CUSTOM HOOKS (Yahoo-style mobile interactions) ──────────────────────────
@@ -1011,6 +1019,44 @@ body{
 .topbar-wrap{position:sticky;top:0;z-index:300;}
 
 /* ═══════════════════════════════════════════
+   UNIFIED STATUS STRIP — one slim row (was 3 stacked bars)
+   live/breaking · market ticker · weather chip
+═══════════════════════════════════════════ */
+.status-strip{
+  display:flex;align-items:center;gap:var(--s3);
+  height:38px;padding:0 var(--s4);
+  background:var(--surface);border-bottom:1px solid var(--border2);
+  font-family:var(--font-publicsans);
+}
+.ss-flag{display:inline-flex;align-items:center;gap:6px;flex-shrink:0;
+  font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:0.09em;
+  border:none;background:none;font-family:inherit;padding:0;}
+.ss-flag-markets{color:var(--text3);cursor:default;}
+.ss-flag-breaking{color:var(--red);cursor:pointer;}
+.ss-pulse{width:7px;height:7px;border-radius:50%;background:var(--red);
+  animation:ss-pulse 1.8s ease-out infinite;}
+@keyframes ss-pulse{0%{box-shadow:0 0 0 0 rgba(200,16,46,0.5);}70%{box-shadow:0 0 0 6px rgba(200,16,46,0);}100%{box-shadow:0 0 0 0 rgba(200,16,46,0);}}
+.ss-ticker{flex:1;min-width:0;overflow:hidden;
+  -webkit-mask-image:linear-gradient(90deg,transparent,#000 20px,#000 calc(100% - 20px),transparent);
+          mask-image:linear-gradient(90deg,transparent,#000 20px,#000 calc(100% - 20px),transparent);}
+.ss-ticker-inner{display:flex;align-items:center;gap:var(--s4);overflow-x:auto;scrollbar-width:none;}
+.ss-ticker-inner::-webkit-scrollbar{display:none;}
+.ss-tk{display:inline-flex;align-items:baseline;gap:6px;flex-shrink:0;
+  background:none;border:none;cursor:pointer;font-family:inherit;padding:0;white-space:nowrap;}
+.ss-tk-sym{font-size:10px;font-weight:700;letter-spacing:0.04em;color:var(--text3);text-transform:uppercase;}
+.ss-tk-val{font-size:12px;font-weight:600;color:var(--text);}
+.ss-tk-chg{font-size:11px;font-weight:700;}
+.ss-tk-chg.up{color:var(--pos);}
+.ss-tk-chg.down{color:var(--neg);}
+.ss-wx{display:inline-flex;align-items:center;gap:5px;flex-shrink:0;text-decoration:none;
+  color:var(--text2);font-size:12px;font-weight:600;padding-left:var(--s3);border-left:1px solid var(--border2);}
+.ss-wx svg{color:var(--text3);}
+.ss-wx:hover{color:var(--accent);}
+.ss-wx:hover svg{color:var(--accent);}
+/* Numbers read as data everywhere — scores, clocks, timestamps that lacked it. */
+.sb-status,.sst-status,.hs-status,.rn-fresh,.gn-lead-meta,.fc-meta,.today-item-src,.pod-meta,.snap-time{font-variant-numeric:tabular-nums;}
+
+/* ═══════════════════════════════════════════
    PILL BAR — editorial data strip
    BBC-clean: navy background, high-contrast data
    Weather shown prominently; indices + tickers scroll
@@ -1159,18 +1205,9 @@ body:not(.dark) .pill-bar{
   transition:color 0.12s,border-color 0.12s;letter-spacing:0.04em;
   text-transform:uppercase;
 }
-.nav-tab.active{color:var(--text);border-bottom-color:var(--accent);}
+/* One accent for the active section — identity is the label, not a colour per tab */
+.nav-tab.active{color:var(--accent);border-bottom-color:var(--accent);}
 .nav-tab:hover:not(.active){color:var(--text2);}
-/* BBC category color coding — each section has identity */
-.nav-tab.t-general.active{color:var(--navy);border-bottom-color:var(--navy);}
-.nav-tab.t-sports.active{color:#b45309;border-bottom-color:#b45309;}
-.nav-tab.t-business.active{color:#1a6b2a;border-bottom-color:#1a6b2a;}
-.nav-tab.t-finance.active{color:#6d28d9;border-bottom-color:#6d28d9;}
-.nav-tab.t-bloom.active{color:#0369a1;border-bottom-color:#0369a1;}
-.nav-tab.t-tech.active{color:#6366f1;border-bottom-color:#6366f1;}
-.nav-tab.t-comedy.active{color:#7c3aed;border-bottom-color:#7c3aed;}
-.nav-tab.t-popculture.active{color:#be185d;border-bottom-color:#be185d;}
-.nav-tab.t-podcasts.active{color:#c41d25;border-bottom-color:#c41d25;}
 .nav-right{display:flex;gap:8px;align-items:center;flex-shrink:0;padding-left:16px;border-left:1px solid var(--border);}
 .search-input{
   background:var(--surface2);border:1px solid var(--border);color:var(--text);
@@ -1312,7 +1349,7 @@ body:not(.dark) .pill-bar{
 .fc-act:hover{border-color:var(--accent);color:var(--accent);background:var(--accent-bg);}
 .fc-act:active{transform:scale(0.96);}
 .fc-act.saved{border-color:var(--amber);color:var(--amber);background:#fffbeb;}
-.fc-act.ai-on{border-color:#7c3aed;color:#7c3aed;background:#f5f3ff;}
+.fc-act.ai-on{border-color:var(--accent);color:var(--accent);background:var(--accent-bg);}
 .fc-act.disc-on{border-color:#0ea5e9;color:#0ea5e9;background:#f0f9ff;}
 .fc-save-btn{display:flex;align-items:center;gap:5px;}
 .fc-ellipsis-btn{padding:4px 9px;font-size:16px;letter-spacing:1px;line-height:1;}
@@ -1332,7 +1369,7 @@ body:not(.dark) .pill-bar{
 .fc-ai-panel{margin-top:12px;display:flex;flex-direction:column;gap:8px;}
 .fc-preview-note{font-size:10.5px;font-weight:600;color:var(--amber);background:#fffbeb;border:1px solid #fde68a;border-radius:6px;padding:5px 9px;letter-spacing:0.01em;}
 .fc-summary{background:var(--surface2);border-radius:8px;padding:10px 12px;}
-.fc-summary-lbl{font-size:9px;font-weight:700;color:#7c3aed;text-transform:uppercase;letter-spacing:0.08em;margin-bottom:5px;}
+.fc-summary-lbl{font-size:9px;font-weight:700;color:var(--accent);text-transform:uppercase;letter-spacing:0.08em;margin-bottom:5px;}
 .fc-summary-text{font-size:12px;color:var(--text2);line-height:1.6;}
 /* v46: AI skeleton + error/retry so the panel never renders blank */
 @keyframes shimmer{0%{background-position:-200px 0;}100%{background-position:calc(200px + 100%) 0;}}
@@ -1342,11 +1379,11 @@ body:not(.dark) .pill-bar{
   background-size:200px 100%;animation:shimmer 1.2s ease-in-out infinite;}
 .fc-ai-error{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;}
 .fc-ai-error-msg{font-size:11px;color:var(--text3);line-height:1.4;}
-.fc-ai-retry{font-size:11px;font-weight:700;color:#7c3aed;background:var(--surface);
-  border:1px solid #7c3aed;border-radius:14px;padding:3px 12px;cursor:pointer;
+.fc-ai-retry{font-size:11px;font-weight:700;color:var(--accent);background:var(--surface);
+  border:1px solid var(--accent);border-radius:14px;padding:3px 12px;cursor:pointer;
   font-family:inherit;flex-shrink:0;transition:background 0.12s,color 0.12s;}
-.fc-ai-retry:hover{background:#7c3aed;color:#fff;}
-.fc-takeaways{background:var(--surface2);border-radius:8px;padding:12px 14px;border-left:2px solid #7c3aed;}
+.fc-ai-retry:hover{background:var(--accent);color:#fff;}
+.fc-takeaways{background:var(--surface2);border-radius:8px;padding:12px 14px;border-left:2px solid var(--accent);}
 .fc-takeaways-lbl{font-size:9px;font-weight:700;color:#4f46e5;text-transform:uppercase;letter-spacing:0.08em;margin-bottom:8px;}
 .takeaways-list{display:flex;flex-direction:column;gap:8px;}
 .takeaway-item{display:flex;gap:8px;align-items:flex-start;font-size:12px;line-height:1.5;color:var(--text2);}
@@ -1708,8 +1745,8 @@ body:not(.dark) .pill-bar{
   padding:2px 6px;font-size:11px;cursor:pointer;font-family:inherit;font-weight:600;
   flex-shrink:0;align-self:flex-start;transition:all 0.1s;
 }
-.today-ai-btn:hover{border-color:#7c3aed;color:#7c3aed;}
-.today-ai-btn.on{border-color:#7c3aed;color:#7c3aed;background:#f5f3ff;}
+.today-ai-btn:hover{border-color:var(--accent);color:var(--accent);}
+.today-ai-btn.on{border-color:var(--accent);color:var(--accent);background:var(--accent-bg);}
 .today-ai-btn:disabled{cursor:wait;opacity:0.6;}
 .today-summary{padding:0 14px 10px 70px;font-size:11px;color:var(--text2);line-height:1.55;}
 .today-bloom-row{grid-column:1/-1;}
@@ -1876,7 +1913,7 @@ body:not(.dark) .pill-bar{
 .fc-title,.today-item-title,.hero-side-title,.trend-title,.trend-src,.pod-title,
 .pod-desc,.snap-title,.snap-snippet,.sop-item-title{overflow-wrap:anywhere;word-break:break-word;}
 .pod-header{
-  background:linear-gradient(135deg,#e11d48,#f43f5e);border-radius:10px;
+  background:linear-gradient(135deg,var(--accent),var(--accent));border-radius:10px;
   padding:14px 18px;display:flex;align-items:center;gap:12px;
 }
 .pod-header-emoji{font-size:26px;}
@@ -1886,28 +1923,28 @@ body:not(.dark) .pill-bar{
   background:var(--surface);border-radius:10px;border:1px solid var(--border);
   padding:14px;transition:border-color 0.15s;
 }
-.pod-card:hover{border-color:#fda4af;}
+.pod-card:hover{border-color:var(--accent);}
 .pod-card-top{display:flex;gap:12px;align-items:flex-start;margin-bottom:10px;}
 .pod-num{font-size:15px;font-weight:800;color:var(--text4);min-width:22px;line-height:1.3;flex-shrink:0;font-variant-numeric:tabular-nums;}
 .pod-body{flex:1;min-width:0;}
-.pod-show{font-size:10px;font-weight:600;color:#e11d48;margin-bottom:2px;}
+.pod-show{font-size:10px;font-weight:600;color:var(--accent);margin-bottom:2px;}
 .pod-title{font-size:13px;font-weight:700;color:var(--text);line-height:1.35;margin-bottom:4px;cursor:pointer;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;overflow-wrap:anywhere;word-break:break-word;}
-.pod-title:hover{color:#e11d48;}
+.pod-title:hover{color:var(--accent);}
 .pod-meta{font-size:10px;color:var(--text3);display:flex;gap:8px;flex-wrap:wrap;}
 .pod-desc{font-size:11px;color:var(--text2);line-height:1.5;margin-top:6px;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden;}
 .pod-actions{display:flex;gap:6px;flex-wrap:wrap;}
 .pod-skel-line{border-radius:5px;background:linear-gradient(90deg,var(--surface2) 25%,var(--border) 50%,var(--surface2) 75%);background-size:200% 100%;animation:shimmer 1.4s infinite;}
 .pod-btn{border:1px solid var(--border);border-radius:6px;padding:4px 10px;font-size:10px;cursor:pointer;font-family:inherit;font-weight:500;background:none;color:var(--text2);transition:all 0.12s;}
-.pod-btn:hover{border-color:#e11d48;color:#e11d48;}
+.pod-btn:hover{border-color:var(--accent);color:var(--accent);}
 .pod-btn.saved{border-color:var(--amber);color:var(--amber);background:#fffbeb;}
 .pod-shows{background:var(--surface);border-radius:10px;border:1px solid var(--border);padding:14px;}
 .pod-show-item{display:flex;align-items:center;gap:8px;padding:8px 0;border-bottom:1px solid var(--border2);cursor:pointer;}
 .pod-show-item:last-child{border-bottom:none;}
-.pod-show-item:hover .pod-show-name{color:#e11d48;}
+.pod-show-item:hover .pod-show-name{color:var(--accent);}
 .pod-show-emoji{font-size:16px;width:24px;text-align:center;}
 .pod-show-name{font-size:12px;font-weight:600;color:var(--text);transition:color 0.1s;}
 .pod-show-ep{font-size:10px;color:var(--text3);margin-top:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:150px;}
-.pod-show-dot{width:5px;height:5px;border-radius:50%;background:#e11d48;flex-shrink:0;margin-left:auto;}
+.pod-show-dot{width:5px;height:5px;border-radius:50%;background:var(--accent);flex-shrink:0;margin-left:auto;}
 .saved-empty{text-align:center;padding:80px 20px;}
 
 /* ═══════════════════════════════════════════
@@ -2317,8 +2354,8 @@ body:not(.dark) .pill-bar{
 }
 .sport-tab:hover{background:var(--surface);color:var(--text);border-color:var(--text3);}
 .sport-tab.active{
-  background:#6001d2;color:#fff;border-color:#6001d2;
-  box-shadow:0 2px 8px rgba(96,1,210,0.35);
+  background:var(--accent);color:#fff;border-color:var(--accent);
+  box-shadow:var(--shadow-sm);
 }
 .sport-tab-emoji{font-size:15px;}
 
@@ -2328,7 +2365,7 @@ body:not(.dark) .pill-bar{
   padding:20px 24px;margin:0 0 20px 0;
   background:linear-gradient(135deg,#12002a 0%,#2d006b 50%,#1a0048 100%);
   border-radius:12px;color:#fff;
-  box-shadow:0 4px 20px rgba(96,1,210,0.3);
+  box-shadow:var(--shadow-md);
   position:relative;overflow:hidden;
 }
 .sport-league-header::after{
@@ -2355,7 +2392,7 @@ body:not(.dark) .pill-bar{
 .team-hub{
   background:var(--surface);border:1px solid var(--border);
   border-radius:12px;padding:18px 20px;margin-bottom:20px;
-  border-left:4px solid #6001d2;
+  border-left:4px solid var(--accent);
 }
 .team-hub-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;}
 .team-hub-title{font-size:18px;font-weight:800;display:flex;align-items:center;gap:10px;}
@@ -2365,7 +2402,7 @@ body:not(.dark) .pill-bar{
   text-decoration:none;border:1px solid var(--border);color:var(--text2);
   transition:all 0.12s;
 }
-.team-hub-link:hover{border-color:#6001d2;color:#6001d2;}
+.team-hub-link:hover{border-color:var(--accent);color:var(--accent);}
 .team-hub-count{font-size:12px;color:var(--text3);margin-top:2px;}
 .team-hub-clear{
   font-size:12px;font-weight:600;color:var(--text3);
@@ -2393,16 +2430,16 @@ body:not(.dark) .pill-bar{
   overflow:hidden;background:var(--surface);
   transition:border-color 0.15s;
 }
-.team-pill-group:hover{border-color:#6001d2;}
-.team-pill-group.active{border-color:#6001d2;background:#f5edff;}
-.dark .team-pill-group.active{background:#2a1d4a;}
+.team-pill-group:hover{border-color:var(--accent);}
+.team-pill-group.active{border-color:var(--accent);background:var(--accent-bg);}
+.dark .team-pill-group.active{background:var(--accent-bg);}
 .team-pill{
   background:none;border:none;cursor:pointer;font-family:inherit;
   display:inline-flex;align-items:center;gap:5px;
   padding:5px 11px;font-size:11px;font-weight:700;color:var(--text);
   -webkit-tap-highlight-color:transparent;
 }
-.team-pill-group.active .team-pill{color:#6001d2;}
+.team-pill-group.active .team-pill{color:var(--accent);}
 .team-pill-emoji{font-size:14px;}
 .team-pill-name{letter-spacing:-0.1px;}
 .team-pill-link{
@@ -2413,7 +2450,7 @@ body:not(.dark) .pill-bar{
   letter-spacing:0.04em;
   transition:color 0.12s, background 0.12s;
 }
-.team-pill-link:hover{color:#6001d2;background:var(--surface2);}
+.team-pill-link:hover{color:var(--accent);background:var(--surface2);}
 .team-pills-edit{
   background:none;border:1px dashed var(--border);
   border-radius:20px;padding:5px 12px;
@@ -2421,20 +2458,20 @@ body:not(.dark) .pill-bar{
   cursor:pointer;font-family:inherit;
   transition:all 0.15s;
 }
-.team-pills-edit:hover{border-color:#6001d2;color:#6001d2;border-style:solid;}
+.team-pills-edit:hover{border-color:var(--accent);color:var(--accent);border-style:solid;}
 
 /* ACTIVE TEAM NOTICE */
 .active-team-notice{
   display:flex;align-items:center;justify-content:space-between;
-  background:#f5edff;border:1px solid #ddd0ff;
+  background:var(--accent-bg);border:1px solid var(--accent);
   border-radius:8px;padding:8px 14px;margin-bottom:18px;
-  font-size:12px;color:#6001d2;
+  font-size:12px;color:var(--accent);
 }
-.dark .active-team-notice{background:#2a1d4a;border-color:#3a2d5a;}
+.dark .active-team-notice{background:var(--accent-bg);border-color:var(--border);}
 .active-team-notice strong{color:#3f0080;font-weight:800;}
 .dark .active-team-notice strong{color:#c4a5ff;}
 .active-team-notice button{
-  background:none;border:none;color:#6001d2;cursor:pointer;
+  background:none;border:none;color:var(--accent);cursor:pointer;
   font-size:11px;font-weight:700;font-family:inherit;
 }
 
@@ -3326,10 +3363,11 @@ body{overscroll-behavior-y:contain;}
   .mobile-top{display:block;}
   .bottom-tabs{display:block;}
 
-  /* Pill bar: compact on mobile — 4 pills visible */
-  .pill-bar{padding:0;}
-  .pill{min-width:110px;padding:7px 12px;gap:7px;}
-  .pill-icon{font-size:15px;}
+  /* Status strip: slimmer padding on mobile; drop the settled "Markets" kicker
+     (breaking signal still shows) so the ticker + weather get the room. */
+  .status-strip{height:34px;padding:0 var(--s3);gap:var(--s2);}
+  .ss-flag-markets{display:none;}
+  .ss-wx{padding-left:var(--s2);}
   .pill-label{font-size:8px;}
   .pill-value{font-size:13px;}
   .pill-chg{font-size:9px;padding:1px 5px;}
@@ -3488,7 +3526,7 @@ body{overscroll-behavior-y:contain;}
 
 /* Cluster badge — "N sources" indicator */
 .fc-cluster-badge{
-  font-size:9px;font-weight:700;color:#7c3aed;background:#f5f3ff;
+  font-size:9px;font-weight:700;color:var(--accent);background:var(--accent-bg);
   border-radius:4px;padding:2px 7px;letter-spacing:0.04em;cursor:default;
 }
 .dark .fc-cluster-badge{background:#2d1f5a;color:#a78bfa;}
@@ -3570,15 +3608,7 @@ body{overscroll-behavior-y:contain;}
   font-family:'SF Mono','Cascadia Code','Consolas',monospace;letter-spacing:0;font-size:9px;
 }
 
-/* Dark mode: Bloomberg slate override */
-.dark{
-  --bg:#0d1117;--surface:#161d2b;--surface2:#1e2638;
-  --border:#2a3347;--border2:#1e2638;
-  --text:#e2e8f4;--text2:#8892b0;--text3:#4a5570;--text4:#1e2638;
-  --shadow-sm:0 1px 3px rgba(0,0,0,0.4);
-  --shadow-md:0 4px 16px rgba(0,0,0,0.5);
-  --shadow-lg:0 8px 32px rgba(0,0,0,0.6);
-}
+/* Dark palette is owned solely by src/styles/tokens.css (single source of truth). */
 
 /* Skeleton loading shimmer for feed cards */
 @keyframes shimmer{0%{background-position:-200% 0;}100%{background-position:200% 0;}}
@@ -3760,13 +3790,15 @@ kbd{display:inline-block;padding:1px 5px;border:1px solid var(--border);border-r
 .mobile-actions{display:flex;gap:6px;}
 
 /* BOTTOM TABS — editorial section icons */
+/* Visibility is controlled by the base rule (display:none) + the ≤640 media query
+   (display:block). Do NOT set display here or the bar shows on iPad/desktop too. */
 .bottom-tabs{
   position:fixed;bottom:0;left:0;right:0;
   background:var(--surface);
-  border-top:2px solid var(--accent);
-  display:flex;z-index:200;
+  border-top:1px solid var(--border);
+  z-index:400;
   padding-bottom:env(safe-area-inset-bottom, 0);
-  box-shadow:0 -2px 16px rgba(0,0,0,0.08);
+  box-shadow:0 -2px 16px rgba(0,0,0,0.06);
 }
 .bottom-tab{
   flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;
@@ -3806,15 +3838,7 @@ kbd{display:inline-block;padding:1px 5px;border:1px solid var(--border);border-r
   font-size:32px;font-weight:700;color:var(--text);letter-spacing:-1px;font-variant-numeric:tabular-nums;
 }
 
-/* Dark mode: Bloomberg slate — final override */
-.dark{
-  --bg:#0d1117;--surface:#161d2b;--surface2:#1e2638;
-  --border:#2a3347;--border2:#1e2638;
-  --text:#e2e8f4;--text2:#8892b0;--text3:#4a5570;--text4:#1e2638;
-  --shadow-sm:0 1px 4px rgba(0,0,0,0.4);
-  --shadow-md:0 4px 20px rgba(0,0,0,0.5);
-  --shadow-lg:0 8px 40px rgba(0,0,0,0.6);
-}
+/* (Dark palette lives in src/styles/tokens.css — no override here.) */
 
 /* Podcast card serif title */
 .pod-title{
@@ -3920,7 +3944,7 @@ kbd{display:inline-block;padding:1px 5px;border:1px solid var(--border);border-r
 .fc-act:hover{border-color:var(--accent);color:var(--accent);background:var(--accent-bg);}
 .fc-act:active{transform:scale(0.96);}
 .fc-act.saved{border-color:var(--amber);color:var(--amber);background:#fffbeb;}
-.fc-act.ai-on{border-color:#7c3aed;color:#7c3aed;background:#f5f3ff;}
+.fc-act.ai-on{border-color:var(--accent);color:var(--accent);background:var(--accent-bg);}
 .fc-act.disc-on{border-color:#0ea5e9;color:#0ea5e9;background:#f0f9ff;}
 .fc-read-link{
   margin-left:auto;font-size:10px;color:var(--text3);
@@ -4093,7 +4117,7 @@ kbd{display:inline-block;padding:1px 5px;border:1px solid var(--border);border-r
 .teams-shelf-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:10px;}
 .team-card{background:var(--surface);border:1px solid var(--border);border-radius:10px;overflow:hidden;position:relative;transition:box-shadow 0.15s;}
 .team-card:hover{box-shadow:var(--shadow-sm);}
-.team-card.filtered{border-color:#6001d2;box-shadow:0 0 0 2px rgba(96,1,210,0.18);}
+.team-card.filtered{border-color:var(--accent);box-shadow:0 0 0 2px var(--accent-bg);}
 .team-card-btn{width:100%;display:flex;align-items:center;gap:10px;padding:11px 13px;background:none;border:none;cursor:pointer;text-align:left;font-family:var(--font-sans);}
 .team-card-btn:hover{background:var(--surface2);}
 .team-card-emoji{font-size:20px;flex-shrink:0;}
@@ -4372,7 +4396,7 @@ kbd{display:inline-block;padding:1px 5px;border:1px solid var(--border);border-r
 
 /* ── ONBOARDING WELCOME CARD ───────────────────────────────────── */
 .onboarding-card{
-  background:linear-gradient(135deg,var(--accent) 0%,#c0392b 100%);
+  background:linear-gradient(135deg,var(--accent) 0%,var(--navy) 100%);
   border-radius:10px;padding:16px 18px;margin-bottom:16px;
   display:flex;gap:12px;align-items:flex-start;
 }
@@ -6317,7 +6341,7 @@ function MenuSheet({ tab, onTabChange, onClose, onCustomize, onRefresh, dark, se
           <span className="menu-sheet-item-label">{dark?'Light mode':'Dark mode'}</span>
         </button>
         <button className="menu-sheet-item" onClick={() => { onCustomize(); onClose(); }}>
-          <span className="menu-sheet-item-emoji">⚙</span>
+          <span className="menu-sheet-item-emoji"><IconGear/></span>
           <span className="menu-sheet-item-label">Customize</span>
           <span className="menu-sheet-item-chevron">›</span>
         </button>
@@ -6757,80 +6781,48 @@ function TopBar({tab, setTab, search, setSearch, dark, setDark,
 
   return (
     <div className={`topbar-wrap ${hidden?'hidden':''} ${shrunk?'shrunk':''}`}>
-      {/* v25: Pill bar — replaces the cramped whisper bar. Bigger pills with
-          color-coded change indicators. Horizontal scroll on narrow viewports.
-          Shows weather + indices + tickers in priority order. */}
-      <div className="pill-bar">
-        <div className="pill-bar-inner">
-          {wxList.map((wx,i)=>(
-            <a key={`wx-${i}`} className="pill pill-wx"
-               href={`https://weather.com/weather/today/l/${encodeURIComponent(wx.slug)}`}
-               target="_blank" rel="noreferrer">
-              <svg className="pill-icon" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M2 12h2M20 12h2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M19.1 4.9l-1.4 1.4M6.3 17.7l-1.4 1.4"/></svg>
-              <div className="pill-body">
-                <div className="pill-label">{wx.name}</div>
-                <div className="pill-value">{wx.temp}°<span className="pill-sub"> {wx.desc}</span></div>
-              </div>
-            </a>
-          ))}
-          {INDICES.filter(idx=>!(hiddenIndices||[]).includes(idx.sym)).map(idx=>{
-            const q=quotes[idx.sym]; const up=q?q.chg>=0:null;
-            return (
-              <div key={idx.sym} className="pill pill-idx" onClick={()=>q&&window.open(`https://finance.yahoo.com/quote/${encodeURIComponent(idx.sym)}`,'_blank')}>
-                <div className="pill-body">
-                  <div className="pill-label">{idx.short}</div>
-                  <div className="pill-value">
-                    {q ? q.price.toLocaleString('en-US',{maximumFractionDigits:0}) : '—'}
-                  </div>
-                </div>
-                {q && (
-                  <span className={`pill-chg ${up?'up':'down'}`}>
-                    {up?'▲':'▼'} {Math.abs(q.pct).toFixed(2)}%
-                  </span>
-                )}
-              </div>
-            );
-          })}
-          {TICKERS.map(t=>{
-            const q=quotes[t.sym]; const up=q?q.chg>=0:null;
-            return (
-              <div key={t.sym} className="pill pill-tk" onClick={()=>onTickerClick&&onTickerClick(t)}>
-                <div className="pill-body">
-                  <div className="pill-label" style={{color:t.color}}>{t.sym}</div>
-                  <div className="pill-value">
-                    {q ? `$${q.price.toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2})}` : '—'}
-                  </div>
-                </div>
-                {q && (
-                  <span className={`pill-chg ${up?'up':'down'}`}>
-                    {up?'▲':'▼'} {Math.abs(q.pct).toFixed(2)}%
-                  </span>
-                )}
-              </div>
-            );
-          })}
-        </div>
-      </div>
-
-      {/* ━━━ Breaking (both layouts). v22: hidden on Today since RightNowStrip
-            already surfaces urgent items there — keeps breaking ticker available
-            on every other page where RightNow doesn't render. ━━━ */}
-      {hasBreaking && showBreaking && tab !== 'today' && (
-        <div className="breaking-bar">
-          <div className="breaking-label">BREAKING</div>
-          <div className="breaking-ticker">
-            <div className="breaking-ticker-inner">
-              {tickerItems.map((item,i)=>(
-                <span key={i} className="breaking-item" onClick={()=>item.link&&window.open(item.link,'_blank')}>
-                  {item.title} <span style={{opacity:0.6,fontSize:'10px'}}>· {item.source}</span>
-                  <span className="breaking-sep">◆</span>
-                </span>
-              ))}
-            </div>
+      {/* Unified status strip — collapses the old weather + ticker + breaking bars
+          into one slim row: live/breaking signal LEFT, market ticker CENTER,
+          compact weather chip RIGHT. Red is a signal here, never a texture. */}
+      <div className="status-strip">
+        {hasBreaking && showBreaking ? (
+          <button className="ss-flag ss-flag-breaking" onClick={()=>tickerItems[0]?.link&&window.open(tickerItems[0].link,'_blank')} title={tickerItems[0]?.title||'Breaking'}>
+            <span className="ss-pulse"/> Breaking
+          </button>
+        ) : (
+          <span className="ss-flag ss-flag-markets">Markets</span>
+        )}
+        <div className="ss-ticker">
+          <div className="ss-ticker-inner">
+            {INDICES.filter(idx=>!(hiddenIndices||[]).includes(idx.sym)).map(idx=>{
+              const q=quotes[idx.sym]; const up=q?q.chg>=0:null;
+              return (
+                <button key={idx.sym} className="ss-tk" onClick={()=>q&&window.open(`https://finance.yahoo.com/quote/${encodeURIComponent(idx.sym)}`,'_blank')}>
+                  <span className="ss-tk-sym">{idx.short}</span>
+                  <span className="ss-tk-val tnum">{q?q.price.toLocaleString('en-US',{maximumFractionDigits:0}):'—'}</span>
+                  {q&&<span className={`ss-tk-chg tnum ${up?'up':'down'}`}>{up?'+':'−'}{Math.abs(q.pct).toFixed(2)}%</span>}
+                </button>
+              );
+            })}
+            {TICKERS.map(t=>{
+              const q=quotes[t.sym]; const up=q?q.chg>=0:null;
+              return (
+                <button key={t.sym} className="ss-tk" onClick={()=>onTickerClick&&onTickerClick(t)}>
+                  <span className="ss-tk-sym">{t.sym}</span>
+                  <span className="ss-tk-val tnum">{q?`$${q.price.toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2})}`:'—'}</span>
+                  {q&&<span className={`ss-tk-chg tnum ${up?'up':'down'}`}>{up?'+':'−'}{Math.abs(q.pct).toFixed(2)}%</span>}
+                </button>
+              );
+            })}
           </div>
-          <button className="breaking-close" onClick={()=>setShowBreaking(false)}>✕</button>
         </div>
-      )}
+        {wxList[0] && (
+          <a className="ss-wx" href={`https://weather.com/weather/today/l/${encodeURIComponent(wxList[0].slug)}`} target="_blank" rel="noreferrer" title={`${wxList[0].name} · ${wxList[0].desc}`}>
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M2 12h2M20 12h2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M19.1 4.9l-1.4 1.4M6.3 17.7l-1.4 1.4"/></svg>
+            <span className="tnum">{wxList[0].temp}°</span>
+          </a>
+        )}
+      </div>
 
       {/* ━━━ DESKTOP: nav bar ━━━ */}
       <div className="nav-bar">
@@ -7981,7 +7973,7 @@ export default function App() {
               <div className="teams-shelf">
                 <div className="teams-shelf-head">
                   <span className="teams-shelf-label">My Teams</span>
-                  <button className="teams-shelf-edit" onClick={()=>openCustomize('teams','sports')}>⚙ Edit</button>
+                  <button className="teams-shelf-edit" onClick={()=>openCustomize('teams','sports')}><IconGear/> Edit</button>
                 </div>
                 <div className="teams-shelf-grid">
                   {teams.map(t => {
@@ -8190,7 +8182,7 @@ export default function App() {
               <div className="onboarding-tips">
                 <span className="onboarding-tip"><strong>Click any article</strong> to open the AI reader — Summarize, Key Points, Bias Check</span>
                 <span className="onboarding-tip"><strong>"Brief" button</strong> (top bar) → paste any article, transcript, or YouTube video for a breakdown</span>
-                <span className="onboarding-tip">⚙️ <strong>Customize</strong> → add/remove sources, set keywords, build your feed</span>
+                <span className="onboarding-tip"><IconGear/> <strong>Customize</strong> → add/remove sources, set keywords, build your feed</span>
               </div>
               <button className="onboarding-dismiss" onClick={dismissOnboarding}>Got it, dismiss</button>
             </div>
@@ -8308,7 +8300,7 @@ export default function App() {
                   const down = (feeds[cat]||[]).filter(f=>f.on && feedHealth[f.name] && !feedHealth[f.name].ok).length;
                   return down>0 ? <button className="feed-degraded" title="Some sources failed to load — open Customize to review" onClick={()=>openCustomize('sources',cat)}>{down} source{down===1?'':'s'} unavailable</button> : null;
                 })()}
-                <button className="page-customize-btn" onClick={()=>openCustomize('sources',cat)}>⚙ Customize</button>
+                <button className="page-customize-btn" onClick={()=>openCustomize('sources',cat)}><IconGear/> Customize</button>
               </div>
             </div>
             {cat === 'bloom' && !activeKw && !activeSrc && !search && (
@@ -8828,7 +8820,7 @@ export default function App() {
               <div style={{fontSize:'10px',fontWeight:'700',color:'var(--text3)',textTransform:'uppercase',letterSpacing:'0.08em',marginBottom:'8px',paddingBottom:'8px',borderBottom:'1px solid var(--border2)'}}>Shows</div>
               <div className="pod-show-item" onClick={()=>setActivePod(null)}>
                 <div className="pod-show-emoji"></div>
-                <div><div className="pod-show-name" style={{color:!activePod?'#e11d48':''}}>All Shows</div><div className="pod-show-ep">Latest from all {PODCAST_FEEDS.length} podcasts</div></div>
+                <div><div className="pod-show-name" style={{color:!activePod?'var(--accent)':''}}>All Shows</div><div className="pod-show-ep">Latest from all {PODCAST_FEEDS.length} podcasts</div></div>
                 {!activePod&&<div className="pod-show-dot"/>}
               </div>
               {PODCAST_FEEDS.map((p,i)=>{
@@ -8837,7 +8829,7 @@ export default function App() {
                   <div key={i} className="pod-show-item" onClick={()=>setActivePod(isA?null:p)}>
                     <div className="pod-show-emoji">{p.emoji}</div>
                     <div style={{flex:1,minWidth:0}}>
-                      <div className="pod-show-name" style={{color:isA?'#e11d48':''}}>{p.name}</div>
+                      <div className="pod-show-name" style={{color:isA?'var(--accent)':''}}>{p.name}</div>
                       <div className="pod-show-ep">{podLoading[p.name]?'Loading…':(latest?latest.title.slice(0,36)+'…':'No episodes yet')}</div>
                     </div>
                     {isA&&<div className="pod-show-dot"/>}
@@ -8940,7 +8932,7 @@ export default function App() {
             <h1 className="sources-title">News Sources</h1>
             <p className="sources-sub">{activeSources} active · {totalSources} feeds powering your hub</p>
           </div>
-          <button className="sources-manage-btn" onClick={()=>openCustomize('sources','general')}>⚙ Manage feeds</button>
+          <button className="sources-manage-btn" onClick={()=>openCustomize('sources','general')}><IconGear/> Manage feeds</button>
         </div>
         <input className="sources-search" placeholder="Filter sources…" value={q} onChange={e=>setQ(e.target.value)}/>
         <div className="sources-cat-grid">
@@ -9041,7 +9033,7 @@ export default function App() {
                       ))}
                     </div>
                   )}
-                  <button className="page-customize-btn" onClick={()=>openCustomize('watchlist','finance')}>⚙ Edit</button>
+                  <button className="page-customize-btn" onClick={()=>openCustomize('watchlist','finance')}><IconGear/> Edit</button>
                 </div>
               </div>
               <table className="fin-table">
@@ -9109,7 +9101,7 @@ export default function App() {
             <section className="fin-news">
               <div className="fin-section-head">
                 <span className="fin-section-title">Markets News</span>
-                <button className="page-customize-btn" onClick={()=>openCustomize('sources','finance')}>⚙ Sources</button>
+                <button className="page-customize-btn" onClick={()=>openCustomize('sources','finance')}><IconGear/> Sources</button>
               </div>
               {newsItems.length===0
                 ?<div className="empty-state"><div className="empty-icon"></div><div className="empty-msg">Loading Markets news…</div></div>
