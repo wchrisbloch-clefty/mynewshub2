@@ -87,15 +87,13 @@ export function ChatBot({ arts, onNavigate, fetchSummary, resolveDeepLink }) {
     if (!txt || loading) return;
     setLoading(true);
     setAnalyzeResult('');
-    const modePrompts = {
-      summary:   'Summarize this article in 3-5 sentences, hitting the key facts.',
-      takeaways: 'List the 5 most important takeaways from this article as bullet points.',
-      bias:      'Analyze the bias and framing in this article. What perspective does it favor? What might it omit?',
-      related:   'What broader context, history, or related topics should a reader understand about this article?',
-    };
-    const prompt = `${modePrompts[analyzeMode]}\n\nARTICLE:\n${txt}`;
-    const { summary, error } = await fetchSummary({ type:'article', title:'Article Analysis', content:prompt, mode:analyzeMode });
-    setAnalyzeResult(error ? 'Analysis failed — please try again.' : (summary || 'No result.'));
+    // Detect a pasted URL (article, podcast page, or YouTube) → extract-first path.
+    const urlMatch = txt.match(/https?:\/\/[^\s]+/);
+    const isUrl = urlMatch && txt.split(/\s+/).length <= 2;
+    const { summary, error, unavailable } = isUrl
+      ? await fetchSummary({ type:'article', title:'Analysis', content:'', mode:analyzeMode, url: urlMatch[0] })
+      : await fetchSummary({ type:'article', title:'Analysis', content:txt, mode:analyzeMode });
+    setAnalyzeResult(error ? error : (summary || 'No result.'));
     setLoading(false);
   };
 

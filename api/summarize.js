@@ -37,7 +37,14 @@ function buildSystem(type, mode) {
     return 'You are a sharp morning news briefing writer. Given headlines from multiple news categories, write ONE punchy sentence per category summarizing the single most important story. Be direct, specific, include names and numbers. No filler.\n\nFormat each line as:\nCategory: One sentence summary';
   }
   if (mode === 'takeaways') {
-    return `Extract 4-6 key points from this ${verb}. Each point MUST contain a concrete, specific detail drawn from the text that is NOT already stated in the headline — a proper name, a number, a dollar amount, a date/time, a statistic, a direct quote, or a stated consequence/next step. Across the points, cover the who, what, when, where, why, and how. Never restate or paraphrase the headline, and skip anything generic or obvious.\n\nFormat each as:\n**1. [Specific point]** — [One sentence carrying the concrete detail]\n**2. [Specific point]** — [One sentence carrying the concrete detail]\n(continue to 4-6)`;
+    return `Extract the key points from this ${verb}. Output ONLY as many bullets as the source genuinely supports — three strong bullets beat six padded ones. Rules:
+- Every bullet must carry a concrete fact NOT already in the headline: a name, a number, a dollar amount, a date, a place, or a direct quote under 15 words.
+- If a fact isn't in the source, OMIT the bullet. Never write a bullet that says information is missing.
+- Never output metadata as a takeaway (episode number, release date, sponsor, host, "the speaker's source of information") — that is not news.
+- BANNED phrases (never use): "not specified", "not mentioned", "the provided content", "the article does not".
+Format each as:
+**1. [Point]** — [one sentence with the concrete fact]
+**2. [Point]** — [one sentence with the concrete fact]`;
   }
   if (mode === 'explain') {
     return `You are an expert news analyst. Explain this ${verb} for someone who wants full context.\n\nStructure your response as:\n**Background** — Context that makes this story important\n**Key Players** — Who is involved and their role\n**What's Happening** — The core development in plain language\n**Wider Impact** — Economic, political, or global implications\n**What to Watch** — One specific development to follow\n\nBe specific. Include names, numbers, and dates. No filler.`;
@@ -57,7 +64,11 @@ function buildSystem(type, mode) {
   if (mode === 'brief') {
     return `Write a punchy one-paragraph brief on this ${verb}. Lead with the most important fact, include key names and numbers, end with what to watch. No headers.`;
   }
-  return `Write a 3-4 sentence summary of this ${verb}. Sentence 1: the core event — what specifically happened, naming the key people/organizations and any pivotal number. Sentences 2-3: the context and why it matters — the cause, the stakes, or the significance beyond the headline. Final sentence: what happens next or the specific thing to watch. Be concrete and factual, ground every sentence in the article's details, and never merely paraphrase the headline. No filler, no "this article discusses".`;
+  return `Write a 3-4 sentence summary of this ${verb}, grounded entirely in the source text:
+- What happened — the concrete event, naming the key people/organizations and any pivotal number.
+- Why it matters — the stakes and context beyond the headline.
+- What's next — ONLY if the source states a specific next step; then end there. If the source states no next step, end after the stakes.
+Never paraphrase the headline. BANNED: filler closers like "as the situation unfolds, it will be crucial to watch for further developments", "only time will tell", "this is a developing story", and the phrase "the provided content". No "this article discusses".`;
 }
 
 // ── User content ─────────────────────────────────────────────────────────────
