@@ -131,7 +131,7 @@ const DEFAULT_FEEDS = {
     { name:'CBS Sports CFB',       url:'https://www.cbssports.com/rss/headlines/college-football',              on:true },
     { name:'CBS Sports CBB',       url:'https://www.cbssports.com/rss/headlines/college-basketball',            on:true },
     { name:'Pro Football Talk',    url:'https://www.nbcsports.com/profootballtalk.rss',                         on:true },
-    { name:'Bleacher Report',      url:'https://feeds.bleacherreport.com/articles/feed',                        on:true },
+    { name:'Yahoo Sports',         url:'https://sports.yahoo.com/rss/',                                         on:true },
     { name:'OutKick',              url:'https://www.outkick.com/feed/',                                              on:true },
     { name:'D1Baseball',           url:'https://d1baseball.com/feed/',                                              on:true },
     { name:'Baseball America',     url:'https://www.baseballamerica.com/feed/',                                      on:false },

@@ -6,6 +6,11 @@
 // returned so the client can count degraded sources. A single bad feed can never
 // throw the request — parsing is guarded.
 
+// Suppress Node/undici internal deprecation warnings (e.g. [DEP0169] url.parse()
+// emitted by fetch/redirect handling) — they flood the serverless logs as "errors"
+// but come from the runtime, not our code.
+process.noDeprecation = true;
+
 // A real browser UA + Accept headers. Many publishers 403 default/bot agents
 // (the old "NewsBot/1.0" was being blocked across the board).
 const UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36';
