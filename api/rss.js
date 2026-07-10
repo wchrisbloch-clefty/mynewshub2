@@ -1,3 +1,5 @@
+process.noDeprecation = true; // silence Node/undici [DEP0169] url.parse() log noise
+
 export default async function handler(req, res) {
   const { url } = req.query;
   if (!url) return res.status(400).json({ error: 'No URL provided' });
