@@ -1865,7 +1865,16 @@ body:not(.dark) .pill-bar{
    PODCAST PAGE
 ═══════════════════════════════════════════ */
 .pod-page{display:grid;grid-template-columns:1fr 268px;gap:32px;}
-.pod-col{display:flex;flex-direction:column;gap:10px;}
+/* min-width:0 — a 1fr grid track defaults to min-width:auto and refuses to shrink
+   below its content, so a long title overflows the column (the grid min-content
+   trap). This lets the column shrink and the title wrap instead. */
+.pod-col{display:flex;flex-direction:column;gap:10px;min-width:0;}
+/* ── Card text overflow guard (min-content trap) ──────────────────────────────
+   Card bodies set min-width:0 so they CAN shrink; these make the text ITSELF
+   break long/unbreakable tokens instead of running past the card's right edge.
+   Applies on every breakpoint. */
+.fc-title,.today-item-title,.hero-side-title,.trend-title,.trend-src,.pod-title,
+.pod-desc,.snap-title,.snap-snippet,.sop-item-title{overflow-wrap:anywhere;word-break:break-word;}
 .pod-header{
   background:linear-gradient(135deg,#e11d48,#f43f5e);border-radius:10px;
   padding:14px 18px;display:flex;align-items:center;gap:12px;
@@ -1879,14 +1888,15 @@ body:not(.dark) .pill-bar{
 }
 .pod-card:hover{border-color:#fda4af;}
 .pod-card-top{display:flex;gap:12px;align-items:flex-start;margin-bottom:10px;}
-.pod-num{font-size:20px;font-weight:800;color:var(--text4);min-width:26px;line-height:1;}
+.pod-num{font-size:15px;font-weight:800;color:var(--text4);min-width:22px;line-height:1.3;flex-shrink:0;font-variant-numeric:tabular-nums;}
 .pod-body{flex:1;min-width:0;}
 .pod-show{font-size:10px;font-weight:600;color:#e11d48;margin-bottom:2px;}
-.pod-title{font-size:13px;font-weight:700;color:var(--text);line-height:1.35;margin-bottom:4px;cursor:pointer;}
+.pod-title{font-size:13px;font-weight:700;color:var(--text);line-height:1.35;margin-bottom:4px;cursor:pointer;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;overflow-wrap:anywhere;word-break:break-word;}
 .pod-title:hover{color:#e11d48;}
 .pod-meta{font-size:10px;color:var(--text3);display:flex;gap:8px;flex-wrap:wrap;}
 .pod-desc{font-size:11px;color:var(--text2);line-height:1.5;margin-top:6px;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden;}
 .pod-actions{display:flex;gap:6px;flex-wrap:wrap;}
+.pod-skel-line{border-radius:5px;background:linear-gradient(90deg,var(--surface2) 25%,var(--border) 50%,var(--surface2) 75%);background-size:200% 100%;animation:shimmer 1.4s infinite;}
 .pod-btn{border:1px solid var(--border);border-radius:6px;padding:4px 10px;font-size:10px;cursor:pointer;font-family:inherit;font-weight:500;background:none;color:var(--text2);transition:all 0.12s;}
 .pod-btn:hover{border-color:#e11d48;color:#e11d48;}
 .pod-btn.saved{border-color:var(--amber);color:var(--amber);background:#fffbeb;}
@@ -3402,7 +3412,7 @@ body{overscroll-behavior-y:contain;}
   .sb-league-head{padding:10px 12px;min-height:44px;}
   .sidebar{display:none;} /* sidebar hidden on mobile — content only */
 
-  .pod-page{gap:20px;}
+  .pod-page{gap:20px;grid-template-columns:1fr;} /* sidebar is display:none here — collapse the empty 268px track or it forces horizontal overflow */
   .pod-card{padding:12px;}
   .pod-btn{padding:8px 12px;font-size:11px;min-height:44px;}
   .pod-show-item{padding:12px 0;min-height:44px;}
@@ -8340,7 +8350,21 @@ export default function App() {
               </div>
             )}
             {isLoading&&!feedItems.length
-              ?<div className="empty-state"><div className="empty-icon"></div><div className="empty-msg">Loading {cc.label}…</div></div>
+              ?<div className="snap-feed" aria-busy="true" aria-label={`Loading ${cc.label}`}>
+                  {Array.from({length:6}).map((_,i)=>(
+                    <div key={i} className="snap-card snap-skel">
+                      <div className="snap-accent"/>
+                      <div className="snap-skel-main">
+                        <div className="snap-skel-line" style={{width:'30%',height:'11px'}}/>
+                        <div className="snap-skel-line" style={{width:'96%',height:'17px',marginTop:'10px'}}/>
+                        <div className="snap-skel-line" style={{width:'78%',height:'17px'}}/>
+                        <div className="snap-skel-line" style={{width:'100%',height:'12px',marginTop:'12px'}}/>
+                        <div className="snap-skel-line" style={{width:'55%',height:'12px'}}/>
+                      </div>
+                      <div className="snap-skel-thumb"/>
+                    </div>
+                  ))}
+                 </div>
               :feedItems.length===0
                 ?<div className="empty-state"><div className="empty-icon"></div><div className="empty-msg">{activeKw||activeSrc?'No articles match this filter':search?`No internal results for "${search}"`:'No articles loaded yet'}</div><button className="refresh-btn" onClick={refreshAll}>Refresh</button></div>
                 :<div className="snap-feed">
@@ -8782,8 +8806,22 @@ export default function App() {
                 <div className="pod-header-sub">{activePod?`Hosted by ${activePod.host}`:`${PODCAST_FEEDS.length} shows`}</div>
               </div>
             </div>
-            {displayEps.length===0?<div className="empty-state"><div className="empty-msg">Loading episodes…</div></div>
-            :displayEps.slice(0,20).map((ep,i)=><PodCard key={i} ep={ep} idx={i}/>)}
+            {displayEps.length===0
+              ?Array.from({length:5}).map((_,i)=>(
+                  <div key={i} className="pod-card" aria-busy="true">
+                    <div className="pod-card-top">
+                      <div className="pod-skel-line" style={{width:'22px',height:'15px',flexShrink:0}}/>
+                      <div className="pod-body">
+                        <div className="pod-skel-line" style={{width:'34%',height:'10px',marginBottom:'6px'}}/>
+                        <div className="pod-skel-line" style={{width:'92%',height:'14px',marginBottom:'5px'}}/>
+                        <div className="pod-skel-line" style={{width:'70%',height:'14px',marginBottom:'8px'}}/>
+                        <div className="pod-skel-line" style={{width:'100%',height:'11px',marginBottom:'4px'}}/>
+                        <div className="pod-skel-line" style={{width:'85%',height:'11px'}}/>
+                      </div>
+                    </div>
+                  </div>
+                ))
+              :displayEps.slice(0,20).map((ep,i)=><PodCard key={i} ep={ep} idx={i}/>)}
           </div>
           <div className="sidebar">
             <div className="pod-shows">
