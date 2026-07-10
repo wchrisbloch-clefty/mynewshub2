@@ -36,20 +36,67 @@ function tag(block, name) {
   const m = block.match(new RegExp(`<${name}[^>]*>([\\s\\S]*?)</${name}>`, 'i'));
   return m ? decodeEntities(m[1]).replace(/<[^>]*>/g, '').trim() : '';
 }
+function attr(block, tagName, attrName) {
+  const m = block.match(new RegExp(`<${tagName}[^>]*\\b${attrName}=["']([^"']+)["']`, 'i'));
+  return m ? m[1] : '';
+}
 function extractImg(block) {
   let m = block.match(/<(?:media:content|media:thumbnail|enclosure)[^>]*url=["']([^"']+)["']/i);
   if (m) return m[1];
   m = block.match(/<img[^>]*src=["']([^"']+)["']/i);
   return m ? m[1] : '';
 }
-function parseFeed(xml) {
+// Link resolution that survives real-world feeds:
+//   1) <link>https://…</link>  (RSS)        3) <guid>https://…</guid>  (ESPN, some CMS)
+//   2) <link href="…"/>        (Atom)        4) <enclosure url="…">     (podcasts)
+// The old parser REQUIRED a text <link> and silently dropped every item without one —
+// that was the ESPN / megaphone "200 with 0 items" bug (link lives in guid/href).
+function pickLink(block) {
+  const text = tag(block, 'link');
+  if (/^https?:\/\//i.test(text)) return text;
+  const href = attr(block, 'link', 'href');
+  if (href) return href;
+  const guid = tag(block, 'guid');
+  if (/^https?:\/\//i.test(guid)) return guid;
+  const enc = attr(block, 'enclosure', 'url');
+  if (enc) return enc;
+  return text || '';
+}
+// JSON feeds (e.g. ESPN's site.api.espn.com news API returns { articles:[…] }).
+function parseJsonFeed(body) {
+  let d; try { d = JSON.parse(body); } catch { return []; }
+  const arr = d.items || d.entries || d.articles || (Array.isArray(d) ? d : []);
+  const out = [];
+  for (const it of (arr || []).slice(0, 20)) {
+    const title = String(it.title || it.headline || '').trim();
+    if (!title) continue;
+    const link = it.url || it.links?.web?.href || (typeof it.link === 'string' ? it.link : it.link?.href) || it.links?.[0]?.href || '';
+    const descRaw = it.description || it.summary || it.content_text || it.content || '';
+    const imgRaw = it.image?.url || it.image || (it.images && (it.images[0]?.url || it.images[0])) || it.thumbnail || '';
+    out.push({
+      title,
+      link: String(link || ''),
+      desc: String(descRaw).replace(/<[^>]*>/g, '').replace(/\s+/g, ' ').trim().slice(0, 300),
+      pubDate: it.published || it.date_published || it.pubDate || it.updated || '',
+      img: typeof imgRaw === 'string' ? imgRaw : '',
+      duration: '',
+    });
+  }
+  return out;
+}
+function parseFeed(body) {
+  const s = (body || '').replace(/^﻿/, '').trimStart();
+  if (s[0] === '{' || s[0] === '[') return parseJsonFeed(s);        // JSON feed
+  // XML: accept RSS <item> AND Atom <entry>, in whatever order they appear.
+  const blocks = [
+    ...(body.match(/<item[\s\S]*?<\/item>/gi) || []),
+    ...(body.match(/<entry[\s\S]*?<\/entry>/gi) || []),
+  ];
   const items = [];
-  const blocks = xml.match(/<item[\s\S]*?<\/item>/gi) || xml.match(/<entry[\s\S]*?<\/entry>/gi) || [];
   for (const b of blocks.slice(0, 20)) {
     const title = tag(b, 'title');
-    let link = tag(b, 'link');
-    if (!link) { const m = b.match(/<link[^>]*href=["']([^"']+)["']/i); if (m) link = m[1]; }
-    if (!title || !link) continue;
+    if (!title) continue;                                            // title is the only hard requirement
+    const link = pickLink(b);
     const desc = (tag(b, 'description') || tag(b, 'summary') || tag(b, 'content')).slice(0, 300);
     const pubDate = tag(b, 'pubDate') || tag(b, 'published') || tag(b, 'updated');
     items.push({ title, link, desc, pubDate, img: extractImg(b), duration: tag(b, 'itunes:duration') });

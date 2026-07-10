@@ -7,6 +7,11 @@
 // (1) we want clean parsed JSON, (2) we cap per-symbol cache, (3) if Yahoo
 // changes shape we change one place.
 
+// Suppress Node/undici internal [DEP0169] url.parse() deprecation warnings emitted
+// by fetch/redirect handling — they flooded the logs as "errors" from the runtime,
+// not our code (same suppression as api/feed.js).
+process.noDeprecation = true;
+
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
   const sym = (req.query.sym || '').trim();
