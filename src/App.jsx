@@ -49,14 +49,14 @@ import { ChatBot } from './modules/concierge';
 
 // ─── CATEGORIES ───────────────────────────────────────────────────────────────
 const CATS = {
-  general:    { label:'News',         color:'#1d4ed8', bg:'#eff6ff', emoji:'📰' },
-  sports:     { label:'Sports',       color:'#d97706', bg:'#fef3c7', emoji:'🏆' },
-  business:   { label:'Business',     color:'#16a34a', bg:'#f0fdf4', emoji:'⚡' },
-  finance:    { label:'Markets',      color:'#7c3aed', bg:'#f5f3ff', emoji:'📈' },
-  bloom:      { label:'Energy',       color:'#0369a1', bg:'#e0f2fe', emoji:'🔋' },
-  tech:       { label:'AI & Tech',    color:'#6366f1', bg:'#eef2ff', emoji:'🤖' },
-  popculture: { label:'Pop Culture',  color:'#db2777', bg:'#fdf2f8', emoji:'✨' },
-  comedy:     { label:'Comedy',       color:'#a855f7', bg:'#faf5ff', emoji:'😂' },
+  general:    { label:'News',         color:'#1d4ed8', bg:'#eff6ff', emoji:'' },
+  sports:     { label:'Sports',       color:'#d97706', bg:'#fef3c7', emoji:'' },
+  business:   { label:'Business',     color:'#16a34a', bg:'#f0fdf4', emoji:'' },
+  finance:    { label:'Markets',      color:'#7c3aed', bg:'#f5f3ff', emoji:'' },
+  bloom:      { label:'Energy',       color:'#0369a1', bg:'#e0f2fe', emoji:'' },
+  tech:       { label:'AI & Tech',    color:'#6366f1', bg:'#eef2ff', emoji:'' },
+  popculture: { label:'Pop Culture',  color:'#db2777', bg:'#fdf2f8', emoji:'' },
+  comedy:     { label:'Comedy',       color:'#a855f7', bg:'#faf5ff', emoji:'' },
 };
 
 // Order for mobile swipe-left/right navigation between categories.
@@ -72,18 +72,18 @@ const TICKERS = [
 ];
 
 const PODCAST_FEEDS = [
-  { name:'Joe Rogan Experience', host:'Joe Rogan',         url:'https://feeds.megaphone.fm/GLT1412515089',   emoji:'🟢' },
-  { name:'Ben Shapiro Show',     host:'Ben Shapiro',       url:'https://feeds.megaphone.fm/BVDWV5370667266', emoji:'🔵' },
-  { name:'Tucker Carlson Show',  host:'Tucker Carlson',    url:'https://feeds.megaphone.fm/RSV1597324942',   emoji:'🦅' },
-  { name:'Candace',              host:'Candace Owens',     url:'https://feeds.megaphone.fm/candace',         emoji:'🎤' },
-  { name:'Morning Wire',         host:'Daily Wire',        url:'https://feeds.megaphone.fm/BVDWV8747925072', emoji:'☀️' },
-  { name:'All-In Podcast',       host:'Chamath & Besties', url:'https://allinchamathjason.libsyn.com/rss',   emoji:'💰' },
-  { name:'Flagrant',             host:'Andrew Schulz',     url:'https://feeds.megaphone.fm/APPI6857213837',  emoji:'🔥' },
-  { name:'NPR Politics',         host:'NPR',               url:'https://feeds.npr.org/510310/podcast.xml',   emoji:'📻' },
-  { name:'Marketplace',          host:'APM',               url:'https://feeds.publicradio.org/public_feeds/marketplace-pm/rss/rss', emoji:'📈' },
-  { name:'Freakonomics Radio',   host:'Stephen Dubner',    url:'https://feeds.simplecast.com/Y8lFbOT4',      emoji:'🎓' },
-  { name:'Masters of Scale',     host:'Reid Hoffman',      url:'https://feeds.simplecast.com/3NwB90JG',      emoji:'🚀' },
-  { name:'Acquired',             host:'Ben & David',       url:'https://feeds.simplecast.com/jeNJI0r9',      emoji:'💡' },
+  { name:'Joe Rogan Experience', host:'Joe Rogan',         url:'https://feeds.megaphone.fm/GLT1412515089',   emoji:'' },
+  { name:'Ben Shapiro Show',     host:'Ben Shapiro',       url:'https://feeds.megaphone.fm/BVDWV5370667266', emoji:'' },
+  { name:'Tucker Carlson Show',  host:'Tucker Carlson',    url:'https://feeds.megaphone.fm/RSV1597324942',   emoji:'' },
+  { name:'Candace',              host:'Candace Owens',     url:'https://feeds.megaphone.fm/candace',         emoji:'' },
+  { name:'Morning Wire',         host:'Daily Wire',        url:'https://feeds.megaphone.fm/BVDWV8747925072', emoji:'' },
+  { name:'All-In Podcast',       host:'Chamath & Besties', url:'https://allinchamathjason.libsyn.com/rss',   emoji:'' },
+  { name:'Flagrant',             host:'Andrew Schulz',     url:'https://feeds.megaphone.fm/APPI6857213837',  emoji:'' },
+  { name:'NPR Politics',         host:'NPR',               url:'https://feeds.npr.org/510310/podcast.xml',   emoji:'' },
+  { name:'Marketplace',          host:'APM',               url:'https://feeds.publicradio.org/public_feeds/marketplace-pm/rss/rss', emoji:'' },
+  { name:'Freakonomics Radio',   host:'Stephen Dubner',    url:'https://feeds.simplecast.com/Y8lFbOT4',      emoji:'' },
+  { name:'Masters of Scale',     host:'Reid Hoffman',      url:'https://feeds.simplecast.com/3NwB90JG',      emoji:'' },
+  { name:'Acquired',             host:'Ben & David',       url:'https://feeds.simplecast.com/jeNJI0r9',      emoji:'' },
 ];
 
 const DEFAULT_KW = {
@@ -264,35 +264,35 @@ const DEFAULT_SOCIAL = {
 // expose external links. Users can edit/extend this list via the Customize
 // panel "Sports Teams" tab; the array below is the default seed.
 const SCORE_TEAMS = [
-  { team:'Texans',        sport:'football',   league:'nfl',                       match:'Houston Texans',    emoji:'🏈',
+  { team:'Texans',        sport:'football',   league:'nfl',                       match:'Houston Texans',    emoji:'',
     espnUrl:'https://www.espn.com/nfl/team/_/name/hou/houston-texans',
     teamUrl:'https://www.houstontexans.com/' },
-  { team:'Rockets',       sport:'basketball', league:'nba',                       match:'Houston Rockets',   emoji:'🏀',
+  { team:'Rockets',       sport:'basketball', league:'nba',                       match:'Houston Rockets',   emoji:'',
     espnUrl:'https://www.espn.com/nba/team/_/name/hou/houston-rockets',
     teamUrl:'https://www.nba.com/rockets/' },
-  { team:'Astros',        sport:'baseball',   league:'mlb',                       match:'Houston Astros',    emoji:'⚾',
+  { team:'Astros',        sport:'baseball',   league:'mlb',                       match:'Houston Astros',    emoji:'',
     espnUrl:'https://www.espn.com/mlb/team/_/name/hou/houston-astros',
     teamUrl:'https://www.mlb.com/astros' },
-  { team:'Braves',        sport:'baseball',   league:'mlb',                       match:'Atlanta Braves',    emoji:'⚾',
+  { team:'Braves',        sport:'baseball',   league:'mlb',                       match:'Atlanta Braves',    emoji:'',
     espnUrl:'https://www.espn.com/mlb/team/_/name/atl/atlanta-braves',
     teamUrl:'https://www.mlb.com/braves' },
-  { team:'UK Basketball', sport:'basketball', league:'mens-college-basketball',   match:'Kentucky',          emoji:'🏀',
+  { team:'UK Basketball', sport:'basketball', league:'mens-college-basketball',   match:'Kentucky',          emoji:'',
     espnUrl:'https://www.espn.com/mens-college-basketball/team/_/id/96/kentucky-wildcats',
     teamUrl:'https://ukathletics.com/sports/mens-basketball/' },
-  { team:'UK Football',   sport:'football',   league:'college-football',          match:'Kentucky',          emoji:'🏈',
+  { team:'UK Football',   sport:'football',   league:'college-football',          match:'Kentucky',          emoji:'',
     espnUrl:'https://www.espn.com/college-football/team/_/id/96/kentucky-wildcats',
     teamUrl:'https://ukathletics.com/sports/football/' },
-  { team:'Clemson FB',    sport:'football',   league:'college-football',          match:'Clemson',           emoji:'🏈',
+  { team:'Clemson FB',    sport:'football',   league:'college-football',          match:'Clemson',           emoji:'',
     espnUrl:'https://www.espn.com/college-football/team/_/id/228/clemson-tigers',
     teamUrl:'https://clemsontigers.com/sports/football/' },
 ];
 
 const LEAGUES = [
-  { key:'nfl', label:'NFL',       sport:'football',   league:'nfl',                     emoji:'🏈', accent:'#1d4ed8' },
-  { key:'nba', label:'NBA',       sport:'basketball', league:'nba',                     emoji:'🏀', accent:'#dc2626' },
-  { key:'mlb', label:'MLB',       sport:'baseball',   league:'mlb',                     emoji:'⚾', accent:'#1d4ed8' },
-  { key:'cfb', label:'College FB',sport:'football',   league:'college-football',        emoji:'🏈', accent:'#7c3aed' },
-  { key:'cbb', label:'College BB',sport:'basketball', league:'mens-college-basketball', emoji:'🏀', accent:'#d97706' },
+  { key:'nfl', label:'NFL',       sport:'football',   league:'nfl',                     emoji:'', accent:'#1d4ed8' },
+  { key:'nba', label:'NBA',       sport:'basketball', league:'nba',                     emoji:'', accent:'#dc2626' },
+  { key:'mlb', label:'MLB',       sport:'baseball',   league:'mlb',                     emoji:'', accent:'#1d4ed8' },
+  { key:'cfb', label:'College FB',sport:'football',   league:'college-football',        emoji:'', accent:'#7c3aed' },
+  { key:'cbb', label:'College BB',sport:'basketball', league:'mens-college-basketball', emoji:'', accent:'#d97706' },
 ];
 
 // Tier 3 (Phase 5): ~20 major programs per league for the team-chip rail.
@@ -355,7 +355,7 @@ const DEFAULT_WEATHER_CITIES = [
 ];
 
 const WX_CODES  = {0:'Clear',1:'Mostly Clear',2:'Partly Cloudy',3:'Overcast',45:'Foggy',48:'Icy Fog',51:'Light Drizzle',53:'Drizzle',55:'Heavy Drizzle',61:'Light Rain',63:'Rain',65:'Heavy Rain',71:'Light Snow',73:'Snow',75:'Heavy Snow',80:'Showers',81:'Heavy Showers',95:'Thunderstorm',99:'Severe Storm'};
-const WX_EMOJI = {0:'☀️',1:'🌤️',2:'⛅',3:'☁️',45:'🌫️',48:'🌫️',51:'🌦️',53:'🌦️',55:'🌧️',61:'🌧️',63:'🌧️',65:'⛈️',71:'🌨️',73:'❄️',75:'❄️',80:'🌦️',81:'🌧️',95:'⛈️',99:'🌪️'};
+const WX_EMOJI = {0:'',1:'',2:'',3:'',45:'',48:'',51:'',53:'',55:'',61:'',63:'',65:'',71:'',73:'',75:'',80:'',81:'',95:'',99:''};
 
 // ─── STORAGE ─────────────────────────────────────────────────────────────────
 function ld(k, d) {
@@ -473,7 +473,7 @@ async function fetchWeatherCity(city) {
   try {
     const r = await fetchWithTimeout(`https://api.open-meteo.com/v1/forecast?latitude=${city.lat}&longitude=${city.lon}&current=temperature_2m,weathercode,windspeed_10m&temperature_unit=fahrenheit&windspeed_unit=mph&timezone=${encodeURIComponent(city.tz)}`);
     const d = await r.json(), c = d.current;
-    return {name:city.name, slug:city.slug, temp:Math.round(c.temperature_2m), code:c.weathercode, wind:Math.round(c.windspeed_10m), desc:WX_CODES[c.weathercode]||'Unknown', emoji:WX_EMOJI[c.weathercode]||'🌡️'};
+    return {name:city.name, slug:city.slug, temp:Math.round(c.temperature_2m), code:c.weathercode, wind:Math.round(c.windspeed_10m), desc:WX_CODES[c.weathercode]||'Unknown', emoji:WX_EMOJI[c.weathercode]||''};
   } catch { return null; }
 }
 async function fetchAllWeather(cities) {
@@ -1257,6 +1257,11 @@ body:not(.dark) .pill-bar{
   width:160px;height:107px;border-radius:4px;flex-shrink:0;
   display:flex;align-items:center;justify-content:center;font-size:24px;background:var(--surface2);
 }
+/* Typographic fallback for image-less cards: publisher name in the display face
+   on a neutral field (replaces the old emoji placeholders). */
+.ph-label{font-family:var(--font-archivo);font-weight:800;font-size:11px;letter-spacing:0.03em;
+  text-transform:uppercase;color:var(--text3);text-align:center;padding:0 8px;line-height:1.25;
+  overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;}
 .fc-text{flex:1;min-width:0;}
 .fc-title{
   /* TIME Magazine: Playfair Display bold serif headline — the definitive editorial signal */
@@ -4461,7 +4466,7 @@ kbd{display:inline-block;padding:1px 5px;border:1px solid var(--border);border-r
   position:relative;overflow:hidden;
 }
 .briefing-teaser::after{
-  content:'☕';
+  content:'';
   position:absolute;right:20px;top:14px;
   font-size:36px;opacity:0.1;pointer-events:none;
 }
@@ -4996,7 +5001,7 @@ function FeedCard({a, cat, isSaved, onSave, onRead, relatedSources, isRead, user
     <div className={`fc ${cat}${isRead?' fc-read':''}`} onClick={() => onRead(a)}>
       <div className="fc-meta">
         <span className="fc-source" style={{color:cc.color}}>{a.source}</span>
-        {paywall && <span className="fc-paywall-badge" title="Subscription may be required">🔒</span>}
+        {paywall && <span className="fc-paywall-badge" title="Subscription may be required"></span>}
         {a.isAlert && <span className="fc-alert-badge">● BREAKING</span>}
         {topKw && <span className="fc-topic" style={{background:cc.bg,color:cc.color}}>{topKw}</span>}
         {clusterCount > 1 && (
@@ -5009,9 +5014,7 @@ function FeedCard({a, cat, isSaved, onSave, onRead, relatedSources, isRead, user
       <div className="fc-body">
         {a.img && !imgErr
           ? <img className="fc-thumb" src={a.img} loading="lazy" onError={()=>setImgErr(true)} alt=""/>
-          : <div className="fc-thumb-ph" style={{background:`linear-gradient(135deg,${cc.bg},${cc.bg}cc)`}}>
-              <span style={{fontSize:'22px'}}>{cc.emoji}</span>
-            </div>}
+          : <div className="fc-thumb-ph"><span className="ph-label">{a.source}</span></div>}
         <div className="fc-text">
           <div className={`fc-title${a.isAlert?' fc-title-breaking':''}`}>{a.title}</div>
           {a.desc && <div className="fc-desc">{a.desc}</div>}
@@ -5026,7 +5029,7 @@ function FeedCard({a, cat, isSaved, onSave, onRead, relatedSources, isRead, user
               ? <div className="fc-ai-skeleton"><span/><span/><span style={{width:'70%'}}/></div>
               : aiErr && !summary
                 ? <div className="fc-ai-error">
-                    <span className="fc-ai-error-msg">⚠ {aiErr}</span>
+                    <span className="fc-ai-error-msg">{aiErr}</span>
                     <button className="fc-ai-retry" onClick={retryAI}>↻ Retry</button>
                   </div>
                 : summary
@@ -5038,7 +5041,7 @@ function FeedCard({a, cat, isSaved, onSave, onRead, relatedSources, isRead, user
           </div>
           {/* Key points (3 bullets) */}
           <div className="fc-takeaways">
-            <div className="fc-takeaways-lbl">📋 Key Points</div>
+            <div className="fc-takeaways-lbl">Key Points</div>
             {loadingAI && !takeaways
               ? <div className="fc-ai-skeleton"><span/><span style={{width:'85%'}}/></div>
               : takeaways
@@ -5056,7 +5059,7 @@ function FeedCard({a, cat, isSaved, onSave, onRead, relatedSources, isRead, user
       )}
       {showDisc && (
         <div className="fc-disc" onClick={e=>e.stopPropagation()}>
-          <div className="fc-disc-lbl">💬 What People Are Saying</div>
+          <div className="fc-disc-lbl">What People Are Saying</div>
           {loadingDisc
             ? <div style={{fontSize:'11px',color:'var(--text3)',fontStyle:'italic'}}>Searching discussions...</div>
             : (!disc||(disc.reddit.length===0&&disc.hn.length===0))
@@ -5081,7 +5084,7 @@ function FeedCard({a, cat, isSaved, onSave, onRead, relatedSources, isRead, user
       )}
       {showExplain && (
         <div className="fc-explain" onClick={e=>e.stopPropagation()}>
-          <div className="fc-explain-lbl">🧠 Learning Companion</div>
+          <div className="fc-explain-lbl">Learning Companion</div>
           {loadingExplain
             ? <div style={{fontSize:'12px',color:'#b45309',fontStyle:'italic'}}>Analyzing context…</div>
             : <ExplainContent text={explainText}/>}
@@ -5152,7 +5155,7 @@ function TodayItem({a, cc, onRead}) {
       <div className="today-item" onClick={()=>onRead(a)}>
         {a.img && !imgErr
           ? <img className="today-thumb" src={a.img} loading="lazy" onError={()=>setImgErr(true)} alt=""/>
-          : <div className="today-thumb-ph" style={{background:cc.bg}}>{cc.emoji}</div>}
+          : <div className="today-thumb-ph"><span className="ph-label">{cc.label}</span></div>}
         <div className="today-item-body">
           <div className="today-item-title">{a.title}</div>
           <div className="today-item-src">{a.source} · {fmtDate(a.pubDate)}</div>
@@ -5322,7 +5325,7 @@ Output ONLY the paragraph followed by the bullets. No headers, no labels, no clo
     <section className="briefing-inline">
       <div className="briefing-inline-head">
         <div className="briefing-inline-label-row">
-          <span className="briefing-inline-label">☕ The Briefing</span>
+          <span className="briefing-inline-label">The Briefing</span>
           <span className="briefing-inline-date">{dateStr}</span>
           {tsLabel && (
             <span className="briefing-inline-ts">
@@ -5336,8 +5339,8 @@ Output ONLY the paragraph followed by the bullets. No headers, no labels, no clo
         </button>
       </div>
       <div className="briefing-inline-sources">
-        <span className="briefing-src-pill">☕ {BRIEFING_PRIORITY_SOURCES.join(' · ')}</span>
-        <span className="briefing-src-pill">📰 Top headlines per category</span>
+        <span className="briefing-src-pill">{BRIEFING_PRIORITY_SOURCES.join(' · ')}</span>
+        <span className="briefing-src-pill">Top headlines per category</span>
       </div>
       {body
         ? <p className="briefing-inline-body" dangerouslySetInnerHTML={{__html: body.replace(/\*\*([^*]+)\*\*/g,'<strong>$1</strong>')}}/>
@@ -5575,7 +5578,7 @@ function Scoreboard({scores, loading, compact=false}) {
   };
 
   if (loading&&(!scores||Object.keys(scores).length===0)) {
-    return <div className="sb-box"><div className="sb-box-head"><span className="sb-box-title">🏆 Scoreboard</span></div><div className="sb-empty">Loading scores…</div></div>;
+    return <div className="sb-box"><div className="sb-box-head"><span className="sb-box-title">Scoreboard</span></div><div className="sb-empty">Loading scores…</div></div>;
   }
 
   // v46: Only in-season leagues with active games (live / recent final / upcoming).
@@ -5585,7 +5588,7 @@ function Scoreboard({scores, loading, compact=false}) {
   if (leaguesToShow.length === 0) {
     return (
       <div className="sb-box">
-        <div className="sb-box-head"><span className="sb-box-title">🏆 Scoreboard</span></div>
+        <div className="sb-box-head"><span className="sb-box-title">Scoreboard</span></div>
         <div className="sb-empty">No live or upcoming games right now.</div>
       </div>
     );
@@ -5594,7 +5597,7 @@ function Scoreboard({scores, loading, compact=false}) {
   return (
     <div className="sb-box">
       <button className="sb-box-head sb-box-head-btn" onClick={()=>setCollapsed(c=>!c)}>
-        <span className="sb-box-title">🏆 Scoreboard</span>
+        <span className="sb-box-title">Scoreboard</span>
         <span className="sb-box-sub">
           {totalLive>0 && <span className="sb-live-pill">● {totalLive} LIVE</span>}
           <span className="sb-collapse-chev">{collapsed?'▸':'▾'}</span>
@@ -5679,8 +5682,8 @@ function Sidebar({cat, arts, kw, health, activeKw, setActiveKw, activeSource, se
     <div className="sidebar">
       {(activeKw||activeSource) && (
         <div className="gs-filter">
-          {activeKw && <><span className="gs-filter-label">🔍 {activeKw}</span><button className="gs-filter-x" onClick={()=>setActiveKw(null)}>✕</button></>}
-          {activeSource && <><span className="gs-filter-label" style={{color:cc.color}}>📰 {activeSource}</span><button className="gs-filter-x" style={{color:cc.color}} onClick={()=>setActiveSource(null)}>✕</button></>}
+          {activeKw && <><span className="gs-filter-label">{activeKw}</span><button className="gs-filter-x" onClick={()=>setActiveKw(null)}>✕</button></>}
+          {activeSource && <><span className="gs-filter-label" style={{color:cc.color}}>{activeSource}</span><button className="gs-filter-x" style={{color:cc.color}} onClick={()=>setActiveSource(null)}>✕</button></>}
         </div>
       )}
 
@@ -5690,7 +5693,7 @@ function Sidebar({cat, arts, kw, health, activeKw, setActiveKw, activeSource, se
       <div className="sidebar-section">
         <div className="sidebar-sec-head">
           <span className="sidebar-sec-label">
-            {activeKw ? `🔍 ${activeKw}` : activeSource ? `📰 ${activeSource}` : `🔥 Trending in ${cc.label}`}
+            {activeKw ? `${activeKw}` : activeSource ? `${activeSource}` : `Trending in ${cc.label}`}
           </span>
         </div>
         {sbItems.length === 0
@@ -5771,7 +5774,7 @@ function Sidebar({cat, arts, kw, health, activeKw, setActiveKw, activeSource, se
       {recommended && recommended.length > 0 && (
         <div className="sidebar-section rec-section">
           <div className="sidebar-sec-head">
-            <span className="sidebar-sec-label">⭐ For You</span>
+            <span className="sidebar-sec-label">For You</span>
             <span className="rec-section-sub">Based on your interests</span>
           </div>
           {recommended.slice(0, 5).map((a, i) => (
@@ -5803,7 +5806,7 @@ function SocialFollows({cat, social}) {
   return (
     <div className="social-block">
       <div className="social-block-head">
-        <span className="social-block-title">🔗 Social Follows</span>
+        <span className="social-block-title">Social Follows</span>
         <span className="social-block-sub">Tap to open</span>
       </div>
       <div className="social-platforms">
@@ -5859,7 +5862,7 @@ function SourceFooter({cat, feeds, arts}) {
 }
 
 // ─── CUSTOMIZE PANEL ──────────────────────────────────────────────────────────
-const CAT_LABELS = {general:'📰 News',sports:'🏆 Sports',business:'⚡ Business',finance:'📈 Markets',bloom:'🔋 Energy',tech:'🤖 AI & Tech',popculture:'✨ Pop Culture',comedy:'😂 Comedy'};
+const CAT_LABELS = {general:'News',sports:'Sports',business:'Business',finance:'Markets',bloom:'Energy',tech:'AI & Tech',popculture:'Pop Culture',comedy:'Comedy'};
 const PLAT_LABELS = {twitter:'𝕏',linkedin:'in',instagram:'IG',youtube:'▶'};
 
 function CustomizePanel({feeds, kw, alerts, urgent, social, watchlist, teams, health, arts, weatherCities, hiddenIndices, briefingExclude, initialTab, initialCat, onClose, onSave}) {
@@ -5879,7 +5882,7 @@ function CustomizePanel({feeds, kw, alerts, urgent, social, watchlist, teams, he
   const [newCityLon, setNewCityLon] = useState('');
   // v23: editable favorite teams
   const [lt, setLt] = useState(JSON.parse(JSON.stringify(teams||[])));
-  const [newTeam, setNewTeam] = useState({team:'',match:'',sport:'football',league:'nfl',emoji:'🏈',espnUrl:'',teamUrl:''});
+  const [newTeam, setNewTeam] = useState({team:'',match:'',sport:'football',league:'nfl',emoji:'',espnUrl:'',teamUrl:''});
   const [secTab, setSecTab] = useState(initialTab||'keywords');
   const [kwTab, setKwTab] = useState(initialCat||'general');
   const [srcTab, setSrcTab] = useState(initialCat||'general');
@@ -5934,7 +5937,7 @@ function CustomizePanel({feeds, kw, alerts, urgent, social, watchlist, teams, he
           <div className="cp-sec-tabs">
             {['keywords','alerts','sources','social','watchlist','teams','datastrip','briefing'].map(t=>(
               <button key={t} className={`cp-sec-tab ${secTab===t?'active':''}`} onClick={()=>setSecTab(t)}>
-                {t==='keywords'?'Keywords':t==='alerts'?'Alerts':t==='sources'?'Sources':t==='social'?'Social':t==='watchlist'?'📈 Watchlist':t==='teams'?'🏆 Teams':t==='briefing'?'☕ Briefing':'🌤 Data Strip'}
+                {t==='keywords'?'Keywords':t==='alerts'?'Alerts':t==='sources'?'Sources':t==='social'?'Social':t==='watchlist'?'Watchlist':t==='teams'?'Teams':t==='briefing'?'Briefing':'Data Strip'}
               </button>
             ))}
           </div>
@@ -6110,14 +6113,14 @@ function CustomizePanel({feeds, kw, alerts, urgent, social, watchlist, teams, he
                     <option value="mens-college-basketball">College Basketball</option>
                     <option value="womens-college-basketball">Women's College Basketball</option>
                   </select>
-                  <input className="cp-input-sm" style={{width:'60px'}} placeholder="🏈" value={newTeam.emoji} onChange={e=>setNewTeam(t=>({...t,emoji:e.target.value}))}/>
+                  <input className="cp-input-sm" style={{width:'60px'}} placeholder="" value={newTeam.emoji} onChange={e=>setNewTeam(t=>({...t,emoji:e.target.value}))}/>
                 </div>
                 <input className="cp-input-sm" placeholder="ESPN URL (optional)" value={newTeam.espnUrl} onChange={e=>setNewTeam(t=>({...t,espnUrl:e.target.value}))}/>
                 <input className="cp-input-sm" placeholder="Official team URL (optional)" value={newTeam.teamUrl} onChange={e=>setNewTeam(t=>({...t,teamUrl:e.target.value}))}/>
                 <button className="cp-btn" style={{width:'100%'}} onClick={()=>{
                   if (newTeam.team.trim() && newTeam.match.trim()) {
                     setLt(prev=>[...prev, {...newTeam, team:newTeam.team.trim(), match:newTeam.match.trim()}]);
-                    setNewTeam({team:'',match:'',sport:'football',league:'nfl',emoji:'🏈',espnUrl:'',teamUrl:''});
+                    setNewTeam({team:'',match:'',sport:'football',league:'nfl',emoji:'',espnUrl:'',teamUrl:''});
                   }
                 }}>Add Team</button>
               </div>
@@ -6176,7 +6179,7 @@ function CustomizePanel({feeds, kw, alerts, urgent, social, watchlist, teams, he
 
           {secTab==='briefing' && (
             <div className="cp-sec">
-              <div className="cp-lbl">☕ Morning Briefing Sources</div>
+              <div className="cp-lbl">Morning Briefing Sources</div>
               <div className="cp-desc">The briefing pulls top headlines from each category. Toggle categories off to exclude them from the briefing synthesis.</div>
               <div className="cp-lbl" style={{marginTop:'14px'}}>Priority Sources (always included when available)</div>
               <div className="cp-desc" style={{marginBottom:'8px'}}>
@@ -6226,8 +6229,8 @@ function CustomizePanel({feeds, kw, alerts, urgent, social, watchlist, teams, he
 // destinations a mobile user actually uses for quick check-ins.
 function MenuSheet({ tab, onTabChange, onClose, onCustomize, onRefresh, dark, setDark, search, onSearch, trendingTopics }) {
   const items = [
-    { key:'briefing',   emoji:'☕', label:'The Briefing' },
-    { key:'podcasts',   emoji:'🎙️', label:'Podcasts' },
+    { key:'briefing',   emoji:'', label:'The Briefing' },
+    { key:'podcasts',   emoji:'', label:'Podcasts' },
   ];
   return (
     <div className="menu-sheet-overlay" onClick={onClose}>
@@ -6267,7 +6270,9 @@ function MenuSheet({ tab, onTabChange, onClose, onCustomize, onRefresh, dark, se
           <span className="menu-sheet-item-label">Refresh all feeds</span>
         </button>
         <button className="menu-sheet-item" onClick={() => setDark(d=>!d)}>
-          <span className="menu-sheet-item-emoji">{dark?'☀️':'🌙'}</span>
+          <span className="menu-sheet-item-emoji">{dark
+            ? <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><circle cx="12" cy="12" r="5"/><path d="M12 1v2M12 21v2M4.2 4.2l1.4 1.4M18.4 18.4l1.4 1.4M1 12h2M21 12h2M4.2 19.8l1.4-1.4M18.4 5.6l1.4-1.4"/></svg>
+            : <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>}</span>
           <span className="menu-sheet-item-label">{dark?'Light mode':'Dark mode'}</span>
         </button>
         <button className="menu-sheet-item" onClick={() => { onCustomize(); onClose(); }}>
@@ -6362,7 +6367,7 @@ function RightNowStrip({ breakingItems, scores, marketData, watchlist, onOpen, o
       if (!q || Math.abs(q.pct) < 2) return;
       out.push({
         kind:'market', key:`m${w.sym}`,
-        emoji: q.chg >= 0 ? '📈' : '📉',
+        emoji: q.chg >= 0 ? '' : '',
         text: w.sym,
         val: `${q.chg >= 0 ? '▲':'▼'} ${Math.abs(q.pct).toFixed(2)}%`,
         valClass: q.chg >= 0 ? 'up' : 'down',
@@ -6373,7 +6378,7 @@ function RightNowStrip({ breakingItems, scores, marketData, watchlist, onOpen, o
     // Urgent breaking items (already deduped + urgent-filtered upstream)
     (breakingItems || []).slice(0, 3).forEach((b, i) => {
       out.push({
-        kind:'urgent', key:`b${i}`, emoji:'🚨',
+        kind:'urgent', key:`b${i}`, emoji:'',
         text: b.title.length > 54 ? b.title.slice(0, 52) + '…' : b.title,
         sub: b.source,
         article: b,
@@ -6421,7 +6426,7 @@ function TrendingCarousel({ arts, kw, onRead }) {
   return (
     <div className="trending-inline">
       <div className="trending-inline-head">
-        <span className="trending-inline-title">🔥 Trending across the hub</span>
+        <span className="trending-inline-title">Trending across the hub</span>
       </div>
       <div className="trending-row">
         {stories.map((a, i) => {
@@ -6430,7 +6435,7 @@ function TrendingCarousel({ arts, kw, onRead }) {
             <div key={i} className="trending-card" onClick={() => onRead(a)}>
               <div className="trending-card-meta">
                 <span className="trending-card-num">{i+1}</span>
-                <span className="trending-card-badge" style={{background:cc.bg,color:cc.color}}>{cc.emoji} {cc.label}</span>
+                <span className="trending-card-badge" style={{background:cc.bg,color:cc.color}}>{cc.label}</span>
               </div>
               <div className="trending-card-title">{a.title}</div>
               <div className="trending-card-src">{a.source} · {fmtDate(a.pubDate)}</div>
@@ -6461,7 +6466,7 @@ function MiniScoreboardStrip({ scores, onOpen }) {
 
   return (
     <div className="mini-sb-strip">
-      <span className="mini-sb-label">🏆 Scores</span>
+      <span className="mini-sb-label">Scores</span>
       <div className="mini-sb-items">
         {games.map(g => {
           const live = g.state === 'in';
@@ -6720,7 +6725,7 @@ function TopBar({tab, setTab, search, setSearch, dark, setDark,
             <a key={`wx-${i}`} className="pill pill-wx"
                href={`https://weather.com/weather/today/l/${encodeURIComponent(wx.slug)}`}
                target="_blank" rel="noreferrer">
-              <span className="pill-icon">{wx.emoji}</span>
+              <svg className="pill-icon" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M2 12h2M20 12h2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M19.1 4.9l-1.4 1.4M6.3 17.7l-1.4 1.4"/></svg>
               <div className="pill-body">
                 <div className="pill-label">{wx.name}</div>
                 <div className="pill-value">{wx.temp}°<span className="pill-sub"> {wx.desc}</span></div>
@@ -6940,10 +6945,10 @@ function TopOfHourStrip({ catLead, arts, onRead }) {
             <article key={i} className={`toh-card${i===0?' toh-card-lead':''}`} onClick={() => onRead(a)}>
               {a.img
                 ? <div className="toh-img" style={{backgroundImage:`url(${a.img})`}}/>
-                : <div className="toh-img-ph" style={{background:`linear-gradient(135deg,${cc.bg},${cc.color}33)`}}><span>{cc.emoji}</span></div>}
+                : <div className="toh-img-ph"><span className="ph-label">{cc.label}</span></div>}
               <div className="toh-grad"/>
               <div className="toh-body">
-                <span className="toh-cat" style={{background:cc.color}}>{cc.emoji} {cc.label}</span>
+                <span className="toh-cat" style={{background:cc.color}}>{cc.label}</span>
                 <h3 className="toh-title">{a.title}</h3>
                 <div className="toh-meta">{a.source} · {fmtDate(a.pubDate)}</div>
               </div>
@@ -7000,11 +7005,11 @@ function AnalyzePanel({ onClose }) {
     <div className="analyze-overlay" onClick={e => { if (e.target === e.currentTarget) onClose(); }}>
       <div className="analyze-panel">
         <div className="analyze-head">
-          <span className="analyze-title">📋 Paste & Brief</span>
+          <span className="analyze-title">Paste & Brief</span>
           <button className="analyze-close" onClick={onClose}>✕</button>
         </div>
         <div className="analyze-type-tabs">
-          <button className={`analyze-type-tab${tabType==='text'?' active':''}`} onClick={()=>setTabType('text')}>📄 Article / Text</button>
+          <button className={`analyze-type-tab${tabType==='text'?' active':''}`} onClick={()=>setTabType('text')}>Article / Text</button>
           <button className={`analyze-type-tab${tabType==='youtube'?' active':''}`} onClick={()=>setTabType('youtube')}>▶ YouTube</button>
         </div>
         <div className="analyze-body">
@@ -7026,7 +7031,7 @@ function AnalyzePanel({ onClose }) {
           </div>
           <button className="analyze-go-btn" onClick={analyze}
             disabled={loading || (tabType==='text' && !text.trim()) || (tabType==='youtube' && !ytUrl.trim() && !ytTranscript.trim())}>
-            {loading ? 'Analyzing…' : '✨ Analyze'}
+            {loading ? 'Analyzing…' : 'Analyze'}
           </button>
           {result && (
             <div className="analyze-result">
@@ -7667,14 +7672,14 @@ export default function App() {
 
     const SPORT_TABS = [
       { key:'all',    label:'All' },
-      { key:'nfl',    label:'NFL',            emoji:'🏈' },
-      { key:'nba',    label:'NBA',            emoji:'🏀' },
-      { key:'mlb',    label:'MLB',            emoji:'⚾' },
-      { key:'cfb',    label:'NCAAF',          emoji:'🏈' },
-      { key:'cbb',    label:'NCAAB',          emoji:'🏀' },
-      { key:'cbase',  label:'College Baseball',emoji:'⚾' },
-      { key:'racing', label:'Horse Racing',   emoji:'🏇' },
-      { key:'golf',   label:'Golf',           emoji:'⛳' },
+      { key:'nfl',    label:'NFL',            emoji:'' },
+      { key:'nba',    label:'NBA',            emoji:'' },
+      { key:'mlb',    label:'MLB',            emoji:'' },
+      { key:'cfb',    label:'NCAAF',          emoji:'' },
+      { key:'cbb',    label:'NCAAB',          emoji:'' },
+      { key:'cbase',  label:'College Baseball',emoji:'' },
+      { key:'racing', label:'Horse Racing',   emoji:'' },
+      { key:'golf',   label:'Golf',           emoji:'' },
     ];
 
     // Keep the active subcategory chip scrolled into view (on load + on change).
@@ -7736,7 +7741,7 @@ export default function App() {
           <>
             <div className="sport-league-header">
               <div className="sport-league-header-left">
-                <span className="sport-league-emoji">{SPORT_TABS.find(s=>s.key===sportTab)?.emoji||'🏆'}</span>
+                <span className="sport-league-emoji">{SPORT_TABS.find(s=>s.key===sportTab)?.emoji||''}</span>
                 <div>
                   <h2 className="sport-league-title">{teamName}</h2>
                   <div className="sport-league-count">{teamItems.length} {teamItems.length===1?'story':'stories'} · {sportTab.toUpperCase()}</div>
@@ -7753,7 +7758,7 @@ export default function App() {
               <div className="feed-col">
                 <StateOfPlay items={teamItems} meta={CATS.sports} onRead={onRead} formatDate={fmtDate}/>
                 {teamItems.length === 0
-                  ? <div className="empty-state"><div className="empty-icon">🏆</div><div className="empty-msg">No recent stories for {teamName}</div><button className="refresh-btn" onClick={()=>loadCat('sports')}>Refresh</button></div>
+                  ? <div className="empty-state"><div className="empty-icon"></div><div className="empty-msg">No recent stories for {teamName}</div><button className="refresh-btn" onClick={()=>loadCat('sports')}>Refresh</button></div>
                   : <div className="snap-feed">
                       {teamItems.slice(0,20).map((a,i)=>(
                         <Fragment key={a.link||i}>
@@ -7786,7 +7791,7 @@ export default function App() {
           return (
             <div className="my-teams-module">
               <div className="my-teams-head">
-                <span className="my-teams-title">⭐ My Teams</span>
+                <span className="my-teams-title">My Teams</span>
                 <button className="my-teams-edit" onClick={()=>openCustomize('teams','sports')}>Edit</button>
               </div>
               <div className="my-teams-scroll">
@@ -7794,7 +7799,7 @@ export default function App() {
                   <div key={i} className="my-team-card" onClick={()=>onRead(a)}>
                     {a.img
                       ? <div className="my-team-img" style={{backgroundImage:`url(${a.img})`}}/>
-                      : <div className="my-team-img ph">{cc.emoji}</div>}
+                      : <div className="my-team-img ph"><span className="ph-label">{a.source}</span></div>}
                     <div className="my-team-card-body">
                       <span className="my-team-src" style={{color:cc.color}}>{a.source}</span>
                       <span className="my-team-title">{a.title}</span>
@@ -7886,10 +7891,10 @@ export default function App() {
             )}
 
             {isLoading && !feedItems.length
-              ? <div className="empty-state"><div className="empty-icon">🏆</div><div className="empty-msg">Loading sports…</div></div>
+              ? <div className="empty-state"><div className="empty-icon"></div><div className="empty-msg">Loading sports…</div></div>
               : feedItems.length === 0
                 ? <div className="empty-state">
-                    <div className="empty-icon">{activeTeam ? activeTeam.emoji : '🏆'}</div>
+                    <div className="empty-icon">{activeTeam ? activeTeam.emoji : ''}</div>
                     <div className="empty-msg">{activeTeam ? `No stories found for ${activeTeam.team} yet` : 'No articles loaded yet'}</div>
                     <div style={{fontSize:'12px',color:'var(--text3)',marginTop:'6px',marginBottom:'12px'}}>
                       {activeTeam ? 'Try refreshing or check ESPN directly.' : 'Pull to refresh or tap below.'}
@@ -7905,7 +7910,7 @@ export default function App() {
             {/* v36: Web results for active league tab */}
             {sportTab !== 'all' && (sportWebResults.length > 0 || sportWebLoading) && (
               <div className="web-fallback">
-                <div className="rail-label" style={{margin:'24px 0 12px'}}>🌐 From the Web</div>
+                <div className="rail-label" style={{margin:'24px 0 12px'}}>From the Web</div>
                 {sportWebLoading && <div style={{fontSize:'12px',color:'var(--text3)',fontStyle:'italic',padding:'10px 0'}}>Searching the web…</div>}
                 {sportWebResults.map((r,i) => (
                   <a key={i} className="web-result" href={r.link} target="_blank" rel="noreferrer">
@@ -7950,7 +7955,7 @@ export default function App() {
                               setActiveTeam(isFiltered ? null : t); setSportTab('all');
                               setTeamMenuSym(null); setTimeout(scrollToFeed, 80);
                             }}>
-                              {isFiltered ? '✕ Clear filter' : '📰 Filter News'}
+                              {isFiltered ? '✕ Clear filter' : 'Filter News'}
                             </button>
                             {t.espnUrl && <a className="team-menu-item" href={t.espnUrl} target="_blank" rel="noreferrer">ESPN ↗</a>}
                             {t.teamUrl && <a className="team-menu-item" href={t.teamUrl} target="_blank" rel="noreferrer">Team Site ↗</a>}
@@ -7996,11 +8001,11 @@ export default function App() {
     const [enWebLoading, setEnWebLoading] = useState(false);
 
     const PC_SUBTABS = [
-      { key:'all',         label:'All',         emoji:'✨' },
-      { key:'shows',       label:'Shows/Movies', emoji:'🎬' },
-      { key:'music',       label:'Music',        emoji:'🎵' },
-      { key:'books',       label:'Books',        emoji:'📚' },
-      { key:'comedy',      label:'Comedy',       emoji:'😂' },
+      { key:'all',         label:'All',         emoji:'' },
+      { key:'shows',       label:'Shows/Movies', emoji:'' },
+      { key:'music',       label:'Music',        emoji:'' },
+      { key:'books',       label:'Books',        emoji:'' },
+      { key:'comedy',      label:'Comedy',       emoji:'' },
     ];
     const PC_KWS = {
       shows:  ['movie','film','tv','streaming','netflix','hbo','disney','show','series','premiere','season','episode','cinema','trailer','oscar','emmy','golden globe'],
@@ -8010,12 +8015,12 @@ export default function App() {
     };
 
     const EN_SUBTABS = [
-      { key:'all',     label:'All',           emoji:'⚡' },
-      { key:'power',   label:'Power',         emoji:'🔌' },
-      { key:'oilgas',  label:'Oil & Gas',     emoji:'🛢️' },
-      { key:'clean',   label:'Clean Energy',  emoji:'🌿' },
-      { key:'markets', label:'Markets',       emoji:'📈' },
-      { key:'policy',  label:'Policy',        emoji:'🏛️' },
+      { key:'all',     label:'All',           emoji:'' },
+      { key:'power',   label:'Power',         emoji:'' },
+      { key:'oilgas',  label:'Oil & Gas',     emoji:'' },
+      { key:'clean',   label:'Clean Energy',  emoji:'' },
+      { key:'markets', label:'Markets',       emoji:'' },
+      { key:'policy',  label:'Policy',        emoji:'' },
     ];
     const EN_KWS = {
       power:   ['power','electric','grid','utility','electricity','megawatt','kilowatt','nuclear','coal','natural gas','transmission','substation','generation','powerplant','baseload'],
@@ -8108,7 +8113,7 @@ export default function App() {
           return (
             <div className="my-teams-module">
               <div className="my-teams-head">
-                <span className="my-teams-title">⭐ My Teams</span>
+                <span className="my-teams-title">My Teams</span>
                 <button className="my-teams-edit" onClick={()=>handleTabChange('sports')}>All sports →</button>
               </div>
               <div className="my-teams-scroll">
@@ -8117,7 +8122,7 @@ export default function App() {
                     onClick={()=>navigate('sports', t.league, t.slug)}>
                     {a.img
                       ? <div className="my-team-img" style={{backgroundImage:`url(${a.img})`}}/>
-                      : <div className="my-team-img ph">🏆</div>}
+                      : <div className="my-team-img ph"><span className="ph-label">{a.source}</span></div>}
                     <div className="my-team-card-body">
                       <span className="my-team-src" style={{color:CATS.sports.color}}>{t.name} · {t.league.toUpperCase()}</span>
                       <span className="my-team-title">{a.title}</span>
@@ -8134,8 +8139,8 @@ export default function App() {
             <div className="onboarding-body">
               <div className="onboarding-title">Welcome to MyNewsHub ✦</div>
               <div className="onboarding-tips">
-                <span className="onboarding-tip">📖 <strong>Click any article</strong> to open the AI reader — Summarize, Key Points, Bias Check</span>
-                <span className="onboarding-tip">📋 <strong>"Brief" button</strong> (top bar) → paste any article, transcript, or YouTube video for a breakdown</span>
+                <span className="onboarding-tip"><strong>Click any article</strong> to open the AI reader — Summarize, Key Points, Bias Check</span>
+                <span className="onboarding-tip"><strong>"Brief" button</strong> (top bar) → paste any article, transcript, or YouTube video for a breakdown</span>
                 <span className="onboarding-tip">⚙️ <strong>Customize</strong> → add/remove sources, set keywords, build your feed</span>
               </div>
               <button className="onboarding-dismiss" onClick={dismissOnboarding}>Got it, dismiss</button>
@@ -8184,7 +8189,7 @@ export default function App() {
           if (topics.length < 2) return null;
           return (
             <div className="trending-section trending-now-row">
-              <span className="trending-section-label">🔥 Trending Now</span>
+              <span className="trending-section-label">Trending Now</span>
               {topics.map((t, i) => (
                 <button key={i} className="trending-chip" onClick={()=>setSearch(t.toLowerCase())}>{t}</button>
               ))}
@@ -8218,7 +8223,7 @@ export default function App() {
                 <article key={i} className={`gn-card ${cat}`} onClick={()=>onRead(a)}>
                   {a.img
                     ? <div className="gn-card-img" style={{backgroundImage:`url(${a.img})`}}/>
-                    : <div className="gn-card-img-ph" style={{background:`linear-gradient(135deg,${cc.bg},${cc.bg}cc)`}}><span style={{fontSize:'20px'}}>{cc.emoji}</span></div>}
+                    : <div className="gn-card-img-ph"><span className="ph-label">{a.source}</span></div>}
                   <h3 className="gn-card-title">{a.title}</h3>
                   <div className="gn-card-meta">
                     <span className="gn-card-source" style={{color:cc.color}}>{a.source}</span>
@@ -8246,13 +8251,13 @@ export default function App() {
           <div className="feed-col">
             <div className="page-header-row">
               <span className="page-header" style={{fontFamily:'var(--font-sans)'}}>
-                {cc.emoji} {cc.label}{feedItems.length>0?` — ${feedItems.length} articles`:''}
+                {cc.label}{feedItems.length>0?` — ${feedItems.length} articles`:''}
                 {lastUpdated[cat] && <span style={{marginLeft:'10px'}}><LastUpdated timestamp={lastUpdated[cat]} onRefresh={() => loadCat(cat)}/></span>}
               </span>
               <div style={{display:'flex',alignItems:'center',gap:'10px'}}>
                 {(() => {
                   const down = (feeds[cat]||[]).filter(f=>f.on && feedHealth[f.name] && !feedHealth[f.name].ok).length;
-                  return down>0 ? <button className="feed-degraded" title="Some sources failed to load — open Customize to review" onClick={()=>openCustomize('sources',cat)}>⚠ {down} source{down===1?'':'s'} unavailable</button> : null;
+                  return down>0 ? <button className="feed-degraded" title="Some sources failed to load — open Customize to review" onClick={()=>openCustomize('sources',cat)}>{down} source{down===1?'':'s'} unavailable</button> : null;
                 })()}
                 <button className="page-customize-btn" onClick={()=>openCustomize('sources',cat)}>⚙ Customize</button>
               </div>
@@ -8291,14 +8296,14 @@ export default function App() {
             )}
             {(activeKw||activeSrc)&&(
               <div className="sticky-filter" style={{display:'flex',gap:'6px',flexWrap:'wrap',marginBottom:'12px'}}>
-                {activeKw&&<span style={{background:cc.bg,color:cc.color,borderRadius:'20px',padding:'3px 10px',fontSize:'10px',fontWeight:'600',display:'inline-flex',alignItems:'center',gap:'5px'}}>🔍 {activeKw}<button onClick={()=>setActiveKw(null)} style={{background:'none',border:'none',cursor:'pointer',color:'inherit',fontSize:'12px',padding:0}}>✕</button></span>}
-                {activeSrc&&<span style={{background:'var(--surface2)',color:'var(--text2)',borderRadius:'20px',padding:'3px 10px',fontSize:'10px',fontWeight:'600',border:'1px solid var(--border)',display:'inline-flex',alignItems:'center',gap:'5px'}}>📰 {activeSrc}<button onClick={()=>setActiveSrc(null)} style={{background:'none',border:'none',cursor:'pointer',color:'inherit',fontSize:'12px',padding:0}}>✕</button></span>}
+                {activeKw&&<span style={{background:cc.bg,color:cc.color,borderRadius:'20px',padding:'3px 10px',fontSize:'10px',fontWeight:'600',display:'inline-flex',alignItems:'center',gap:'5px'}}>{activeKw}<button onClick={()=>setActiveKw(null)} style={{background:'none',border:'none',cursor:'pointer',color:'inherit',fontSize:'12px',padding:0}}>✕</button></span>}
+                {activeSrc&&<span style={{background:'var(--surface2)',color:'var(--text2)',borderRadius:'20px',padding:'3px 10px',fontSize:'10px',fontWeight:'600',border:'1px solid var(--border)',display:'inline-flex',alignItems:'center',gap:'5px'}}>{activeSrc}<button onClick={()=>setActiveSrc(null)} style={{background:'none',border:'none',cursor:'pointer',color:'inherit',fontSize:'12px',padding:0}}>✕</button></span>}
               </div>
             )}
             {isLoading&&!feedItems.length
-              ?<div className="empty-state"><div className="empty-icon">{cc.emoji}</div><div className="empty-msg">Loading {cc.label}…</div></div>
+              ?<div className="empty-state"><div className="empty-icon"></div><div className="empty-msg">Loading {cc.label}…</div></div>
               :feedItems.length===0
-                ?<div className="empty-state"><div className="empty-icon">📭</div><div className="empty-msg">{activeKw||activeSrc?'No articles match this filter':search?`No internal results for "${search}"`:'No articles loaded yet'}</div><button className="refresh-btn" onClick={refreshAll}>Refresh</button></div>
+                ?<div className="empty-state"><div className="empty-icon"></div><div className="empty-msg">{activeKw||activeSrc?'No articles match this filter':search?`No internal results for "${search}"`:'No articles loaded yet'}</div><button className="refresh-btn" onClick={refreshAll}>Refresh</button></div>
                 :<div className="snap-feed">
                   {feedItems.slice(activeKw||activeSrc||search?0:3,20).map((a,i)=>(
                     <Fragment key={a.link||i}>
@@ -8312,7 +8317,7 @@ export default function App() {
             {/* Pop culture sub-tab web results */}
             {cat === 'popculture' && pcSubTab !== 'all' && (pcWebResults.length > 0 || pcWebLoading) && (
               <div className="web-fallback">
-                <div className="rail-label" style={{margin:'24px 0 12px'}}>🌐 From the Web</div>
+                <div className="rail-label" style={{margin:'24px 0 12px'}}>From the Web</div>
                 {pcWebLoading && <div style={{fontSize:'12px',color:'var(--text3)',fontStyle:'italic',padding:'10px 0'}}>Searching the web…</div>}
                 {pcWebResults.map((r,i) => (
                   <a key={i} className="web-result" href={r.link} target="_blank" rel="noreferrer">
@@ -8327,7 +8332,7 @@ export default function App() {
             {/* Energy sub-tab web results */}
             {cat === 'bloom' && enSubTab !== 'all' && (enWebResults.length > 0 || enWebLoading) && (
               <div className="web-fallback">
-                <div className="rail-label" style={{margin:'24px 0 12px'}}>🌐 From the Web</div>
+                <div className="rail-label" style={{margin:'24px 0 12px'}}>From the Web</div>
                 {enWebLoading && <div style={{fontSize:'12px',color:'var(--text3)',fontStyle:'italic',padding:'10px 0'}}>Searching the web…</div>}
                 {enWebResults.map((r,i) => (
                   <a key={i} className="web-result" href={r.link} target="_blank" rel="noreferrer">
@@ -8360,7 +8365,7 @@ export default function App() {
             {/* v26: Source recommendations when searching */}
             {search && sourceRecs.length > 0 && (
               <div className="source-recs">
-                <div className="rail-label" style={{margin:'20px 0 10px'}}>💡 Add a source for "{search}"</div>
+                <div className="rail-label" style={{margin:'20px 0 10px'}}>Add a source for "{search}"</div>
                 <div className="source-rec-list">
                   {sourceRecs.map((s,i) => (
                     <button key={i} className="source-rec-btn" onClick={()=>{
@@ -8384,7 +8389,7 @@ export default function App() {
             {/* v38: More from this source — web results when source filter is active */}
             {activeSrc && (srcWebResults.length > 0 || srcWebLoading) && (
               <div className="web-fallback">
-                <div className="rail-label" style={{margin:'24px 0 12px'}}>🌐 More from {activeSrc}</div>
+                <div className="rail-label" style={{margin:'24px 0 12px'}}>More from {activeSrc}</div>
                 {srcWebLoading && <div style={{fontSize:'12px',color:'var(--text3)',fontStyle:'italic',padding:'10px 0'}}>Searching the web…</div>}
                 {srcWebResults.map((r,i) => (
                   <a key={i} className="web-result" href={r.link} target="_blank" rel="noreferrer">
@@ -8538,10 +8543,10 @@ export default function App() {
                 {loadSum?'…':'✦'} {showSum?'Hide':'Summary'}
               </button>
               <button className={`ba-btn${showEx?' on':''}`} onClick={handleExplain}>
-                {loadEx?'…':'🧠'} {showEx?'Hide':'Explain'}
+                {loadEx?'…':''} {showEx?'Hide':'Explain'}
               </button>
               <button className={`ba-btn${speaking?' on':''}`} onClick={handleListen}>
-                {speaking?'⏹':'🔊'} {speaking?'Stop':'Listen'}
+                {speaking?'⏹':''} {speaking?'Stop':'Listen'}
               </button>
               <button className="ba-btn" onClick={handleShare}>⤴ Share</button>
             </div>
@@ -8628,7 +8633,7 @@ export default function App() {
               <section key={cat} className="briefing-sources">
                 <div className="briefing-sources-head">
                   <span className="briefing-sources-label" style={{color:cc.color}}>
-                    {cc.emoji} {cc.label}
+                    {cc.label}
                   </span>
                   <button className="today-section-link" onClick={()=>handleTabChange(cat)}>
                     See all in {cc.label} →
@@ -8705,7 +8710,7 @@ export default function App() {
               </div>
               {podAiState==='takeaways'&&(
                 <div className="fc-takeaways">
-                  <div className="fc-takeaways-lbl">📋 Key Takeaways</div>
+                  <div className="fc-takeaways-lbl">Key Takeaways</div>
                   {loadPod&&!podTake?<div style={{fontSize:'11px',color:'var(--text3)',fontStyle:'italic'}}>Analyzing episode…</div>
                   :podErr&&!podTake?<div style={{fontSize:'11px',color:'var(--red)'}}>{podErr}</div>
                   :<TakeawaysContent text={podTake}/>}
@@ -8729,7 +8734,7 @@ export default function App() {
         <div className="pod-page">
           <div className="pod-col">
             <div className="pod-header">
-              <div className="pod-header-emoji">{activePod?activePod.emoji:'🎙️'}</div>
+              <div className="pod-header-emoji">{activePod?activePod.emoji:''}</div>
               <div>
                 <div className="pod-header-name">{activePod?activePod.name:'All Podcasts'}</div>
                 <div className="pod-header-sub">{activePod?`Hosted by ${activePod.host}`:`${PODCAST_FEEDS.length} shows`}</div>
@@ -8742,7 +8747,7 @@ export default function App() {
             <div className="pod-shows">
               <div style={{fontSize:'10px',fontWeight:'700',color:'var(--text3)',textTransform:'uppercase',letterSpacing:'0.08em',marginBottom:'8px',paddingBottom:'8px',borderBottom:'1px solid var(--border2)'}}>Shows</div>
               <div className="pod-show-item" onClick={()=>setActivePod(null)}>
-                <div className="pod-show-emoji">🎙️</div>
+                <div className="pod-show-emoji"></div>
                 <div><div className="pod-show-name" style={{color:!activePod?'#e11d48':''}}>All Shows</div><div className="pod-show-ep">Latest from all {PODCAST_FEEDS.length} podcasts</div></div>
                 {!activePod&&<div className="pod-show-dot"/>}
               </div>
@@ -8762,7 +8767,7 @@ export default function App() {
             </div>
             {allEps.length>0&&(
               <div className="gs-section">
-                <div className="gs-label">🔥 Trending Episodes</div>
+                <div className="gs-label">Trending Episodes</div>
                 {allEps.slice(0,6).map((ep,i)=>(
                   <div key={i} className="trend-row" onClick={()=>ep.link&&window.open(ep.link,'_blank')}>
                     <div className="trend-num">{i+1}</div>
@@ -8785,7 +8790,7 @@ export default function App() {
       {/* Reading stats panel */}
       {(readingStats.total > 0 || readingStats.topSources.length > 0) && (
         <div className="stats-panel">
-          <div className="stats-head">📊 Your Reading Stats</div>
+          <div className="stats-head">Your Reading Stats</div>
           <div className="stats-grid">
             <div className="stat-block">
               <div className="stat-num">{readingStats.total}</div>
@@ -8820,7 +8825,7 @@ export default function App() {
               <div className="stats-cat-chips">
                 {readingStats.topCats.map(([c,cnt]) => {
                   const cc=CATS[c]||CATS.general;
-                  return <span key={c} className="stats-cat-chip" style={{background:cc.bg,color:cc.color}}>{cc.emoji} {cc.label} ({cnt})</span>;
+                  return <span key={c} className="stats-cat-chip" style={{background:cc.bg,color:cc.color}}>{cc.label} ({cnt})</span>;
                 })}
               </div>
             </div>
@@ -8867,7 +8872,7 @@ export default function App() {
             return (
               <div key={c} className="sources-cat">
                 <button className="sources-cat-head" style={{borderLeftColor:cc.color}} onClick={()=>handleTabChange(c)}>
-                  <span className="sources-cat-emoji">{cc.emoji}</span>
+                  
                   <span className="sources-cat-label" style={{color:cc.color}}>{cc.label}</span>
                   <span className="sources-cat-count">{list.length}</span>
                 </button>
@@ -8922,7 +8927,7 @@ export default function App() {
         <div className="fin-header fin-header-slim">
           <div className="fin-header-top">
             <div>
-              <div className="fin-header-title">📈 Markets</div>
+              <div className="fin-header-title">Markets</div>
               <div className="fin-header-sub">
                 <span style={{color:'var(--text3)'}}>
                   {mktErr ? 'Live data unavailable — latest news below' : `Live via Financial Modeling Prep${mkt?.asOf?` · updated ${fmtDate(mkt.asOf)}`:''}`}
@@ -9002,7 +9007,7 @@ export default function App() {
                                 </div>
                                 <div className="fin-chart-links">
                                   <a className="fin-chart-link-btn primary" href={`https://finance.yahoo.com/chart/${w.sym}`} target="_blank" rel="noreferrer" onClick={e=>e.stopPropagation()}>
-                                    📊 Full Chart on Yahoo Finance
+                                    Full Chart on Yahoo Finance
                                   </a>
                                   <a className="fin-chart-link-btn" href={`https://www.tradingview.com/chart/?symbol=${w.sym}`} target="_blank" rel="noreferrer" onClick={e=>e.stopPropagation()}>
                                     TradingView ↗
@@ -9027,7 +9032,7 @@ export default function App() {
                 <button className="page-customize-btn" onClick={()=>openCustomize('sources','finance')}>⚙ Sources</button>
               </div>
               {newsItems.length===0
-                ?<div className="empty-state"><div className="empty-icon">📈</div><div className="empty-msg">Loading Markets news…</div></div>
+                ?<div className="empty-state"><div className="empty-icon"></div><div className="empty-msg">Loading Markets news…</div></div>
                 :<div className="snap-feed" style={{padding:'12px 0 0'}}>
                     {newsItems.slice(0, 15).map((a, i) => (
                       <Fragment key={a.link||i}>
