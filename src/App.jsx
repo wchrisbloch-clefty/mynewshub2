@@ -736,14 +736,33 @@ function usePullToRefresh(onRefresh, { threshold = 70, enabled = true } = {}) {
 
 // ─── AI SUMMARY ───────────────────────────────────────────────────────────────
 const EXTRACT_MODES = new Set(['summary','takeaways','explain','bias','related','brief']);
+// Tier (b) label: shown when we couldn't extract the full body but had a usable RSS
+// preview to summarize instead. Never summarize a blurb silently — always label it.
+export const PREVIEW_LABEL = 'Summary from preview text — full article unavailable';
+const PREVIEW_MIN = 120; // RSS preview must be at least this long to be worth summarizing
 async function fetchAISummary({type, title, content, mode='summary', url}) {
-  // Extract-first: run summarization on the REAL source body, never the RSS blurb.
-  // If extraction fails/too-short, refuse to invent — surface an honest fallback.
+  // Extract-first, three honest tiers:
+  //   (a) real extracted body        → normal summary
+  //   (b) extraction failed, but a usable RSS preview exists → summarize it, LABELLED
+  //   (c) neither                    → honest "unavailable", generate nothing
+  // A YouTube video with no captions goes straight to (c): we never summarize a
+  // video's description in place of its transcript.
   let body = content;
+  let fromPreview = false;
   if (url && EXTRACT_MODES.has(mode)) {
     const ex = await extractContent(url);
-    if (ex && ex.text) body = ex.text;
-    else return { summary:'', error: extractionFallbackMessage(ex && ex.error), unavailable:true };
+    if (ex && ex.text) {
+      body = ex.text;                                   // tier (a)
+    } else {
+      const isVideo = (ex && ex.kind === 'youtube') || (ex && ex.error === 'no-transcript');
+      const preview = (content || '').trim();
+      if (!isVideo && preview.length >= PREVIEW_MIN) {   // tier (b)
+        body = preview;
+        fromPreview = true;
+      } else {                                           // tier (c)
+        return { summary:'', error: extractionFallbackMessage(ex && ex.error), unavailable:true };
+      }
+    }
   }
   try {
     const r = await fetch('/api/summarize', {
@@ -759,7 +778,7 @@ async function fetchAISummary({type, title, content, mode='summary', url}) {
       return {summary:'',error:`Unavailable (${detail.slice(0,100)})`};
     }
     const data=await r.json();
-    return {summary:data.summary||'', error:'', provider:data.provider||''};
+    return {summary:data.summary||'', error:'', provider:data.provider||'', fromPreview};
   } catch(err) {
     return {summary:'',error:err.name==='TimeoutError'?'Timed out':'Network error'};
   }
@@ -1317,6 +1336,7 @@ body:not(.dark) .pill-bar{
 
 /* AI panels */
 .fc-ai-panel{margin-top:12px;display:flex;flex-direction:column;gap:8px;}
+.fc-preview-note{font-size:10.5px;font-weight:600;color:var(--amber);background:#fffbeb;border:1px solid #fde68a;border-radius:6px;padding:5px 9px;letter-spacing:0.01em;}
 .fc-summary{background:var(--surface2);border-radius:8px;padding:10px 12px;}
 .fc-summary-lbl{font-size:9px;font-weight:700;color:#7c3aed;text-transform:uppercase;letter-spacing:0.08em;margin-bottom:5px;}
 .fc-summary-text{font-size:12px;color:var(--text2);line-height:1.6;}
@@ -4272,6 +4292,7 @@ kbd{display:inline-block;padding:1px 5px;border:1px solid var(--border);border-r
   width:100%;aspect-ratio:16/9;border:none;border-radius:8px;
   background:#000;margin-bottom:10px;
 }
+.analyze-yt-note{font-size:11px;color:var(--text3);margin-bottom:12px;font-style:italic;}
 .analyze-modes{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px;}
 .analyze-mode-btn{
   font-size:12px;font-weight:700;padding:6px 13px;border-radius:20px;
@@ -4894,6 +4915,7 @@ function FeedCard({a, cat, isSaved, onSave, onRead, relatedSources, isRead, user
   const [aiState, setAiState] = useState('closed');
   const [summary, setSummary] = useState('');
   const [takeaways, setTakeaways] = useState('');
+  const [fromPreview, setFromPreview] = useState(false);
   const [aiErr, setAiErr] = useState('');
   const [loadingAI, setLoadingAI] = useState(false);
   const [explainText, setExplainText] = useState('');
@@ -4926,6 +4948,7 @@ function FeedCard({a, cat, isSaved, onSave, onRead, relatedSources, isRead, user
       for (const r of results) {
         if (r.summary) {
           gotAny = true;
+          if (r.fromPreview) setFromPreview(true);
           if (r.k==='s') setSummary(r.summary); else setTakeaways(r.summary);
         } else if (r.error) {
           lastErr = r.error;
@@ -4946,7 +4969,7 @@ function FeedCard({a, cat, isSaved, onSave, onRead, relatedSources, isRead, user
 
   const retryAI = (e) => {
     e.stopPropagation();
-    setSummary(''); setTakeaways(''); setAiErr('');
+    setSummary(''); setTakeaways(''); setFromPreview(false); setAiErr('');
     runAI();
   };
 
@@ -5032,6 +5055,9 @@ function FeedCard({a, cat, isSaved, onSave, onRead, relatedSources, isRead, user
       </div>
       {aiState!=='closed' && (
         <div className="fc-ai-panel" onClick={e=>e.stopPropagation()}>
+          {fromPreview && (summary || takeaways) && (
+            <div className="fc-preview-note">{PREVIEW_LABEL}</div>
+          )}
           {/* What actually happened */}
           <div className="fc-summary">
             <div className="fc-summary-lbl">✦ What Happened</div>
@@ -5140,6 +5166,7 @@ function FeedCard({a, cat, isSaved, onSave, onRead, relatedSources, isRead, user
 function TodayItem({a, cc, onRead}) {
   const [showSum, setShowSum] = useState(false);
   const [sum, setSum] = useState('');
+  const [sumPreview, setSumPreview] = useState(false);
   const [err, setErr] = useState('');
   const [loading, setLoading] = useState(false);
   const [imgErr, setImgErr] = useState(false);
@@ -5149,8 +5176,8 @@ function TodayItem({a, cc, onRead}) {
     if (showSum) { setShowSum(false); return; }
     if (sum||err) { setShowSum(true); return; }
     setShowSum(true); setLoading(true);
-    const {summary, error} = await fetchAISummary({type:'article',title:a.title,content:a.desc||'',url:a.link});
-    if (summary) setSum(summary); else setErr(error||'Summary unavailable');
+    const {summary, error, fromPreview} = await fetchAISummary({type:'article',title:a.title,content:a.desc||'',url:a.link});
+    if (summary) { setSum(summary); setSumPreview(!!fromPreview); } else setErr(error||'Summary unavailable');
     setLoading(false);
   };
 
@@ -5181,7 +5208,7 @@ function TodayItem({a, cc, onRead}) {
         <div className="today-summary" onClick={e=>e.stopPropagation()}>
           {loading ? <em style={{color:'var(--text3)'}}>Generating summary...</em>
           : err ? <span style={{color:'var(--red)'}}>{err}</span>
-          : sum}
+          : <>{sumPreview && <div className="fc-preview-note" style={{marginBottom:'8px'}}>{PREVIEW_LABEL}</div>}{sum}</>}
         </div>
       )}
     </div>
@@ -6791,7 +6818,7 @@ function TopBar({tab, setTab, search, setSearch, dark, setDark,
             <div className="breaking-ticker-inner">
               {tickerItems.map((item,i)=>(
                 <span key={i} className="breaking-item" onClick={()=>item.link&&window.open(item.link,'_blank')}>
-                  {decodeEntities(item.title)} <span style={{opacity:0.6,fontSize:'10px'}}>· {item.source}</span>
+                  {item.title} <span style={{opacity:0.6,fontSize:'10px'}}>· {item.source}</span>
                   <span className="breaking-sep">◆</span>
                 </span>
               ))}
@@ -6975,7 +7002,6 @@ function AnalyzePanel({ onClose }) {
   const [tabType, setTabType] = useState('text'); // 'text' | 'youtube'
   const [text, setText] = useState('');
   const [ytUrl, setYtUrl] = useState('');
-  const [ytTranscript, setYtTranscript] = useState('');
   const [mode, setMode] = useState('summary');
   const [result, setResult] = useState('');
   const [loading, setLoading] = useState(false);
@@ -6993,21 +7019,28 @@ function AnalyzePanel({ onClose }) {
   }, [ytUrl]);
 
   const analyze = async () => {
-    const content = tabType === 'youtube'
-      ? (ytTranscript.trim() || (ytId ? `YouTube video ID: ${ytId} — URL: ${ytUrl}` : ytUrl.trim()))
-      : text.trim();
-    if (!content || loading) return;
+    const isYt = tabType === 'youtube';
+    if (loading || (isYt ? !ytUrl.trim() : !text.trim())) return;
     setLoading(true);
     setResult('');
-    const modePrompts = {
-      summary:   'Summarize this content in 3-5 sentences, hitting the key facts.',
-      takeaways: 'List the 5 most important takeaways as bullet points.',
-      bias:      'Analyze the bias and framing. What perspective does it favor? What might it omit?',
-      brief:     'Write a comprehensive brief covering: 1) Summary 2) Key Facts 3) Why It Matters 4) Notable Quotes or Data.',
-    };
-    const prompt = `${modePrompts[mode]}\n\nCONTENT:\n${content}`;
-    const { summary, error } = await fetchAISummary({ type:'article', title:'Analysis', content:prompt, mode });
-    setResult(error ? 'Analysis failed — try again.' : (summary || 'No result.'));
+    let res;
+    if (isYt) {
+      // Extract-first: fetch the real caption track server-side. No manual transcript
+      // paste. If the video has no captions, fetchAISummary returns the honest
+      // "No transcript available…" message rather than summarizing the description.
+      res = await fetchAISummary({ type:'article', title:'Analysis', content:'', mode, url: ytUrl.trim() });
+    } else {
+      const modePrompts = {
+        summary:   'Summarize this content in 3-5 sentences, hitting the key facts.',
+        takeaways: 'List the 5 most important takeaways as bullet points.',
+        bias:      'Analyze the bias and framing. What perspective does it favor? What might it omit?',
+        brief:     'Write a comprehensive brief covering: 1) Summary 2) Key Facts 3) Why It Matters 4) Notable Quotes or Data.',
+      };
+      const prompt = `${modePrompts[mode]}\n\nCONTENT:\n${text.trim()}`;
+      res = await fetchAISummary({ type:'article', title:'Analysis', content:prompt, mode });
+    }
+    const { summary, error, unavailable } = res;
+    setResult(unavailable ? error : (error ? 'Analysis failed — try again.' : (summary || 'No result.')));
     setLoading(false);
   };
 
@@ -7031,7 +7064,7 @@ function AnalyzePanel({ onClose }) {
               {ytId && (
                 <iframe className="analyze-yt-embed" src={`https://www.youtube-nocookie.com/embed/${ytId}`} allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowFullScreen title="YouTube video"/>
               )}
-              <textarea className="analyze-input" placeholder="Paste video transcript here for best AI results (optional — without it, AI analyzes the URL/title only)…" value={ytTranscript} onChange={e=>setYtTranscript(e.target.value)} rows={5}/>
+              <div className="analyze-yt-note">Captions are fetched automatically — no transcript to paste.</div>
             </>
           )}
           <div className="analyze-modes">
@@ -7040,14 +7073,14 @@ function AnalyzePanel({ onClose }) {
             ))}
           </div>
           <button className="analyze-go-btn" onClick={analyze}
-            disabled={loading || (tabType==='text' && !text.trim()) || (tabType==='youtube' && !ytUrl.trim() && !ytTranscript.trim())}>
+            disabled={loading || (tabType==='text' && !text.trim()) || (tabType==='youtube' && !ytUrl.trim())}>
             {loading ? 'Analyzing…' : 'Analyze'}
           </button>
           {result && (
             <div className="analyze-result">
               <div className="analyze-result-label">{MODES.find(m=>m.key===mode)?.label}</div>
               <div className="analyze-result-text">{result}</div>
-              <button className="analyze-result-clear" onClick={()=>{setResult('');setText('');setYtUrl('');setYtTranscript('');}}>Clear</button>
+              <button className="analyze-result-clear" onClick={()=>{setResult('');setText('');setYtUrl('');}}>Clear</button>
             </div>
           )}
         </div>
@@ -7064,6 +7097,7 @@ function ArticleReader({ article, onClose }) {
   const [aiErr, setAiErr] = useState('');
   const [aiLoading, setAiLoading] = useState(false);
   const [aiMode, setAiMode] = useState(null);
+  const [aiPreview, setAiPreview] = useState(false);
 
   // Fix: pass the real mode (summary/takeaways/bias) and read the {summary,error}
   // object fetchAISummary returns — previously it sent mode:'groq' (invalid) and
@@ -7071,9 +7105,9 @@ function ArticleReader({ article, onClose }) {
   const runAI = async (mode) => {
     setAiMode(mode);
     setAiLoading(true);
-    setAiResult(''); setAiErr('');
-    const { summary, error } = await fetchAISummary({ type: 'article', title: article.title, content: article.desc || article.title, mode, url: article.link });
-    if (summary) setAiResult(summary);
+    setAiResult(''); setAiErr(''); setAiPreview(false);
+    const { summary, error, fromPreview } = await fetchAISummary({ type: 'article', title: article.title, content: article.desc || article.title, mode, url: article.link });
+    if (summary) { setAiResult(summary); setAiPreview(!!fromPreview); }
     else setAiErr(error || 'Could not generate that right now — try again.');
     setAiLoading(false);
   };
@@ -7106,6 +7140,7 @@ function ArticleReader({ article, onClose }) {
           )}
           {!aiLoading && aiResult && (
             <div className="article-reader-ai-result">
+              {aiPreview && <div className="fc-preview-note" style={{marginBottom:'8px'}}>{PREVIEW_LABEL}</div>}
               <div style={{fontWeight:700,fontSize:'11px',textTransform:'uppercase',letterSpacing:'0.08em',color:'var(--accent)',marginBottom:'8px'}}>
                 {aiMode === 'summary' ? 'Summary' : aiMode === 'takeaways' ? 'Key Points' : 'Bias Check'}
               </div>
@@ -8496,6 +8531,7 @@ export default function App() {
   const BriefingArticleItem = ({ a }) => {
     const [showSum,setShowSum]     = useState(false);
     const [sum,setSum]             = useState('');
+    const [sumPreview,setSumPreview] = useState(false);
     const [sumErr,setSumErr]       = useState('');
     const [loadSum,setLoadSum]     = useState(false);
     const [showEx,setShowEx]       = useState(false);
@@ -8508,8 +8544,8 @@ export default function App() {
       if (showSum) { setShowSum(false); return; }
       if (sum||sumErr) { setShowSum(true); return; }
       setShowSum(true); setLoadSum(true);
-      const {summary,error} = await fetchAISummary({type:'article',title:a.title,content:a.desc||'',url:a.link});
-      if (summary) setSum(summary); else setSumErr(error||'Unavailable');
+      const {summary,error,fromPreview} = await fetchAISummary({type:'article',title:a.title,content:a.desc||'',url:a.link});
+      if (summary) { setSum(summary); setSumPreview(!!fromPreview); } else setSumErr(error||'Unavailable');
       setLoadSum(false);
     };
 
@@ -8562,7 +8598,7 @@ export default function App() {
             </div>
           </div>
         </div>
-        {showSum&&<div className="ba-panel">{loadSum?<em style={{color:'var(--text3)'}}>Generating…</em>:sumErr?<span style={{color:'var(--red)'}}>{sumErr}</span>:sum}</div>}
+        {showSum&&<div className="ba-panel">{loadSum?<em style={{color:'var(--text3)'}}>Generating…</em>:sumErr?<span style={{color:'var(--red)'}}>{sumErr}</span>:<>{sumPreview&&<div className="fc-preview-note" style={{marginBottom:'8px'}}>{PREVIEW_LABEL}</div>}{sum}</>}</div>}
         {showEx&&<div className="ba-panel">{loadEx?<em style={{color:'var(--text3)'}}>Analyzing…</em>:<ExplainContent text={exText}/>}</div>}
       </div>
     );

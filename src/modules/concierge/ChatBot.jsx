@@ -90,10 +90,12 @@ export function ChatBot({ arts, onNavigate, fetchSummary, resolveDeepLink }) {
     // Detect a pasted URL (article, podcast page, or YouTube) → extract-first path.
     const urlMatch = txt.match(/https?:\/\/[^\s]+/);
     const isUrl = urlMatch && txt.split(/\s+/).length <= 2;
-    const { summary, error, unavailable } = isUrl
+    const { summary, error, fromPreview } = isUrl
       ? await fetchSummary({ type:'article', title:'Analysis', content:'', mode:analyzeMode, url: urlMatch[0] })
       : await fetchSummary({ type:'article', title:'Analysis', content:txt, mode:analyzeMode });
-    setAnalyzeResult(error ? error : (summary || 'No result.'));
+    // Never show a preview-based summary unlabeled.
+    const preview = fromPreview ? 'Summary from preview text — full article unavailable\n\n' : '';
+    setAnalyzeResult(error ? error : (summary ? preview + summary : 'No result.'));
     setLoading(false);
   };
 
