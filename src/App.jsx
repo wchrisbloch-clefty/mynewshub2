@@ -82,9 +82,6 @@ const PODCAST_FEEDS = [
   { name:'Flagrant',             host:'Andrew Schulz',     url:'https://feeds.megaphone.fm/APPI6857213837',  emoji:'' },
   { name:'NPR Politics',         host:'NPR',               url:'https://feeds.npr.org/510310/podcast.xml',   emoji:'' },
   { name:'Marketplace',          host:'APM',               url:'https://feeds.publicradio.org/public_feeds/marketplace-pm/rss/rss', emoji:'' },
-  { name:'Freakonomics Radio',   host:'Stephen Dubner',    url:'https://feeds.simplecast.com/Y8lFbOT4',      emoji:'' },
-  { name:'Masters of Scale',     host:'Reid Hoffman',      url:'https://feeds.simplecast.com/3NwB90JG',      emoji:'' },
-  { name:'Acquired',             host:'Ben & David',       url:'https://feeds.simplecast.com/jeNJI0r9',      emoji:'' },
 ];
 
 const DEFAULT_KW = {
@@ -112,20 +109,19 @@ const DEFAULT_FEEDS = {
     { name:'Axios',             url:'https://api.axios.com/feed/',                                              on:true },
     { name:'Breitbart',         url:'https://feeds.feedburner.com/breitbart',                                   on:true },
     { name:'KHOU Houston',      url:'https://www.khou.com/feeds/syndication/rss/news',                          on:true },
-    { name:'Click2Houston',     url:'https://www.click2houston.com/rss/news.rss',                               on:true },
     { name:'Chron.com',         url:'https://www.chron.com/rss/feed/News-270.php',                              on:true },
     { name:'Morning Brew',      url:'https://www.morningbrew.com/feed',                                         on:true },
     { name:'Morning Wire',      url:'https://feeds.megaphone.fm/BVDWV8747925072',                               on:true },
     { name:'Bloomberg',         url:'https://feeds.bloomberg.com/markets/news.rss',                              on:true },
   ],
   sports: [
-    { name:'The Ringer',           url:'https://www.theringer.com/rss/index.xml',                              on:true },
-    { name:'Athlon Sports',        url:'https://athlonsports.com/feed',                                        on:true },
-    { name:'ESPN NFL',             url:'https://www.espn.com/espn/rss/nfl/news',                                on:true },
-    { name:'ESPN NBA',             url:'https://www.espn.com/espn/rss/nba/news',                                on:true },
-    { name:'ESPN MLB',             url:'https://www.espn.com/espn/rss/mlb/news',                                on:true },
-    { name:'ESPN CFB',             url:'https://www.espn.com/espn/rss/ncf/news',                                on:true },
-    { name:'ESPN CBB',             url:'https://www.espn.com/espn/rss/ncb/news',                                on:true },
+    // ESPN via its supported JSON news API (site.api.espn.com) — the old
+    // www.espn.com/espn/rss/* feeds returned 200 with a non-RSS body (0 items).
+    { name:'ESPN NFL',             url:'https://site.api.espn.com/apis/site/v2/sports/football/nfl/news',       on:true },
+    { name:'ESPN NBA',             url:'https://site.api.espn.com/apis/site/v2/sports/basketball/nba/news',     on:true },
+    { name:'ESPN MLB',             url:'https://site.api.espn.com/apis/site/v2/sports/baseball/mlb/news',       on:true },
+    { name:'ESPN CFB',             url:'https://site.api.espn.com/apis/site/v2/sports/football/college-football/news',        on:true },
+    { name:'ESPN CBB',             url:'https://site.api.espn.com/apis/site/v2/sports/basketball/mens-college-basketball/news', on:true },
     { name:'CBS Sports NFL',       url:'https://www.cbssports.com/rss/headlines/nfl',                           on:true },
     { name:'CBS Sports NBA',       url:'https://www.cbssports.com/rss/headlines/nba',                           on:true },
     { name:'CBS Sports MLB',       url:'https://www.cbssports.com/rss/headlines/mlb',                           on:true },
@@ -134,21 +130,20 @@ const DEFAULT_FEEDS = {
     { name:'Pro Football Talk',    url:'https://www.nbcsports.com/profootballtalk.rss',                         on:true },
     { name:'Yahoo Sports',         url:'https://sports.yahoo.com/rss/',                                         on:true },
     { name:'OutKick',              url:'https://www.outkick.com/feed/',                                              on:true },
-    { name:'D1Baseball',           url:'https://d1baseball.com/feed/',                                              on:true },
     { name:'Baseball America',     url:'https://www.baseballamerica.com/feed/',                                      on:false },
     { name:'247Sports',            url:'https://247sports.com/Page/College-Sports-News-and-Recruiting-100021/Feeds/', on:true },
-    { name:'Kentucky Sports Radio',url:'https://kentuckysportsradio.com/feed/',                                 on:true },
     { name:'On3 Recruiting',       url:'https://www.on3.com/feed/',                                             on:true },
     { name:'The Spun',             url:'https://thespun.com/.rss/full/',                                        on:true },
-    { name:'Paulick Report',       url:'https://www.paulickreport.com/feed/',                                    on:true },
+    // Horse racing
     { name:'BloodHorse',           url:'https://www.bloodhorse.com/horse-racing/feed/',                          on:true },
     { name:'Thoroughbred Daily News', url:'https://www.thoroughbreddailynews.com/feed/',                         on:true },
     { name:'Horse Race Nation',    url:'https://horseracenation.com/feed/',                                      on:true },
+    { name:"America's Best Racing", url:'https://www.americasbestracing.net/rss.xml',                            on:true },
     { name:'Daily Racing Form',    url:'https://www.drf.com/news/rss/news',                                      on:false },
-    { name:'GolfWeek',             url:'https://golfweek.usatoday.com/feed/',                                     on:true },
-    { name:'Golf Digest',          url:'https://www.golfdigest.com/rss/rss-sports',                               on:true },
-    { name:'Golf Channel',         url:'https://www.golfchannel.com/feeds/rss.aspx',                              on:true },
-    { name:'No Laying Up',         url:'https://nolayingup.com/feed/',                                            on:true },
+    // Golf — GolfWeek / Golf Digest / Golf Channel / No Laying Up all went dead (404/403).
+    { name:'Golf.com',             url:'https://golf.com/feed/',                                                on:true },
+    { name:'ESPN Golf',            url:'https://site.api.espn.com/apis/site/v2/sports/golf/pga/news',           on:true },
+    { name:'Golf Monthly',         url:'https://www.golfmonthly.com/feed',                                      on:true },
   ],
   business: [
     { name:'NPR Business',           url:'https://feeds.npr.org/1006/rss.xml',                                  on:true },
@@ -159,7 +154,6 @@ const DEFAULT_FEEDS = {
     { name:'Power Magazine',         url:'https://www.powermag.com/feed/',                                      on:true },
     { name:'Rigzone',                url:'https://www.rigzone.com/news/rss/rigzone_latest.aspx',                on:true },
     { name:'MIT Tech Review',        url:'https://www.technologyreview.com/feed/',                              on:true },
-    { name:'AI News',                url:'https://artificialintelligence-news.com/feed/',                       on:true },
     { name:'Canary Media',           url:'https://www.canarymedia.com/rss',                                     on:true },
     { name:'The Guardian Business',  url:'https://www.theguardian.com/business/rss',                            on:true },
     { name:'CNBC Tech',              url:'https://www.cnbc.com/id/19854910/device/rss/rss.html',                on:true },
@@ -167,9 +161,7 @@ const DEFAULT_FEEDS = {
   finance: [
     { name:'MarketWatch',   url:'https://feeds.marketwatch.com/marketwatch/topstories/',                        on:true },
     { name:'Yahoo Finance', url:'https://finance.yahoo.com/news/rssindex',                                      on:true },
-    { name:'Kiplinger',     url:'https://www.kiplinger.com/rss/all',                                            on:true },
     { name:'Motley Fool',   url:'https://www.fool.com/feeds/index.aspx',                                        on:true },
-    { name:'Investopedia',  url:'https://www.investopedia.com/feedbuilder/feed/getfeed/?feedName=rss_headline', on:true },
     { name:'BiggerPockets', url:'https://www.biggerpockets.com/blog/feed',                                      on:true },
     { name:'CNBC Finance',  url:'https://www.cnbc.com/id/10000664/device/rss/rss.html',                         on:true },
   ],
@@ -185,8 +177,9 @@ const DEFAULT_FEEDS = {
   ],
   popculture: [
     { name:'Variety',           url:'https://variety.com/feed/',                                  on:true },
-    { name:'Entertainment Weekly', url:'https://ew.com/feed/',                                    on:true },
-    { name:'Vulture',           url:'https://www.vulture.com/rss/index.xml',                      on:true },
+    { name:'IndieWire',         url:'https://www.indiewire.com/feed/',                            on:true },
+    { name:'Collider',          url:'https://collider.com/feed/',                                 on:true },
+    { name:'The AV Club',       url:'https://www.avclub.com/rss',                                 on:true },
     { name:'Hollywood Reporter',url:'https://www.hollywoodreporter.com/feed/',                    on:true },
     { name:'Vanity Fair',       url:'https://www.vanityfair.com/feed/rss',                        on:true },
     { name:'BuzzFeed Celebrity',url:'https://www.buzzfeed.com/celebrity.xml',                     on:true },
@@ -204,7 +197,6 @@ const DEFAULT_FEEDS = {
     { name:'Ars Technica',      url:'https://feeds.arstechnica.com/arstechnica/index',            on:true },
     { name:'VentureBeat',       url:'https://venturebeat.com/feed/',                              on:true },
     { name:'MIT Tech Review',   url:'https://www.technologyreview.com/feed/',                     on:true },
-    { name:'AI News',           url:'https://artificialintelligence-news.com/feed/',              on:true },
     { name:'Hacker News',       url:'https://news.ycombinator.com/rss',                           on:true },
     { name:'IEEE Spectrum',     url:'https://spectrum.ieee.org/feeds/feed.rss',                   on:true },
     { name:'9to5Google',        url:'https://9to5google.com/feed/',                               on:false },
@@ -401,15 +393,19 @@ function extractImageFromJson(i) {
 // ─── RSS FETCH ────────────────────────────────────────────────────────────────
 function parseXML(txt) {
   const p = new DOMParser(), x = p.parseFromString(txt, 'text/xml');
-  const items = Array.from(x.querySelectorAll('item')).slice(0, 15);
+  // Accept RSS <item> AND Atom <entry>; don't drop items whose link lives in an
+  // href attribute or <guid> (mirrors the server parser in api/feed.js).
+  const items = Array.from(x.querySelectorAll('item, entry')).slice(0, 15);
   if (!items.length) return [];
   return items.map(i => {
-    const descRaw = i.querySelector('description')?.textContent || i.querySelector('summary')?.textContent || '';
+    const descRaw = i.querySelector('description')?.textContent || i.querySelector('summary')?.textContent || i.querySelector('content')?.textContent || '';
     const desc = decodeEntities(descRaw.replace(/<[^>]*>/g,'')).replace(/\s+/g,' ').trim().slice(0,300);
+    const linkEl = i.querySelector('link');
+    const link = (linkEl?.textContent?.trim()) || linkEl?.getAttribute('href') || i.querySelector('guid')?.textContent?.trim() || '';
     return {
       title:   decodeEntities((i.querySelector('title')?.textContent || '').trim()),
-      link:    i.querySelector('link')?.textContent || '',
-      desc, pubDate: i.querySelector('pubDate')?.textContent || '',
+      link,
+      desc, pubDate: i.querySelector('pubDate')?.textContent || i.querySelector('published')?.textContent || i.querySelector('updated')?.textContent || '',
       img:     extractImage(i, descRaw),
       duration:i.querySelector('duration')?.textContent || '',
     };
@@ -421,22 +417,20 @@ async function fetchWithTimeout(url, ms=8000) {
   try { return await fetch(url, {signal:ctrl.signal}); } finally { clearTimeout(timer); }
 }
 async function fetchRSS(url) {
-  // Primary: first-party /api/feed proxy (browser UA + retry, parses server-side).
-  // It always returns 200 with { items, error?, status } so we can surface the real
-  // upstream status for the health indicator instead of guessing.
+  // ONE first-party fetch path: /api/feed (browser UA + retry, robust server-side
+  // parse for RSS / Atom / JSON / link-in-guid). It always returns 200 with
+  // { items, error?, status } so we can surface the real upstream status.
+  //
+  // The old /api/rss stage was removed: it re-fetched the SAME host with the SAME
+  // UA whenever /api/feed parsed empty, doubling function invocations and rate-limit
+  // exposure for zero benefit now that the server parser matches the client one.
   let lastStatus = 0;
   try {
     const r = await fetchWithTimeout(`/api/feed?url=${encodeURIComponent(url)}`, 12000);
     if (r.ok) { const d = await r.json(); if (d.items?.length) return {items:d.items, reason:'', status:200}; if (d.status) lastStatus = d.status; }
   } catch {}
-  // Fallback: /api/rss (raw XML, same browser UA) → client parse.
-  try {
-    const r = await fetchWithTimeout(`/api/rss?url=${encodeURIComponent(url)}`, 10000);
-    if (r.ok) { const items = parseXML(await r.text()); if (items.length) return {items, reason:'', status:200}; if (!r.ok) lastStatus = r.status; }
-    else lastStatus = r.status;
-  } catch {}
-  // Last resort: public CORS proxies (rss2json removed — its free tier 402s and
-  // was the dominant console-error source).
+  // Last resort only: a public CORS proxy — a genuinely different host/network path,
+  // so it can succeed where our own egress is blocked. Not a same-host refetch.
   try {
     const r = await fetchWithTimeout(`https://api.allorigins.win/get?url=${encodeURIComponent(url)}`);
     if (r.ok) { const d = await r.json(); if (d.contents) { const items = parseXML(d.contents); if (items.length) return {items, reason:'', status:200}; } }
