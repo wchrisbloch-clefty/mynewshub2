@@ -26,6 +26,6 @@ export async function extractContent(url, { endpoint = '/api/extract', timeout =
 }
 
 export function extractionFallbackMessage(error) {
-  if (error === 'no-transcript') return 'No transcript available for this video.';
+  if (error === 'no-transcript') return "No transcript available — this video can't be summarized";
   return 'Full text unavailable — open the source.';
 }

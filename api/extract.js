@@ -14,6 +14,15 @@
 process.noDeprecation = true;
 
 const UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36';
+// A full real-browser header set. Publishers 403 requests that send only a UA (or
+// a bot UA) with no Accept/Accept-Language — the missing Accept header was the root
+// cause of "Full text unavailable" in production. Match what feed.js already sends.
+const ARTICLE_HEADERS = {
+  'User-Agent': UA,
+  'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8',
+  'Accept-Language': 'en-US,en;q=0.9',
+};
+const hostOf = u => { try { return new URL(u).host; } catch { return u; } };
 const MIN_CHARS = 500;
 const MAX_CHARS = 8000; // sensible token cap for summarization
 const cache = new Map(); // url -> { at, data }
@@ -35,8 +44,12 @@ const youtubeId = (url) => {
 };
 
 async function fetchText(url, timeout = 9000) {
-  const r = await fetch(url, { headers: { 'User-Agent': UA, 'Accept-Language': 'en-US,en;q=0.9' }, redirect: 'follow', signal: AbortSignal.timeout(timeout) });
-  if (!r.ok) throw new Error(`HTTP ${r.status}`);
+  const r = await fetch(url, { headers: ARTICLE_HEADERS, redirect: 'follow', signal: AbortSignal.timeout(timeout) });
+  if (!r.ok) {
+    // Log the actual input-path failure: which host blocked us and with what status.
+    console.error(`[extract] ${hostOf(url)} FAIL status=${r.status}`);
+    throw new Error(`HTTP ${r.status}`);
+  }
   return r.text();
 }
 
