@@ -43,7 +43,7 @@ import { extractContent, extractionFallbackMessage } from './modules/extractor';
 import { retrieveFeedContext, buildFeedContextBlock } from './modules/retrieval';
 import { XPulse } from './modules/x-pulse';
 import { StateOfPlay } from './modules/state-of-play';
-import { SnapshotCard } from './modules/snapshot-card';
+import { SnapshotCard, CoverageList } from './modules/snapshot-card';
 import { MarketsSurface, useMarkets } from './modules/markets-surface';
 import { parseRoute, buildPath } from './modules/routing';
 import { ChatBot } from './modules/concierge';
@@ -1438,10 +1438,10 @@ body:not(.dark) .pill-bar{
   font-family:inherit;flex-shrink:0;transition:background 0.12s,color 0.12s;}
 .fc-ai-retry:hover{background:var(--accent);color:#fff;}
 .fc-takeaways{background:var(--surface2);border-radius:8px;padding:12px 14px;border-left:2px solid var(--accent);}
-.fc-takeaways-lbl{font-size:9px;font-weight:700;color:#4f46e5;text-transform:uppercase;letter-spacing:0.08em;margin-bottom:8px;}
+.fc-takeaways-lbl{font-size:9px;font-weight:700;color:var(--accent);text-transform:uppercase;letter-spacing:0.08em;margin-bottom:8px;}
 .takeaways-list{display:flex;flex-direction:column;gap:8px;}
 .takeaway-item{display:flex;gap:8px;align-items:flex-start;font-size:12px;line-height:1.5;color:var(--text2);}
-.takeaway-num{font-size:14px;font-weight:900;color:#4f46e5;min-width:18px;flex-shrink:0;line-height:1.3;}
+.takeaway-num{font-size:14px;font-weight:900;color:var(--accent);min-width:18px;flex-shrink:0;line-height:1.3;}
 .takeaway-head{font-weight:700;color:var(--text);}
 .takeaway-body{font-weight:400;}
 
@@ -1869,7 +1869,7 @@ body:not(.dark) .pill-bar{
 .fin-table td{
   padding:10px 16px;font-size:13px;color:var(--text);
 }
-.fin-sym{font-weight:800;font-size:13px;color:#6366f1;letter-spacing:-0.2px;}
+.fin-sym{font-weight:800;font-size:13px;color:var(--accent);letter-spacing:-0.2px;}
 .fin-name{color:var(--text3);font-size:11px;font-weight:400;padding-left:0;}
 .fin-px{font-variant-numeric:tabular-nums;text-align:right;font-weight:600;font-size:13px;}
 .fin-up{color:#16a34a;}
@@ -1895,11 +1895,11 @@ body:not(.dark) .pill-bar{
   background:var(--surface);border:1px solid var(--border);color:var(--text3);
   cursor:pointer;transition:all 0.12s;font-family:var(--font-sans);
 }
-.fin-period-pill:hover{border-color:#6366f1;color:#6366f1;}
-.fin-period-pill.active{background:#6366f1;color:#fff;border-color:#6366f1;}
+.fin-period-pill:hover{border-color:var(--accent);color:var(--accent);}
+.fin-period-pill.active{background:var(--accent);color:#fff;border-color:var(--accent);}
 .fin-period-row{display:flex;gap:4px;}
 .fin-period-btn{padding:3px 8px;border-radius:12px;font-size:10px;font-weight:700;background:var(--surface2);border:1px solid var(--border);color:var(--text3);cursor:pointer;font-family:var(--font-sans);}
-.fin-period-btn.active{background:#6366f1;color:#fff;border-color:#6366f1;}
+.fin-period-btn.active{background:var(--accent);color:#fff;border-color:var(--accent);}
 .fin-chart-frame{width:100%;height:200px;border:none;border-radius:6px;display:block;}
 .fin-chart-ext{
   margin-left:auto;font-size:11px;font-weight:600;color:var(--text3);
@@ -4266,6 +4266,26 @@ kbd{display:inline-block;padding:1px 5px;border:1px solid var(--border);border-r
 }
 
 /* ── ARTICLE READER OVERLAY ────────────────────────────────────── */
+/* ═══ PERSPECTIVES PANEL ═══
+   Desktop/iPad: right-hand side panel, feed visible behind (light scrim only).
+   Mobile: bottom sheet. */
+.persp-overlay{position:fixed;inset:0;z-index:2000;background:rgba(0,0,0,0.28);display:flex;justify-content:flex-end;}
+.persp-panel{background:var(--surface);width:min(460px,100%);height:100%;display:flex;flex-direction:column;box-shadow:var(--shadow-lg);animation:persp-slide-in 0.2s ease-out;}
+@keyframes persp-slide-in{from{transform:translateX(100%);}to{transform:translateX(0);}}
+.persp-head{display:flex;align-items:flex-start;gap:12px;padding:var(--s4);border-bottom:1px solid var(--border2);position:sticky;top:0;background:var(--surface);z-index:1;}
+.persp-head-text{flex:1;min-width:0;}
+.persp-kicker{font-family:var(--font-publicsans);font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:0.08em;margin-bottom:4px;}
+.persp-title{font-family:var(--font-archivo);font-weight:800;font-size:17px;line-height:1.25;color:var(--text);letter-spacing:-0.2px;overflow-wrap:anywhere;}
+.persp-close{background:none;border:none;font-size:24px;line-height:1;color:var(--text3);cursor:pointer;flex-shrink:0;padding:0 2px;}
+.persp-close:hover{color:var(--text);}
+.persp-body{flex:1;overflow-y:auto;padding:var(--s4);display:flex;flex-direction:column;gap:var(--s5);-webkit-overflow-scrolling:touch;}
+.persp-sec-lbl{font-family:var(--font-publicsans);font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:0.07em;color:var(--text3);margin-bottom:10px;padding-bottom:6px;border-bottom:1px solid var(--border2);}
+.persp-muted{font-size:12px;color:var(--text3);font-style:italic;padding:2px 0;}
+@media(max-width:640px){
+  .persp-overlay{justify-content:center;align-items:flex-end;}
+  .persp-panel{width:100%;height:88vh;border-radius:16px 16px 0 0;animation:persp-slide-up 0.22s ease-out;}
+  @keyframes persp-slide-up{from{transform:translateY(100%);}to{transform:translateY(0);}}
+}
 .article-reader-overlay{
   position:fixed;inset:0;z-index:2000;
   background:rgba(0,0,0,0.6);backdrop-filter:blur(4px);
@@ -7266,6 +7286,59 @@ function ArticleReader({ article, onClose }) {
   );
 }
 
+// ─── PERSPECTIVES PANEL ───────────────────────────────────────────────────────
+// One consolidated view for a story cluster: AI Key Points, every source (reusing
+// the Full Coverage CoverageList — not a duplicate), and the X Pulse. Opened from a
+// card's "N sources · Perspectives" action; supersedes the old inline coverage
+// disclosure. Desktop/iPad: right-hand side panel with the feed visible behind it.
+// Mobile: bottom sheet.
+function PerspectivesPanel({ article, onClose }) {
+  const [tk, setTk] = useState('');
+  const [tkErr, setTkErr] = useState('');
+  const [tkLoad, setTkLoad] = useState(true);
+  const cc = CATS[article.cat] || CATS.general;
+  const members = article._clusterMembers?.length ? article._clusterMembers : [article];
+
+  useEffect(() => {
+    let live = true;
+    setTkLoad(true); setTk(''); setTkErr('');
+    fetchAISummary({ type: 'article', title: article.title, content: article.desc || article.title, mode: 'takeaways', url: article.link })
+      .then(r => { if (!live) return; if (r.summary) setTk(r.summary); else setTkErr(r.error || 'Key points unavailable for this story.'); setTkLoad(false); })
+      .catch(() => { if (live) { setTkErr('Key points unavailable.'); setTkLoad(false); } });
+    return () => { live = false; };
+  }, [article.link]);
+
+  return (
+    <div className="persp-overlay" onClick={e => { if (e.target === e.currentTarget) onClose(); }}>
+      <div className="persp-panel" onClick={e => e.stopPropagation()}>
+        <div className="persp-head">
+          <div className="persp-head-text">
+            <div className="persp-kicker" style={{ color: cc.color }}>Perspectives</div>
+            <div className="persp-title">{article.title}</div>
+          </div>
+          <button className="persp-close" onClick={onClose} aria-label="Close">×</button>
+        </div>
+        <div className="persp-body">
+          <section className="persp-sec">
+            <div className="persp-sec-lbl">Key Points</div>
+            {tkLoad ? <div className="persp-muted">Analyzing across sources…</div>
+              : tkErr ? <div className="persp-muted">{tkErr}</div>
+                : <TakeawaysContent text={tk}/>}
+          </section>
+          <section className="persp-sec">
+            <div className="persp-sec-lbl">Across {members.length} source{members.length === 1 ? '' : 's'}</div>
+            <CoverageList members={members}/>
+          </section>
+          <section className="persp-sec">
+            <div className="persp-sec-lbl">On X</div>
+            <XPulse topic={article.title} variant="reader"/>
+          </section>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function App() {
   const [tab, setTab]           = useState(()=>parseRoute().category);
   const [subcat, setSubcat]     = useState(()=>parseRoute().subcategory); // URL-driven subcategory
@@ -7292,6 +7365,7 @@ export default function App() {
   const [clicks, setClicks]     = useState(()=>ld('clicks',{}));
   const [readLinks, setReadLinks] = useState(()=>new Set(ld('readLinks',[])));
   const [readerArticle, setReaderArticle] = useState(null);
+  const [perspArticle, setPerspArticle] = useState(null);
   const [showAnalyze, setShowAnalyze] = useState(false);
   const [webResults, setWebResults] = useState([]);
   const [webLoading, setWebLoading] = useState(false);
@@ -7616,13 +7690,14 @@ export default function App() {
       }
       if (e.key === 'Escape') {
         if (showAnalyze) { setShowAnalyze(false); return; }
+        if (perspArticle) { setPerspArticle(null); return; }
         if (readerArticle) { setReaderArticle(null); return; }
         setSearch(''); setActiveKw(null); setActiveSrc(null);
       }
     };
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
-  }, [readerArticle, showAnalyze]);
+  }, [readerArticle, showAnalyze, perspArticle]);
 
   const handleCustomizeSave = ({feeds:nf,kw:nk,alerts:na,urgent:nu,social:ns,watchlist:nw,teams:nt,weatherCities:nwx,hiddenIndices:ni,briefingExclude:nbe})=>{
     setFeeds(nf);sv('feeds',nf);
@@ -7928,7 +8003,7 @@ export default function App() {
                   : <div className="snap-feed">
                       {teamItems.slice(0,20).map((a,i)=>(
                         <Fragment key={a.link||i}>
-                          <SnapshotCard a={a} meta={CATS.sports} isSaved={isSavedFn(a)} onSave={onSave} onRead={onRead} formatDate={fmtDate}/>
+                          <SnapshotCard a={a} meta={CATS.sports} isSaved={isSavedFn(a)} onSave={onSave} onRead={onRead} onPerspectives={setPerspArticle} formatDate={fmtDate}/>
                           {i===2 && <XPulse topic={teamName} variant="feed"/>}
                         </Fragment>
                       ))}
@@ -8523,7 +8598,7 @@ export default function App() {
                 :<div className="snap-feed">
                   {feedItems.slice(activeKw||activeSrc||search?0:3,20).map((a,i)=>(
                     <Fragment key={a.link||i}>
-                      <SnapshotCard a={a} meta={CATS[cat]||CATS.general} isSaved={isSavedFn(a)} onSave={onSave} onRead={onRead} formatDate={fmtDate}/>
+                      <SnapshotCard a={a} meta={CATS[cat]||CATS.general} isSaved={isSavedFn(a)} onSave={onSave} onRead={onRead} onPerspectives={setPerspArticle} formatDate={fmtDate}/>
                       {i===2 && <XPulse topic={cc?.label||cat} variant="feed"/>}
                     </Fragment>
                   ))}
@@ -9269,7 +9344,7 @@ export default function App() {
                 :<div className="snap-feed" style={{padding:'12px 0 0'}}>
                     {newsItems.slice(0, 15).map((a, i) => (
                       <Fragment key={a.link||i}>
-                        <SnapshotCard a={a} meta={CATS.finance} isSaved={isSavedFn(a)} onSave={onSave} onRead={onRead} formatDate={fmtDate}/>
+                        <SnapshotCard a={a} meta={CATS.finance} isSaved={isSavedFn(a)} onSave={onSave} onRead={onRead} onPerspectives={setPerspArticle} formatDate={fmtDate}/>
                         {i===2 && <XPulse topic="Markets" variant="feed"/>}
                       </Fragment>
                     ))}
@@ -9359,6 +9434,8 @@ export default function App() {
         resolveDeepLink={({entities})=>{ for(const [lg,names] of Object.entries(TEAM_CHIPS)){ const hit=names.find(n=>{const w=n.toLowerCase().split(' ');return w.some(x=>entities.includes(x))||entities.some(k=>k.length>3&&n.toLowerCase().includes(k));}); if(hit) return `/sports/${lg}/${teamSlug(hit)}`; } return null; }}/>
       {/* Inline article reader overlay */}
       {readerArticle && <ArticleReader article={readerArticle} onClose={() => setReaderArticle(null)}/>}
+      {/* Perspectives panel (sources + X Pulse + AI key points) */}
+      {perspArticle && <PerspectivesPanel article={perspArticle} onClose={() => setPerspArticle(null)}/>}
       {/* Paste & Brief panel */}
       {showAnalyze && <AnalyzePanel onClose={() => setShowAnalyze(false)}/>}
     </>
