@@ -54,6 +54,17 @@ function extractImg(block) {
   m = block.match(/<img[^>]*src=["']([^"']+)["']/i);
   return m ? m[1] : '';
 }
+// Byline at ingestion: Atom <author><name>, WordPress <dc:creator>, or RSS <author>
+// (often "email (Name)" or a bare name — never surface a raw email). Empty when none.
+function extractAuthor(block) {
+  const atom = block.match(/<author[^>]*>[\s\S]*?<name[^>]*>([\s\S]*?)<\/name>/i);
+  if (atom) return decodeEntities(atom[1]).replace(/<[^>]*>/g, '').trim().slice(0, 80);
+  const creator = tag(block, 'dc:creator');
+  if (creator) return creator.slice(0, 80);
+  const a = tag(block, 'author');
+  if (a) { const paren = a.match(/\(([^)]+)\)/); const name = paren ? paren[1].trim() : (a.includes('@') ? '' : a); return name.slice(0, 80); }
+  return '';
+}
 // Link resolution that survives real-world feeds:
 //   1) <link>https://…</link>  (RSS)        3) <guid>https://…</guid>  (ESPN, some CMS)
 //   2) <link href="…"/>        (Atom)        4) <enclosure url="…">     (podcasts)
@@ -81,7 +92,9 @@ function parseJsonFeed(body) {
     const link = it.url || it.links?.web?.href || (typeof it.link === 'string' ? it.link : it.link?.href) || it.links?.[0]?.href || '';
     const descRaw = it.description || it.summary || it.content_text || it.content || '';
     const imgRaw = it.image?.url || it.image || (it.images && (it.images[0]?.url || it.images[0])) || it.thumbnail || '';
+    const authorRaw = it.author?.name || (typeof it.author === 'string' ? it.author : '') || it.byline || (Array.isArray(it.authors) ? (it.authors[0]?.name || it.authors[0]) : '') || '';
     out.push({
+      author: decodeEntities(String(authorRaw || '')).replace(/<[^>]*>/g, '').trim().slice(0, 80),
       title,
       link: String(link || ''),
       desc: decodeEntities(String(descRaw).replace(/<[^>]*>/g, '')).replace(/\s+/g, ' ').trim().slice(0, 300),
@@ -107,7 +120,7 @@ function parseFeed(body) {
     const link = pickLink(b);
     const desc = (tag(b, 'description') || tag(b, 'summary') || tag(b, 'content')).slice(0, 300);
     const pubDate = tag(b, 'pubDate') || tag(b, 'published') || tag(b, 'updated');
-    items.push({ title, link, desc, pubDate, img: extractImg(b), duration: tag(b, 'itunes:duration') });
+    items.push({ title, link, desc, pubDate, img: extractImg(b), duration: tag(b, 'itunes:duration'), author: extractAuthor(b) });
   }
   return items;
 }
