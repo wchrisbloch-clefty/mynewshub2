@@ -1,16 +1,16 @@
 /* Concierge (chat) — co-located styles. Consumes design tokens (src/styles/tokens.css).
-   The #6001d2 purple + white are intentional brand literals for the chat launcher. */
+   The launcher uses the single brand accent (one accent across the whole app). */
 /* ── CHATBOT ─────────────────────────────────────────────────── */
 .chat-fab{
   position:fixed;bottom:calc(70px + env(safe-area-inset-bottom, 0));right:20px;
   width:52px;height:52px;border-radius:50%;
-  background:linear-gradient(135deg,#6001d2,#9333ea);
+  background:var(--accent);
   color:#fff;border:none;cursor:pointer;
   display:flex;align-items:center;justify-content:center;font-size:22px;
-  box-shadow:0 4px 20px rgba(96,1,210,0.45);
+  box-shadow:var(--shadow-md);
   z-index:200;transition:transform 0.15s,box-shadow 0.15s;
 }
-.chat-fab:hover{transform:scale(1.08);box-shadow:0 6px 28px rgba(96,1,210,0.6);}
+.chat-fab:hover{transform:scale(1.08);box-shadow:var(--shadow-lg);}
 .chat-fab.open{background:linear-gradient(135deg,#444,#222);}
 @media (min-width:641px){
   .chat-fab{bottom:24px;}
