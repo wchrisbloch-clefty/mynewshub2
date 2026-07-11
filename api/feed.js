@@ -22,8 +22,8 @@ const FEED_HEADERS = {
 
 // Decode at ingestion: full numeric + named entities so every downstream surface
 // receives clean text by construction (no per-surface decoding needed).
-function decodeEntities(s = '') {
-  return String(s)
+function decodeOnce(s) {
+  return s
     .replace(/<!\[CDATA\[([\s\S]*?)\]\]>/g, '$1')
     .replace(/&#x([0-9a-fA-F]+);/g, (_, h) => { try { return String.fromCodePoint(parseInt(h, 16)); } catch { return _; } })
     .replace(/&#(\d+);/g, (_, d) => { try { return String.fromCodePoint(parseInt(d, 10)); } catch { return _; } })
@@ -31,6 +31,14 @@ function decodeEntities(s = '') {
     .replace(/&lsquo;/g, '‘').replace(/&rsquo;/g, '’').replace(/&ldquo;/g, '“').replace(/&rdquo;/g, '”')
     .replace(/&hellip;/g, '…').replace(/&mdash;/g, '—').replace(/&ndash;/g, '–')
     .replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&');
+}
+// Iterate so DOUBLE-encoded entities decode fully. A single pass decodes &amp; last,
+// so `she&amp;#8217;s` only becomes `she&#8217;s` and would render raw downstream
+// (this was the recurring "State of Play shows &#8217;" bug). Loop until stable.
+function decodeEntities(s = '') {
+  let out = String(s), prev;
+  for (let i = 0; i < 3 && out !== prev; i++) { prev = out; out = decodeOnce(out); }
+  return out;
 }
 function tag(block, name) {
   const m = block.match(new RegExp(`<${name}[^>]*>([\\s\\S]*?)</${name}>`, 'i'));
@@ -68,7 +76,7 @@ function parseJsonFeed(body) {
   const arr = d.items || d.entries || d.articles || (Array.isArray(d) ? d : []);
   const out = [];
   for (const it of (arr || []).slice(0, 20)) {
-    const title = String(it.title || it.headline || '').trim();
+    const title = decodeEntities(String(it.title || it.headline || '').trim());
     if (!title) continue;
     const link = it.url || it.links?.web?.href || (typeof it.link === 'string' ? it.link : it.link?.href) || it.links?.[0]?.href || '';
     const descRaw = it.description || it.summary || it.content_text || it.content || '';
@@ -76,7 +84,7 @@ function parseJsonFeed(body) {
     out.push({
       title,
       link: String(link || ''),
-      desc: String(descRaw).replace(/<[^>]*>/g, '').replace(/\s+/g, ' ').trim().slice(0, 300),
+      desc: decodeEntities(String(descRaw).replace(/<[^>]*>/g, '')).replace(/\s+/g, ' ').trim().slice(0, 300),
       pubDate: it.published || it.date_published || it.pubDate || it.updated || '',
       img: typeof imgRaw === 'string' ? imgRaw : '',
       duration: '',

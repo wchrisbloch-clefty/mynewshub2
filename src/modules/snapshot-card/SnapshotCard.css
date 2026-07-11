@@ -20,17 +20,32 @@
 .snap-single{font-family:var(--font-publicsans);font-size:11px;color:var(--text3);}
 .snap-save{background:none;border:1px solid var(--border);border-radius:8px;padding:5px 8px;cursor:pointer;color:var(--text3);flex-shrink:0;display:flex;align-items:center;transition:color 0.12s,border-color 0.12s;}
 .snap-save:hover,.snap-save.saved{color:var(--accent);border-color:var(--accent);}
-.snap-thumb{width:150px;flex-shrink:0;object-fit:cover;background:var(--surface2);align-self:stretch;}
+/* Thumbnail is a FIXED size, capped regardless of the column/main-column width, so
+   standard feed cards stay headline-forward and balanced against the sidebar. Height
+   is capped too so a tall card can't stretch the image into a large square. (The
+   hero/Top-Stories images are separate — .gn-lead-img / .gn-card-img — and untouched.) */
+.snap-thumb{width:150px;aspect-ratio:4/3;align-self:center;flex-shrink:0;object-fit:cover;border-radius:6px;background:var(--surface2);margin:0 12px;}
 /* Loading skeleton — mirrors the real card's layout so it reserves the SAME
    height. Content then swaps in place instead of popping in and shifting scroll. */
 .snap-skel{cursor:default;}
 .snap-skel:hover{transform:none;box-shadow:none;}
 .snap-skel .snap-accent{background:var(--border);}
 .snap-skel-main{flex:1;min-width:0;padding:14px 16px;}
-.snap-skel-thumb{width:150px;flex-shrink:0;background:var(--surface2);align-self:stretch;}
+.snap-skel-thumb{width:150px;aspect-ratio:4/3;align-self:center;flex-shrink:0;background:var(--surface2);border-radius:6px;margin:0 12px;}
 .snap-skel-line{border-radius:5px;margin-bottom:8px;background:linear-gradient(90deg,var(--surface2) 25%,var(--border) 50%,var(--surface2) 75%);background-size:200% 100%;animation:shimmer 1.4s infinite;}
 @media(max-width:640px){
   .snap-thumb{width:104px;}
   .snap-title{font-size:16px;}
   .snap-skel-thumb{width:104px;}
+}
+/* iPad (768–1279): the feed LIST is a 2-column card grid (the original responsive
+   spec). Cards flip to VERTICAL (image on top, headline + body full-cell-width) so
+   the body copy gets a comfortable measure (~65 chars) instead of the crushed
+   single-stretched-column it regressed to. Hero/lead grids (.gn-grid) set their own
+   columns and are untouched. */
+@media (min-width:768px) and (max-width:1279px){
+  .snap-feed{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:20px;align-items:start;}
+  .snap-card{flex-direction:column;}
+  .snap-accent{width:100%;height:4px;order:-2;}
+  .snap-thumb,.snap-skel-thumb{order:-1;width:100%;aspect-ratio:16/9;align-self:stretch;margin:0;border-radius:0;}
 }

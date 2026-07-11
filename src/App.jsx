@@ -660,7 +660,7 @@ function useSwipe(onSwipe, { threshold = 80, enabled = true } = {}) {
     if (!enabled) return;
     // Don't hijack gestures that begin inside a horizontally-scrollable rail —
     // let those scroll natively instead of triggering category navigation.
-    if (e.target?.closest?.('.sport-tabs, .pc-subtabs, .chip-bar, .mkt-rail-inner, .my-teams-scroll, .trending-section, .snap-feed')) {
+    if (e.target?.closest?.('.sport-tabs, .pc-subtabs, .chip-bar, .mkt-rail-inner, .my-teams-scroll, .trending-section, .snap-feed, .ss-ticker-inner')) {
       state.current = { x: 0, y: 0, active: false, cancelled: true };
       return;
     }
@@ -3820,7 +3820,10 @@ kbd{display:inline-block;padding:1px 5px;border:1px solid var(--border);border-r
 
 /* iPad 2-col: bridge desktop and mobile gracefully */
 @media (min-width:641px) and (max-width:1100px){
-  .page-grid{grid-template-columns:1fr 260px!important;gap:28px!important;}
+  /* iPad: stack the sidebar so the feed-col spans full width, matching the hero
+     grids (which render outside .page-grid). This is what lets the feed become a
+     readable 2-column card grid instead of a crushed column beside the sidebar. */
+  .page-grid{grid-template-columns:1fr!important;gap:28px!important;}
   .hero-lead-title{font-size:22px;}
   .fc-title{font-size:17px;}
   .gn-lead-solo .gn-lead-title{font-size:28px;}

@@ -81,9 +81,8 @@ export function clusterStories(articles) {
 
 // Decode HTML entities (numeric + named) so titles/topics never render raw
 // &#8217; / &quot; / &#8230; etc. Safe on already-decoded strings.
-export function decodeEntities(str = '') {
-  if (!str) return str;
-  return String(str)
+function decodeEntitiesOnce(str) {
+  return str
     .replace(/&#x([0-9a-fA-F]+);/g, (_, h) => { try { return String.fromCodePoint(parseInt(h, 16)); } catch { return _; } })
     .replace(/&#(\d+);/g, (_, d) => { try { return String.fromCodePoint(parseInt(d, 10)); } catch { return _; } })
     .replace(/&quot;/g, '"').replace(/&apos;/g, "'")
@@ -91,7 +90,15 @@ export function decodeEntities(str = '') {
     .replace(/&ldquo;/g, '“').replace(/&rdquo;/g, '”')
     .replace(/&hellip;/g, '…').replace(/&mdash;/g, '—').replace(/&ndash;/g, '–')
     .replace(/&nbsp;/g, ' ').replace(/&lt;/g, '<').replace(/&gt;/g, '>')
-    .replace(/&amp;/g, '&'); // amp last so it doesn't double-decode
+    .replace(/&amp;/g, '&'); // amp last within a pass
+}
+// Iterate so DOUBLE-encoded entities (`&amp;#8217;`) decode fully instead of
+// stalling at `&#8217;`. Safe on already-decoded strings (loop exits when stable).
+export function decodeEntities(str = '') {
+  if (!str) return str;
+  let out = String(str), prev;
+  for (let i = 0; i < 3 && out !== prev; i++) { prev = out; out = decodeEntitiesOnce(out); }
+  return out;
 }
 
 // Cap how many items any single publisher contributes to a ranked list (prevents a
@@ -112,7 +119,18 @@ export function capByPublisher(items, max = 2) {
 // primitive for any "ranked list" (Trending, State of Play, Top Stories).
 export function rankClusters(items, { max = 2, limit } = {}) {
   const ranked = [...(items || [])].sort((a, b) => heatScore(b) - heatScore(a));
-  const capped = capByPublisher(ranked, max);
+  // Drop near-identical headlines that title-bigram clustering missed — e.g. when
+  // one source encoded its entities and another didn't, so "'The Hawk' LA premiere"
+  // and "&#8216;The Hawk&#8217; LA premiere" never matched and both ranked (the
+  // duplicate-in-State-of-Play bug). Normalize by decoding + stripping punctuation.
+  const seen = new Set(), deduped = [];
+  for (const a of ranked) {
+    const key = decodeEntities(a.title || '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim().split(' ').slice(0, 10).join(' ');
+    if (key && seen.has(key)) continue;
+    if (key) seen.add(key);
+    deduped.push(a);
+  }
+  const capped = capByPublisher(deduped, max);
   return limit ? capped.slice(0, limit) : capped;
 }
 
