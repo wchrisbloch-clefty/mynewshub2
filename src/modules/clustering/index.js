@@ -74,6 +74,7 @@ export function clusterStories(articles) {
       ...a,
       _clusterSize: cluster.length,
       _clusterSources: [...clusterSources].slice(0, 5),
+      _clusterMembers: cluster, // every article in the cluster — powers Full Coverage
     });
   }
   return result;

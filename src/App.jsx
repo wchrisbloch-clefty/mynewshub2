@@ -410,9 +410,11 @@ function parseXML(txt) {
     const desc = decodeEntities(descRaw.replace(/<[^>]*>/g,'')).replace(/\s+/g,' ').trim().slice(0,300);
     const linkEl = i.querySelector('link');
     const link = (linkEl?.textContent?.trim()) || linkEl?.getAttribute('href') || i.querySelector('guid')?.textContent?.trim() || '';
+    const authorRaw = i.querySelector('creator')?.textContent || i.querySelector('author name')?.textContent || i.querySelector('author')?.textContent || '';
+    const author = decodeEntities((authorRaw.match(/\(([^)]+)\)/)?.[1] || (authorRaw.includes('@') ? '' : authorRaw)).trim()).slice(0,80);
     return {
       title:   decodeEntities((i.querySelector('title')?.textContent || '').trim()),
-      link,
+      link, author,
       desc, pubDate: i.querySelector('pubDate')?.textContent || i.querySelector('published')?.textContent || i.querySelector('updated')?.textContent || '',
       img:     extractImage(i, descRaw),
       duration:i.querySelector('duration')?.textContent || '',
@@ -474,9 +476,14 @@ function fmtDuration(s) {
 // ─── WEATHER / QUOTES / SCORES ───────────────────────────────────────────────
 async function fetchWeatherCity(city) {
   try {
-    const r = await fetchWithTimeout(`https://api.open-meteo.com/v1/forecast?latitude=${city.lat}&longitude=${city.lon}&current=temperature_2m,weathercode,windspeed_10m&temperature_unit=fahrenheit&windspeed_unit=mph&timezone=${encodeURIComponent(city.tz)}`);
+    const r = await fetchWithTimeout(`https://api.open-meteo.com/v1/forecast?latitude=${city.lat}&longitude=${city.lon}&current=temperature_2m,weathercode,windspeed_10m,apparent_temperature&daily=temperature_2m_max,temperature_2m_min,weather_code&forecast_days=3&temperature_unit=fahrenheit&windspeed_unit=mph&timezone=${encodeURIComponent(city.tz)}`);
     const d = await r.json(), c = d.current;
-    return {name:city.name, slug:city.slug, temp:Math.round(c.temperature_2m), code:c.weathercode, wind:Math.round(c.windspeed_10m), desc:WX_CODES[c.weathercode]||'Unknown', emoji:WX_EMOJI[c.weathercode]||''};
+    const daily = (d.daily?.time || []).map((t, i) => ({
+      day: new Date(`${t}T00:00`).toLocaleDateString('en-US', { weekday: 'short' }),
+      hi: Math.round(d.daily.temperature_2m_max[i]), lo: Math.round(d.daily.temperature_2m_min[i]),
+      code: d.daily.weather_code[i], desc: WX_CODES[d.daily.weather_code[i]] || '',
+    }));
+    return {name:city.name, slug:city.slug, temp:Math.round(c.temperature_2m), feels:Math.round(c.apparent_temperature ?? c.temperature_2m), code:c.weathercode, wind:Math.round(c.windspeed_10m), desc:WX_CODES[c.weathercode]||'Unknown', emoji:WX_EMOJI[c.weathercode]||'', daily};
   } catch { return null; }
 }
 async function fetchAllWeather(cities) {
@@ -660,7 +667,7 @@ function useSwipe(onSwipe, { threshold = 80, enabled = true } = {}) {
     if (!enabled) return;
     // Don't hijack gestures that begin inside a horizontally-scrollable rail —
     // let those scroll natively instead of triggering category navigation.
-    if (e.target?.closest?.('.sport-tabs, .pc-subtabs, .chip-bar, .mkt-rail-inner, .my-teams-scroll, .trending-section, .snap-feed, .ss-ticker-inner')) {
+    if (e.target?.closest?.('.sport-tabs, .pc-subtabs, .chip-bar, .mkt-rail-inner, .my-teams-scroll, .trending-section, .snap-feed, .ss-ticker-inner, .houston-scroll')) {
       state.current = { x: 0, y: 0, active: false, cancelled: true };
       return;
     }
@@ -1048,11 +1055,58 @@ body{
 .ss-tk-chg{font-size:11px;font-weight:700;}
 .ss-tk-chg.up{color:var(--pos);}
 .ss-tk-chg.down{color:var(--neg);}
-.ss-wx{display:inline-flex;align-items:center;gap:5px;flex-shrink:0;text-decoration:none;
-  color:var(--text2);font-size:12px;font-weight:600;padding-left:var(--s3);border-left:1px solid var(--border2);}
-.ss-wx svg{color:var(--text3);}
-.ss-wx:hover{color:var(--accent);}
-.ss-wx:hover svg{color:var(--accent);}
+/* (Weather chip removed from the strip in Part B — now the Home RightNowWeather card.) */
+
+/* ═══ HOME: Right Now weather card + Houston local row (Part B) ═══ */
+.rnw-card{background:var(--surface);border:1px solid var(--border2);border-radius:var(--radius);margin-bottom:var(--s4);overflow:hidden;}
+.rnw-row{width:100%;display:flex;align-items:center;gap:var(--s3);padding:12px var(--s4);background:none;border:none;cursor:pointer;font-family:var(--font-publicsans);text-align:left;}
+.rnw-label{font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:0.08em;color:var(--accent);flex-shrink:0;}
+.rnw-city{font-size:13px;font-weight:700;color:var(--text);}
+.rnw-temp{font-size:18px;font-weight:800;color:var(--text);}
+.rnw-desc{font-size:13px;color:var(--text2);}
+.rnw-feels{font-size:11px;color:var(--text3);margin-left:auto;}
+.rnw-caret{color:var(--text3);flex-shrink:0;transition:transform 0.15s;}
+.rnw-caret.open{transform:rotate(180deg);}
+.rnw-forecast{border-top:1px solid var(--border2);padding:4px var(--s4) 10px;}
+.rnw-day{display:flex;align-items:center;gap:var(--s3);padding:7px 0;border-bottom:1px solid var(--border2);}
+.rnw-day:last-child{border-bottom:none;}
+.rnw-day-name{font-size:12px;font-weight:700;color:var(--text);width:52px;flex-shrink:0;}
+.rnw-day-desc{font-size:12px;color:var(--text3);}
+.rnw-day-temp{font-size:13px;color:var(--text);margin-left:auto;}
+.rnw-day-lo{color:var(--text3);}
+@media(max-width:640px){
+  .rnw-feels{display:none;}
+  .rnw-row{flex-wrap:wrap;gap:var(--s2) var(--s3);}
+}
+.houston-row{margin-bottom:var(--s4);}
+.houston-head{display:flex;align-items:baseline;gap:8px;margin-bottom:10px;}
+.houston-label{font-family:var(--font-archivo);font-weight:800;font-size:16px;color:var(--text);letter-spacing:-0.2px;}
+.houston-sub{font-family:var(--font-publicsans);font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:var(--text3);}
+.houston-scroll{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:var(--s3);}
+.houston-card{background:var(--surface);border:1px solid var(--border2);border-radius:var(--radius);overflow:hidden;cursor:pointer;text-align:left;padding:0 0 10px;display:flex;flex-direction:column;font-family:inherit;}
+.houston-card:hover{border-color:var(--accent);}
+.houston-img{width:100%;aspect-ratio:16/9;object-fit:cover;background:var(--surface2);margin-bottom:8px;}
+.houston-img-ph{display:flex;align-items:center;justify-content:center;background:linear-gradient(135deg,var(--surface2),var(--surface));}
+.houston-card-title{font-family:var(--font-publicsans);font-size:13px;font-weight:600;line-height:1.35;color:var(--text);padding:0 10px;margin-bottom:6px;overflow-wrap:anywhere;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden;}
+.houston-card-meta{font-family:var(--font-publicsans);font-size:10px;color:var(--text3);padding:0 10px;display:flex;gap:5px;flex-wrap:wrap;font-variant-numeric:tabular-nums;}
+@media(max-width:640px){
+  .houston-scroll{grid-template-columns:none;grid-auto-flow:column;grid-auto-columns:78%;overflow-x:auto;scroll-snap-type:x mandatory;-webkit-overflow-scrolling:touch;}
+  .houston-card{scroll-snap-align:start;}
+}
+/* Following row (My Topics + My Teams) */
+.following-row{display:flex;align-items:center;gap:var(--s3);flex-wrap:wrap;margin-bottom:var(--s4);padding-bottom:var(--s3);border-bottom:1px solid var(--border2);}
+.following-label{font-family:var(--font-archivo);font-weight:800;font-size:12px;text-transform:uppercase;letter-spacing:0.07em;color:var(--text3);flex-shrink:0;}
+.following-chips{display:flex;gap:8px;flex-wrap:wrap;}
+.following-chip{display:inline-flex;align-items:center;gap:6px;background:var(--accent-bg);border:1px solid var(--border2);border-radius:16px;padding:4px 6px 4px 12px;cursor:pointer;font-family:var(--font-publicsans);}
+.following-chip:hover{border-color:var(--accent);}
+.following-chip-name{font-size:12px;font-weight:600;color:var(--accent);}
+.following-chip-x{background:none;border:none;color:var(--text3);cursor:pointer;font-size:15px;line-height:1;padding:0 2px;border-radius:50%;}
+.following-chip-x:hover{color:var(--neg);}
+/* Trending follow-star pill */
+.trending-chip-group{display:inline-flex;align-items:stretch;}
+.trending-follow{background:none;border:none;cursor:pointer;color:var(--text4);font-size:13px;line-height:1;padding:0 4px 0 2px;transition:color 0.12s;}
+.trending-follow:hover{color:var(--accent);}
+.trending-follow.on{color:var(--amber);}
 /* Numbers read as data everywhere — scores, clocks, timestamps that lacked it. */
 .sb-status,.sst-status,.hs-status,.rn-fresh,.gn-lead-meta,.fc-meta,.today-item-src,.pod-meta,.snap-time{font-variant-numeric:tabular-nums;}
 
@@ -1222,7 +1276,7 @@ body:not(.dark) .pill-bar{
 }
 .nav-btn:hover{border-color:var(--text3);color:var(--text);}
 .nav-icon-btn{
-  background:transparent;border:1px solid var(--border);color:var(--text2);
+  background:transparent;border:1px solid var(--border);color:var(--text);
   border-radius:var(--radius-sm);width:32px;height:32px;cursor:pointer;
   display:flex;align-items:center;justify-content:center;
   transition:all 0.12s;flex-shrink:0;
@@ -3367,7 +3421,6 @@ body{overscroll-behavior-y:contain;}
      (breaking signal still shows) so the ticker + weather get the room. */
   .status-strip{height:34px;padding:0 var(--s3);gap:var(--s2);}
   .ss-flag-markets{display:none;}
-  .ss-wx{padding-left:var(--s2);}
   .pill-label{font-size:8px;}
   .pill-value{font-size:13px;}
   .pill-chg{font-size:9px;padding:1px 5px;}
@@ -3534,8 +3587,9 @@ body{overscroll-behavior-y:contain;}
 /* Category placeholder image with gradient */
 .gn-card-img-ph{
   display:flex;align-items:center;justify-content:center;
-  font-size:22px;
+  background:linear-gradient(135deg,var(--surface2) 0%,var(--surface) 100%);
 }
+.gn-card-img-ph .ph-label{font-size:15px;color:var(--accent);opacity:0.8;-webkit-line-clamp:2;}
 
 /* v26: Why It Matters — gold callout under AI panel */
 .fc-why{background:linear-gradient(135deg,#fbf5e8 0%,#f9eed2 100%);border-left:3px solid #b8893d;border-radius:0 8px 8px 0;padding:10px 12px;margin-top:8px;}
@@ -4462,8 +4516,11 @@ kbd{display:inline-block;padding:1px 5px;border:1px solid var(--border);border-r
 }
 .toh-img-ph{
   display:flex;align-items:center;justify-content:center;
-  font-size:48px;
+  /* Branded neutral field (never a bare grey box) with the publisher set large in
+     the display face, sitting UNDER the gradient+headline as a watermark. */
+  background:linear-gradient(135deg,var(--navy-light) 0%,var(--navy) 100%);
 }
+.toh-img-ph .ph-label{font-size:clamp(20px,4vw,34px);color:rgba(255,255,255,0.16);-webkit-line-clamp:3;letter-spacing:0.02em;}
 .toh-grad{
   position:absolute;inset:0;
   background:linear-gradient(to top,rgba(0,0,0,0.92) 0%,rgba(0,0,0,0.45) 45%,rgba(0,0,0,0.06) 100%);
@@ -6731,15 +6788,9 @@ function TopBar({tab, setTab, search, setSearch, dark, setDark,
                  hidden, shrunk, mobileSearchOpen, onMobileSearchToggle, weatherCities, hiddenIndices,
                  onAnalyze, searchHistory, trendingTopics}) {
   const [searchFocused, setSearchFocused] = useState(false);
-  const [wxList, setWxList] = useState([]);
   const [quotes, setQuotes] = useState({});
   const [showBreaking, setShowBreaking] = useState(true);
-  const cities = weatherCities || DEFAULT_WEATHER_CITIES;
-
-  useEffect(()=>{
-    fetchAllWeather(cities).then(setWxList);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  },[JSON.stringify(cities)]);
+  // Weather moved off the global strip → Home-only "Right Now" card (RightNowWeather).
 
   useEffect(()=>{
     // v25: also fetch indices (S&P, DOW, Nasdaq) for the pill bar
@@ -6819,12 +6870,6 @@ function TopBar({tab, setTab, search, setSearch, dark, setDark,
             })}
           </div>
         </div>
-        {wxList[0] && (
-          <a className="ss-wx" href={`https://weather.com/weather/today/l/${encodeURIComponent(wxList[0].slug)}`} target="_blank" rel="noreferrer" title={`${wxList[0].name} · ${wxList[0].desc}`}>
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M2 12h2M20 12h2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M19.1 4.9l-1.4 1.4M6.3 17.7l-1.4 1.4"/></svg>
-            <span className="tnum">{wxList[0].temp}°</span>
-          </a>
-        )}
       </div>
 
       {/* ━━━ DESKTOP: nav bar ━━━ */}
@@ -6952,6 +6997,73 @@ function TopBar({tab, setTab, search, setSearch, dark, setDark,
   );
 }
 
+// ─── RIGHT NOW (Home-only local context card) ─────────────────────────────────
+// Weather moved off the global status strip (Part B) to a compact Home card:
+// one-line local conditions, tap to expand a 3-day forecast.
+function RightNowWeather({ cities }) {
+  const [wx, setWx] = useState(null);
+  const [open, setOpen] = useState(false);
+  useEffect(() => {
+    let live = true;
+    const city = (cities && cities[0]) || DEFAULT_WEATHER_CITIES[0];
+    fetchWeatherCity(city).then(w => { if (live && w) setWx(w); });
+    return () => { live = false; };
+  }, [JSON.stringify((cities && cities[0]) || DEFAULT_WEATHER_CITIES[0])]);
+  if (!wx) return null;
+  return (
+    <div className={`rnw-card ${open ? 'open' : ''}`}>
+      <button className="rnw-row" onClick={() => setOpen(o => !o)} aria-expanded={open}>
+        <span className="rnw-label">Right Now</span>
+        <span className="rnw-city">{wx.name}</span>
+        <span className="rnw-temp tnum">{wx.temp}°</span>
+        <span className="rnw-desc">{wx.desc}</span>
+        <span className="rnw-feels">Feels {wx.feels}° · Wind {wx.wind} mph</span>
+        <svg className={`rnw-caret ${open ? 'open' : ''}`} width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+      </button>
+      {open && wx.daily?.length > 0 && (
+        <div className="rnw-forecast">
+          {wx.daily.map((d, i) => (
+            <div key={i} className="rnw-day">
+              <span className="rnw-day-name">{i === 0 ? 'Today' : d.day}</span>
+              <span className="rnw-day-desc">{d.desc}</span>
+              <span className="rnw-day-temp tnum"><strong>{d.hi}°</strong> <span className="rnw-day-lo">{d.lo}°</span></span>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── HOUSTON (Home-only local news row) ───────────────────────────────────────
+// Filters the already-loaded feed to local Houston sources.
+const HOUSTON_SOURCES = ['KHOU Houston', 'Chron.com', 'Click2Houston', 'Houston Public Media', 'Houston Chronicle'];
+function HoustonRow({ arts, onRead, formatDate }) {
+  const items = useMemo(() => {
+    const seen = new Set();
+    return Object.values(arts || {}).flat()
+      .filter(a => HOUSTON_SOURCES.includes(a.source))
+      .filter(a => { const k = (a.title || '').slice(0, 60); if (seen.has(k)) return false; seen.add(k); return true; })
+      .sort((a, b) => new Date(b.pubDate) - new Date(a.pubDate))
+      .slice(0, 6);
+  }, [arts]);
+  if (items.length < 2) return null;
+  return (
+    <section className="houston-row">
+      <div className="houston-head"><span className="houston-label">Houston</span><span className="houston-sub">Local</span></div>
+      <div className="houston-scroll">
+        {items.map((a, i) => (
+          <button key={a.link || i} className="houston-card" onClick={() => onRead(a)}>
+            {a.img ? <img className="houston-img" src={a.img} loading="lazy" alt=""/> : <div className="houston-img houston-img-ph"><span className="ph-label">{a.source}</span></div>}
+            <div className="houston-card-title">{a.title}</div>
+            <div className="houston-card-meta"><span>{a.source}</span><span>·</span><span>{formatDate(a.pubDate)}</span></div>
+          </button>
+        ))}
+      </div>
+    </section>
+  );
+}
+
 // ─── MAIN APP ─────────────────────────────────────────────────────────────────
 // ChatBot now lives in ./modules/concierge
 
@@ -6981,7 +7093,7 @@ function TopOfHourStrip({ catLead, arts, onRead }) {
             <article key={i} className={`toh-card${i===0?' toh-card-lead':''}`} onClick={() => onRead(a)}>
               {a.img
                 ? <div className="toh-img" style={{backgroundImage:`url(${a.img})`}}/>
-                : <div className="toh-img-ph"><span className="ph-label">{cc.label}</span></div>}
+                : <div className="toh-img-ph"><span className="ph-label">{a.source}</span></div>}
               <div className="toh-grad"/>
               <div className="toh-body">
                 <span className="toh-cat" style={{background:cc.color}}>{cc.label}</span>
@@ -7163,6 +7275,16 @@ export default function App() {
     const exists = prev.some(x => x.slug === t.slug && x.league === t.league);
     const next = exists ? prev.filter(x => !(x.slug === t.slug && x.league === t.league)) : [...prev, t];
     sv('myTeams', next); return next;
+  });
+  // My Topics — the same follow pattern generalized to ANY entity (ticker, company,
+  // topic, trending pill). Stored as lowercase-keyed labels in localStorage.
+  const [myTopics, setMyTopics] = useState(()=>ld('myTopics', []));       // ['nvidia','fed rate cuts', …]
+  const isTopicFollowed = (label) => myTopics.some(x => x.toLowerCase() === String(label).toLowerCase());
+  const toggleTopic = (label) => setMyTopics(prev => {
+    const l = String(label).trim(); if (!l) return prev;
+    const exists = prev.some(x => x.toLowerCase() === l.toLowerCase());
+    const next = exists ? prev.filter(x => x.toLowerCase() !== l.toLowerCase()) : [...prev, l];
+    sv('myTopics', next); return next;
   });
   const [search, setSearch]     = useState('');
   const [dark, setDark]         = useState(()=>ld('dark',false));
@@ -7922,7 +8044,7 @@ export default function App() {
                   <article key={i} className="gn-card" onClick={()=>onRead(a)}>
                     {a.img
                       ? <div className="gn-card-img" style={{backgroundImage:`url(${a.img})`}}/>
-                      : <div className="gn-card-img-ph"/>}
+                      : <div className="gn-card-img-ph"><span className="ph-label">{a.source}</span></div>}
                     <h3 className="gn-card-title">{a.title}</h3>
                     <div className="gn-card-meta">
                       <span className="gn-card-source" style={{color:cc.color}}>{a.source}</span>
@@ -8144,6 +8266,30 @@ export default function App() {
             <span className="nsp-dot"/> ↑ {pendingNew[cat].length} new {pendingNew[cat].length===1?'story':'stories'}
           </button>
         )}
+        {/* HOME: unified Following row (topics + teams) above the category feeds */}
+        {isHome && !activeKw && !activeSrc && !search && (myTopics.length > 0 || myTeams.length > 0) && (
+          <section className="following-row">
+            <span className="following-label">Following</span>
+            <div className="following-chips">
+              {myTeams.map((t, i) => (
+                <span key={`tm-${i}`} className="following-chip" onClick={()=>navigate('sports', t.league, t.slug)}>
+                  <span className="following-chip-name">{t.name}</span>
+                  <button className="following-chip-x" onClick={e=>{e.stopPropagation();toggleMyTeam(t);}} aria-label="Unfollow">×</button>
+                </span>
+              ))}
+              {myTopics.map((t, i) => (
+                <span key={`tp-${i}`} className="following-chip" onClick={()=>setSearch(t.toLowerCase())}>
+                  <span className="following-chip-name">{t}</span>
+                  <button className="following-chip-x" onClick={e=>{e.stopPropagation();toggleTopic(t);}} aria-label="Unfollow">×</button>
+                </span>
+              ))}
+            </div>
+          </section>
+        )}
+        {/* HOME: Right Now local weather card (relocated from the status strip) */}
+        {isHome && !activeKw && !activeSrc && !search && (
+          <RightNowWeather cities={weatherCities}/>
+        )}
         {/* Tier 3: MY TEAMS on Home — latest 1-2 stories per followed team */}
         {isHome && myTeams.length > 0 && !activeKw && !activeSrc && !search && (() => {
           const rows = myTeams.flatMap(t => {
@@ -8234,9 +8380,16 @@ export default function App() {
           return (
             <div className="trending-section trending-now-row">
               <span className="trending-section-label">Trending Now</span>
-              {topics.map((t, i) => (
-                <button key={i} className="trending-chip" onClick={()=>setSearch(t.toLowerCase())}>{t}</button>
-              ))}
+              {topics.map((t, i) => {
+                const label = t.split(/\s+/).slice(0, 3).join(' ');
+                const followed = isTopicFollowed(label);
+                return (
+                  <span key={i} className="trending-chip-group">
+                    <button className="trending-chip" onClick={()=>setSearch(t.toLowerCase())} title={t}>{label}</button>
+                    <button className={`trending-follow ${followed?'on':''}`} onClick={()=>toggleTopic(label)} title={followed?'Following':'Follow topic'} aria-label={followed?'Unfollow topic':'Follow topic'}>{followed?'★':'☆'}</button>
+                  </span>
+                );
+              })}
             </div>
           );
         })()}
@@ -8244,6 +8397,11 @@ export default function App() {
         {/* ── HOME: Top of Hour strip (image cards) ── */}
         {isHome && !activeKw && !activeSrc && !search && (
           <TopOfHourStrip catLead={catLead} arts={arts} onRead={onRead}/>
+        )}
+
+        {/* ── HOME: Houston local row ── */}
+        {isHome && !activeKw && !activeSrc && !search && (
+          <HoustonRow arts={arts} onRead={onRead} formatDate={fmtDate}/>
         )}
 
         {/* Category pages: lead image grid */}

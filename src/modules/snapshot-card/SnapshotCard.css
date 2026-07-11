@@ -14,7 +14,36 @@
 .snap-time{font-family:var(--font-publicsans);font-size:11px;color:var(--text3);margin-left:auto;}
 .snap-title{font-family:var(--font-archivo);font-weight:800;font-size:18px;line-height:1.22;letter-spacing:-0.2px;color:var(--text);margin:0 0 6px;overflow-wrap:anywhere;word-break:break-word;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden;}
 .snap-snippet{font-family:var(--font-publicsans);font-size:13px;line-height:1.5;color:var(--text2);margin:0 0 10px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;overflow-wrap:anywhere;word-break:break-word;}
+.snap-byline{font-family:var(--font-publicsans);font-size:11px;color:var(--text3);}
+.snap-byline::before{content:"·";margin-right:5px;color:var(--text4);}
 .snap-foot{display:flex;align-items:center;justify-content:space-between;gap:10px;}
+/* Full Coverage — "N sources" is a tappable disclosure that lists every article in
+   the cluster (publisher · byline · relative time), max 2 per publisher then Show all. */
+.snap-sources-btn{background:none;border:none;cursor:pointer;font-family:inherit;display:inline-flex;align-items:center;gap:4px;padding:2px 0;}
+.snap-sources-btn:hover{color:var(--accent);}
+.snap-cov-caret{transition:transform 0.15s;}
+.snap-cov-caret.open{transform:rotate(180deg);}
+.snap-coverage{margin-top:10px;border-top:1px solid var(--border2);padding-top:10px;animation:fade-in 0.15s ease-out;}
+.snap-cov-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;}
+.snap-cov-title-lbl{font-family:var(--font-publicsans);font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:0.07em;color:var(--text3);}
+.snap-cov-close{background:none;border:none;font-size:20px;line-height:1;color:var(--text3);cursor:pointer;display:none;}
+.snap-cov-list{display:flex;flex-direction:column;gap:2px;}
+.snap-cov-item{display:block;text-decoration:none;padding:8px;border-radius:8px;transition:background 0.12s;}
+.snap-cov-item:hover{background:var(--surface2);}
+.snap-cov-line{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:2px;}
+.snap-cov-pub{font-family:var(--font-publicsans);font-size:11px;font-weight:700;color:var(--accent);}
+.snap-cov-by{font-family:var(--font-publicsans);font-size:11px;color:var(--text3);}
+.snap-cov-time{font-family:var(--font-publicsans);font-size:11px;color:var(--text3);margin-left:auto;font-variant-numeric:tabular-nums;}
+.snap-cov-hl{font-family:var(--font-publicsans);font-size:13px;line-height:1.35;color:var(--text);overflow-wrap:anywhere;}
+.snap-cov-all{margin-top:8px;background:none;border:1px solid var(--border);border-radius:8px;padding:6px 12px;font-family:var(--font-publicsans);font-size:12px;font-weight:600;color:var(--accent);cursor:pointer;width:100%;}
+.snap-cov-all:hover{background:var(--accent-bg);border-color:var(--accent);}
+/* Mobile: Full Coverage becomes a full-screen sheet. */
+@media(max-width:640px){
+  .snap-coverage{position:fixed;inset:0;z-index:600;margin:0;background:var(--surface);overflow-y:auto;padding:18px 16px calc(24px + env(safe-area-inset-bottom,0));border-top:none;}
+  .snap-cov-close{display:block;}
+  .snap-cov-title-lbl{font-size:13px;}
+  .snap-cov-hl{font-size:15px;}
+}
 .snap-sources{font-family:var(--font-publicsans);font-size:11px;color:var(--text3);min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
 .snap-sources strong{color:var(--accent);font-weight:700;}
 .snap-single{font-family:var(--font-publicsans);font-size:11px;color:var(--text3);}
