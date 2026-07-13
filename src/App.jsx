@@ -1149,11 +1149,21 @@ body{
    live/breaking · market ticker · weather chip
 ═══════════════════════════════════════════ */
 .status-strip{
-  display:flex;align-items:center;gap:var(--s3);
-  height:38px;padding:0 var(--s4);
+  height:38px;
   background:var(--surface);border-bottom:1px solid var(--border2);
   font-family:var(--font-publicsans);
 }
+/* Contain the ticker to the same max-width as the nav/content below it. */
+.status-strip-inner{
+  max-width:1400px;margin:0 auto;height:100%;
+  display:flex;align-items:center;gap:var(--s3);padding:0 var(--s4);
+}
+/* Home weather stacked under the ticker: full-bleed bar, content contained to the
+   same max-width, flush (no card chrome). */
+.topbar-wx{background:var(--surface);border-bottom:1px solid var(--border2);}
+.topbar-wx .rnw-card{max-width:1400px;margin:0 auto;padding:0 var(--s4);border:none;border-radius:0;background:none;}
+.topbar-wx .rnw-row{padding:8px 0;}
+.topbar-wx .rnw-forecast{padding-left:var(--s4);padding-right:var(--s4);}
 .ss-flag{display:inline-flex;align-items:center;gap:6px;flex-shrink:0;
   font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:0.09em;
   border:none;background:none;font-family:inherit;padding:0;}
@@ -1184,8 +1194,14 @@ body{
 .rnw-temp{font-size:18px;font-weight:800;color:var(--text);}
 .rnw-desc{font-size:13px;color:var(--text2);}
 .rnw-feels{font-size:11px;color:var(--text3);margin-left:auto;}
-.rnw-caret{color:var(--text3);flex-shrink:0;transition:transform 0.15s;}
+.rnw-caret{color:var(--text3);flex-shrink:0;transition:transform 0.15s;margin-left:auto;}
 .rnw-caret.open{transform:rotate(180deg);}
+/* Multi-city: Houston + Louisville side by side in the one row. */
+.rnw-cities{display:flex;align-items:center;gap:var(--s4);flex:1;min-width:0;overflow:hidden;}
+.rnw-city-item{display:inline-flex;align-items:baseline;gap:7px;white-space:nowrap;}
+.rnw-city-fc{padding-top:6px;}
+.rnw-city-fc + .rnw-city-fc{border-top:1px solid var(--border);margin-top:6px;}
+.rnw-city-fc-head{font-size:11px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:0.05em;padding:4px 0 2px;}
 .rnw-forecast{border-top:1px solid var(--border2);padding:4px var(--s4) 10px;}
 .rnw-day{display:flex;align-items:center;gap:var(--s3);padding:7px 0;border-bottom:1px solid var(--border2);}
 .rnw-day:last-child{border-bottom:none;}
@@ -1196,6 +1212,7 @@ body{
 @media(max-width:640px){
   .rnw-feels{display:none;}
   .rnw-row{flex-wrap:wrap;gap:var(--s2) var(--s3);}
+  .rnw-cities{flex-wrap:wrap;gap:var(--s2) var(--s3);}
 }
 .houston-row{margin-bottom:var(--s4);}
 .houston-head{display:flex;align-items:baseline;gap:8px;margin-bottom:10px;}
@@ -3569,7 +3586,9 @@ body{overscroll-behavior-y:contain;}
 
   /* Status strip: slimmer padding on mobile; drop the settled "Markets" kicker
      (breaking signal still shows) so the ticker + weather get the room. */
-  .status-strip{height:34px;padding:0 var(--s3);gap:var(--s2);}
+  .status-strip{height:34px;}
+  .status-strip-inner{padding:0 var(--s3);gap:var(--s2);}
+  .topbar-wx .rnw-card{padding:0 var(--s3);}
   .ss-flag-markets{display:none;}
   .pill-label{font-size:8px;}
   .pill-value{font-size:13px;}
@@ -4217,6 +4236,9 @@ kbd{display:inline-block;padding:1px 5px;border:1px solid var(--border);border-r
   transition:background 0.12s;
 }
 .hs-tile:last-child{border-right:none;}
+/* Followed/favorite team's game — subtle accent highlight, sorted to the front. */
+.hs-tile.fav{border:1px solid var(--accent);border-radius:8px;background:var(--accent-bg);}
+.hs-fav-dot{color:var(--amber);margin-right:4px;}
 .hs-tile:hover{background:var(--surface2);}
 .hs-league{font-size:9px;font-weight:800;color:var(--text3);text-transform:uppercase;letter-spacing:0.08em;margin-bottom:6px;}
 .hs-team-row{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:3px 0;}
@@ -5089,17 +5111,23 @@ function AudioListen({ text, title }) {
 
 
 // ─── ACTIVE SCORES BAR — compact live/final games for General homepage ────────
-function ActiveScoresBar({ scores, onGoToSports }) {
-  const activeLeagues = useMemo(() => {
-    return Object.entries(scores)
-      .map(([key, games]) => {
-        const active = (games || []).filter(isGameActive);
-        return { key, games: active.slice(0, 4) };
-      })
-      .filter(l => l.games.length > 0);
-  }, [scores]);
+function ActiveScoresBar({ scores, onGoToSports, favTeams }) {
+  // Followed/favorite teams' games sort to the FRONT and get an accent highlight;
+  // then live games; then the rest. `favTeams` is a list of {match} terms built from
+  // the user's favorites config AND their My Teams follow set.
+  const games = useMemo(() => {
+    const all = [];
+    Object.entries(scores || {}).forEach(([key, gs]) =>
+      (gs || []).filter(isGameActive).forEach(g => all.push({ ...g, _league: key })));
+    if (!all.length) return [];
+    const isLive = g => g.state === 'in';
+    return all
+      .map(g => ({ ...g, _fav: !!favoriteInList(g, favTeams || []) }))
+      .sort((a, b) => ((a._fav ? 0 : 1) - (b._fav ? 0 : 1)) || ((isLive(a) ? 0 : 1) - (isLive(b) ? 0 : 1)))
+      .slice(0, 10);
+  }, [scores, favTeams]);
 
-  if (!activeLeagues.length) return null;
+  if (!games.length) return null;
 
   const LEAGUE_LABEL = { nfl:'NFL', nba:'NBA', mlb:'MLB', cfb:'CFB', cbb:'CBB' };
 
@@ -5110,28 +5138,26 @@ function ActiveScoresBar({ scores, onGoToSports }) {
         <button className="home-scores-see-all" onClick={onGoToSports}>Sports →</button>
       </div>
       <div className="home-scores-scroll">
-        {activeLeagues.flatMap(({ key, games }) =>
-          games.map((g, i) => {
-            const homeWin = g.state === 'post' && parseInt(g.homeScore) > parseInt(g.awayScore);
-            const awayWin = g.state === 'post' && parseInt(g.awayScore) > parseInt(g.homeScore);
-            return (
-              <div key={`${key}-${i}`} className="hs-tile" onClick={() => g.link && window.open(g.link, '_blank')}>
-                <div className="hs-league">{LEAGUE_LABEL[key] || key.toUpperCase()}</div>
-                <div className="hs-team-row">
-                  <span className="hs-team-name">{g.awayAbbr || g.awayName}</span>
-                  <span className={`hs-team-score ${awayWin ? 'winner' : ''}`}>{g.awayScore || '–'}</span>
-                </div>
-                <div className="hs-team-row">
-                  <span className="hs-team-name">{g.homeAbbr || g.homeName}</span>
-                  <span className={`hs-team-score ${homeWin ? 'winner' : ''}`}>{g.homeScore || '–'}</span>
-                </div>
-                <div className={`hs-status ${g.state === 'in' ? 'live' : 'final'}`}>
-                  {g.state === 'in' ? g.status || 'Live' : 'Final'}
-                </div>
+        {games.map((g, i) => {
+          const homeWin = g.state === 'post' && parseInt(g.homeScore) > parseInt(g.awayScore);
+          const awayWin = g.state === 'post' && parseInt(g.awayScore) > parseInt(g.homeScore);
+          return (
+            <div key={`${g._league}-${i}`} className={`hs-tile ${g._fav ? 'fav' : ''}`} onClick={() => g.link && window.open(g.link, '_blank')}>
+              <div className="hs-league">{g._fav && <span className="hs-fav-dot">★</span>}{LEAGUE_LABEL[g._league] || g._league.toUpperCase()}</div>
+              <div className="hs-team-row">
+                <span className="hs-team-name">{g.awayAbbr || g.awayName}</span>
+                <span className={`hs-team-score ${awayWin ? 'winner' : ''}`}>{g.awayScore || '–'}</span>
               </div>
-            );
-          })
-        )}
+              <div className="hs-team-row">
+                <span className="hs-team-name">{g.homeAbbr || g.homeName}</span>
+                <span className={`hs-team-score ${homeWin ? 'winner' : ''}`}>{g.homeScore || '–'}</span>
+              </div>
+              <div className={`hs-status ${g.state === 'in' ? 'live' : 'final'}`}>
+                {g.state === 'in' ? g.status || 'Live' : 'Final'}
+              </div>
+            </div>
+          );
+        })}
       </div>
     </div>
   );
@@ -7021,38 +7047,45 @@ function TopBar({tab, setTab, search, setSearch, dark, setDark,
           into one slim row: live/breaking signal LEFT, market ticker CENTER,
           compact weather chip RIGHT. Red is a signal here, never a texture. */}
       <div className="status-strip">
-        {hasBreaking && showBreaking ? (
-          <button className="ss-flag ss-flag-breaking" onClick={()=>tickerItems[0]?.link&&window.open(tickerItems[0].link,'_blank')} title={tickerItems[0]?.title||'Breaking'}>
-            <span className="ss-pulse"/> Breaking
-          </button>
-        ) : (
-          <span className="ss-flag ss-flag-markets">Markets</span>
-        )}
-        <div className="ss-ticker">
-          <div className="ss-ticker-inner">
-            {INDICES.filter(idx=>!(hiddenIndices||[]).includes(idx.sym)).map(idx=>{
-              const q=quotes[idx.sym]; const up=q?q.chg>=0:null;
-              return (
-                <button key={idx.sym} className="ss-tk" onClick={()=>q&&window.open(`https://finance.yahoo.com/quote/${encodeURIComponent(idx.sym)}`,'_blank')}>
-                  <span className="ss-tk-sym">{idx.short}</span>
-                  <span className="ss-tk-val tnum">{q?q.price.toLocaleString('en-US',{maximumFractionDigits:0}):'—'}</span>
-                  {q&&<span className={`ss-tk-chg tnum ${up?'up':'down'}`}>{up?'+':'−'}{Math.abs(q.pct).toFixed(2)}%</span>}
-                </button>
-              );
-            })}
-            {TICKERS.map(t=>{
-              const q=quotes[t.sym]; const up=q?q.chg>=0:null;
-              return (
-                <button key={t.sym} className="ss-tk" onClick={()=>onTickerClick&&onTickerClick(t)}>
-                  <span className="ss-tk-sym">{t.sym}</span>
-                  <span className="ss-tk-val tnum">{q?`$${q.price.toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2})}`:'—'}</span>
-                  {q&&<span className={`ss-tk-chg tnum ${up?'up':'down'}`}>{up?'+':'−'}{Math.abs(q.pct).toFixed(2)}%</span>}
-                </button>
-              );
-            })}
+        <div className="status-strip-inner">
+          {hasBreaking && showBreaking ? (
+            <button className="ss-flag ss-flag-breaking" onClick={()=>tickerItems[0]?.link&&window.open(tickerItems[0].link,'_blank')} title={tickerItems[0]?.title||'Breaking'}>
+              <span className="ss-pulse"/> Breaking
+            </button>
+          ) : (
+            <span className="ss-flag ss-flag-markets">Markets</span>
+          )}
+          <div className="ss-ticker">
+            <div className="ss-ticker-inner">
+              {INDICES.filter(idx=>!(hiddenIndices||[]).includes(idx.sym)).map(idx=>{
+                const q=quotes[idx.sym]; const up=q?q.chg>=0:null;
+                return (
+                  <button key={idx.sym} className="ss-tk" onClick={()=>q&&window.open(`https://finance.yahoo.com/quote/${encodeURIComponent(idx.sym)}`,'_blank')}>
+                    <span className="ss-tk-sym">{idx.short}</span>
+                    <span className="ss-tk-val tnum">{q?q.price.toLocaleString('en-US',{maximumFractionDigits:0}):'—'}</span>
+                    {q&&<span className={`ss-tk-chg tnum ${up?'up':'down'}`}>{up?'+':'−'}{Math.abs(q.pct).toFixed(2)}%</span>}
+                  </button>
+                );
+              })}
+              {TICKERS.map(t=>{
+                const q=quotes[t.sym]; const up=q?q.chg>=0:null;
+                return (
+                  <button key={t.sym} className="ss-tk" onClick={()=>onTickerClick&&onTickerClick(t)}>
+                    <span className="ss-tk-sym">{t.sym}</span>
+                    <span className="ss-tk-val tnum">{q?`$${q.price.toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2})}`:'—'}</span>
+                    {q&&<span className={`ss-tk-chg tnum ${up?'up':'down'}`}>{up?'+':'−'}{Math.abs(q.pct).toFixed(2)}%</span>}
+                  </button>
+                );
+              })}
+            </div>
           </div>
         </div>
       </div>
+
+      {/* Home-only weather, stacked under the ticker as one contained top block. */}
+      {tab==='general' && (
+        <div className="topbar-wx"><RightNowWeather cities={weatherCities}/></div>
+      )}
 
       {/* ━━━ DESKTOP: nav bar ━━━ */}
       <div className="nav-bar">
@@ -7183,32 +7216,43 @@ function TopBar({tab, setTab, search, setSearch, dark, setDark,
 // Weather moved off the global status strip (Part B) to a compact Home card:
 // one-line local conditions, tap to expand a 3-day forecast.
 function RightNowWeather({ cities }) {
-  const [wx, setWx] = useState(null);
+  const use = (cities && cities.length ? cities : DEFAULT_WEATHER_CITIES).slice(0, 2);
+  const [list, setList] = useState([]);
   const [open, setOpen] = useState(false);
   useEffect(() => {
     let live = true;
-    const city = (cities && cities[0]) || DEFAULT_WEATHER_CITIES[0];
-    fetchWeatherCity(city).then(w => { if (live && w) setWx(w); });
+    Promise.all(use.map(c => fetchWeatherCity(c))).then(r => { if (live) setList(r.filter(Boolean)); });
     return () => { live = false; };
-  }, [JSON.stringify((cities && cities[0]) || DEFAULT_WEATHER_CITIES[0])]);
-  if (!wx) return null;
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [JSON.stringify(use.map(c => c.name))]);
+  if (!list.length) return null;
   return (
     <div className={`rnw-card ${open ? 'open' : ''}`}>
       <button className="rnw-row" onClick={() => setOpen(o => !o)} aria-expanded={open}>
         <span className="rnw-label">Right Now</span>
-        <span className="rnw-city">{wx.name}</span>
-        <span className="rnw-temp tnum">{wx.temp}°</span>
-        <span className="rnw-desc">{wx.desc}</span>
-        <span className="rnw-feels">Feels {wx.feels}° · Wind {wx.wind} mph</span>
+        <div className="rnw-cities">
+          {list.map((wx, i) => (
+            <span key={i} className="rnw-city-item">
+              <span className="rnw-city">{wx.name}</span>
+              <span className="rnw-temp tnum">{wx.temp}°</span>
+              <span className="rnw-desc">{wx.desc}</span>
+            </span>
+          ))}
+        </div>
         <svg className={`rnw-caret ${open ? 'open' : ''}`} width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
       </button>
-      {open && wx.daily?.length > 0 && (
+      {open && (
         <div className="rnw-forecast">
-          {wx.daily.map((d, i) => (
-            <div key={i} className="rnw-day">
-              <span className="rnw-day-name">{i === 0 ? 'Today' : d.day}</span>
-              <span className="rnw-day-desc">{d.desc}</span>
-              <span className="rnw-day-temp tnum"><strong>{d.hi}°</strong> <span className="rnw-day-lo">{d.lo}°</span></span>
+          {list.map((wx, ci) => (
+            <div key={ci} className="rnw-city-fc">
+              <div className="rnw-city-fc-head">{wx.name} · Feels {wx.feels}° · Wind {wx.wind} mph</div>
+              {(wx.daily || []).map((d, i) => (
+                <div key={i} className="rnw-day">
+                  <span className="rnw-day-name">{i === 0 ? 'Today' : d.day}</span>
+                  <span className="rnw-day-desc">{d.desc}</span>
+                  <span className="rnw-day-temp tnum"><strong>{d.hi}°</strong> <span className="rnw-day-lo">{d.lo}°</span></span>
+                </div>
+              ))}
             </div>
           ))}
         </div>
@@ -8553,13 +8597,23 @@ export default function App() {
           <section className="following-row">
             <span className="following-label">Following</span>
             <div className="following-chips">
-              {myTeams.map((t, i) => (
-                <span key={`tm-${i}`} className="following-chip following-chip-team" onClick={()=>navigate('sports', t.league, t.slug)}>
-                  <TeamLogo name={t.name} league={t.league} size={18}/>
-                  <span className="following-chip-name">{t.name}</span>
-                  <button className="following-chip-x" onClick={e=>{e.stopPropagation();toggleMyTeam(t);}} aria-label="Unfollow">×</button>
-                </span>
-              ))}
+              {(() => {
+                // Same team name under two sport tags (e.g. Kentucky CBB + CFB) are
+                // distinct follows — show the league on the chip so they don't read
+                // as a duplicate. Unique names stay clean.
+                const nameCounts = {};
+                myTeams.forEach(t => { const k = (t.name||'').toLowerCase(); nameCounts[k] = (nameCounts[k]||0) + 1; });
+                return myTeams.map((t, i) => {
+                  const dup = nameCounts[(t.name||'').toLowerCase()] > 1;
+                  return (
+                    <span key={`tm-${i}`} className="following-chip following-chip-team" onClick={()=>navigate('sports', t.league, t.slug)}>
+                      <TeamLogo name={t.name} league={t.league} size={18}/>
+                      <span className="following-chip-name">{t.name}{dup ? ` · ${(t.league||'').toUpperCase()}` : ''}</span>
+                      <button className="following-chip-x" onClick={e=>{e.stopPropagation();toggleMyTeam(t);}} aria-label="Unfollow">×</button>
+                    </span>
+                  );
+                });
+              })()}
               {myTopics.map((t, i) => (
                 <span key={`tp-${i}`} className="following-chip" onClick={()=>navigate('general','topic',teamSlug(t))}>
                   <span className="following-chip-name">{t}</span>
@@ -8583,19 +8637,36 @@ export default function App() {
             </div>
           </section>
         )}
-        {/* HOME: Right Now local weather card (relocated from the status strip) */}
-        {isHome && !activeKw && !activeSrc && !search && (
-          <RightNowWeather cities={weatherCities}/>
+        {/* First-run onboarding card */}
+        {isHome && !onboardingDismissed && !activeKw && !activeSrc && !search && (
+          <div className="onboarding-card">
+            <div className="onboarding-body">
+              <div className="onboarding-title">Welcome to MyNewsHub ✦</div>
+              <div className="onboarding-tips">
+                <span className="onboarding-tip"><strong>Click any article</strong> to open the AI reader — Summarize, Key Points, Bias Check</span>
+                <span className="onboarding-tip"><strong>"Brief" button</strong> (top bar) → paste any article, transcript, or YouTube video for a breakdown</span>
+                <span className="onboarding-tip"><IconGear/> <strong>Customize</strong> → add/remove sources, set keywords, build your feed</span>
+              </div>
+              <button className="onboarding-dismiss" onClick={dismissOnboarding}>Got it, dismiss</button>
+            </div>
+            <button className="onboarding-x" onClick={dismissOnboarding}>✕</button>
+          </div>
         )}
-        {/* Tier 3: MY TEAMS on Home — latest 1-2 stories per followed team */}
+
+        {/* ── STATE OF PLAY strip — top of every category ── */}
+        {!activeKw && !activeSrc && !search && (
+          <StateOfPlay items={activeFilteredItems} meta={CATS[cat]||CATS.general} onRead={onRead} formatDate={fmtDate}/>
+        )}
+
+        {/* Tier 3: MY TEAMS on Home — CONDENSED teaser (single row, ≤4 cards, one per
+            team) that links to the full module on Sports. The full story-card module
+            lives on /sports only (this avoids the Home↔Sports duplication). */}
         {isHome && myTeams.length > 0 && !activeKw && !activeSrc && !search && (() => {
-          const rows = myTeams.flatMap(t => {
+          const rows = myTeams.map(t => {
             const q = t.name.toLowerCase();
-            return (arts.sports || [])
-              .filter(a => (a.title + ' ' + (a.desc||'')).toLowerCase().includes(q))
-              .slice(0, 2)
-              .map(a => ({ t, a }));
-          });
+            const a = (arts.sports || []).find(a => (a.title + ' ' + (a.desc||'')).toLowerCase().includes(q));
+            return a ? { t, a } : null;
+          }).filter(Boolean).slice(0, 4);
           if (!rows.length) return null;
           return (
             <div className="my-teams-module">
@@ -8620,53 +8691,11 @@ export default function App() {
             </div>
           );
         })()}
-        {/* First-run onboarding card */}
-        {isHome && !onboardingDismissed && !activeKw && !activeSrc && !search && (
-          <div className="onboarding-card">
-            <div className="onboarding-body">
-              <div className="onboarding-title">Welcome to MyNewsHub ✦</div>
-              <div className="onboarding-tips">
-                <span className="onboarding-tip"><strong>Click any article</strong> to open the AI reader — Summarize, Key Points, Bias Check</span>
-                <span className="onboarding-tip"><strong>"Brief" button</strong> (top bar) → paste any article, transcript, or YouTube video for a breakdown</span>
-                <span className="onboarding-tip"><IconGear/> <strong>Customize</strong> → add/remove sources, set keywords, build your feed</span>
-              </div>
-              <button className="onboarding-dismiss" onClick={dismissOnboarding}>Got it, dismiss</button>
-            </div>
-            <button className="onboarding-x" onClick={dismissOnboarding}>✕</button>
-          </div>
-        )}
 
-        {/* v46: "Right Now" live band — recency + live-games pulse for breaking energy */}
-        {isHome && !activeKw && !activeSrc && !search && (() => {
-          const allHome = Object.values(arts).flat();
-          const fresh = allHome.filter(a => a.pubDate && (Date.now()-new Date(a.pubDate)) < 3600*1000).length;
-          const liveGames = Object.values(scores||{}).flat().filter(g=>g.state==='in' && isGameValid(g)).length;
-          const newest = allHome.reduce((mx,a)=>{const t=a.pubDate?new Date(a.pubDate).getTime():0; return t>mx?t:mx;},0);
-          if (!allHome.length) return null;
-          const ageMin = Math.floor((Date.now()-newest)/60000);
-          // Only claim "live" when something genuinely arrived recently. Never label a stale surface as live.
-          const isLive = newest>0 && ageMin <= 30;
-          const ago = ageMin<1?'just now':ageMin<60?`${ageMin}m ago`:`${Math.floor(ageMin/60)}h ago`;
-          return (
-            <div className={`right-now-band ${isLive?'':'rn-stale'}`}>
-              {isLive
-                ? <span className="rn-live"><span className="rn-live-dot"/>Right Now</span>
-                : <span className="rn-live rn-static">Latest</span>}
-              {fresh>0 && <span className="rn-fresh"><strong>{fresh}</strong> {fresh===1?'story':'stories'} in the last hour</span>}
-              {liveGames>0 && <span className="rn-fresh">·&nbsp;<strong>{liveGames}</strong> live {liveGames===1?'game':'games'}</span>}
-              {newest>0 && <span className="rn-updated">Updated {ago}</span>}
-            </div>
-          );
-        })()}
-
-        {/* Scores strip — General and Sports only; Sports has its own strip */}
+        {/* Live Scores — General only. Favorite/followed teams sort to the front and
+            get an accent highlight (Sports has its own scoreboard). */}
         {cat === 'general' && !activeKw && !activeSrc && !search && (
-          <ActiveScoresBar scores={scores} onGoToSports={() => handleTabChange('sports')}/>
-        )}
-
-        {/* ── STATE OF PLAY strip (Phase 1) — top of every category ── */}
-        {!activeKw && !activeSrc && !search && (
-          <StateOfPlay items={activeFilteredItems} meta={CATS[cat]||CATS.general} onRead={onRead} formatDate={fmtDate}/>
+          <ActiveScoresBar scores={scores} favTeams={[...teams, ...myTeams.map(t=>({match:t.name}))]} onGoToSports={() => handleTabChange('sports')}/>
         )}
 
         {/* ── TRENDING NOW — hottest clusters; tapping a pill opens that entity's hub ── */}
