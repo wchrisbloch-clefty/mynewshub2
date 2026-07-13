@@ -307,6 +307,80 @@ const TEAM_CHIPS = {
 };
 const teamSlug = (name) => name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
 
+// ── ESPN public team logos (no API key). Resolve a followed team's crest from the
+// ESPN teams endpoint (cached per league) and fall back to a clean initials tile if
+// the league is unknown, the team isn't found, or the image errors. Sports only. ──
+const ESPN_LEAGUE = { nfl:['football','nfl'], nba:['basketball','nba'], mlb:['baseball','mlb'], cfb:['football','college-football'], cbb:['basketball','mens-college-basketball'] };
+const _logoCache = {};
+function espnTeamLogos(leagueKey) {
+  const map = ESPN_LEAGUE[leagueKey];
+  if (!map) return Promise.resolve({});
+  if (_logoCache[leagueKey]) return _logoCache[leagueKey];
+  _logoCache[leagueKey] = (async () => {
+    try {
+      const r = await fetchWithTimeout(`https://site.api.espn.com/apis/site/v2/sports/${map[0]}/${map[1]}/teams`, 9000);
+      const d = await r.json();
+      const teams = d?.sports?.[0]?.leagues?.[0]?.teams || [];
+      const out = {};
+      for (const t of teams) {
+        const tm = t.team || {};
+        const href = tm.logos?.[0]?.href || '';
+        if (!href) continue;
+        [tm.displayName, tm.shortDisplayName, tm.name, tm.nickname, tm.location].filter(Boolean).forEach(n => { out[n.toLowerCase()] = href; });
+      }
+      return out;
+    } catch { return {}; }
+  })();
+  return _logoCache[leagueKey];
+}
+function teamInitials(name = '') {
+  const words = String(name).replace(/[^A-Za-z0-9 ]/g, '').split(/\s+/).filter(Boolean);
+  if (!words.length) return '?';
+  if (words.length === 1) return words[0].slice(0, 3).toUpperCase();
+  return words.slice(0, 3).map(w => w[0]).join('').toUpperCase();
+}
+function TeamLogo({ name, league, size = 28 }) {
+  const [url, setUrl] = useState('');
+  const [err, setErr] = useState(false);
+  useEffect(() => {
+    let live = true; setErr(false); setUrl('');
+    espnTeamLogos(league).then(map => {
+      if (!live) return;
+      const key = String(name || '').toLowerCase();
+      let href = map[key];
+      if (!href) { const hit = Object.keys(map).find(k => k && (k.includes(key) || key.includes(k))); if (hit) href = map[hit]; }
+      if (href) setUrl(href);
+    });
+    return () => { live = false; };
+  }, [name, league]);
+  const style = { width: size, height: size };
+  if (url && !err) return <img className="team-logo" style={style} src={url} alt="" onError={() => setErr(true)} loading="lazy"/>;
+  return <span className="team-logo team-logo-ph" style={{ ...style, fontSize: Math.round(size * 0.36) }} aria-hidden="true">{teamInitials(name)}</span>;
+}
+
+// Reusable scoped trending pills — the same hotClusterTopics engine, over any item
+// list (feed, team page, entity hub). Clamped to ~3 words; each pill has a follow
+// star; the label opens the entity hub via onOpen.
+function TrendingPills({ label, items, onOpen, isTopicFollowed, toggleTopic, limit = 6 }) {
+  const topics = useMemo(() => hotClusterTopics(items || [], limit), [items, limit]);
+  if (topics.length < 2) return null;
+  return (
+    <div className="trending-section trending-now-row">
+      <span className="trending-section-label">{label}</span>
+      {topics.map((t, i) => {
+        const short = t.split(/\s+/).slice(0, 3).join(' ');
+        const followed = isTopicFollowed?.(short);
+        return (
+          <span key={i} className="trending-chip-group">
+            <button className="trending-chip" onClick={() => onOpen(short)} title={t}>{short}</button>
+            {toggleTopic && <button className={`trending-follow ${followed ? 'on' : ''}`} onClick={() => toggleTopic(short)} title={followed ? 'Following' : 'Follow topic'} aria-label={followed ? 'Unfollow topic' : 'Follow topic'}>{followed ? '★' : '☆'}</button>}
+          </span>
+        );
+      })}
+    </div>
+  );
+}
+
 const SK = 'v26_';
 const OLD_SKS = ['v25b_','v25a_','v24_','v23_'];
 
@@ -1098,6 +1172,18 @@ body{
 .following-label{font-family:var(--font-archivo);font-weight:800;font-size:12px;text-transform:uppercase;letter-spacing:0.07em;color:var(--text3);flex-shrink:0;}
 .following-chips{display:flex;gap:8px;flex-wrap:wrap;}
 .following-chip{display:inline-flex;align-items:center;gap:6px;background:var(--accent-bg);border:1px solid var(--border2);border-radius:16px;padding:4px 6px 4px 12px;cursor:pointer;font-family:var(--font-publicsans);}
+.following-chip-team{padding-left:5px;}
+/* ── Team logos (ESPN CDN) + initials fallback (Sports only) ── */
+.team-logo{border-radius:6px;object-fit:contain;flex-shrink:0;background:var(--surface2);}
+.team-logo-ph{display:inline-flex;align-items:center;justify-content:center;font-family:var(--font-archivo);font-weight:800;color:var(--accent);letter-spacing:0.02em;line-height:1;}
+/* ── Entity mini-hub header (Markets/Energy/etc.) ── */
+.entity-hub-header{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:var(--s4);padding-bottom:var(--s3);border-bottom:1px solid var(--border2);}
+.entity-hub-title{font-family:var(--font-archivo);font-weight:900;font-size:26px;letter-spacing:-0.4px;color:var(--text);line-height:1.1;text-transform:capitalize;}
+.entity-hub-sub{font-family:var(--font-publicsans);font-size:12px;color:var(--text3);margin-top:4px;}
+.entity-hub-actions{display:flex;gap:8px;align-items:center;flex-shrink:0;}
+.entity-hub-btn{font-size:12px;font-weight:700;color:var(--text2);background:var(--surface);border:1px solid var(--border);border-radius:20px;padding:7px 16px;cursor:pointer;font-family:var(--font-publicsans);transition:all 0.12s;}
+.entity-hub-btn:hover{border-color:var(--accent);color:var(--accent);}
+.entity-hub-btn.on{color:var(--amber);border-color:var(--amber);}
 .following-chip:hover{border-color:var(--accent);}
 .following-chip-name{font-size:12px;font-weight:600;color:var(--accent);}
 .following-chip-x{background:none;border:none;color:var(--text3);cursor:pointer;font-size:15px;line-height:1;padding:0 2px;border-radius:50%;}
@@ -2417,7 +2503,7 @@ body:not(.dark) .pill-bar{
 .sport-league-header{
   display:flex;align-items:center;justify-content:space-between;
   padding:20px 24px;margin:0 0 20px 0;
-  background:linear-gradient(135deg,#12002a 0%,#2d006b 50%,#1a0048 100%);
+  background:linear-gradient(135deg,var(--navy) 0%,var(--navy-light) 100%);
   border-radius:12px;color:#fff;
   box-shadow:var(--shadow-md);
   position:relative;overflow:hidden;
@@ -2427,7 +2513,6 @@ body:not(.dark) .pill-bar{
   width:120px;height:120px;border-radius:50%;
   background:rgba(255,255,255,0.04);
 }
-.dark .sport-league-header{background:linear-gradient(135deg,#0a001a 0%,#1a0040 50%,#0d0024 100%);}
 .sport-league-header-left{display:flex;align-items:center;gap:14px;}
 .sport-league-emoji{font-size:36px;line-height:1;}
 .sport-league-title{font-size:22px;font-weight:900;letter-spacing:-0.5px;margin:0 0 4px 0;color:#fff;}
@@ -5785,7 +5870,7 @@ function Scoreboard({scores, loading, compact=false}) {
 }
 
 // ─── GHOST SIDEBAR ────────────────────────────────────────────────────────────
-function Sidebar({cat, arts, kw, health, activeKw, setActiveKw, activeSource, setActiveSource, onRead, scores, scoresLoading, showScoreboard, recommended, showBriefing, onOpenBriefing, briefingExcludeCats}) {
+function Sidebar({cat, arts, kw, health, activeKw, setActiveKw, activeSource, setActiveSource, onRead, scores, scoresLoading, showScoreboard, recommended, showBriefing, onOpenBriefing, briefingExcludeCats, onTopicOpen}) {
   const cc = CATS[cat]||CATS.general;
   const catKws = kw[cat]||[];
   const catArts = arts[cat]||[];
@@ -5819,6 +5904,9 @@ function Sidebar({cat, arts, kw, health, activeKw, setActiveKw, activeSource, se
   const visibleSrcs = showAllSrcs ? sources : sources.slice(0, 10);
 
   const handleTopicClick = (label) => {
+    // Today's Topics tag → open the entity mini-hub (where available); otherwise
+    // fall back to the in-page keyword filter (e.g. on Sports).
+    if (onTopicOpen) { onTopicOpen(label); return; }
     setActiveKw(activeKw === label ? null : label);
     setTimeout(() => window.scrollTo({top: 0, behavior: 'smooth'}), 50);
   };
@@ -7982,7 +8070,7 @@ export default function App() {
           <>
             <div className="sport-league-header">
               <div className="sport-league-header-left">
-                <span className="sport-league-emoji">{SPORT_TABS.find(s=>s.key===sportTab)?.emoji||''}</span>
+                <TeamLogo name={teamName} league={sportTab} size={40}/>
                 <div>
                   <h2 className="sport-league-title">{teamName}</h2>
                   <div className="sport-league-count">{teamItems.length} {teamItems.length===1?'story':'stories'} · {sportTab.toUpperCase()}</div>
@@ -7998,6 +8086,7 @@ export default function App() {
             <div className="page-grid">
               <div className="feed-col">
                 <StateOfPlay items={teamItems} meta={CATS.sports} onRead={onRead} formatDate={fmtDate}/>
+                <TrendingPills label={`Trending · ${teamName}`} items={teamItems} onOpen={t=>setSearch(t.toLowerCase())} isTopicFollowed={isTopicFollowed} toggleTopic={toggleTopic}/>
                 {teamItems.length === 0
                   ? <div className="empty-state"><div className="empty-icon"></div><div className="empty-msg">No recent stories for {teamName}</div><button className="refresh-btn" onClick={()=>loadCat('sports')}>Refresh</button></div>
                   : <div className="snap-feed">
@@ -8222,6 +8311,45 @@ export default function App() {
     );
   };
 
+  // Generic entity mini-hub — Markets/Energy/etc. topics (no dedicated page before).
+  // Scoped StateOfPlay + "Trending for [entity]" + the entity's deduped feed. Text
+  // header only (no logo — sports teams keep their own Tier-3 page with a logo).
+  const EntityHub = ({ cat, entity }) => {
+    const cc = CATS[cat] || CATS.general;
+    const q = entity.toLowerCase();
+    const entityItems = useMemo(
+      () => clusterStories(Object.values(arts).flat().filter(a => (a.title + ' ' + (a.desc || '')).toLowerCase().includes(q))),
+      [arts, q]
+    );
+    const followed = isTopicFollowed(entity);
+    return (
+      <div className="page">
+        <div className="entity-hub-header">
+          <div className="entity-hub-title-wrap">
+            <h1 className="entity-hub-title">{entity}</h1>
+            <div className="entity-hub-sub">{entityItems.length} {entityItems.length === 1 ? 'story' : 'stories'} · {cc.label}</div>
+          </div>
+          <div className="entity-hub-actions">
+            <button className={`entity-hub-btn ${followed ? 'on' : ''}`} onClick={() => toggleTopic(entity)}>{followed ? '★ Following' : '☆ Follow'}</button>
+            <button className="entity-hub-btn" onClick={() => navigate(cat)}>← {cc.label}</button>
+          </div>
+        </div>
+        <StateOfPlay items={entityItems} meta={cc} onRead={onRead} formatDate={fmtDate}/>
+        <TrendingPills label={`Trending · ${entity}`} items={entityItems} onOpen={t => navigate(cat, 'topic', teamSlug(t))} isTopicFollowed={isTopicFollowed} toggleTopic={toggleTopic}/>
+        {entityItems.length === 0
+          ? <div className="empty-state"><div className="empty-icon"></div><div className="empty-msg">No recent stories mentioning “{entity}”.</div><button className="refresh-btn" onClick={() => loadCat(cat)}>Refresh</button></div>
+          : <div className="snap-feed">
+              {entityItems.slice(0, 20).map((a, i) => (
+                <Fragment key={a.link || i}>
+                  <SnapshotCard a={a} meta={cc} isSaved={isSavedFn(a)} onSave={onSave} onRead={onRead} onPerspectives={setPerspArticle} formatDate={fmtDate}/>
+                  {i === 2 && <XPulse topic={entity} variant="feed"/>}
+                </Fragment>
+              ))}
+            </div>}
+      </div>
+    );
+  };
+
   const FeedPage = ({cat}) => {
     const cc=CATS[cat];
     const [onboardingDismissed, setOnboardingDismissed] = useState(()=>ld('onboarded',false));
@@ -8347,13 +8475,14 @@ export default function App() {
             <span className="following-label">Following</span>
             <div className="following-chips">
               {myTeams.map((t, i) => (
-                <span key={`tm-${i}`} className="following-chip" onClick={()=>navigate('sports', t.league, t.slug)}>
+                <span key={`tm-${i}`} className="following-chip following-chip-team" onClick={()=>navigate('sports', t.league, t.slug)}>
+                  <TeamLogo name={t.name} league={t.league} size={18}/>
                   <span className="following-chip-name">{t.name}</span>
                   <button className="following-chip-x" onClick={e=>{e.stopPropagation();toggleMyTeam(t);}} aria-label="Unfollow">×</button>
                 </span>
               ))}
               {myTopics.map((t, i) => (
-                <span key={`tp-${i}`} className="following-chip" onClick={()=>setSearch(t.toLowerCase())}>
+                <span key={`tp-${i}`} className="following-chip" onClick={()=>navigate('general','topic',teamSlug(t))}>
                   <span className="following-chip-name">{t}</span>
                   <button className="following-chip-x" onClick={e=>{e.stopPropagation();toggleTopic(t);}} aria-label="Unfollow">×</button>
                 </span>
@@ -8447,27 +8576,12 @@ export default function App() {
           <StateOfPlay items={activeFilteredItems} meta={CATS[cat]||CATS.general} onRead={onRead} formatDate={fmtDate}/>
         )}
 
-        {/* ── TRENDING NOW (Phase 5 #2) — hottest clusters as tappable filter pills,
-              directly under State of Play, in every category incl. those with no subcats ── */}
-        {!activeKw && !activeSrc && !search && (() => {
-          const topics = hotClusterTopics(activeFilteredItems, 5);
-          if (topics.length < 2) return null;
-          return (
-            <div className="trending-section trending-now-row">
-              <span className="trending-section-label">Trending Now</span>
-              {topics.map((t, i) => {
-                const label = t.split(/\s+/).slice(0, 3).join(' ');
-                const followed = isTopicFollowed(label);
-                return (
-                  <span key={i} className="trending-chip-group">
-                    <button className="trending-chip" onClick={()=>setSearch(t.toLowerCase())} title={t}>{label}</button>
-                    <button className={`trending-follow ${followed?'on':''}`} onClick={()=>toggleTopic(label)} title={followed?'Following':'Follow topic'} aria-label={followed?'Unfollow topic':'Follow topic'}>{followed?'★':'☆'}</button>
-                  </span>
-                );
-              })}
-            </div>
-          );
-        })()}
+        {/* ── TRENDING NOW — hottest clusters; tapping a pill opens that entity's hub ── */}
+        {!activeKw && !activeSrc && !search && (
+          <TrendingPills label="Trending Now" items={activeFilteredItems}
+            onOpen={t => navigate(cat, 'topic', teamSlug(t))}
+            isTopicFollowed={isTopicFollowed} toggleTopic={toggleTopic}/>
+        )}
 
         {/* ── HOME: Top of Hour strip (image cards) ── */}
         {isHome && !activeKw && !activeSrc && !search && (
@@ -8754,6 +8868,7 @@ export default function App() {
             activeSource={activeSrc} setActiveSource={s=>{setActiveSrc(s);setActiveKw(null);}}
             onRead={onRead} scores={scores} scoresLoading={scoresLoading}
             showScoreboard={cat==='sports'} recommended={recommended}
+            onTopicOpen={label => navigate(cat, 'topic', teamSlug(label))}
             showBriefing={isHome} onOpenBriefing={() => handleTabChange('briefing')} briefingExcludeCats={briefingExclude}/>
         </div>
       </div>
@@ -9357,6 +9472,7 @@ export default function App() {
           <Sidebar cat="finance" arts={arts} kw={kw} health={health}
             activeKw={activeKw} setActiveKw={k=>{setActiveKw(k);setActiveSrc(null);}}
             activeSource={activeSrc} setActiveSource={s=>{setActiveSrc(s);setActiveKw(null);}}
+            onTopicOpen={label => navigate('finance', 'topic', teamSlug(label))}
             onRead={onRead} scores={scores} scoresLoading={scoresLoading} showScoreboard={false}/>
         </div>
       </div>
@@ -9387,13 +9503,23 @@ export default function App() {
 
         {/* v24a: Today removed (its content folded into General page).
             BriefingPage restored as a dedicated full-read destination. */}
-        {tab==='briefing'&&<BriefingPage/>}
-        {tab==='sports'&&<SportsPage/>}
-        {NEWS_CATS.filter(c=>c!=='sports').includes(tab)&&<FeedPage cat={tab}/>}
-        {tab==='finance'&&<FinancePage/>}
-        {tab==='podcasts'&&<PodcastsPage/>}
-        {tab==='sources'&&<SourcesPage/>}
-        {tab==='saved'&&<SavedPage/>}
+        {(() => {
+          // Entity mini-hub route: /:cat/topic/:slug for any non-sports category.
+          // (Sports keeps its own Tier-3 team page, which handles tertiary itself.)
+          const isEntityRoute = subcat === 'topic' && tertiary && tab !== 'sports';
+          if (isEntityRoute) return <EntityHub cat={tab} entity={tertiary.replace(/-/g, ' ')}/>;
+          return (
+            <>
+              {tab==='briefing'&&<BriefingPage/>}
+              {tab==='sports'&&<SportsPage/>}
+              {NEWS_CATS.filter(c=>c!=='sports').includes(tab)&&<FeedPage cat={tab}/>}
+              {tab==='finance'&&<FinancePage/>}
+              {tab==='podcasts'&&<PodcastsPage/>}
+              {tab==='sources'&&<SourcesPage/>}
+              {tab==='saved'&&<SavedPage/>}
+            </>
+          );
+        })()}
 
         {/* Mobile overflow menu sheet */}
         {menuOpen && (
