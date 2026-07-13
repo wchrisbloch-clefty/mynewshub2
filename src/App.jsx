@@ -381,6 +381,45 @@ function TrendingPills({ label, items, onOpen, isTopicFollowed, toggleTopic, lim
   );
 }
 
+// Search-and-add for the follow system: type to find a team (from TEAM_CHIPS across
+// leagues, with logo) or add a free-text topic. Writes to myTeams/myTopics via the
+// injected callbacks — the same follow/star model, just reachable without a page dive.
+function FollowAdd({ isFollowingTeam, isTopicFollowed, onAddTeam, onAddTopic, onClose }) {
+  const [q, setQ] = useState('');
+  const ql = q.trim().toLowerCase();
+  const teamResults = useMemo(() => {
+    if (!ql) return [];
+    const out = [];
+    for (const [league, names] of Object.entries(TEAM_CHIPS)) {
+      for (const name of names) if (name.toLowerCase().includes(ql)) out.push({ name, league });
+    }
+    return out.slice(0, 6);
+  }, [ql]);
+  return (
+    <div className="follow-add" onClick={e => e.stopPropagation()}>
+      <input autoFocus className="follow-add-input" placeholder="Search teams, or type a topic…" value={q}
+        onChange={e => setQ(e.target.value)}
+        onKeyDown={e => { if (e.key === 'Enter' && q.trim()) { onAddTopic(q.trim()); setQ(''); } else if (e.key === 'Escape') onClose(); }}/>
+      {ql && (
+        <div className="follow-add-results">
+          {teamResults.map((t, i) => (
+            <button key={`t-${i}`} className="follow-add-item" onClick={() => onAddTeam(t)}>
+              <TeamLogo name={t.name} league={t.league} size={20}/>
+              <span className="follow-add-name">{t.name}</span>
+              <span className="follow-add-league">{t.league.toUpperCase()}</span>
+              <span className="follow-add-star">{isFollowingTeam(t) ? '★' : '☆'}</span>
+            </button>
+          ))}
+          <button className="follow-add-item follow-add-topic" onClick={() => { onAddTopic(q.trim()); setQ(''); }}>
+            <span className="follow-add-name">Follow topic “{q.trim()}”</span>
+            <span className="follow-add-star">{isTopicFollowed(q.trim()) ? '★' : '☆'}</span>
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
 const SK = 'v26_';
 const OLD_SKS = ['v25b_','v25a_','v24_','v23_'];
 
@@ -397,6 +436,12 @@ const PAYWALL_DOMAINS = new Set([
 // Tier 2: per-category top headlines, deduped against Tier 1.
 // Tier 3: time-aware refresh — auto-regenerate if briefing is >90min stale.
 const BRIEFING_PRIORITY_SOURCES = ['Axios','Morning Brew','Morning Wire','Bloomberg'];
+// The Briefing's anchor sources: the user's Briefing-scoped picker (Customize →
+// Briefing) if they've chosen any, else the default priority list above.
+function briefingSourceList() {
+  const s = ld('briefingSources', []);
+  return Array.isArray(s) && s.length ? s : BRIEFING_PRIORITY_SOURCES;
+}
 const BRIEFING_EXCLUDE_CATS = ['comedy']; // satire dilutes professional briefing voice
 const BRIEFING_STALE_MS = 90 * 60 * 1000; // 90 minutes
 
@@ -1188,6 +1233,22 @@ body{
 .following-chip-name{font-size:12px;font-weight:600;color:var(--accent);}
 .following-chip-x{background:none;border:none;color:var(--text3);cursor:pointer;font-size:15px;line-height:1;padding:0 2px;border-radius:50%;}
 .following-chip-x:hover{color:var(--neg);}
+.following-empty{font-size:12px;color:var(--text3);font-style:italic;}
+/* Search-and-add popover for teams/topics */
+.follow-add-wrap{position:relative;display:inline-block;}
+.following-add-btn{background:none;border:1px dashed var(--border);border-radius:16px;padding:4px 12px;font-family:var(--font-publicsans);font-size:12px;font-weight:600;color:var(--text2);cursor:pointer;}
+.following-add-btn:hover{border-color:var(--accent);color:var(--accent);border-style:solid;}
+.follow-add{position:absolute;top:calc(100% + 6px);left:0;z-index:400;width:280px;background:var(--surface);border:1px solid var(--border);border-radius:10px;box-shadow:var(--shadow-lg);padding:8px;}
+.follow-add-input{width:100%;box-sizing:border-box;border:1px solid var(--border);border-radius:8px;padding:8px 10px;font-family:var(--font-publicsans);font-size:13px;background:var(--surface);color:var(--text);}
+.follow-add-input:focus{outline:none;border-color:var(--accent);}
+.follow-add-results{margin-top:6px;display:flex;flex-direction:column;gap:1px;max-height:260px;overflow-y:auto;}
+.follow-add-item{display:flex;align-items:center;gap:8px;width:100%;background:none;border:none;cursor:pointer;padding:7px 6px;border-radius:7px;text-align:left;font-family:var(--font-publicsans);}
+.follow-add-item:hover{background:var(--surface2);}
+.follow-add-name{flex:1;min-width:0;font-size:13px;font-weight:600;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.follow-add-league{font-size:10px;font-weight:700;color:var(--text3);}
+.follow-add-star{color:var(--amber);font-size:14px;}
+.follow-add-topic{border-top:1px solid var(--border2);margin-top:2px;}
+@media(max-width:640px){ .follow-add{position:fixed;left:12px;right:12px;width:auto;top:auto;} }
 /* Trending follow-star pill */
 .trending-chip-group{display:inline-flex;align-items:stretch;}
 .trending-follow{background:none;border:none;cursor:pointer;color:var(--text4);font-size:13px;line-height:1;padding:0 4px 0 2px;transition:color 0.12s;}
@@ -2099,6 +2160,10 @@ body:not(.dark) .pill-bar{
 .cp-sec{}
 .cp-lbl{font-size:9px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:0.08em;margin-bottom:8px;}
 .cp-desc{font-size:11px;color:var(--text2);line-height:1.5;margin-bottom:8px;}
+.cp-briefing-src-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:4px 10px;max-height:220px;overflow-y:auto;padding:8px;border:1px solid var(--border2);border-radius:8px;background:var(--surface2);}
+.cp-briefing-src{display:flex;align-items:center;gap:7px;font-size:12px;color:var(--text2);cursor:pointer;padding:3px 2px;}
+.cp-briefing-src.on{color:var(--text);font-weight:600;}
+.cp-briefing-src span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
 .cp-cat-tabs{display:flex;gap:4px;flex-wrap:wrap;margin-bottom:10px;}
 .cp-cat-tab{background:var(--surface2);border:1px solid var(--border);border-radius:6px;padding:4px 10px;font-size:10px;cursor:pointer;font-family:inherit;color:var(--text2);font-weight:500;transition:all 0.1s;}
 .cp-cat-tab.active{background:var(--accent);color:#fff;border-color:var(--accent);}
@@ -5447,7 +5512,7 @@ function MorningBriefingInline({arts, excludeCats}) {
     const allArts = Object.values(arts).flat();
     const tier1 = [];
     const tier1Keys = new Set(); // dedup keys for Tier 2 to filter against
-    BRIEFING_PRIORITY_SOURCES.forEach(srcName => {
+    briefingSourceList().forEach(srcName => {
       const matches = allArts
         .filter(a => a.source === srcName)
         .sort((a,b) => new Date(b.pubDate) - new Date(a.pubDate))
@@ -5569,7 +5634,7 @@ Output ONLY the paragraph followed by the bullets. No headers, no labels, no clo
         </button>
       </div>
       <div className="briefing-inline-sources">
-        <span className="briefing-src-pill">{BRIEFING_PRIORITY_SOURCES.join(' · ')}</span>
+        <span className="briefing-src-pill">{briefingSourceList().join(' · ')}</span>
         <span className="briefing-src-pill">Top headlines per category</span>
       </div>
       {body
@@ -5624,7 +5689,7 @@ function BriefingTeaser({arts, excludeCats, onOpenFull, compact}) {
     const allArts = Object.values(arts).flat();
     const tier1 = [];
     const tier1Keys = new Set();
-    BRIEFING_PRIORITY_SOURCES.forEach(srcName => {
+    briefingSourceList().forEach(srcName => {
       allArts
         .filter(a => a.source === srcName)
         .sort((a,b) => new Date(b.pubDate) - new Date(a.pubDate))
@@ -5762,7 +5827,7 @@ OUTPUT: 3-sentence paragraph followed by exactly 3 bullets (- markers). No heade
       )}
       <div className="briefing-teaser-footer">
         <span className="briefing-teaser-sources">
-          {BRIEFING_PRIORITY_SOURCES.join(' · ')}
+          {briefingSourceList().join(' · ')}
         </span>
         <button className="briefing-teaser-cta-link" onClick={onOpenFull}>Full briefing →</button>
       </div>
@@ -6098,13 +6163,14 @@ function SourceFooter({cat, feeds, arts}) {
 const CAT_LABELS = {general:'News',sports:'Sports',business:'Business',finance:'Markets',bloom:'Energy',tech:'AI & Tech',popculture:'Pop Culture',comedy:'Comedy'};
 const PLAT_LABELS = {twitter:'𝕏',linkedin:'in',instagram:'IG',youtube:'▶'};
 
-function CustomizePanel({feeds, kw, alerts, urgent, social, watchlist, teams, health, arts, weatherCities, hiddenIndices, briefingExclude, initialTab, initialCat, onClose, onSave}) {
+function CustomizePanel({feeds, kw, alerts, urgent, social, watchlist, teams, health, arts, weatherCities, hiddenIndices, briefingExclude, briefingSources, initialTab, initialCat, onClose, onSave}) {
   const [lf, setLf] = useState(JSON.parse(JSON.stringify(feeds)));
   const [lk, setLk] = useState(JSON.parse(JSON.stringify(kw)));
   const [la, setLa] = useState([...alerts]);
   const [lu, setLu] = useState([...(urgent||[])]);
   const [lw, setLw] = useState(JSON.parse(JSON.stringify(watchlist||[])));
   const [lbe, setLbe] = useState([...(briefingExclude||['comedy'])]);
+  const [lbs, setLbs] = useState([...(briefingSources||[])]);
   const [newSym, setNewSym] = useState('');
   const [newSymName, setNewSymName] = useState('');
   const [ls, setLs] = useState(JSON.parse(JSON.stringify(social)));
@@ -6412,14 +6478,22 @@ function CustomizePanel({feeds, kw, alerts, urgent, social, watchlist, teams, he
 
           {secTab==='briefing' && (
             <div className="cp-sec">
-              <div className="cp-lbl">Morning Briefing Sources</div>
-              <div className="cp-desc">The briefing pulls top headlines from each category. Toggle categories off to exclude them from the briefing synthesis.</div>
-              <div className="cp-lbl" style={{marginTop:'14px'}}>Priority Sources (always included when available)</div>
-              <div className="cp-desc" style={{marginBottom:'8px'}}>
-                {BRIEFING_PRIORITY_SOURCES.map(s=>(
-                  <span key={s} style={{display:'inline-block',background:'var(--surface2)',border:'1px solid var(--border)',borderRadius:'12px',padding:'3px 10px',fontSize:'11px',fontWeight:600,marginRight:'6px',marginBottom:'4px'}}>{s}</span>
-                ))}
-                <div style={{marginTop:'6px',fontSize:'10px',color:'var(--text3)'}}>Make sure these are enabled in your General sources tab for best results.</div>
+              <div className="cp-lbl">Briefing anchor sources</div>
+              <div className="cp-desc">Pick the specific sources that anchor your Morning Briefing. Leave all unchecked to use the defaults ({BRIEFING_PRIORITY_SOURCES.join(', ')}).</div>
+              <div className="cp-briefing-src-grid">
+                {[...new Set(Object.values(lf).flat().map(f=>f.name))].sort((a,b)=>a.localeCompare(b)).map(name=>{
+                  const on = lbs.includes(name);
+                  return (
+                    <label key={name} className={`cp-briefing-src${on?' on':''}`}>
+                      <input type="checkbox" style={{accentColor:'var(--accent)'}} checked={on}
+                        onChange={()=>setLbs(prev=>on?prev.filter(s=>s!==name):[...prev,name])}/>
+                      <span>{name}</span>
+                    </label>
+                  );
+                })}
+              </div>
+              <div style={{marginTop:'8px',fontSize:'11px',color:'var(--text3)'}}>
+                {lbs.length ? `${lbs.length} source${lbs.length===1?'':'s'} selected` : `Using defaults: ${BRIEFING_PRIORITY_SOURCES.join(', ')}`}
               </div>
               <div className="cp-lbl" style={{marginTop:'14px'}}>Categories included in briefing</div>
               <div style={{display:'flex',flexWrap:'wrap',gap:'8px',marginTop:'8px'}}>
@@ -6446,7 +6520,7 @@ function CustomizePanel({feeds, kw, alerts, urgent, social, watchlist, teams, he
             </div>
           )}
 
-          <button className="cp-save" onClick={()=>onSave({feeds:lf,kw:lk,alerts:la,urgent:lu,social:ls,watchlist:lw,teams:lt,weatherCities:lwx,hiddenIndices:lhi,briefingExclude:lbe})}>Save & Refresh</button>
+          <button className="cp-save" onClick={()=>onSave({feeds:lf,kw:lk,alerts:la,urgent:lu,social:ls,watchlist:lw,teams:lt,weatherCities:lwx,hiddenIndices:lhi,briefingExclude:lbe,briefingSources:lbs})}>Save & Refresh</button>
         </div>
       </div>
     </div>
@@ -7468,6 +7542,7 @@ export default function App() {
   const [weatherCities, setWeatherCities] = useState(()=>ld('weatherCities', DEFAULT_WEATHER_CITIES));
   const [hiddenIndices, setHiddenIndices] = useState(()=>ld('hiddenIndices',[]));
   const [briefingExclude, setBriefingExclude] = useState(()=>ld('briefingExclude',['comedy']));
+  const [briefingSources, setBriefingSources] = useState(()=>ld('briefingSources',[]));
   const [marketData, setMarketData] = useState({});
   const [marketLoading, setMarketLoading] = useState(false);
   const [social, setSocial]     = useState(()=>ld('social',DEFAULT_SOCIAL));
@@ -7787,7 +7862,7 @@ export default function App() {
     return () => window.removeEventListener('keydown', handler);
   }, [readerArticle, showAnalyze, perspArticle]);
 
-  const handleCustomizeSave = ({feeds:nf,kw:nk,alerts:na,urgent:nu,social:ns,watchlist:nw,teams:nt,weatherCities:nwx,hiddenIndices:ni,briefingExclude:nbe})=>{
+  const handleCustomizeSave = ({feeds:nf,kw:nk,alerts:na,urgent:nu,social:ns,watchlist:nw,teams:nt,weatherCities:nwx,hiddenIndices:ni,briefingExclude:nbe,briefingSources:nbs})=>{
     setFeeds(nf);sv('feeds',nf);
     setKw(nk);sv('kw',nk);
     setAlerts(na);sv('alerts',na);
@@ -7798,6 +7873,7 @@ export default function App() {
     if(nwx){setWeatherCities(nwx);sv('weatherCities',nwx);}
     if(ni!=null){setHiddenIndices(ni);sv('hiddenIndices',ni);}
     if(nbe!=null){setBriefingExclude(nbe);sv('briefingExclude',nbe);}
+    if(nbs!=null){setBriefingSources(nbs);sv('briefingSources',nbs);}
     setShowPanel(false);refreshAll();
   };
 
@@ -8352,6 +8428,7 @@ export default function App() {
 
   const FeedPage = ({cat}) => {
     const cc=CATS[cat];
+    const [showFollowAdd, setShowFollowAdd] = useState(false);
     const [onboardingDismissed, setOnboardingDismissed] = useState(()=>ld('onboarded',false));
     const dismissOnboarding = () => { sv('onboarded',true); setOnboardingDismissed(true); };
     // Apply story clustering before sorting so cluster metadata is available
@@ -8469,8 +8546,10 @@ export default function App() {
             <span className="nsp-dot"/> ↑ {pendingNew[cat].length} new {pendingNew[cat].length===1?'story':'stories'}
           </button>
         )}
-        {/* HOME: unified Following row (topics + teams) above the category feeds */}
-        {isHome && !activeKw && !activeSrc && !search && (myTopics.length > 0 || myTeams.length > 0) && (
+        {/* HOME: unified Following row (topics + teams) above the category feeds.
+            Always shown on Home so the "+ Add" search-and-add is reachable even when
+            nothing is followed yet. */}
+        {isHome && !activeKw && !activeSrc && !search && (
           <section className="following-row">
             <span className="following-label">Following</span>
             <div className="following-chips">
@@ -8487,6 +8566,20 @@ export default function App() {
                   <button className="following-chip-x" onClick={e=>{e.stopPropagation();toggleTopic(t);}} aria-label="Unfollow">×</button>
                 </span>
               ))}
+              {myTeams.length === 0 && myTopics.length === 0 && (
+                <span className="following-empty">Follow teams &amp; topics to build your row</span>
+              )}
+              <div className="follow-add-wrap">
+                <button className="following-add-btn" onClick={()=>setShowFollowAdd(v=>!v)} aria-expanded={showFollowAdd}>+ Add</button>
+                {showFollowAdd && (
+                  <FollowAdd
+                    isFollowingTeam={t => myTeams.some(x => x.slug === teamSlug(t.name) && x.league === t.league)}
+                    isTopicFollowed={isTopicFollowed}
+                    onAddTeam={t => toggleMyTeam({ name: t.name, league: t.league, slug: teamSlug(t.name) })}
+                    onAddTopic={topic => toggleTopic(topic)}
+                    onClose={() => setShowFollowAdd(false)}/>
+                )}
+              </div>
             </div>
           </section>
         )}
@@ -8971,7 +9064,7 @@ export default function App() {
       const allArts = Object.values(arts).flat();
       const out = [];
       const seen = new Set();
-      BRIEFING_PRIORITY_SOURCES.forEach(srcName => {
+      briefingSourceList().forEach(srcName => {
         const matches = allArts
           .filter(a => a.source === srcName)
           .sort((a,b) => new Date(b.pubDate) - new Date(a.pubDate))
@@ -9021,12 +9114,12 @@ export default function App() {
             <div className="briefing-sources-head">
               <span className="briefing-sources-label">Priority briefings</span>
               <span className="briefing-sources-meta">
-                {tier1.items.length} articles from {BRIEFING_PRIORITY_SOURCES.join(' · ')}
+                {tier1.items.length} articles from {briefingSourceList().join(' · ')}
               </span>
             </div>
             {tier1.items.length === 0
               ? <div style={{padding:'14px 0',fontSize:'12px',color:'var(--text3)'}}>
-                  Priority briefing sources haven't loaded yet. Make sure {BRIEFING_PRIORITY_SOURCES.join(', ')} are enabled in your General feeds.
+                  Priority briefing sources haven't loaded yet. Make sure {briefingSourceList().join(', ')} are enabled in your General feeds.
                 </div>
               : tier1.items.map((a, i) => (
                   <BriefingArticleItem key={`t1-${i}`} a={a}/>
@@ -9550,6 +9643,7 @@ export default function App() {
           social={social} watchlist={watchlist} teams={teams} health={health} arts={arts}
           weatherCities={weatherCities} hiddenIndices={hiddenIndices}
           briefingExclude={briefingExclude}
+          briefingSources={briefingSources}
           initialTab={panelInitial.tab} initialCat={panelInitial.cat}
           onClose={()=>setShowPanel(false)} onSave={handleCustomizeSave}/>}
       </div>
