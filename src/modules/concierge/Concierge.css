@@ -130,3 +130,8 @@
 .chat-tier-web{color:#2563eb;}
 .chat-tier-ai{color:#9333ea;}
 .chat-tier-open{color:var(--accent);}
+
+/* Web-tier answers: clickable source links under the bubble */
+.chat-sources{display:flex;flex-direction:column;gap:3px;margin-top:5px;}
+.chat-source-link{font-size:10px;color:var(--text3);text-decoration:none;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.chat-source-link:hover{color:#2563eb;text-decoration:underline;}
