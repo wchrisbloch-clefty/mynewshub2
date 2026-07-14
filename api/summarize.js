@@ -11,7 +11,7 @@
 
 const MAX_INPUT       = 3000;
 const MAX_INPUT_LARGE = 5000; // briefing-gen mode
-const TOKENS = { summary: 320, takeaways: 700, explain: 500, briefing: 400, 'briefing-gen': 700, chat: 300, bias: 400, related: 400, brief: 300 };
+const TOKENS = { summary: 320, takeaways: 700, explain: 500, briefing: 400, 'briefing-gen': 700, chat: 300, 'chat-open': 300, bias: 400, related: 400, brief: 300 };
 
 // ── Body parser ──────────────────────────────────────────────────────────────
 async function readBody(req) {
@@ -50,10 +50,10 @@ Format each as:
     return `You are an expert news analyst. Explain this ${verb} for someone who wants full context.\n\nStructure your response as:\n**Background** — Context that makes this story important\n**Key Players** — Who is involved and their role\n**What's Happening** — The core development in plain language\n**Wider Impact** — Economic, political, or global implications\n**What to Watch** — One specific development to follow\n\nBe specific. Include names, numbers, and dates. No filler.`;
   }
   if (mode === 'chat') {
-    return `You are MyNewsHub's news concierge. Answer the user's question using ONLY the FEED CONTEXT provided in their message — these are real stories from today's aggregated feed. Rules:
-- Ground every statement in the FEED CONTEXT. When you use a story, name its source (e.g., "per Reuters").
-- If the FEED CONTEXT does not contain what's needed to answer, reply exactly: "I don't see that in today's feed." Do NOT fall back on outside or general knowledge, and never invent stories, quotes, numbers, dates, or sources.
-- Be concise and specific: 2-4 sentences. Note recency when relevant (e.g., "in the last few hours").`;
+    return `You are MyNewsHub's news concierge. Prefer the FEED CONTEXT provided. If the FEED CONTEXT answers the question, ground your answer in it and name sources (e.g. "per Reuters"). If the FEED CONTEXT does NOT contain the answer, say "This isn't in today's feed —" and then answer from general knowledge concisely. Never invent story sources, quotes, or dates. Be concise: 2-4 sentences.`;
+  }
+  if (mode === 'chat-open') {
+    return `You are MyNewsHub's assistant. Answer the user's question about the SPECIFIC ARTICLE provided in their message. Ground every statement in that article's text. If the article doesn't contain the answer, say so in one sentence, then answer from general knowledge clearly prefaced with "Beyond this article:". Be concise: 2-4 sentences.`;
   }
   if (mode === 'bias') {
     return `Analyze the framing and perspective in this ${verb}. Note what angle it takes, what it emphasizes or omits, and what perspective it favors. Be specific and balanced in your assessment. 3-5 sentences.`;
@@ -73,7 +73,7 @@ Never paraphrase the headline. BANNED: filler closers like "as the situation unf
 
 // ── User content ─────────────────────────────────────────────────────────────
 function buildUser(title, content, mode) {
-  if (mode === 'briefing' || mode === 'briefing-gen' || mode === 'chat') return content; // chat content is already a clean FEED CONTEXT + QUESTION block
+  if (mode === 'briefing' || mode === 'briefing-gen' || mode === 'chat' || mode === 'chat-open') return content; // chat content is already a clean FEED CONTEXT + QUESTION block
   return `Title: ${title}\n\nContent: ${content}`;
 }
 
@@ -236,7 +236,7 @@ export default async function handler(req, res) {
     return res.status(400).json({ error: 'title required' });
   }
 
-  const validModes = ['summary', 'takeaways', 'explain', 'briefing', 'briefing-gen', 'chat', 'bias', 'related', 'brief'];
+  const validModes = ['summary', 'takeaways', 'explain', 'briefing', 'briefing-gen', 'chat', 'chat-open', 'bias', 'related', 'brief'];
   const m = validModes.includes(mode) ? mode : 'summary';
   const maxTokens = TOKENS[m] || 250;
   const maxInput = m === 'briefing-gen' ? MAX_INPUT_LARGE : MAX_INPUT;
