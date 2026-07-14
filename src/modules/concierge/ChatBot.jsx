@@ -6,15 +6,18 @@
 // Props:
 //   arts            ({[cat]: article[]})  feed data to ground answers in
 //   onNavigate(path)(fn)  open an in-app route, e.g. "/sports/cfb/kentucky"
-//   fetchSummary    (fn)  ({type,title,content,mode}) -> { summary, error }  (LLM call)
+//   fetchSummary    (fn)  ({type,title,content,mode,url}) -> { summary, error }  (LLM call)
+//   fetchWebSearch  (fn)  (query) -> [{title,desc,source}]  (web-tier fallback)
 //   resolveDeepLink (fn)  ({entities,category}) -> string|null  (entity -> in-app path)
+//   chatContext     (obj|null)  article the reader handed us to ground answers on
+//   onClearContext  (fn)  clear the grounding article
 //
 // Styling: co-located Concierge.css + design tokens (src/styles/tokens.css).
 import { useState, useEffect, useRef } from 'react';
 import { retrieveFeedContext, buildFeedContextBlock } from '../retrieval';
 import './Concierge.css';
 
-export function ChatBot({ arts, onNavigate, fetchSummary, resolveDeepLink }) {
+export function ChatBot({ arts, onNavigate, fetchSummary, fetchWebSearch, resolveDeepLink, chatContext, onClearContext }) {
   const [open, setOpen] = useState(false);
   const [chatMode, setChatMode] = useState('chat'); // 'chat' | 'analyze'
   const [msgs, setMsgs] = useState([
@@ -31,6 +34,11 @@ export function ChatBot({ arts, onNavigate, fetchSummary, resolveDeepLink }) {
     if (open && chatMode === 'chat') messagesEndRef.current?.scrollIntoView({ behavior:'smooth' });
   }, [msgs, open, chatMode]);
 
+  // When the reader hands us an article to ground on, pop the chat open.
+  useEffect(() => {
+    if (chatContext) { setOpen(true); setChatMode('chat'); }
+  }, [chatContext]);
+
   const QUICK = ["What's trending today?", "Sports update?", "Markets summary", "Top tech news"];
   const ANALYZE_MODES = [
     { key:'summary',   label:'Summarize' },
@@ -39,47 +47,59 @@ export function ChatBot({ arts, onNavigate, fetchSummary, resolveDeepLink }) {
     { key:'related',   label:'Related Context' },
   ];
 
-  // Phase 6: grounded concierge. Retrieve relevant clustered feed data for the
-  // question (standalone retrieveFeedContext), hand ONLY that to the model, and
-  // let the backend chat system prompt enforce "answer only from the feed".
+  // Push a bot message tagged with its source tier ('feed'|'web'|'ai'|'open').
+  const pushBot = (summary, error, tier, link=null) => {
+    const t2 = new Date().toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'});
+    const botText = error ? (error.includes('No AI provider') ? '⚙️ AI not configured — add GROQ_API_KEY in Vercel env vars.' : "Sorry, I couldn't reach the AI right now.") : (summary || 'No response.');
+    setMsgs(m => [...m, { role:'bot', text:botText, time:t2, tier: error?null:tier, link }]);
+  };
+
+  // Unified waterfall: pasted URL → reader context → Feed → Web → AI-general.
+  // Every answer is badged with the tier it came from.
   const send = async (text) => {
     const q = (text || input).trim();
     if (!q || loading) return;
     const t = new Date().toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'});
     setMsgs(m => [...m, { role:'user', text:q, time:t }]);
-    setInput('');
-    setLoading(true);
-    const ctx = retrieveFeedContext(q, arts, { resolveDeepLink });
-    let contextBlock = '';
-    let deepLink = ctx.deepLink;
+    setInput(''); setLoading(true);
 
-    if (ctx.intent === 'markets') {
-      try {
-        const r = await fetch('/api/markets', { signal: AbortSignal.timeout(9000) });
-        if (r.ok) {
-          const d = await r.json();
-          const idx = (d.indices || []).map(i => `${i.name} ${i.price} (${(i.pct||0) >= 0 ? '+' : ''}${(i.pct||0).toFixed(2)}%)`).join(', ');
-          const g = (d.gainers || []).slice(0, 3).map(m => `${m.symbol} ${(m.pct||0) >= 0 ? '+' : ''}${(m.pct||0).toFixed(1)}%`).join(', ');
-          const l = (d.losers || []).slice(0, 3).map(m => `${m.symbol} ${(m.pct||0).toFixed(1)}%`).join(', ');
-          if (idx) { contextBlock = `LIVE MARKETS SNAPSHOT:\nIndices: ${idx}\nTop gainers: ${g || '—'}\nTop losers: ${l || '—'}`; deepLink = '/finance'; }
-        }
-      } catch {}
-      if (!contextBlock) contextBlock = buildFeedContextBlock(retrieveFeedContext(q, arts, { resolveDeepLink })); // fall back to feed
-    } else {
-      contextBlock = buildFeedContextBlock(ctx);
+    // Detect a pasted URL/YouTube in the question → extract-first, tier 'open'
+    const urlMatch = q.match(/https?:\/\/[^\s]+/);
+    if (urlMatch) {
+      const { summary, error } = await fetchSummary({ type:'article', title:'Ask', content:`QUESTION: ${q}`, mode:'chat-open', url: urlMatch[0] });
+      pushBot(summary, error, 'open'); setLoading(false); return;
     }
 
-    const content = contextBlock
-      ? `FEED CONTEXT:\n${contextBlock}\n\nQUESTION: ${q}`
-      : `FEED CONTEXT: (no matching stories found in today's feed)\n\nQUESTION: ${q}`;
+    // Reader context present → answer about that article, tier 'open'
+    if (chatContext) {
+      const content = `ARTICLE:\n${chatContext.title}\n${chatContext.desc || ''}\n\nQUESTION: ${q}`;
+      const { summary, error } = await fetchSummary({ type:'article', title:chatContext.title, content, mode:'chat-open', url: chatContext.link });
+      pushBot(summary, error, 'open'); setLoading(false); return;
+    }
 
-    const { summary, error } = await fetchSummary({ type:'article', title:'concierge', content, mode:'chat' });
-    const t2 = new Date().toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'});
-    const botText = error
-      ? (error.includes('No AI provider') ? '⚙️ AI not configured — add GROQ_API_KEY in Vercel env vars, then redeploy.' : 'Sorry, I couldn\'t reach the AI right now. Try again in a moment.')
-      : (summary || 'No response.');
-    setMsgs(m => [...m, { role:'bot', text: botText, time:t2, link: (!error && contextBlock) ? deepLink : null }]);
-    setLoading(false);
+    // Tier 1: FEED
+    const ctx = retrieveFeedContext(q, arts, { resolveDeepLink });
+    const feedBlock = buildFeedContextBlock(ctx);
+    if (feedBlock) {
+      const content = `FEED CONTEXT:\n${feedBlock}\n\nQUESTION: ${q}`;
+      const { summary, error } = await fetchSummary({ type:'article', title:'concierge', content, mode:'chat' });
+      if (summary && !/isn't in today's feed/i.test(summary)) { pushBot(summary, error, 'feed', ctx.deepLink); setLoading(false); return; }
+    }
+
+    // Tier 2: WEB
+    try {
+      const web = await fetchWebSearch(q);
+      if (web && web.length) {
+        const webBlock = web.slice(0,5).map(r=>`${r.title} — ${r.desc||''} (${r.source})`).join('\n');
+        const content = `WEB RESULTS:\n${webBlock}\n\nQUESTION: ${q}`;
+        const { summary, error } = await fetchSummary({ type:'article', title:'web', content, mode:'chat-open' });
+        if (summary) { pushBot(summary, error, 'web'); setLoading(false); return; }
+      }
+    } catch {}
+
+    // Tier 3: AI-general
+    const { summary, error } = await fetchSummary({ type:'article', title:'ask', content:`QUESTION: ${q}\n\nAnswer from general knowledge, concisely.`, mode:'chat-open' });
+    pushBot(summary, error, 'ai'); setLoading(false);
   };
 
   const analyze = async () => {
@@ -121,9 +141,17 @@ export function ChatBot({ arts, onNavigate, fetchSummary, resolveDeepLink }) {
           </div>
           {chatMode === 'chat' ? (
             <>
+              {chatContext && (
+                <div className="chat-context-chip">
+                  <span className="chat-context-label">Asking about:</span>
+                  <span className="chat-context-title">{chatContext.title}</span>
+                  <button className="chat-context-clear" onClick={onClearContext} aria-label="Clear context">✕</button>
+                </div>
+              )}
               <div className="chat-messages">
                 {msgs.map((m, i) => (
                   <div key={i} className={`chat-msg ${m.role}`}>
+                    {m.tier && <span className={`chat-tier chat-tier-${m.tier}`}>{m.tier==='feed'?'● FEED':m.tier==='web'?'● WEB':m.tier==='open'?'● THIS':'● AI'}</span>}
                     <div className="chat-bubble">{m.text}</div>
                     {m.link && onNavigate && (
                       <button className="chat-deeplink" onClick={()=>{ onNavigate(m.link); setOpen(false); }}>Open in app →</button>

@@ -7429,7 +7429,7 @@ function AnalyzePanel({ onClose }) {
 // ─── ARTICLE READER ───────────────────────────────────────────────────────────
 // XPulse component now lives in ./modules/x-pulse
 
-function ArticleReader({ article, onClose }) {
+function ArticleReader({ article, onClose, onAskInChat }) {
   const [aiResult, setAiResult] = useState('');
   const [aiErr, setAiErr] = useState('');
   const [aiLoading, setAiLoading] = useState(false);
@@ -7468,6 +7468,7 @@ function ArticleReader({ article, onClose }) {
             <button className="article-reader-btn" onClick={() => runAI('summary')}>✦ Summarize</button>
             <button className="article-reader-btn" onClick={() => runAI('takeaways')}>Key Points</button>
             <button className="article-reader-btn" onClick={() => runAI('bias')}>Bias Check</button>
+            <button className="article-reader-btn" onClick={() => { onAskInChat?.(article); onClose(); }}>💬 Ask in Chat</button>
           </div>
           {aiLoading && <div className="article-reader-ai-result" style={{color:'var(--text3)'}}>Analyzing with AI…</div>}
           {!aiLoading && aiErr && (
@@ -7571,6 +7572,7 @@ export default function App() {
   const [clicks, setClicks]     = useState(()=>ld('clicks',{}));
   const [readLinks, setReadLinks] = useState(()=>new Set(ld('readLinks',[])));
   const [readerArticle, setReaderArticle] = useState(null);
+  const [chatContext, setChatContext] = useState(null);
   const [perspArticle, setPerspArticle] = useState(null);
   const [showAnalyze, setShowAnalyze] = useState(false);
   const [webResults, setWebResults] = useState([]);
@@ -9680,9 +9682,12 @@ export default function App() {
       <ChatBot arts={arts}
         onNavigate={(path)=>{ const p=(path||'').split('/').filter(Boolean); navigate(p[0]||'general', p[1]||null, p[2]||null); }}
         fetchSummary={fetchAISummary}
+        fetchWebSearch={fetchWebSearch}
+        chatContext={chatContext}
+        onClearContext={()=>setChatContext(null)}
         resolveDeepLink={({entities})=>{ for(const [lg,names] of Object.entries(TEAM_CHIPS)){ const hit=names.find(n=>{const w=n.toLowerCase().split(' ');return w.some(x=>entities.includes(x))||entities.some(k=>k.length>3&&n.toLowerCase().includes(k));}); if(hit) return `/sports/${lg}/${teamSlug(hit)}`; } return null; }}/>
       {/* Inline article reader overlay */}
-      {readerArticle && <ArticleReader article={readerArticle} onClose={() => setReaderArticle(null)}/>}
+      {readerArticle && <ArticleReader article={readerArticle} onClose={() => setReaderArticle(null)} onAskInChat={(a)=>setChatContext(a)}/>}
       {/* Perspectives panel (sources + X Pulse + AI key points) */}
       {perspArticle && <PerspectivesPanel article={perspArticle} onClose={() => setPerspArticle(null)}/>}
       {/* Paste & Brief panel */}

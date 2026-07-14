@@ -119,3 +119,14 @@
 .chat-analyze-result-label{font-size:9px;font-weight:800;color:#6001d2;text-transform:uppercase;letter-spacing:0.1em;margin-bottom:8px;}
 .chat-analyze-result-text{font-size:13px;color:var(--text);line-height:1.6;white-space:pre-wrap;}
 .chat-analyze-clear{margin-top:8px;background:none;border:1px solid var(--border);border-radius:6px;padding:4px 10px;font-size:11px;color:var(--text3);cursor:pointer;font-family:var(--font-sans);}
+
+/* Unified assistant: reader-context chip + source-tier badges */
+.chat-context-chip{display:flex;align-items:center;gap:6px;padding:8px 12px;background:var(--surface2);border-bottom:1px solid var(--border);font-size:11px;}
+.chat-context-label{font-weight:800;color:var(--text3);text-transform:uppercase;letter-spacing:0.06em;}
+.chat-context-title{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--text);font-weight:600;}
+.chat-context-clear{background:none;border:none;cursor:pointer;color:var(--text3);font-size:13px;}
+.chat-tier{display:inline-block;font-size:8px;font-weight:900;letter-spacing:0.08em;margin-bottom:3px;opacity:0.75;}
+.chat-tier-feed{color:#16a34a;}
+.chat-tier-web{color:#2563eb;}
+.chat-tier-ai{color:#9333ea;}
+.chat-tier-open{color:var(--accent);}
