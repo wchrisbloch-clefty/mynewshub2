@@ -47,6 +47,7 @@ import { SnapshotCard, CoverageList } from './modules/snapshot-card';
 import { MarketsSurface, useMarkets } from './modules/markets-surface';
 import { parseRoute, buildPath } from './modules/routing';
 import { ChatBot } from './modules/concierge';
+import { isCloudSyncEnabled, getUserId, signInWithEmail, signOut, onAuthStateChange, loadProfileFromCloud, saveProfileToCloud, emitEvent } from './lib/cloudSync';
 
 // ─── CATEGORIES ───────────────────────────────────────────────────────────────
 // One brand accent across all sections — hierarchy comes from type, not colour-coded
@@ -6994,7 +6995,7 @@ function LastUpdated({ timestamp, onRefresh }) {
 function TopBar({tab, setTab, search, setSearch, dark, setDark,
                  onCustomize, onRefresh, breakingItems, onTickerClick,
                  hidden, shrunk, mobileSearchOpen, onMobileSearchToggle, weatherCities, hiddenIndices,
-                 onAnalyze, searchHistory, trendingTopics}) {
+                 onAnalyze, searchHistory, trendingTopics, onAccount, signedIn}) {
   const [searchFocused, setSearchFocused] = useState(false);
   const [quotes, setQuotes] = useState({});
   const [showBreaking, setShowBreaking] = useState(true);
@@ -7148,6 +7149,9 @@ function TopBar({tab, setTab, search, setSearch, dark, setDark,
                 ? <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>
                 : <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
               }
+            </button>
+            <button className="nav-icon-btn" onClick={onAccount} title={signedIn?'Account — synced':'Sign in to sync'} style={signedIn?{color:'#16a34a'}:undefined}>
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
             </button>
             <button className="nav-btn-blue" onClick={onCustomize}>
               <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{flexShrink:0}}><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06-.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
@@ -7546,6 +7550,42 @@ function PerspectivesPanel({ article, onClose }) {
   );
 }
 
+// ─── AUTH MODAL ──────────────────────────────────────────────────────────────
+// v26b: minimal email magic-link sign-in. On success Supabase emails a link;
+// clicking it establishes a session, which onAuthStateChange picks up in App.
+function AuthModal({ onClose, onSend, status, email, setEmail, userId, onSignOut }) {
+  const overlay = {position:'fixed',inset:0,background:'rgba(0,0,0,.45)',display:'flex',alignItems:'center',justifyContent:'center',zIndex:9999,padding:16};
+  const card = {position:'relative',background:'var(--surface,#fff)',color:'var(--text,#111)',width:'min(94vw,380px)',borderRadius:14,padding:'26px 24px',boxShadow:'0 12px 40px rgba(0,0,0,.28)',border:'1px solid var(--border,#e5e7eb)'};
+  const input = {width:'100%',padding:'11px 12px',border:'1px solid var(--border,#d5d8dc)',borderRadius:9,fontSize:15,margin:'0 0 12px',boxSizing:'border-box',background:'var(--surface2,#fff)',color:'inherit'};
+  const btn = {width:'100%',padding:'11px 12px',border:'none',borderRadius:9,background:'#2563eb',color:'#fff',fontSize:15,fontWeight:600,cursor:'pointer',opacity:(status==='sending')?0.6:1};
+  return (
+    <div style={overlay} onClick={onClose}>
+      <div style={card} onClick={e=>e.stopPropagation()}>
+        <button onClick={onClose} style={{position:'absolute',top:12,right:14,border:'none',background:'none',fontSize:18,cursor:'pointer',color:'inherit',lineHeight:1}}>✕</button>
+        {userId ? (
+          <>
+            <h3 style={{margin:'0 0 6px',fontSize:18}}>You're signed in</h3>
+            <p style={{margin:'0 0 18px',fontSize:14,opacity:.7}}>Your keywords, teams and sources sync across your devices.</p>
+            <button style={{...btn,background:'#dc2626'}} onClick={onSignOut}>Sign out</button>
+          </>
+        ) : (
+          <>
+            <h3 style={{margin:'0 0 6px',fontSize:18}}>Sign in to sync</h3>
+            <p style={{margin:'0 0 18px',fontSize:14,opacity:.7}}>Enter your email and we'll send a magic sign-in link. No password needed.</p>
+            <input style={input} type="email" placeholder="you@example.com" value={email}
+              onChange={e=>setEmail(e.target.value)} onKeyDown={e=>{if(e.key==='Enter')onSend();}} autoFocus/>
+            <button style={btn} onClick={onSend} disabled={status==='sending'||!email}>
+              {status==='sending'?'Sending…':'Send magic link'}
+            </button>
+            {status==='sent' && <p style={{margin:'12px 0 0',fontSize:13,color:'#16a34a'}}>Check your email for the sign-in link.</p>}
+            {status==='error' && <p style={{margin:'12px 0 0',fontSize:13,color:'#dc2626'}}>Couldn't send the link. Check the address and try again.</p>}
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
 export default function App() {
   const [tab, setTab]           = useState(()=>parseRoute().category);
   const [subcat, setSubcat]     = useState(()=>parseRoute().subcategory); // URL-driven subcategory
@@ -7907,6 +7947,82 @@ export default function App() {
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
   }, [readerArticle, showAnalyze, perspArticle]);
+
+  // ─── v26b: CLOUD SYNC (Supabase) ──────────────────────────────────────────
+  // userId is null until the user signs in via the magic-link flow; once set,
+  // saveProfileToCloud/emitEvent receive a real id. Config sync is symmetric:
+  // applyCloudConfig pulls the profile down, a debounced effect pushes it up.
+  const [userId, setUserId]         = useState(null);
+  const [showAuth, setShowAuth]     = useState(false);
+  const [authEmail, setAuthEmail]   = useState('');
+  const [authStatus, setAuthStatus] = useState(''); // '' | 'sending' | 'sent' | 'error'
+  const cloudLoadedRef = useRef(false); // gate saves until the first pull completes
+
+  // The slice of local state that mirrors to newshub_profiles.config.
+  const cloudConfig = useMemo(() => ({
+    kw, teams, feeds, alerts, urgent, social, watchlist,
+    weatherCities, hiddenIndices, briefingExclude, briefingSources,
+    myTeams, myTopics,
+  }), [kw, teams, feeds, alerts, urgent, social, watchlist,
+       weatherCities, hiddenIndices, briefingExclude, briefingSources, myTeams, myTopics]);
+
+  // Apply a downloaded profile onto local state (+ localStorage), keying defensively.
+  const applyCloudConfig = useCallback((cfg) => {
+    if (!cfg || typeof cfg !== 'object') return;
+    const put = (key, val, setter) => { if (val !== undefined && val !== null) { setter(val); sv(key, val); } };
+    put('kw', cfg.kw, setKw);
+    put('teams', cfg.teams, setTeams);
+    put('feeds', cfg.feeds, setFeeds);
+    put('alerts', cfg.alerts, setAlerts);
+    put('urgent', cfg.urgent, setUrgent);
+    put('social', cfg.social, setSocial);
+    put('watchlist', cfg.watchlist, setWatchlist);
+    put('weatherCities', cfg.weatherCities, setWeatherCities);
+    put('hiddenIndices', cfg.hiddenIndices, setHiddenIndices);
+    put('briefingExclude', cfg.briefingExclude, setBriefingExclude);
+    put('briefingSources', cfg.briefingSources, setBriefingSources);
+    put('myTeams', cfg.myTeams, setMyTeams);
+    put('myTopics', cfg.myTopics, setMyTopics);
+  }, []);
+
+  const pullCloudProfile = useCallback(async (uid) => {
+    if (!uid) return;
+    const cfg = await loadProfileFromCloud(uid);
+    applyCloudConfig(cfg);
+    cloudLoadedRef.current = true;
+  }, [applyCloudConfig]);
+
+  // On load: adopt an existing session and pull its profile; then react to sign-in/out.
+  useEffect(() => {
+    if (!isCloudSyncEnabled()) return;
+    getUserId().then(uid => { if (uid) { setUserId(uid); pullCloudProfile(uid); } });
+    const unsub = onAuthStateChange((user) => {
+      const id = user?.id || null;
+      setUserId(id);
+      cloudLoadedRef.current = false;
+      if (id) pullCloudProfile(id);
+    });
+    return unsub;
+  }, [pullCloudProfile]);
+
+  // Push config up whenever it changes (debounced), once signed in and pulled.
+  useEffect(() => {
+    if (!userId || !cloudLoadedRef.current) return;
+    const t = setTimeout(() => {
+      saveProfileToCloud(userId, cloudConfig);
+      emitEvent('config_changed', { keys: Object.keys(cloudConfig) }, userId);
+    }, 800);
+    return () => clearTimeout(t);
+  }, [userId, cloudConfig]);
+
+  const handleSendMagicLink = async () => {
+    const email = authEmail.trim();
+    if (!email) return;
+    setAuthStatus('sending');
+    const { error } = await signInWithEmail(email);
+    setAuthStatus(error ? 'error' : 'sent');
+  };
+  const handleSignOut = async () => { await signOut(); setUserId(null); setShowAuth(false); };
 
   const handleCustomizeSave = ({feeds:nf,kw:nk,alerts:na,urgent:nu,social:ns,watchlist:nw,teams:nt,weatherCities:nwx,hiddenIndices:ni,briefingExclude:nbe,briefingSources:nbs})=>{
     setFeeds(nf);sv('feeds',nf);
@@ -9620,7 +9736,8 @@ export default function App() {
           hiddenIndices={hiddenIndices}
           onAnalyze={() => setShowAnalyze(true)}
           searchHistory={searchHistory}
-          trendingTopics={homeTrendingTopics}/>
+          trendingTopics={homeTrendingTopics}
+          onAccount={()=>setShowAuth(true)} signedIn={!!userId}/>
 
         {/* Pull-to-refresh indicator (mobile, touch-only) */}
         {isMobile && <PtrIndicator distance={ptrDistance} threshold={70} refreshing={refreshing}/>}
@@ -9692,6 +9809,9 @@ export default function App() {
       {perspArticle && <PerspectivesPanel article={perspArticle} onClose={() => setPerspArticle(null)}/>}
       {/* Paste & Brief panel */}
       {showAnalyze && <AnalyzePanel onClose={() => setShowAnalyze(false)}/>}
+      {/* v26b: email magic-link sign-in */}
+      {showAuth && <AuthModal onClose={()=>{setShowAuth(false);setAuthStatus('');}} onSend={handleSendMagicLink}
+        status={authStatus} email={authEmail} setEmail={setAuthEmail} userId={userId} onSignOut={handleSignOut}/>}
     </>
   );
 }
