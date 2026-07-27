@@ -930,6 +930,56 @@ async function fetchListen(url) {
   }
 }
 
+// Consensus / contradiction detection for entity & topic pages.
+async function fetchContradictions(topic, items) {
+  try {
+    const r = await fetch('/api/contradictions', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ topic, items }),
+      signal: AbortSignal.timeout(20000),
+    });
+    if (!r.ok) return { consensus: '', conflicts: [] };
+    return await r.json();
+  } catch { return { consensus: '', conflicts: [] }; }
+}
+
+// "Sources disagree" panel — renders ONLY when a genuine factual conflict exists.
+// Positions arrive already ordered strongest-tier-first from the API, so a lone
+// verified source reads as authoritative rather than a false 50/50.
+const TIER_LABEL = { verified: 'Verified', reported: 'Reported', unverified: 'Unverified' };
+function SourcesDisagree({ topic, items }) {
+  const [data, setData] = useState(null);
+  useEffect(() => {
+    let alive = true;
+    if (!topic || !items || items.length < 3) { setData(null); return () => { alive = false; }; }
+    const payload = items.slice(0, 10).map(a => ({
+      title: a.title, summary: (a.desc || '').slice(0, 220),
+      source: a.source || '', tier: a._tier || a.tier || 'reported',
+    }));
+    fetchContradictions(topic, payload).then(r => { if (alive) setData(r); });
+    return () => { alive = false; };
+  }, [topic, items]);
+  if (!data || !Array.isArray(data.conflicts) || data.conflicts.length === 0) return null;
+  return (
+    <div className="disagree-panel">
+      <div className="disagree-head"><span className="disagree-dot"/> Sources disagree</div>
+      {data.consensus && <div className="disagree-consensus"><strong>Most agree:</strong> {data.consensus}</div>}
+      {data.conflicts.map((c, i) => (
+        <div key={i} className="disagree-conflict">
+          <div className="disagree-issue">{c.issue}</div>
+          {c.positions.map((p, j) => (
+            <div key={j} className={`disagree-pos tier-${p.tier}`}>
+              <span className="disagree-tier">{TIER_LABEL[p.tier] || p.tier}</span>
+              <span className="disagree-claim">{p.claim}</span>
+              {p.sources && p.sources.length > 0 && <span className="disagree-src">— {p.sources.join(', ')}</span>}
+            </div>
+          ))}
+        </div>
+      ))}
+    </div>
+  );
+}
+
 function TakeawaysContent({text}) {
   if (!text) return null;
   const lines = text.split('\n').filter(l=>l.trim());
@@ -2658,6 +2708,21 @@ body:not(.dark) .pill-bar{
 }
 .team-hub-link:hover{border-color:var(--accent);color:var(--accent);}
 .team-hub-count{font-size:12px;color:var(--text3);margin-top:2px;}
+/* Sources disagree — compact contradiction panel (entity/topic pages) */
+.disagree-panel{border:1px solid var(--border);border-left:3px solid #dc2626;border-radius:10px;padding:12px 14px;margin:0 0 16px;background:var(--surface2);}
+.disagree-head{display:flex;align-items:center;gap:7px;font-size:12px;font-weight:800;text-transform:uppercase;letter-spacing:0.06em;color:var(--text);margin-bottom:8px;}
+.disagree-dot{width:7px;height:7px;border-radius:50%;background:#dc2626;display:inline-block;flex-shrink:0;}
+.disagree-consensus{font-size:12px;color:var(--text2);margin-bottom:10px;line-height:1.5;}
+.disagree-conflict{padding-top:8px;border-top:1px solid var(--border);margin-top:8px;}
+.disagree-conflict:first-of-type{border-top:none;margin-top:0;padding-top:0;}
+.disagree-issue{font-size:11px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:0.04em;margin-bottom:5px;}
+.disagree-pos{display:flex;align-items:baseline;gap:8px;font-size:12.5px;line-height:1.45;margin-bottom:4px;flex-wrap:wrap;}
+.disagree-tier{flex-shrink:0;font-size:9px;font-weight:800;text-transform:uppercase;letter-spacing:0.05em;padding:1px 6px;border-radius:10px;}
+.disagree-pos.tier-verified .disagree-tier{background:#16a34a;color:#fff;}
+.disagree-pos.tier-reported .disagree-tier{background:#d97706;color:#fff;}
+.disagree-pos.tier-unverified .disagree-tier{background:var(--surface);color:var(--text3);border:1px solid var(--border);}
+.disagree-claim{color:var(--text);}
+.disagree-src{color:var(--text3);font-size:11px;}
 .team-hub-clear{
   font-size:12px;font-weight:600;color:var(--text3);
   background:none;border:1px solid var(--border);border-radius:14px;
@@ -8386,6 +8451,7 @@ export default function App() {
               <div className="feed-col">
                 <StateOfPlay items={teamItems} meta={CATS.sports} onRead={onRead} formatDate={fmtDate}/>
                 <TrendingPills label={`Trending · ${teamName}`} items={teamItems} onOpen={t=>setSearch(t.toLowerCase())} isTopicFollowed={isTopicFollowed} toggleTopic={toggleTopic}/>
+                <SourcesDisagree topic={teamName} items={teamItems}/>
                 {teamItems.length === 0
                   ? <div className="empty-state"><div className="empty-icon"></div><div className="empty-msg">No recent stories for {teamName}</div><button className="refresh-btn" onClick={()=>loadCat('sports')}>Refresh</button></div>
                   : <div className="snap-feed">
@@ -8604,6 +8670,7 @@ export default function App() {
         </div>
         <StateOfPlay items={entityItems} meta={cc} onRead={onRead} formatDate={fmtDate}/>
         <TrendingPills label={`Trending · ${entity}`} items={entityItems} onOpen={t => navigate(cat, 'topic', teamSlug(t))} isTopicFollowed={isTopicFollowed} toggleTopic={toggleTopic}/>
+        <SourcesDisagree topic={entity} items={entityItems}/>
         {entityItems.length === 0
           ? <div className="empty-state"><div className="empty-icon"></div><div className="empty-msg">No recent stories mentioning “{entity}”.</div><button className="refresh-btn" onClick={() => loadCat(cat)}>Refresh</button></div>
           : <div className="snap-feed">
