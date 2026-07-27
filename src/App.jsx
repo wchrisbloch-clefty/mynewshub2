@@ -4720,11 +4720,15 @@ kbd{display:inline-block;padding:1px 5px;border:1px solid var(--border);border-r
   font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:0.12em;
   color:var(--text3);
 }
+/* Bento grid: story size reflects priority. The lead spans a 2×2 block; the four
+   secondaries fill the remaining cells. One column on mobile (see media query). */
 .toh-grid{
   display:grid;
-  grid-template-columns:1.65fr 1fr 1fr;
+  grid-template-columns:repeat(4,1fr);
+  grid-auto-rows:188px;
   gap:14px;
 }
+.toh-card-lead{grid-column:span 2;grid-row:span 2;}
 .toh-card{
   position:relative;border-radius:10px;overflow:hidden;
   cursor:pointer;display:block;
@@ -4732,9 +4736,8 @@ kbd{display:inline-block;padding:1px 5px;border:1px solid var(--border);border-r
   transition:transform 0.2s,box-shadow 0.2s;
 }
 .toh-card:hover{transform:translateY(-2px);box-shadow:0 12px 40px rgba(0,0,0,0.22);}
-/* Aspect ratio via padding trick */
-.toh-card::before{content:'';display:block;padding-bottom:62%;}
-.toh-card-lead::before{padding-bottom:54%;}
+/* Card height comes from the bento grid rows now, not an aspect-ratio spacer. */
+.toh-card::before{content:none;}
 .toh-img,.toh-img-ph{
   position:absolute;inset:0;
   background-size:cover;background-position:center top;
@@ -4775,29 +4778,22 @@ kbd{display:inline-block;padding:1px 5px;border:1px solid var(--border);border-r
 }
 /* Tablet: 2-col */
 @media(max-width:1000px) and (min-width:641px){
-  .toh-grid{grid-template-columns:1.4fr 1fr;}
-  .toh-card:nth-child(3){display:none;}
-  .toh-card-lead .toh-title{font-size:19px;}
+  .toh-grid{grid-template-columns:repeat(2,1fr);grid-auto-rows:156px;}
+  .toh-card-lead{grid-column:span 2;grid-row:span 2;}
+  .toh-card-lead .toh-title{font-size:20px;}
 }
-/* Mobile: horizontal scroll */
+/* Mobile: single column, stacking order preserved (lead first). */
 @media(max-width:640px){
   .toh-strip{margin-bottom:20px;}
   .toh-grid{
-    display:flex;gap:10px;
-    overflow-x:auto;scroll-snap-type:x mandatory;
-    -webkit-overflow-scrolling:touch;
-    margin:0 -12px;padding:0 12px 8px;
-    scrollbar-width:none;
+    grid-template-columns:1fr;
+    grid-auto-rows:194px;
+    gap:12px;
   }
-  .toh-grid::-webkit-scrollbar{display:none;}
-  .toh-card,.toh-card-lead{
-    flex-shrink:0;width:72vw;min-width:220px;max-width:280px;
-    scroll-snap-align:start;border-radius:8px;
-  }
-  .toh-card::before,.toh-card-lead::before{padding-bottom:65%;}
-  .toh-card:nth-child(3){display:block;}
-  .toh-title{font-size:14px;}
-  .toh-card-lead .toh-title{font-size:17px;}
+  .toh-card-lead{grid-column:auto;grid-row:auto;}
+  .toh-card-lead::before{content:none;}
+  .toh-title{font-size:16px;}
+  .toh-card-lead .toh-title{font-size:19px;}
 }
 
 /* ── BRIEFING TEASER — editorial dark card ─────────────────────── */
@@ -7334,13 +7330,22 @@ function TopOfHourStrip({ catLead, arts, onRead }) {
   const stories = useMemo(() => {
     const picks = catLead && catLead.img ? [catLead] : (catLead ? [] : []);
     const used = new Set(catLead ? [catLead.link] : []);
-    const catOrder = ['sports','business','finance','bloom','popculture','general'];
+    const catOrder = ['sports','business','finance','bloom','popculture','general','tech'];
+    // Two passes so the bento fills to 5: one per category first (variety), then
+    // top up from any category if some feeds were empty.
     for (const c of catOrder) {
-      if (picks.length >= 3) break;
+      if (picks.length >= 5) break;
       const item = (arts[c]||[]).find(a => a.img && !used.has(a.link));
       if (item) { picks.push({...item, cat: item.cat||c}); used.add(item.link); }
     }
-    return picks.slice(0,3);
+    for (const c of catOrder) {
+      if (picks.length >= 5) break;
+      for (const a of (arts[c]||[])) {
+        if (picks.length >= 5) break;
+        if (a.img && !used.has(a.link)) { picks.push({...a, cat: a.cat||c}); used.add(a.link); }
+      }
+    }
+    return picks.slice(0,5);
   }, [catLead, arts]);
   if (stories.length < 1) return null;
   return (
