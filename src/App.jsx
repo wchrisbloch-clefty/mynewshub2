@@ -913,6 +913,120 @@ async function fetchAISummary({type, title, content, mode='summary', url}) {
   }
 }
 
+// Capture-first path for pasted media links: hits /api/listen, which pulls real
+// YouTube captions or transcribes audio via Groq Whisper and returns an honest
+// `provenance` flag ('captions' | 'audio' | 'show-notes'). Falls back gracefully.
+async function fetchListen(url) {
+  try {
+    const r = await fetch('/api/listen', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ url }),
+      signal: AbortSignal.timeout(60000),
+    });
+    if (!r.ok) return { summary: '', provenance: 'show-notes', error: `HTTP ${r.status}` };
+    return await r.json();
+  } catch (e) {
+    return { summary: '', provenance: 'show-notes', error: e.name === 'TimeoutError' ? 'Timed out' : 'Network error' };
+  }
+}
+
+// Consensus / contradiction detection for entity & topic pages.
+async function fetchContradictions(topic, items) {
+  try {
+    const r = await fetch('/api/contradictions', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ topic, items }),
+      signal: AbortSignal.timeout(20000),
+    });
+    if (!r.ok) return { consensus: '', conflicts: [] };
+    return await r.json();
+  } catch { return { consensus: '', conflicts: [] }; }
+}
+
+// "Sources disagree" panel — renders ONLY when a genuine factual conflict exists.
+// Positions arrive already ordered strongest-tier-first from the API, so a lone
+// verified source reads as authoritative rather than a false 50/50.
+const TIER_LABEL = { verified: 'Verified', reported: 'Reported', unverified: 'Unverified' };
+function SourcesDisagree({ topic, items }) {
+  const [data, setData] = useState(null);
+  useEffect(() => {
+    let alive = true;
+    if (!topic || !items || items.length < 3) { setData(null); return () => { alive = false; }; }
+    const payload = items.slice(0, 10).map(a => ({
+      title: a.title, summary: (a.desc || '').slice(0, 220),
+      source: a.source || '', tier: a._tier || a.tier || 'reported',
+    }));
+    fetchContradictions(topic, payload).then(r => { if (alive) setData(r); });
+    return () => { alive = false; };
+  }, [topic, items]);
+  if (!data || !Array.isArray(data.conflicts) || data.conflicts.length === 0) return null;
+  return (
+    <div className="disagree-panel">
+      <div className="disagree-head"><span className="disagree-dot"/> Sources disagree</div>
+      {data.consensus && <div className="disagree-consensus"><strong>Most agree:</strong> {data.consensus}</div>}
+      {data.conflicts.map((c, i) => (
+        <div key={i} className="disagree-conflict">
+          <div className="disagree-issue">{c.issue}</div>
+          {c.positions.map((p, j) => (
+            <div key={j} className={`disagree-pos tier-${p.tier}`}>
+              <span className="disagree-tier">{TIER_LABEL[p.tier] || p.tier}</span>
+              <span className="disagree-claim">{p.claim}</span>
+              {p.sources && p.sources.length > 0 && <span className="disagree-src">— {p.sources.join(', ')}</span>}
+            </div>
+          ))}
+        </div>
+      ))}
+    </div>
+  );
+}
+
+// Coverage-gap discovery: stories multiple wider outlets cover that none of the
+// reader's own sources touched. Capped at 'reported' tier by the API.
+async function fetchDiscover(category, keywords, followedSources) {
+  try {
+    const r = await fetch('/api/discover', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ category, keywords, followedSources }),
+      signal: AbortSignal.timeout(15000),
+    });
+    if (!r.ok) return { items: [] };
+    return await r.json();
+  } catch { return { items: [] }; }
+}
+
+// "You may be missing this" — compact panel, distinct from the main feed. Renders
+// only when a genuine gap exists; each item is tagged "Not in your sources".
+function CoverageGap({ category, keywords, followedSources }) {
+  const [items, setItems] = useState([]);
+  const kwKey = (keywords || []).join('|');
+  const srcKey = (followedSources || []).join('|');
+  useEffect(() => {
+    let alive = true;
+    if (!keywords || !keywords.length) { setItems([]); return () => { alive = false; }; }
+    fetchDiscover(category, keywords, followedSources).then(r => { if (alive) setItems((r && r.items) || []); });
+    return () => { alive = false; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [category, kwKey, srcKey]);
+  if (!items.length) return null;
+  return (
+    <div className="gap-panel">
+      <div className="gap-head">
+        <span className="gap-title">You may be missing this</span>
+        <span className="gap-sub">Widely covered — but not in your sources</span>
+      </div>
+      <div className="gap-list">
+        {items.map((it, i) => (
+          <a key={i} className="gap-item" href={it.link} target="_blank" rel="noreferrer">
+            <span className="gap-tag">Not in your sources</span>
+            <span className="gap-item-title">{it.title}</span>
+            <span className="gap-item-meta">{it.outletCount} outlets · {it.source}</span>
+          </a>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 function TakeawaysContent({text}) {
   if (!text) return null;
   const lines = text.split('\n').filter(l=>l.trim());
@@ -2641,6 +2755,32 @@ body:not(.dark) .pill-bar{
 }
 .team-hub-link:hover{border-color:var(--accent);color:var(--accent);}
 .team-hub-count{font-size:12px;color:var(--text3);margin-top:2px;}
+/* Sources disagree — compact contradiction panel (entity/topic pages) */
+.disagree-panel{border:1px solid var(--border);border-left:3px solid #dc2626;border-radius:10px;padding:12px 14px;margin:0 0 16px;background:var(--surface2);}
+.disagree-head{display:flex;align-items:center;gap:7px;font-size:12px;font-weight:800;text-transform:uppercase;letter-spacing:0.06em;color:var(--text);margin-bottom:8px;}
+.disagree-dot{width:7px;height:7px;border-radius:50%;background:#dc2626;display:inline-block;flex-shrink:0;}
+.disagree-consensus{font-size:12px;color:var(--text2);margin-bottom:10px;line-height:1.5;}
+.disagree-conflict{padding-top:8px;border-top:1px solid var(--border);margin-top:8px;}
+.disagree-conflict:first-of-type{border-top:none;margin-top:0;padding-top:0;}
+.disagree-issue{font-size:11px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:0.04em;margin-bottom:5px;}
+.disagree-pos{display:flex;align-items:baseline;gap:8px;font-size:12.5px;line-height:1.45;margin-bottom:4px;flex-wrap:wrap;}
+.disagree-tier{flex-shrink:0;font-size:9px;font-weight:800;text-transform:uppercase;letter-spacing:0.05em;padding:1px 6px;border-radius:10px;}
+.disagree-pos.tier-verified .disagree-tier{background:#16a34a;color:#fff;}
+.disagree-pos.tier-reported .disagree-tier{background:#d97706;color:#fff;}
+.disagree-pos.tier-unverified .disagree-tier{background:var(--surface);color:var(--text3);border:1px solid var(--border);}
+.disagree-claim{color:var(--text);}
+.disagree-src{color:var(--text3);font-size:11px;}
+/* Coverage gap — "You may be missing this" panel (General, below Trending) */
+.gap-panel{border:1px dashed var(--border);border-radius:10px;padding:12px 14px;margin:0 0 20px;background:var(--surface2);}
+.gap-head{display:flex;align-items:baseline;gap:8px;flex-wrap:wrap;margin-bottom:10px;}
+.gap-title{font-size:13px;font-weight:800;color:var(--text);}
+.gap-sub{font-size:11px;color:var(--text3);}
+.gap-list{display:grid;gap:8px;}
+.gap-item{display:flex;flex-direction:column;gap:3px;padding:9px 11px;border-radius:8px;background:var(--surface);border:1px solid var(--border);text-decoration:none;transition:border-color 0.15s ease;}
+.gap-item:hover{border-color:var(--accent);}
+.gap-tag{align-self:flex-start;font-size:8px;font-weight:800;text-transform:uppercase;letter-spacing:0.06em;color:#b45309;background:rgba(217,119,6,0.12);padding:1px 7px;border-radius:10px;}
+.gap-item-title{font-size:13px;font-weight:600;color:var(--text);line-height:1.35;}
+.gap-item-meta{font-size:11px;color:var(--text3);}
 .team-hub-clear{
   font-size:12px;font-weight:600;color:var(--text3);
   background:none;border:1px solid var(--border);border-radius:14px;
@@ -4703,11 +4843,15 @@ kbd{display:inline-block;padding:1px 5px;border:1px solid var(--border);border-r
   font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:0.12em;
   color:var(--text3);
 }
+/* Bento grid: story size reflects priority. The lead spans a 2×2 block; the four
+   secondaries fill the remaining cells. One column on mobile (see media query). */
 .toh-grid{
   display:grid;
-  grid-template-columns:1.65fr 1fr 1fr;
+  grid-template-columns:repeat(4,1fr);
+  grid-auto-rows:188px;
   gap:14px;
 }
+.toh-card-lead{grid-column:span 2;grid-row:span 2;}
 .toh-card{
   position:relative;border-radius:10px;overflow:hidden;
   cursor:pointer;display:block;
@@ -4715,9 +4859,8 @@ kbd{display:inline-block;padding:1px 5px;border:1px solid var(--border);border-r
   transition:transform 0.2s,box-shadow 0.2s;
 }
 .toh-card:hover{transform:translateY(-2px);box-shadow:0 12px 40px rgba(0,0,0,0.22);}
-/* Aspect ratio via padding trick */
-.toh-card::before{content:'';display:block;padding-bottom:62%;}
-.toh-card-lead::before{padding-bottom:54%;}
+/* Card height comes from the bento grid rows now, not an aspect-ratio spacer. */
+.toh-card::before{content:none;}
 .toh-img,.toh-img-ph{
   position:absolute;inset:0;
   background-size:cover;background-position:center top;
@@ -4758,29 +4901,22 @@ kbd{display:inline-block;padding:1px 5px;border:1px solid var(--border);border-r
 }
 /* Tablet: 2-col */
 @media(max-width:1000px) and (min-width:641px){
-  .toh-grid{grid-template-columns:1.4fr 1fr;}
-  .toh-card:nth-child(3){display:none;}
-  .toh-card-lead .toh-title{font-size:19px;}
+  .toh-grid{grid-template-columns:repeat(2,1fr);grid-auto-rows:156px;}
+  .toh-card-lead{grid-column:span 2;grid-row:span 2;}
+  .toh-card-lead .toh-title{font-size:20px;}
 }
-/* Mobile: horizontal scroll */
+/* Mobile: single column, stacking order preserved (lead first). */
 @media(max-width:640px){
   .toh-strip{margin-bottom:20px;}
   .toh-grid{
-    display:flex;gap:10px;
-    overflow-x:auto;scroll-snap-type:x mandatory;
-    -webkit-overflow-scrolling:touch;
-    margin:0 -12px;padding:0 12px 8px;
-    scrollbar-width:none;
+    grid-template-columns:1fr;
+    grid-auto-rows:194px;
+    gap:12px;
   }
-  .toh-grid::-webkit-scrollbar{display:none;}
-  .toh-card,.toh-card-lead{
-    flex-shrink:0;width:72vw;min-width:220px;max-width:280px;
-    scroll-snap-align:start;border-radius:8px;
-  }
-  .toh-card::before,.toh-card-lead::before{padding-bottom:65%;}
-  .toh-card:nth-child(3){display:block;}
-  .toh-title{font-size:14px;}
-  .toh-card-lead .toh-title{font-size:17px;}
+  .toh-card-lead{grid-column:auto;grid-row:auto;}
+  .toh-card-lead::before{content:none;}
+  .toh-title{font-size:16px;}
+  .toh-card-lead .toh-title{font-size:19px;}
 }
 
 /* ── BRIEFING TEASER — editorial dark card ─────────────────────── */
@@ -7317,13 +7453,22 @@ function TopOfHourStrip({ catLead, arts, onRead }) {
   const stories = useMemo(() => {
     const picks = catLead && catLead.img ? [catLead] : (catLead ? [] : []);
     const used = new Set(catLead ? [catLead.link] : []);
-    const catOrder = ['sports','business','finance','bloom','popculture','general'];
+    const catOrder = ['sports','business','finance','bloom','popculture','general','tech'];
+    // Two passes so the bento fills to 5: one per category first (variety), then
+    // top up from any category if some feeds were empty.
     for (const c of catOrder) {
-      if (picks.length >= 3) break;
+      if (picks.length >= 5) break;
       const item = (arts[c]||[]).find(a => a.img && !used.has(a.link));
       if (item) { picks.push({...item, cat: item.cat||c}); used.add(item.link); }
     }
-    return picks.slice(0,3);
+    for (const c of catOrder) {
+      if (picks.length >= 5) break;
+      for (const a of (arts[c]||[])) {
+        if (picks.length >= 5) break;
+        if (a.img && !used.has(a.link)) { picks.push({...a, cat: a.cat||c}); used.add(a.link); }
+      }
+    }
+    return picks.slice(0,5);
   }, [catLead, arts]);
   if (stories.length < 1) return null;
   return (
@@ -8364,6 +8509,7 @@ export default function App() {
               <div className="feed-col">
                 <StateOfPlay items={teamItems} meta={CATS.sports} onRead={onRead} formatDate={fmtDate}/>
                 <TrendingPills label={`Trending · ${teamName}`} items={teamItems} onOpen={t=>setSearch(t.toLowerCase())} isTopicFollowed={isTopicFollowed} toggleTopic={toggleTopic}/>
+                <SourcesDisagree topic={teamName} items={teamItems}/>
                 {teamItems.length === 0
                   ? <div className="empty-state"><div className="empty-icon"></div><div className="empty-msg">No recent stories for {teamName}</div><button className="refresh-btn" onClick={()=>loadCat('sports')}>Refresh</button></div>
                   : <div className="snap-feed">
@@ -8582,6 +8728,7 @@ export default function App() {
         </div>
         <StateOfPlay items={entityItems} meta={cc} onRead={onRead} formatDate={fmtDate}/>
         <TrendingPills label={`Trending · ${entity}`} items={entityItems} onOpen={t => navigate(cat, 'topic', teamSlug(t))} isTopicFollowed={isTopicFollowed} toggleTopic={toggleTopic}/>
+        <SourcesDisagree topic={entity} items={entityItems}/>
         {entityItems.length === 0
           ? <div className="empty-state"><div className="empty-icon"></div><div className="empty-msg">No recent stories mentioning “{entity}”.</div><button className="refresh-btn" onClick={() => loadCat(cat)}>Refresh</button></div>
           : <div className="snap-feed">
@@ -8799,6 +8946,14 @@ export default function App() {
           <TrendingPills label="Trending Now" items={activeFilteredItems}
             onOpen={t => navigate(cat, 'topic', teamSlug(t))}
             isTopicFollowed={isTopicFollowed} toggleTopic={toggleTopic}/>
+        )}
+
+        {/* ── COVERAGE GAP — "You may be missing this" (General only, below Trending,
+            above the feed). A wider discovery scan surfaces widely-covered stories
+            none of the reader's own sources carried; never mixed into the feed. ── */}
+        {isHome && !activeKw && !activeSrc && !search && (
+          <CoverageGap category={cat} keywords={catKws}
+            followedSources={(feeds[cat]||[]).filter(f=>f.on).map(f=>f.name)}/>
         )}
 
         {/* ── HOME: Top of Hour strip (image cards) ── */}
@@ -9798,6 +9953,7 @@ export default function App() {
       <ChatBot arts={arts}
         onNavigate={(path)=>{ const p=(path||'').split('/').filter(Boolean); navigate(p[0]||'general', p[1]||null, p[2]||null); }}
         fetchSummary={fetchAISummary}
+        fetchListen={fetchListen}
         fetchWebSearch={fetchWebSearch}
         chatContext={chatContext}
         onClearContext={()=>setChatContext(null)}

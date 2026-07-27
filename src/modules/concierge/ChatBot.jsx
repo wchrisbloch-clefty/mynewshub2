@@ -18,7 +18,7 @@ import { useState, useEffect, useRef } from 'react';
 import { retrieveFeedContext, buildFeedContextBlock } from '../retrieval';
 import './Concierge.css';
 
-export function ChatBot({ arts, onNavigate, fetchSummary, fetchWebSearch, resolveDeepLink, chatContext, onClearContext }) {
+export function ChatBot({ arts, onNavigate, fetchSummary, fetchListen, fetchWebSearch, resolveDeepLink, chatContext, onClearContext }) {
   const [open, setOpen] = useState(false);
   const [msgs, setMsgs] = useState([
     { role:'bot', text:"Hi! I'm your AI news assistant. Ask me anything about today's stories, markets, or sports.", time: new Date().toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'}) }
@@ -39,10 +39,10 @@ export function ChatBot({ arts, onNavigate, fetchSummary, fetchWebSearch, resolv
   const QUICK = ["What's trending today?", "Sports update?", "Markets summary", "Top tech news"];
 
   // Push a bot message tagged with its source tier ('feed'|'web'|'ai'|'open').
-  const pushBot = (summary, error, tier, link=null, sources=null) => {
+  const pushBot = (summary, error, tier, link=null, sources=null, provenance=null) => {
     const t2 = new Date().toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'});
     const botText = error ? (error.includes('No AI provider') ? '⚙️ AI not configured — add GROQ_API_KEY in Vercel env vars.' : "Sorry, I couldn't reach the AI right now.") : (summary || 'No response.');
-    setMsgs(m => [...m, { role:'bot', text:botText, time:t2, tier: error?null:tier, link, sources: error?null:sources }]);
+    setMsgs(m => [...m, { role:'bot', text:botText, time:t2, tier: error?null:tier, link, sources: error?null:sources, provenance: error?null:provenance }]);
   };
 
   // Unified waterfall: pasted URL → reader context → Feed → Web → AI-general.
@@ -57,7 +57,19 @@ export function ChatBot({ arts, onNavigate, fetchSummary, fetchWebSearch, resolv
     // Detect a pasted URL/YouTube in the question → extract-first, tier 'open'
     const urlMatch = q.match(/https?:\/\/[^\s]+/);
     if (urlMatch) {
-      const { summary, error } = await fetchSummary({ type:'article', title:'Ask', content:`QUESTION: ${q}`, mode:'chat-open', url: urlMatch[0] });
+      const link = urlMatch[0];
+      // Media links (YouTube / podcast / audio) → api/listen first, so we capture the
+      // real captions or audio and label provenance honestly. Anything else, or a
+      // failed capture, falls through to today's generic extract-first summary path.
+      const isMedia = /(?:youtube\.com|youtu\.be)/i.test(link)
+        || /\.(mp3|m4a|aac|ogg|oga|wav|flac|m4b)(\?|#|$)/i.test(link)
+        || /(podcasts\.apple\.com|open\.spotify\.com\/episode|megaphone\.fm|libsyn|buzzsprout|simplecast|anchor\.fm|podbean|acast\.com|captivate\.fm)/i.test(link);
+      if (isMedia && fetchListen) {
+        const r = await fetchListen(link);
+        if (r && r.summary) { pushBot(r.summary, null, 'open', null, null, r.provenance); setLoading(false); return; }
+        // capture failed → fall through to the generic path
+      }
+      const { summary, error } = await fetchSummary({ type:'article', title:'Ask', content:`QUESTION: ${q}`, mode:'chat-open', url: link });
       pushBot(summary, error, 'open'); setLoading(false); return;
     }
 
@@ -126,6 +138,13 @@ export function ChatBot({ arts, onNavigate, fetchSummary, fetchWebSearch, resolv
               <div key={i} className={`chat-msg ${m.role}`}>
                 {m.tier && <span className={`chat-tier chat-tier-${m.tier}`}>{m.tier==='feed'?'● FEED':m.tier==='web'?'● WEB':m.tier==='open'?'● THIS':'● AI'}</span>}
                 <div className="chat-bubble">{m.text}</div>
+                {m.provenance && (
+                  <span className={`chat-tier chat-prov chat-prov-${m.provenance}`}>
+                    {m.provenance==='captions' ? '▸ from video captions'
+                      : m.provenance==='audio' ? '▸ transcribed from audio'
+                      : '▸ summarized from show notes'}
+                  </span>
+                )}
                 {m.sources && m.sources.length > 0 && (
                   <div className="chat-sources">
                     {m.sources.map((s, si) => (
