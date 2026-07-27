@@ -2136,6 +2136,13 @@ body:not(.dark) .pill-bar{
   padding:14px 18px;display:flex;align-items:center;gap:12px;
 }
 .pod-header-emoji{font-size:26px;}
+.pod-load-more{display:flex;justify-content:center;margin:16px 0 4px;}
+.pod-load-more button{
+  background:var(--surface2);border:1px solid var(--border);color:var(--text);
+  border-radius:9px;padding:10px 24px;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit;
+  transition:border-color 0.15s ease,color 0.15s ease;
+}
+.pod-load-more button:hover{border-color:var(--accent);color:var(--accent);}
 .pod-header-name{font-size:13px;font-weight:700;color:#fff;}
 .pod-header-sub{font-size:11px;color:rgba(255,255,255,0.75);margin-top:2px;}
 .pod-card{
@@ -2501,6 +2508,14 @@ body:not(.dark) .pill-bar{
 }
 .sports-score-strip.empty{padding:18px 24px;text-align:center;}
 .sports-score-strip-empty{color:rgba(255,255,255,0.5);font-size:11px;font-style:italic;letter-spacing:0.04em;}
+/* Full-bleed strip: its negative horizontal margin must match the page's padding
+   at each breakpoint, otherwise it overshoots the viewport (horizontal scroll). */
+@media (min-width:641px) and (max-width:1024px){
+  .sports-score-strip{margin-left:-18px;margin-right:-18px;}
+}
+@media (min-width:1025px) and (max-width:1100px){
+  .sports-score-strip{margin-left:-16px;margin-right:-16px;}
+}
 .sports-score-strip-inner{
   display:flex;gap:8px;
   overflow-x:auto;scrollbar-width:none;
@@ -7641,12 +7656,17 @@ export default function App() {
   const [podEps, setPodEps]     = useState({});
   const [podLoading, setPodLoading] = useState({});
   const [activePod, setActivePod]   = useState(null);
+  const [podLimit, setPodLimit]     = useState(20); // episodes shown; "Load more" adds 20. App-level so it survives PodcastsPage remounts.
   const [showPanel, setShowPanel]   = useState(false);
   const [panelInitial, setPanelInitial] = useState({tab:'keywords',cat:'general'});
   const [activeKw, setActiveKw]     = useState(null);
   const [activeSrc, setActiveSrc]   = useState(null);
   const [scores, setScores]         = useState({});
   const [scoresLoading, setScoresLoading] = useState(false);
+  // Sports team-hub filter. Lifted to App (from inside SportsPage) so it survives
+  // SportsPage remounts — SportsPage is defined inline in App and remounts on any
+  // App re-render (scroll/header/poll), which previously wiped a locally-held value.
+  const [activeTeam, setActiveTeam] = useState(null);
   const [searchHistory, setSearchHistory] = useState(()=>ld('searchHistory',[]));
   const [srcWebResults, setSrcWebResults] = useState([]);
   const [srcWebLoading, setSrcWebLoading] = useState(false);
@@ -8137,7 +8157,7 @@ export default function App() {
          || tertiary.replace(/-/g, ' ').replace(/\b\w/g, c => c.toUpperCase()))
       : null;
     const teamFollowed = !!(tertiary && myTeams.some(x => x.slug === tertiary && x.league === sportTab));
-    const [activeTeam, setActiveTeam] = useState(null); // team obj when filter pill tapped
+    // activeTeam/setActiveTeam now live in App state (survives SportsPage remounts).
     const [teamMenuSym, setTeamMenuSym] = useState(null); // team with open popup menu
     const [sportWebResults, setSportWebResults] = useState([]);
     const [sportWebLoading, setSportWebLoading] = useState(false);
@@ -8274,7 +8294,10 @@ export default function App() {
           </button>
         )}
 
-        {/* ── SPORT TABS — ESPN pill-style ── */}
+        {/* ── SCORES — live scoreboard, anchored at the very top of the ribbon ── */}
+        {!teamName && <SportsScoreStrip scores={visibleScores} teams={teams}/>}
+
+        {/* ── LEAGUES — ESPN pill-style tab row ── */}
         <div className="sport-tabs" ref={sportTabsRef}>
           {SPORT_TABS.map(t => (
             <button key={t.key}
@@ -8285,6 +8308,22 @@ export default function App() {
             </button>
           ))}
         </div>
+
+        {/* ── MY TEAMS — followed teams as a pill ribbon (Yahoo Sports style). A pill
+            click routes into the existing team-hub (setActiveTeam → filtered feed +
+            ESPN/Team links). Order follows the user's My Teams (favorites) config. ── */}
+        {!teamName && !activeSrc && !search && teams.length > 0 && (
+          <div className="sport-tabs my-teams-ribbon">
+            {teams.map((t, i) => (
+              <button key={(t.team||'')+i}
+                className={`sport-tab ${activeTeam && activeTeam.team===t.team && activeTeam.league===t.league ? 'active' : ''}`}
+                onClick={()=>{ setActiveTeam(activeTeam && activeTeam.team===t.team ? null : t); setTimeout(scrollToFeed,80); }}>
+                {t.emoji && <span className="sport-tab-emoji">{t.emoji}</span>}
+                {t.team}
+              </button>
+            ))}
+          </div>
+        )}
 
         {/* ── TEAM CHIP RAIL (Tier 3) — reuses sport-tabs styling ── */}
         {TEAM_CHIPS[sportTab] && (
@@ -8344,43 +8383,12 @@ export default function App() {
           </>
         )}
 
-        {/* ── SCOREBOARD STRIP — ESPN dark card style ── */}
-        {!teamName && <SportsScoreStrip scores={visibleScores} teams={teams}/>}
-
-        {/* v46: MY TEAMS — Yahoo-style personalized rail of followed-team headlines */}
-        {sportTab === 'all' && !activeTeam && !activeSrc && !search && (() => {
-          const favMatches = teams.map(t => (t.match||'').toLowerCase()).filter(Boolean);
-          if (!favMatches.length) return null;
-          const myTeamArts = allItems.filter(a => {
-            const t = (a.title+' '+(a.desc||'')).toLowerCase();
-            return favMatches.some(m => t.includes(m));
-          }).slice(0, 10);
-          if (myTeamArts.length < 2) return null;
-          return (
-            <div className="my-teams-module">
-              <div className="my-teams-head">
-                <span className="my-teams-title">My Teams</span>
-                <button className="my-teams-edit" onClick={()=>openCustomize('teams','sports')}>Edit</button>
-              </div>
-              <div className="my-teams-scroll">
-                {myTeamArts.map((a,i) => (
-                  <div key={i} className="my-team-card" onClick={()=>onRead(a)}>
-                    {a.img
-                      ? <div className="my-team-img" style={{backgroundImage:`url(${a.img})`}}/>
-                      : <div className="my-team-img ph"><span className="ph-label">{a.source}</span></div>}
-                    <div className="my-team-card-body">
-                      <span className="my-team-src" style={{color:cc.color}}>{a.source}</span>
-                      <span className="my-team-title">{a.title}</span>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          );
-        })()}
+        {/* My Teams photo-thumbnail cards removed from the hero area — replaced by the
+            My Teams pill ribbon under the league tabs (routes into the team-hub via
+            setActiveTeam). Scores now sit at the very top of the page. */}
 
         {/* ── LEAGUE HEADER — ESPN hero banner (only when league tab active) ── */}
-        {sportTab !== 'all' && !teamName && (() => {
+        {sportTab !== 'all' && !teamName && !activeTeam && (() => {
           const lt = SPORT_TABS.find(st => st.key === sportTab);
           return (
             <div className="sport-league-header">
@@ -8708,6 +8716,12 @@ export default function App() {
             <span className="nsp-dot"/> ↑ {pendingNew[cat].length} new {pendingNew[cat].length===1?'story':'stories'}
           </button>
         )}
+        {/* Live Scores — General only, anchored at the very top under the nav.
+            Favorite/followed teams sort to the front and get an accent highlight
+            (Sports has its own scoreboard). Self-hides when nothing is live. */}
+        {cat === 'general' && !activeKw && !activeSrc && !search && (
+          <ActiveScoresBar scores={scores} favTeams={[...teams, ...myTeams.map(t=>({match:t.name}))]} onGoToSports={() => handleTabChange('sports')}/>
+        )}
         {/* HOME: unified Following row (topics + teams) above the category feeds.
             Always shown on Home so the "+ Add" search-and-add is reachable even when
             nothing is followed yet. */}
@@ -8776,45 +8790,9 @@ export default function App() {
           <StateOfPlay items={activeFilteredItems} meta={CATS[cat]||CATS.general} onRead={onRead} formatDate={fmtDate}/>
         )}
 
-        {/* Tier 3: MY TEAMS on Home — CONDENSED teaser (single row, ≤4 cards, one per
-            team) that links to the full module on Sports. The full story-card module
-            lives on /sports only (this avoids the Home↔Sports duplication). */}
-        {isHome && myTeams.length > 0 && !activeKw && !activeSrc && !search && (() => {
-          const rows = myTeams.map(t => {
-            const q = t.name.toLowerCase();
-            const a = (arts.sports || []).find(a => (a.title + ' ' + (a.desc||'')).toLowerCase().includes(q));
-            return a ? { t, a } : null;
-          }).filter(Boolean).slice(0, 4);
-          if (!rows.length) return null;
-          return (
-            <div className="my-teams-module">
-              <div className="my-teams-head">
-                <span className="my-teams-title">My Teams</span>
-                <button className="my-teams-edit" onClick={()=>handleTabChange('sports')}>All sports →</button>
-              </div>
-              <div className="my-teams-scroll">
-                {rows.map(({t, a}, i) => (
-                  <div key={t.slug + i} className="my-team-card"
-                    onClick={()=>navigate('sports', t.league, t.slug)}>
-                    {a.img
-                      ? <div className="my-team-img" style={{backgroundImage:`url(${a.img})`}}/>
-                      : <div className="my-team-img ph"><span className="ph-label">{a.source}</span></div>}
-                    <div className="my-team-card-body">
-                      <span className="my-team-src" style={{color:CATS.sports.color}}>{t.name} · {t.league.toUpperCase()}</span>
-                      <span className="my-team-title">{a.title}</span>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          );
-        })()}
-
-        {/* Live Scores — General only. Favorite/followed teams sort to the front and
-            get an accent highlight (Sports has its own scoreboard). */}
-        {cat === 'general' && !activeKw && !activeSrc && !search && (
-          <ActiveScoresBar scores={scores} favTeams={[...teams, ...myTeams.map(t=>({match:t.name}))]} onGoToSports={() => handleTabChange('sports')}/>
-        )}
+        {/* My Teams thumbnail teaser removed from General — the followed-teams module
+            lives on the Sports page only (avoids Home↔Sports duplication and the extra
+            above-the-fold scroll). Live scores now sit at the top of the page. */}
 
         {/* ── TRENDING NOW — hottest clusters; tapping a pill opens that entity's hub ── */}
         {!activeKw && !activeSrc && !search && (
@@ -9404,12 +9382,19 @@ export default function App() {
                     </div>
                   </div>
                 ))
-              :displayEps.slice(0,20).map((ep,i)=><PodCard key={i} ep={ep} idx={i}/>)}
+              :displayEps.slice(0,podLimit).map((ep,i)=><PodCard key={i} ep={ep} idx={i}/>)}
+            {displayEps.length>podLimit && (
+              <div className="pod-load-more">
+                <button onClick={()=>setPodLimit(n=>n+20)}>
+                  Load more · {displayEps.length-podLimit} left
+                </button>
+              </div>
+            )}
           </div>
           <div className="sidebar">
             <div className="pod-shows">
               <div style={{fontSize:'10px',fontWeight:'700',color:'var(--text3)',textTransform:'uppercase',letterSpacing:'0.08em',marginBottom:'8px',paddingBottom:'8px',borderBottom:'1px solid var(--border2)'}}>Shows</div>
-              <div className="pod-show-item" onClick={()=>setActivePod(null)}>
+              <div className="pod-show-item" onClick={()=>{setActivePod(null);setPodLimit(20);}}>
                 <div className="pod-show-emoji"></div>
                 <div><div className="pod-show-name" style={{color:!activePod?'var(--accent)':''}}>All Shows</div><div className="pod-show-ep">Latest from all {PODCAST_FEEDS.length} podcasts</div></div>
                 {!activePod&&<div className="pod-show-dot"/>}
@@ -9417,7 +9402,7 @@ export default function App() {
               {PODCAST_FEEDS.map((p,i)=>{
                 const eps=podEps[p.name]||[];const latest=eps[0];const isA=activePod?.name===p.name;
                 return (
-                  <div key={i} className="pod-show-item" onClick={()=>setActivePod(isA?null:p)}>
+                  <div key={i} className="pod-show-item" onClick={()=>{setActivePod(isA?null:p);setPodLimit(20);}}>
                     <div className="pod-show-emoji">{p.emoji}</div>
                     <div style={{flex:1,minWidth:0}}>
                       <div className="pod-show-name" style={{color:isA?'var(--accent)':''}}>{p.name}</div>
@@ -9568,6 +9553,7 @@ export default function App() {
     const items=sorted('finance');
     const [expandedSym, setExpandedSym] = useState(null);
     const [chartPeriod, setChartPeriod] = useState('3M');
+    const [showAllWatchlist, setShowAllWatchlist] = useState(false); // top 5 by default; toggle reveals the rest
 
     const CHART_PERIODS = ['1D','5D','1M','3M','YTD','1Y'];
     const periodToTv = {'1D':'1D','5D':'5D','1M':'1M','3M':'3M','YTD':'YTD','1Y':'12M'};
@@ -9637,7 +9623,7 @@ export default function App() {
                 </tr></thead>
                 <tbody>
                   {watchlist.length===0&&<tr><td colSpan={5} className="fin-empty">No symbols yet — add some in Customize</td></tr>}
-                  {watchlist.map(w=>{
+                  {(showAllWatchlist ? watchlist : watchlist.slice(0,5)).map(w=>{
                     const q=marketData[w.sym];const up=q&&q.chg>=0;
                     const isOpen = expandedSym === w.sym;
                     return (
@@ -9686,6 +9672,19 @@ export default function App() {
                       </Fragment>
                     );
                   })}
+                  {watchlist.length>5 && (
+                    <tr className="fin-showmore-row">
+                      <td colSpan={5} style={{textAlign:'center',padding:'2px 0'}}>
+                        <button className="src-show-more" onClick={()=>setShowAllWatchlist(s=>{
+                          const nx=!s;
+                          if(!nx && expandedSym && !watchlist.slice(0,5).some(w=>w.sym===expandedSym)) setExpandedSym(null);
+                          return nx;
+                        })}>
+                          {showAllWatchlist ? 'Show less ▴' : `+${watchlist.length-5} more ▾`}
+                        </button>
+                      </td>
+                    </tr>
+                  )}
                 </tbody>
               </table>
             </section>
