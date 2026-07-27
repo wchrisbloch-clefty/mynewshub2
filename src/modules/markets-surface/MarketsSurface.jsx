@@ -42,19 +42,30 @@ export function useMarkets({ endpoint = '/api/markets' } = {}) {
 
 export function MarketsSurface({ mkt, loading, error }) {
   const [moverTab, setMoverTab] = useState('gainers');
-  const Movers = ({ title, list, kind }) => (
-    <div className={`mkt-mover-col ${moverTab === kind ? 'active' : ''}`}>
-      <div className="mkt-mover-head">{title}</div>
-      {(list || []).map(m => { const up = (m.pct || 0) >= 0; return (
-        <a key={m.symbol} className="mkt-mover-row" href={`https://finance.yahoo.com/quote/${encodeURIComponent(m.symbol)}`} target="_blank" rel="noreferrer">
-          <span className="mkt-mover-sym">{m.symbol}</span>
-          <span className="mkt-mover-name">{m.name}</span>
-          <span className="mkt-mover-px">{fmtPrice(m.price)}</span>
-          <span className={`mkt-mover-pct ${up ? 'mkt-up' : 'mkt-down'}`}>{up ? '▲' : '▼'} {Math.abs(m.pct || 0).toFixed(2)}%</span>
-        </a>); })}
-      {(!list || !list.length) && <div className="mkt-mover-empty">—</div>}
-    </div>
-  );
+  const [moversAll, setMoversAll] = useState({}); // per-column: top 5 by default, toggle reveals the rest
+  const Movers = ({ title, list, kind }) => {
+    const full = list || [];
+    const showAll = !!moversAll[kind];
+    const shown = showAll ? full : full.slice(0, 5);
+    return (
+      <div className={`mkt-mover-col ${moverTab === kind ? 'active' : ''}`}>
+        <div className="mkt-mover-head">{title}</div>
+        {shown.map(m => { const up = (m.pct || 0) >= 0; return (
+          <a key={m.symbol} className="mkt-mover-row" href={`https://finance.yahoo.com/quote/${encodeURIComponent(m.symbol)}`} target="_blank" rel="noreferrer">
+            <span className="mkt-mover-sym">{m.symbol}</span>
+            <span className="mkt-mover-name">{m.name}</span>
+            <span className="mkt-mover-px">{fmtPrice(m.price)}</span>
+            <span className={`mkt-mover-pct ${up ? 'mkt-up' : 'mkt-down'}`}>{up ? '▲' : '▼'} {Math.abs(m.pct || 0).toFixed(2)}%</span>
+          </a>); })}
+        {!full.length && <div className="mkt-mover-empty">—</div>}
+        {full.length > 5 && (
+          <button className="src-show-more" onClick={() => setMoversAll(s => ({ ...s, [kind]: !s[kind] }))}>
+            {showAll ? 'Show less ▴' : `+${full.length - 5} more ▾`}
+          </button>
+        )}
+      </div>
+    );
+  };
   return (
     <>
       {/* (a) STICKY TICKER RAIL — indices, price, % green/red, tabular nums */}
