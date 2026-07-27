@@ -980,6 +980,53 @@ function SourcesDisagree({ topic, items }) {
   );
 }
 
+// Coverage-gap discovery: stories multiple wider outlets cover that none of the
+// reader's own sources touched. Capped at 'reported' tier by the API.
+async function fetchDiscover(category, keywords, followedSources) {
+  try {
+    const r = await fetch('/api/discover', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ category, keywords, followedSources }),
+      signal: AbortSignal.timeout(15000),
+    });
+    if (!r.ok) return { items: [] };
+    return await r.json();
+  } catch { return { items: [] }; }
+}
+
+// "You may be missing this" — compact panel, distinct from the main feed. Renders
+// only when a genuine gap exists; each item is tagged "Not in your sources".
+function CoverageGap({ category, keywords, followedSources }) {
+  const [items, setItems] = useState([]);
+  const kwKey = (keywords || []).join('|');
+  const srcKey = (followedSources || []).join('|');
+  useEffect(() => {
+    let alive = true;
+    if (!keywords || !keywords.length) { setItems([]); return () => { alive = false; }; }
+    fetchDiscover(category, keywords, followedSources).then(r => { if (alive) setItems((r && r.items) || []); });
+    return () => { alive = false; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [category, kwKey, srcKey]);
+  if (!items.length) return null;
+  return (
+    <div className="gap-panel">
+      <div className="gap-head">
+        <span className="gap-title">You may be missing this</span>
+        <span className="gap-sub">Widely covered — but not in your sources</span>
+      </div>
+      <div className="gap-list">
+        {items.map((it, i) => (
+          <a key={i} className="gap-item" href={it.link} target="_blank" rel="noreferrer">
+            <span className="gap-tag">Not in your sources</span>
+            <span className="gap-item-title">{it.title}</span>
+            <span className="gap-item-meta">{it.outletCount} outlets · {it.source}</span>
+          </a>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 function TakeawaysContent({text}) {
   if (!text) return null;
   const lines = text.split('\n').filter(l=>l.trim());
@@ -2723,6 +2770,17 @@ body:not(.dark) .pill-bar{
 .disagree-pos.tier-unverified .disagree-tier{background:var(--surface);color:var(--text3);border:1px solid var(--border);}
 .disagree-claim{color:var(--text);}
 .disagree-src{color:var(--text3);font-size:11px;}
+/* Coverage gap — "You may be missing this" panel (General, below Trending) */
+.gap-panel{border:1px dashed var(--border);border-radius:10px;padding:12px 14px;margin:0 0 20px;background:var(--surface2);}
+.gap-head{display:flex;align-items:baseline;gap:8px;flex-wrap:wrap;margin-bottom:10px;}
+.gap-title{font-size:13px;font-weight:800;color:var(--text);}
+.gap-sub{font-size:11px;color:var(--text3);}
+.gap-list{display:grid;gap:8px;}
+.gap-item{display:flex;flex-direction:column;gap:3px;padding:9px 11px;border-radius:8px;background:var(--surface);border:1px solid var(--border);text-decoration:none;transition:border-color 0.15s ease;}
+.gap-item:hover{border-color:var(--accent);}
+.gap-tag{align-self:flex-start;font-size:8px;font-weight:800;text-transform:uppercase;letter-spacing:0.06em;color:#b45309;background:rgba(217,119,6,0.12);padding:1px 7px;border-radius:10px;}
+.gap-item-title{font-size:13px;font-weight:600;color:var(--text);line-height:1.35;}
+.gap-item-meta{font-size:11px;color:var(--text3);}
 .team-hub-clear{
   font-size:12px;font-weight:600;color:var(--text3);
   background:none;border:1px solid var(--border);border-radius:14px;
@@ -8888,6 +8946,14 @@ export default function App() {
           <TrendingPills label="Trending Now" items={activeFilteredItems}
             onOpen={t => navigate(cat, 'topic', teamSlug(t))}
             isTopicFollowed={isTopicFollowed} toggleTopic={toggleTopic}/>
+        )}
+
+        {/* ── COVERAGE GAP — "You may be missing this" (General only, below Trending,
+            above the feed). A wider discovery scan surfaces widely-covered stories
+            none of the reader's own sources carried; never mixed into the feed. ── */}
+        {isHome && !activeKw && !activeSrc && !search && (
+          <CoverageGap category={cat} keywords={catKws}
+            followedSources={(feeds[cat]||[]).filter(f=>f.on).map(f=>f.name)}/>
         )}
 
         {/* ── HOME: Top of Hour strip (image cards) ── */}
