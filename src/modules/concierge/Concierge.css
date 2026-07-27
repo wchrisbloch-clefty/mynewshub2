@@ -130,6 +130,11 @@
 .chat-tier-web{color:#2563eb;}
 .chat-tier-ai{color:#9333ea;}
 .chat-tier-open{color:var(--accent);}
+/* Capture provenance — small honest label under the summary bubble (reuses chat-tier). */
+.chat-prov{display:block;margin:4px 0 0;text-transform:none;letter-spacing:0.02em;font-weight:700;opacity:0.7;}
+.chat-prov-captions{color:#16a34a;}
+.chat-prov-audio{color:#2563eb;}
+.chat-prov-show-notes{color:#b45309;}
 
 /* Web-tier answers: clickable source links under the bubble */
 .chat-sources{display:flex;flex-direction:column;gap:3px;margin-top:5px;}

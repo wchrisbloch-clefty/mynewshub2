@@ -913,6 +913,23 @@ async function fetchAISummary({type, title, content, mode='summary', url}) {
   }
 }
 
+// Capture-first path for pasted media links: hits /api/listen, which pulls real
+// YouTube captions or transcribes audio via Groq Whisper and returns an honest
+// `provenance` flag ('captions' | 'audio' | 'show-notes'). Falls back gracefully.
+async function fetchListen(url) {
+  try {
+    const r = await fetch('/api/listen', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ url }),
+      signal: AbortSignal.timeout(60000),
+    });
+    if (!r.ok) return { summary: '', provenance: 'show-notes', error: `HTTP ${r.status}` };
+    return await r.json();
+  } catch (e) {
+    return { summary: '', provenance: 'show-notes', error: e.name === 'TimeoutError' ? 'Timed out' : 'Network error' };
+  }
+}
+
 function TakeawaysContent({text}) {
   if (!text) return null;
   const lines = text.split('\n').filter(l=>l.trim());
@@ -9798,6 +9815,7 @@ export default function App() {
       <ChatBot arts={arts}
         onNavigate={(path)=>{ const p=(path||'').split('/').filter(Boolean); navigate(p[0]||'general', p[1]||null, p[2]||null); }}
         fetchSummary={fetchAISummary}
+        fetchListen={fetchListen}
         fetchWebSearch={fetchWebSearch}
         chatContext={chatContext}
         onClearContext={()=>setChatContext(null)}
