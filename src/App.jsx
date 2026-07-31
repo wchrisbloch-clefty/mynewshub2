@@ -8529,6 +8529,10 @@ export default function App() {
                   collapsed={sopCollapsed} onToggleCollapse={toggleSop}/>
                 <TrendingPills label={`Trending · ${teamName}`} items={teamItems} onOpen={t=>setSearch(t.toLowerCase())} isTopicFollowed={isTopicFollowed} toggleTopic={toggleTopic}/>
                 <SourcesDisagree topic={teamName} items={teamItems}/>
+                {/* Same Coverage Gap mechanism: outside coverage of this team the reader's
+                    own sources missed (widely covered, capped at 'reported' tier). */}
+                <CoverageGap category="sports" keywords={[teamName]}
+                  followedSources={(feeds.sports||[]).filter(f=>f.on).map(f=>f.name)}/>
                 {teamItems.length === 0
                   ? <div className="empty-state"><div className="empty-icon"></div><div className="empty-msg">No recent stories for {teamName}</div><button className="refresh-btn" onClick={()=>loadCat('sports')}>Refresh</button></div>
                   : <div className="snap-feed">
@@ -9006,6 +9010,14 @@ export default function App() {
         {isHome && !activeKw && !activeSrc && !search && (
           <CoverageGap category={cat} keywords={catKws}
             followedSources={(feeds[cat]||[]).filter(f=>f.on).map(f=>f.name)}/>
+        )}
+
+        {/* Coverage Gap on the merged Business/Energy page — same panel/tier-capping,
+            keyed off the active filter's keywords vs the reader's own biz+energy sources. */}
+        {isMergedBiz && !activeKw && !activeSrc && !search && (
+          <CoverageGap category="business"
+            keywords={bizFilter==='energy' ? (kw.bloom||[]) : (kw.business||[])}
+            followedSources={[...(feeds.business||[]),...(feeds.bloom||[])].filter(f=>f.on).map(f=>f.name)}/>
         )}
 
         {/* ── HOME: Top of Hour strip (image cards) ── */}
