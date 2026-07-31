@@ -47,7 +47,19 @@
   /* One spacing scale — 4 / 8 / 16 / 24 / 32 */
   --s1:4px;--s2:8px;--s3:16px;--s4:24px;--s5:32px;
 
+  /* One font-size scale — headline / subhead / body / meta (+ lead for heroes).
+     Shared shell components consume these; new/refactored UI should too, instead
+     of one-off px sizes. */
+  --fs-lead:22px;    /* hero / lead headline */
+  --fs-headline:16px;/* card & section headline */
+  --fs-subhead:14px; /* secondary headline / strong label */
+  --fs-body:13px;    /* body copy */
+  --fs-meta:11px;    /* source, timestamp, small meta */
+
   --radius:8px;--radius-sm:4px;
+  /* One image treatment — aspect ratio, corner radius, loading placeholder. Use the
+     .media-img / .media-img-ph utilities below anywhere a thumbnail or hero appears. */
+  --img-radius:8px;
   --shadow-sm:0 1px 3px rgba(20,18,14,0.05);
   --shadow-md:0 4px 18px rgba(20,18,14,0.08);
   --shadow-lg:0 8px 36px rgba(20,18,14,0.12);
@@ -77,6 +89,13 @@
   --shadow-md:0 4px 18px rgba(0,0,0,0.55);
   --shadow-lg:0 8px 36px rgba(0,0,0,0.65);
 }
+
+/* One shared image treatment — consistent aspect ratio, radius, and a branded
+   placeholder (never a bare grey box) for every thumbnail/hero. */
+.media-img{width:100%;aspect-ratio:16/9;object-fit:cover;background:var(--surface2);border-radius:var(--img-radius);display:block;}
+.media-img.square{aspect-ratio:1/1;}
+.media-img.wide{aspect-ratio:21/9;}
+.media-img-ph{width:100%;aspect-ratio:16/9;border-radius:var(--img-radius);display:flex;align-items:center;justify-content:center;background:linear-gradient(135deg,var(--navy-light) 0%,var(--navy) 100%);color:rgba(255,255,255,0.18);font-weight:800;}
 
 /* Numbers read as data everywhere — tickers, scores, prices, timestamps. */
 .tnum,time,[data-num]{font-variant-numeric:tabular-nums;font-feature-settings:"tnum" 1;}

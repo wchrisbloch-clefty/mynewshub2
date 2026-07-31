@@ -2642,8 +2642,8 @@ body:not(.dark) .pill-bar{
   position:relative;
   flex-shrink:0;scroll-snap-align:start;
   background:#162635;border:1px solid #243446;
-  border-radius:7px;padding:8px 10px;
-  min-width:130px;cursor:pointer;
+  border-radius:7px;padding:6px 9px;
+  min-width:110px;cursor:pointer;
   transition:border-color 0.15s, transform 0.1s;
 }
 .sst-tile:hover{border-color:#3b5168;transform:translateY(-1px);}
@@ -8304,6 +8304,9 @@ export default function App() {
     const teamFollowed = !!(tertiary && myTeams.some(x => x.slug === tertiary && x.league === sportTab));
     // activeTeam/setActiveTeam now live in App state (survives SportsPage remounts).
     const [teamMenuSym, setTeamMenuSym] = useState(null); // team with open popup menu
+    // Collapsible State of Play — shared shell behavior, per-category memory ('sports').
+    const [sopCollapsed, setSopCollapsed] = useState(()=>ld('sopCollapsed_sports', false));
+    const toggleSop = () => setSopCollapsed(v => { const nx = !v; sv('sopCollapsed_sports', nx); return nx; });
     const [sportWebResults, setSportWebResults] = useState([]);
     const [sportWebLoading, setSportWebLoading] = useState(false);
 
@@ -8507,7 +8510,8 @@ export default function App() {
             </div>
             <div className="page-grid">
               <div className="feed-col">
-                <StateOfPlay items={teamItems} meta={CATS.sports} onRead={onRead} formatDate={fmtDate}/>
+                <StateOfPlay items={teamItems} meta={CATS.sports} onRead={onRead} formatDate={fmtDate}
+                  collapsed={sopCollapsed} onToggleCollapse={toggleSop}/>
                 <TrendingPills label={`Trending · ${teamName}`} items={teamItems} onOpen={t=>setSearch(t.toLowerCase())} isTopicFollowed={isTopicFollowed} toggleTopic={toggleTopic}/>
                 <SourcesDisagree topic={teamName} items={teamItems}/>
                 {teamItems.length === 0
@@ -8568,6 +8572,12 @@ export default function App() {
               </div>
             </div>
           </div>
+        )}
+
+        {/* ── STATE OF PLAY — collapsible top-stories block (shared shell), main list view ── */}
+        {!teamName && !activeTeam && !activeSrc && !search && (
+          <StateOfPlay items={sportItems} meta={CATS.sports} onRead={onRead} formatDate={fmtDate}
+            collapsed={sopCollapsed} onToggleCollapse={toggleSop}/>
         )}
 
         {/* ── HERO + FEED ── */}
@@ -9713,6 +9723,9 @@ export default function App() {
     const [expandedSym, setExpandedSym] = useState(null);
     const [chartPeriod, setChartPeriod] = useState('3M');
     const [showAllWatchlist, setShowAllWatchlist] = useState(false); // top 5 by default; toggle reveals the rest
+    // Collapsible State of Play — shared shell behavior, per-category memory ('finance').
+    const [sopCollapsed, setSopCollapsed] = useState(()=>ld('sopCollapsed_finance', false));
+    const toggleSop = () => setSopCollapsed(v => { const nx = !v; sv('sopCollapsed_finance', nx); return nx; });
 
     const CHART_PERIODS = ['1D','5D','1M','3M','YTD','1Y'];
     const periodToTv = {'1D':'1D','5D':'5D','1M':'1M','3M':'3M','YTD':'YTD','1Y':'12M'};
@@ -9751,6 +9764,10 @@ export default function App() {
         </div>
         {/* Ticker rail + movers — extracted MarketsSurface module */}
         <MarketsSurface mkt={mkt} loading={mktLoading} error={mktErr}/>
+
+        {/* ── STATE OF PLAY — collapsible top-stories block (shared shell) ── */}
+        <StateOfPlay items={newsItems} meta={CATS.finance} onRead={onRead} formatDate={fmtDate}
+          collapsed={sopCollapsed} onToggleCollapse={toggleSop}/>
 
         <div className="fin-grid">
           <div className="fin-main">
