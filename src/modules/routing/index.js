@@ -9,7 +9,7 @@
 //   parseRoute(pathname?)            -> { category, subcategory, tertiary }
 //   buildPath(category, sub?, tert?) -> string  (a leading-slash URL path)
 
-export const ROUTE_CATS = ['general','business','finance','bloom','tech','sports','popculture','comedy','briefing','podcasts','sources','saved'];
+export const ROUTE_CATS = ['general','business','finance','bloom','tech','sports','health','popculture','comedy','briefing','podcasts','sources','saved'];
 
 export function parseRoute(pathname) {
   const path = pathname != null ? pathname
