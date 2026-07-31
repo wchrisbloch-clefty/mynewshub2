@@ -18,7 +18,7 @@ import './StateOfPlay.css';
 
 const defaultFormatDate = d => { try { return new Date(d).toLocaleString(); } catch { return ''; } };
 
-export function StateOfPlay({ items, meta = {}, onRead, formatDate = defaultFormatDate }) {
+export function StateOfPlay({ items, meta = {}, onRead, formatDate = defaultFormatDate, collapsed = false, onToggleCollapse }) {
   const color = meta.color;
   const label = meta.label || '';
   // Ranked by heat, capped at 2 per publisher (no single-source flood).
@@ -31,8 +31,18 @@ export function StateOfPlay({ items, meta = {}, onRead, formatDate = defaultForm
       <div className="sop-head">
         <span className="sop-label" style={{ borderColor: color, color }}>State of Play</span>
         <span className="sop-sub">{label} — what’s driving the day</span>
+        {onToggleCollapse && (
+          <button className="sop-collapse" onClick={onToggleCollapse}
+            aria-expanded={!collapsed} aria-label={collapsed ? 'Expand State of Play' : 'Collapse State of Play'}>
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"
+              strokeLinecap="round" strokeLinejoin="round"
+              style={{ transform: collapsed ? 'rotate(-90deg)' : 'none', transition: 'transform 0.2s' }}>
+              <polyline points="6 9 12 15 18 9"/>
+            </svg>
+          </button>
+        )}
       </div>
-      <div className="sop-list">
+      <div className="sop-list" style={collapsed ? { display: 'none' } : undefined}>
         {top.map((a, i) => (
           <button key={a.link || i} className="sop-item" onClick={() => onRead(a)}>
             <span className="sop-num" style={{ color }}>{String(i + 1).padStart(2, '0')}</span>

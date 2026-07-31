@@ -4361,13 +4361,13 @@ kbd{display:inline-block;padding:1px 5px;border:1px solid var(--border);border-r
 
 /* ACTIVE SCORES STRIP — compact live games on General homepage */
 .home-scores{
-  margin-bottom:20px;background:var(--surface);
+  margin-bottom:14px;background:var(--surface);
   border:1px solid var(--border);border-radius:var(--radius);
   overflow:hidden;
 }
 .home-scores-head{
   display:flex;align-items:center;justify-content:space-between;
-  padding:8px 14px;background:var(--navy);
+  padding:5px 12px;background:var(--navy);
 }
 .home-scores-label{
   font-size:9px;font-weight:800;color:rgba(255,255,255,0.9);
@@ -4387,7 +4387,7 @@ kbd{display:inline-block;padding:1px 5px;border:1px solid var(--border);border-r
 }
 .home-scores-scroll::-webkit-scrollbar{display:none;}
 .hs-tile{
-  flex-shrink:0;min-width:148px;padding:10px 14px;
+  flex-shrink:0;min-width:112px;padding:6px 11px;
   border-right:1px solid var(--border2);cursor:pointer;
   transition:background 0.12s;
 }
@@ -4396,12 +4396,12 @@ kbd{display:inline-block;padding:1px 5px;border:1px solid var(--border);border-r
 .hs-tile.fav{border:1px solid var(--accent);border-radius:8px;background:var(--accent-bg);}
 .hs-fav-dot{color:var(--amber);margin-right:4px;}
 .hs-tile:hover{background:var(--surface2);}
-.hs-league{font-size:9px;font-weight:800;color:var(--text3);text-transform:uppercase;letter-spacing:0.08em;margin-bottom:6px;}
-.hs-team-row{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:3px 0;}
-.hs-team-name{font-size:12px;font-weight:600;color:var(--text);flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
-.hs-team-score{font-size:16px;font-weight:900;color:var(--text);font-variant-numeric:tabular-nums;min-width:28px;text-align:right;}
+.hs-league{font-size:8px;font-weight:800;color:var(--text3);text-transform:uppercase;letter-spacing:0.08em;margin-bottom:3px;}
+.hs-team-row{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:1px 0;}
+.hs-team-name{font-size:11px;font-weight:600;color:var(--text);flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.hs-team-score{font-size:13px;font-weight:900;color:var(--text);font-variant-numeric:tabular-nums;min-width:24px;text-align:right;}
 .hs-team-score.winner{color:var(--green);}
-.hs-status{font-size:9px;margin-top:5px;text-transform:uppercase;letter-spacing:0.05em;border-top:1px solid var(--border2);padding-top:5px;}
+.hs-status{font-size:8px;margin-top:3px;text-transform:uppercase;letter-spacing:0.05em;border-top:1px solid var(--border2);padding-top:3px;}
 .hs-status.live{color:var(--red);font-weight:700;display:flex;align-items:center;gap:4px;}
 .hs-status.live::before{content:'●';animation:score-pulse 1.2s ease-in-out infinite;}
 .hs-status.final{color:var(--text3);}
@@ -8748,6 +8748,9 @@ export default function App() {
     const [showFollowAdd, setShowFollowAdd] = useState(false);
     const [onboardingDismissed, setOnboardingDismissed] = useState(()=>ld('onboarded',false));
     const dismissOnboarding = () => { sv('onboarded',true); setOnboardingDismissed(true); };
+    // Collapsible State of Play — expanded on first visit, choice remembered per category.
+    const [sopCollapsed, setSopCollapsed] = useState(()=>ld('sopCollapsed_'+cat, false));
+    const toggleSop = () => setSopCollapsed(v => { const nx = !v; sv('sopCollapsed_'+cat, nx); return nx; });
     // Apply story clustering before sorting so cluster metadata is available
     const rawItems=sorted(cat);
     const items=useMemo(()=>clusterStories(rawItems),[rawItems]);
@@ -8932,9 +8935,10 @@ export default function App() {
           </div>
         )}
 
-        {/* ── STATE OF PLAY strip — top of every category ── */}
+        {/* ── STATE OF PLAY strip — top of every category, collapsible (per-category memory) ── */}
         {!activeKw && !activeSrc && !search && (
-          <StateOfPlay items={activeFilteredItems} meta={CATS[cat]||CATS.general} onRead={onRead} formatDate={fmtDate}/>
+          <StateOfPlay items={activeFilteredItems} meta={CATS[cat]||CATS.general} onRead={onRead} formatDate={fmtDate}
+            collapsed={sopCollapsed} onToggleCollapse={toggleSop}/>
         )}
 
         {/* My Teams thumbnail teaser removed from General — the followed-teams module
