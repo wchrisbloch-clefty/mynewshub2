@@ -61,6 +61,7 @@ const CATS = {
   tech:       { label:'AI & Tech',    color:'var(--accent)', bg:'var(--accent-bg)', emoji:'' },
   popculture: { label:'Pop Culture',  color:'var(--accent)', bg:'var(--accent-bg)', emoji:'' },
   comedy:     { label:'Comedy',       color:'var(--accent)', bg:'var(--accent-bg)', emoji:'' },
+  health:     { label:'Health & Longevity', color:'var(--accent)', bg:'var(--accent-bg)', emoji:'' },
 };
 
 // One consistent line-icon (Feather stroke) for settings/customize affordances —
@@ -102,6 +103,7 @@ const DEFAULT_KW = {
   tech:       ['AI','artificial intelligence','OpenAI','Anthropic','Google','Apple','Microsoft','NVIDIA','semiconductor','startup','LLM','AGI','robotics','chip'],
   popculture: ['celebrity','movie','TV','streaming','Hollywood','music','album','box office','Grammy','Billboard','viral','red carpet'],
   comedy:     ['satire','parody','humor','comedy'],
+  health:     ['longevity','healthspan','sleep','nutrition','metabolic health','supplements','exercise','fasting','VO2 max','protein','zone 2','glucose','cardiovascular','Alzheimer','muscle','omega-3','sauna','biomarkers'],
 };
 
 const DEFAULT_FEEDS = {
@@ -214,6 +216,15 @@ const DEFAULT_FEEDS = {
   comedy: [
     { name:'The Babylon Bee', url:'https://babylonbee.com/feed',  on:true },
     { name:'The Onion',       url:'https://www.theonion.com/rss', on:true },
+  ],
+  // Health & Longevity. ScienceDaily is wire-service science reporting → tiered
+  // 'verified'; the personality-driven shows are 'reported'. (URLs are starter
+  // guesses — swap/expand as better feeds are found.)
+  health: [
+    { name:'ScienceDaily Health', url:'https://www.sciencedaily.com/rss/health_medicine.xml', on:true, tier:'verified' },
+    { name:'Huberman Lab',        url:'https://feeds.megaphone.fm/hubermanlab',                on:true, tier:'reported' },
+    { name:'Peter Attia — The Drive', url:'https://peterattiadrive.libsyn.com/rss',            on:true, tier:'reported' },
+    { name:'FoundMyFitness',      url:'https://podcast.foundmyfitness.com/rss',                on:true, tier:'reported' },
   ],
 };
 
@@ -7167,8 +7178,8 @@ function TopBar({tab, setTab, search, setSearch, dark, setDark,
   const tickerItems = hasBreaking?[...breakingItems,...breakingItems]:[];
 
   // v24a: Desktop nav per user: General · Business · Markets · Bloom · Sports · Pop Culture · Briefing · Podcasts · Saved
-  const ALL_TABS = ['general','business','finance','tech','sports','popculture','briefing','podcasts','sources','saved'];
-  const TAB_LABELS = {business:'Business & Energy',finance:'Markets',tech:'AI & Tech',popculture:'Pop Culture',podcasts:'Podcasts',sources:'Sources',saved:'Saved',briefing:'Briefing'};
+  const ALL_TABS = ['general','business','finance','tech','sports','health','popculture','briefing','podcasts','sources','saved'];
+  const TAB_LABELS = {business:'Business & Energy',finance:'Markets',tech:'AI & Tech',health:'Health',popculture:'Pop Culture',podcasts:'Podcasts',sources:'Sources',saved:'Saved',briefing:'Briefing'};
   const TAB_CLASS  = {general:'t-general',sports:'t-sports',business:'t-business',finance:'t-finance',bloom:'t-bloom',tech:'t-tech',popculture:'t-popculture',podcasts:'t-podcasts'};
 
   // v24a Mobile chip bar per user: General · Business · Markets · Energy · Sports · Pop Culture
@@ -7179,6 +7190,7 @@ function TopBar({tab, setTab, search, setSearch, dark, setDark,
     { key:'finance',    label:'Markets',    color:CATS.finance.color },
     { key:'tech',       label:'AI & Tech',  color:CATS.tech.color },
     { key:'sports',     label:'Sports',     color:CATS.sports.color },
+    { key:'health',     label:'Health',     color:CATS.health.color },
     { key:'popculture', label:'Pop Culture',color:CATS.popculture.color },
   ];
 
@@ -7940,7 +7952,7 @@ export default function App() {
       const ok=items.length>0;
       hUpdates[f.name]=ok?(ms<4000?'green':'yellow'):'red';
       fhUpdates[f.name]={code:status||0, ok, reason:reason||''};
-      items.forEach(i=>{if(i.title&&i.link)results.push({...i,source:f.name,cat});});
+      items.forEach(i=>{if(i.title&&i.link)results.push({...i,source:f.name,cat,_tier:f.tier||'reported'});});
     }));
     setHealth(h=>({...h,...hUpdates}));
     setFeedHealth(h=>({...h,...fhUpdates}));
@@ -7957,7 +7969,7 @@ export default function App() {
     const results=[];
     await Promise.allSettled((feeds[cat]||[]).filter(f=>f.on).map(async f=>{
       const {items}=await fetchRSS(f.url);
-      items.forEach(i=>{if(i.title&&i.link)results.push({...i,source:f.name,cat});});
+      items.forEach(i=>{if(i.title&&i.link)results.push({...i,source:f.name,cat,_tier:f.tier||'reported'});});
     }));
     results.sort((a,b)=>new Date(b.pubDate)-new Date(a.pubDate));
     return results;
@@ -8287,7 +8299,7 @@ export default function App() {
     return { total, topSources, topCats };
   }, [clicks, readLinks, arts]);
 
-  const NEWS_CATS = ['general','sports','business','tech','popculture','comedy'];
+  const NEWS_CATS = ['general','sports','business','tech','popculture','comedy','health'];
   const homeTrendingTopics = useMemo(() => getTrendingTopics(arts), [arts]);
 
   // ─── FEED PAGE ─────────────────────────────────────────────────────────
