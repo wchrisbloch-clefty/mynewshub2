@@ -2489,9 +2489,11 @@ body:not(.dark) .pill-bar{
   margin-right:8px;
 }
 
-/* Tablet/mobile: Top Stories collapses to one column — hero, then the rail below. */
-@media (max-width:900px){
+/* Tablet/mobile: Top Stories collapses to one column — hero, then the rail below.
+   Cap the rail at 2 secondaries (not 3) to avoid over-stacking on small screens. */
+@media (max-width:1024px){
   .gn-grid{grid-template-columns:1fr;gap:18px;}
+  .gn-row .gn-card:nth-child(n+3){display:none;}
 }
 @media (max-width:640px){
   .gn-lead-img{aspect-ratio:16/9;}
@@ -3895,11 +3897,10 @@ body{overscroll-behavior-y:contain;}
   .page-grid{grid-template-columns:1fr;gap:20px;}
   .home-hero-row{grid-template-columns:1fr;gap:16px;}
   .home-hero-side{max-width:100%;}
-  .gn-grid{grid-template-columns:1fr 1fr;gap:16px;}
-  /* Use 16/9 aspect + max-height to prevent overflow on iPad portrait (810px) */
-  .gn-card-img,.gn-card-img-ph{aspect-ratio:16/9;height:auto;max-height:170px;}
-  .gn-lead-img{aspect-ratio:16/9;height:auto;max-height:220px;}
-  .gn-lead-title{font-size:26px;}
+  /* iPad: Top Stories is single column — hero full width, secondaries stacked below. */
+  .gn-grid{grid-template-columns:1fr;gap:18px;}
+  .gn-lead-img{aspect-ratio:16/9;height:auto;max-height:300px;}
+  .gn-lead-title{font-size:20px;}
   .gn-lead-solo .gn-lead-title{font-size:28px;}
   .fc-title{font-size:var(--fs-headline);}
   .fc-thumb,.fc-thumb-ph{width:120px;height:90px;}
@@ -4259,16 +4260,16 @@ kbd{display:inline-block;padding:1px 5px;border:1px solid var(--border);border-r
 }
 .pod-title:hover{color:var(--accent);}
 
-/* gn-grid: editorial card titles use serif */
+/* gn-grid: editorial card titles use serif. Top-Stories-module sizes (Pass G). */
 .gn-lead-title{
   font-family:var(--font-serif);
-  font-size:var(--fs-lead);font-weight:700;line-height:1.2;letter-spacing:-0.2px;
+  font-size:20px;font-weight:700;line-height:1.2;letter-spacing:-0.2px;
   color:var(--text);margin:0 0 10px;
   display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden;
 }
 .gn-card-title{
   font-family:var(--font-serif);
-  font-size:15px;font-weight:700;line-height:1.3;color:var(--text);
+  font-size:15px;font-weight:600;line-height:1.3;color:var(--text);
   display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden;
   margin-bottom:8px;letter-spacing:-0.1px;overflow-wrap:break-word;
 }
@@ -4551,7 +4552,7 @@ kbd{display:inline-block;padding:1px 5px;border:1px solid var(--border);border-r
   .gn-card{flex-direction:row;gap:12px;padding:12px 0;border-bottom:1px solid var(--border2);border-radius:0;}
   .gn-card:last-child{border-bottom:none;}
   .gn-card-img,.gn-card-img-ph{width:100px;height:72px;aspect-ratio:auto;flex-shrink:0;border-radius:6px;}
-  .gn-card-title{font-size:var(--fs-subhead);-webkit-line-clamp:3;font-weight:700;}
+  .gn-card-title{font-size:15px;-webkit-line-clamp:3;font-weight:600;}
   .gn-card-meta{font-size:10px;}
   /* gn-grid on mobile: single column lead only, no grid */
   .gn-grid{grid-template-columns:1fr;}
