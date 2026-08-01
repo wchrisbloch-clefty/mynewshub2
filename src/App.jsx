@@ -7203,8 +7203,8 @@ function TopBar({tab, setTab, search, setSearch, dark, setDark,
   const tickerItems = hasBreaking?[...breakingItems,...breakingItems]:[];
 
   // v24a: Desktop nav per user: General · Business · Markets · Bloom · Sports · Pop Culture · Briefing · Podcasts · Saved
-  const ALL_TABS = ['general','business','finance','tech','sports','health','popculture','briefing','podcasts','sources','saved'];
-  const TAB_LABELS = {business:'Business & Energy',finance:'Markets',tech:'AI & Tech',health:'Health',popculture:'Pop Culture',podcasts:'Podcasts',sources:'Sources',saved:'Saved',briefing:'Briefing'};
+  const ALL_TABS = ['general','business','bloom','tech','sports','health','popculture','briefing','podcasts','sources','saved'];
+  const TAB_LABELS = {business:'Business & Markets',bloom:'Energy',finance:'Markets',tech:'AI & Tech',health:'Health',popculture:'Pop Culture',podcasts:'Podcasts',sources:'Sources',saved:'Saved',briefing:'Briefing'};
   const TAB_CLASS  = {general:'t-general',sports:'t-sports',business:'t-business',finance:'t-finance',bloom:'t-bloom',tech:'t-tech',popculture:'t-popculture',podcasts:'t-podcasts'};
 
   // v24a Mobile chip bar per user: General · Business · Markets · Energy · Sports · Pop Culture
@@ -7212,7 +7212,7 @@ function TopBar({tab, setTab, search, setSearch, dark, setDark,
   const MOBILE_CHIPS = [
     { key:'general',    label:'News',       color:CATS.general.color },
     { key:'business',   label:'Business',   color:CATS.business.color },
-    { key:'finance',    label:'Markets',    color:CATS.finance.color },
+    { key:'bloom',      label:'Energy',     color:CATS.bloom.color },
     { key:'tech',       label:'AI & Tech',  color:CATS.tech.color },
     { key:'sports',     label:'Sports',     color:CATS.sports.color },
     { key:'health',     label:'Health',     color:CATS.health.color },
@@ -7284,7 +7284,7 @@ function TopBar({tab, setTab, search, setSearch, dark, setDark,
           </div>
           <div className="nav-tabs">
             {ALL_TABS.map(t=>(
-              <button key={t} className={`nav-tab ${TAB_CLASS[t]||''} ${tab===t?'active':''}`}
+              <button key={t} className={`nav-tab ${TAB_CLASS[t]||''} ${(tab===t || (t==='business' && tab==='finance'))?'active':''}`}
                 onClick={()=>{setTab(t);setSearch('');}}>
                 {TAB_LABELS[t]||(t.charAt(0).toUpperCase()+t.slice(1))}
               </button>
@@ -7780,8 +7780,8 @@ function AuthModal({ onClose, onSend, status, email, setEmail, userId, onSignOut
 }
 
 export default function App() {
-  const [tab, setTab]           = useState(()=>{ const c=parseRoute().category; return c==='bloom'?'business':c; });
-  const [subcat, setSubcat]     = useState(()=>{ const r=parseRoute(); return r.category==='bloom'?'energy':r.subcategory; }); // URL-driven subcategory
+  const [tab, setTab]           = useState(()=>parseRoute().category);
+  const [subcat, setSubcat]     = useState(()=>parseRoute().subcategory); // URL-driven subcategory
   const [tertiary, setTertiary] = useState(()=>parseRoute().tertiary);    // URL-driven team (Tier 3)
   const [myTeams, setMyTeams]   = useState(()=>ld('myTeams', []));        // followed teams {name,league,slug}
   const toggleMyTeam = (t) => setMyTeams(prev => {
@@ -8244,8 +8244,6 @@ export default function App() {
   // Phase 2: apply a route (category + optional subcategory) to app state and
   // refetch the feed. Called both by navigate() (user clicks) and popstate (back).
   const applyRoute = (category, subcategory, tertiary) => {
-    // Business + Energy merged: Energy is now a filter pill within Business, not a top-level category.
-    if (category === 'bloom') { subcategory = (subcategory && subcategory !== 'all') ? subcategory : 'energy'; category = 'business'; }
     setTab(category); setSubcat(subcategory || null); setTertiary(tertiary || null);
     setSearch('');setActiveKw(null);setActiveSrc(null);
     setMobileSearchOpen(false);
@@ -8254,14 +8252,13 @@ export default function App() {
     if (CAT_TABS.includes(category)) setLastFeedTab(category);
     // Refetch feed whenever the category changes (or first visit).
     if(!['saved','podcasts','social','sources'].includes(category)&&!(arts[category]||[]).length)loadCat(category);
-    if(category==='business'&&!(arts.bloom||[]).length)loadCat('bloom'); // Energy feeds power the merged page
+    if(category==='business'&&!(arts.finance||[]).length)loadCat('finance'); // Markets news powers the merged Business+Markets "All" view
     if(category==='finance')loadMarketData();
   };
 
   // Phase 2/5: the URL is the single source of truth. navigate() writes the path
   // (/:category/:subcategory?/:team?), then applies it. Chips call this, never local state.
   const navigate = (category, subcategory=null, tertiary=null) => {
-    if (category === 'bloom') { subcategory = (subcategory && subcategory !== 'all') ? subcategory : 'energy'; category = 'business'; }
     const path = buildPath(category, subcategory, tertiary);
     if (typeof window!=='undefined' && window.location.pathname !== path) {
       window.history.pushState({category,subcategory,tertiary}, '', path);
@@ -8321,7 +8318,7 @@ export default function App() {
     return { total, topSources, topCats };
   }, [clicks, readLinks, arts]);
 
-  const NEWS_CATS = ['general','sports','business','tech','popculture','comedy','health'];
+  const NEWS_CATS = ['general','sports','business','bloom','tech','popculture','comedy','health'];
   const homeTrendingTopics = useMemo(() => getTrendingTopics(arts), [arts]);
 
   // ─── FEED PAGE ─────────────────────────────────────────────────────────
@@ -8804,21 +8801,20 @@ export default function App() {
     const toggleSop = () => setSopCollapsed(v => { const nx = !v; sv('sopCollapsed_'+cat, nx); return nx; });
     // Business + Energy merged into one category with All / Business / Energy filter pills.
     const isMergedBiz = cat === 'business';
+    // Business + Markets merged: 'all' shows business + markets NEWS combined; 'business'
+    // shows business only; the 'Markets' pill navigates to the full Markets page (FinancePage).
     const bizFilter = isMergedBiz ? (subcat || 'all') : 'all';
-    const setBizFilter = (key) => navigate('business', key === 'all' ? null : key);
-    const BIZ_TABS = [{key:'all',label:'All'},{key:'business',label:'Business'},{key:'energy',label:'Energy'}];
     useEffect(() => {
-      if (cat === 'business' && !(arts.bloom||[]).length && !loading.bloom) loadCat('bloom');
+      if (cat === 'business' && !(arts.finance||[]).length && !loading.finance) loadCat('finance');
       // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [cat]);
     // Apply story clustering before sorting so cluster metadata is available
     const rawItems = isMergedBiz
       ? (bizFilter === 'business' ? sorted('business')
-         : bizFilter === 'energy' ? sorted('bloom')
-         : [...sorted('business'), ...sorted('bloom')].sort((a,b)=>new Date(b.pubDate)-new Date(a.pubDate)))
+         : [...sorted('business'), ...sorted('finance')].sort((a,b)=>new Date(b.pubDate)-new Date(a.pubDate)))
       : sorted(cat);
     const items=useMemo(()=>clusterStories(rawItems),[rawItems]);
-    const isLoading = isMergedBiz ? (loading.business || loading.bloom) : loading[cat];
+    const isLoading = isMergedBiz ? (loading.business || loading.finance) : loading[cat];
 
     // Phase 2: subcategory is URL-driven (never local state). Chips navigate.
     const pcSubTab = cat === 'popculture' ? (subcat || 'all') : 'all';
@@ -9004,13 +9000,13 @@ export default function App() {
         <div className="page-grid">
           <div className="feed-col">
 
-        {/* ── BUSINESS + ENERGY filter pills — reuses the Sports league-pill component ── */}
+        {/* ── BUSINESS + MARKETS filter pills — reuses the Sports league-pill component.
+            Markets routes to the full Markets page (FinancePage). ── */}
         {isMergedBiz && !activeKw && !activeSrc && !search && (
           <div className="sport-tabs" style={{marginBottom:'12px'}}>
-            {BIZ_TABS.map(t => (
-              <button key={t.key} className={`sport-tab ${bizFilter===t.key?'active':''}`}
-                onClick={()=>setBizFilter(t.key)}>{t.label}</button>
-            ))}
+            <button className={`sport-tab ${bizFilter==='all'?'active':''}`} onClick={()=>navigate('business')}>All</button>
+            <button className={`sport-tab ${bizFilter==='business'?'active':''}`} onClick={()=>navigate('business','business')}>Business</button>
+            <button className="sport-tab" onClick={()=>navigate('finance')}>Markets</button>
           </div>
         )}
 
@@ -9039,12 +9035,12 @@ export default function App() {
             followedSources={(feeds[cat]||[]).filter(f=>f.on).map(f=>f.name)}/>
         )}
 
-        {/* Coverage Gap on the merged Business/Energy page — same panel/tier-capping,
-            keyed off the active filter's keywords vs the reader's own biz+energy sources. */}
+        {/* Coverage Gap on the merged Business+Markets page — keyed off the reader's own
+            business + markets sources. */}
         {isMergedBiz && !activeKw && !activeSrc && !search && (
           <CoverageGap category="business"
-            keywords={bizFilter==='energy' ? (kw.bloom||[]) : (kw.business||[])}
-            followedSources={[...(feeds.business||[]),...(feeds.bloom||[])].filter(f=>f.on).map(f=>f.name)}/>
+            keywords={[...(kw.business||[]),...(kw.finance||[])]}
+            followedSources={[...(feeds.business||[]),...(feeds.finance||[])].filter(f=>f.on).map(f=>f.name)}/>
         )}
 
         {/* ── HOME: Top of Hour strip (image cards) ── */}
@@ -9836,6 +9832,12 @@ export default function App() {
               </button>
             </div>
           </div>
+        </div>
+        {/* Business + Markets filter pills — Markets is this page; All/Business route to the feed. */}
+        <div className="sport-tabs" style={{marginBottom:'12px'}}>
+          <button className="sport-tab" onClick={()=>navigate('business')}>All</button>
+          <button className="sport-tab" onClick={()=>navigate('business','business')}>Business</button>
+          <button className="sport-tab active" onClick={()=>navigate('finance')}>Markets</button>
         </div>
         {/* Ticker rail + movers — extracted MarketsSurface module */}
         <MarketsSurface mkt={mkt} loading={mktLoading} error={mktErr}/>
