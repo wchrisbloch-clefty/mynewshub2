@@ -585,18 +585,20 @@ async function fetchRSS(url) {
 }
 
 // ─── FORMATTERS ───────────────────────────────────────────────────────────────
+// One consistent RELATIVE timestamp format everywhere — never a mix of relative
+// and absolute clock times in the same list (CNBC pattern).
 function fmtDate(d) {
   if (!d) return '';
   try {
     const dt = new Date(d); if (isNaN(dt.getTime())) return '';
-    const now = new Date(), diff = Math.floor((now-dt)/1000);
-    const days=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
-    const months=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
-    const h=dt.getHours()%12||12, m=String(dt.getMinutes()).padStart(2,'0'), ampm=dt.getHours()>=12?'PM':'AM';
-    if (diff < 60) return 'Just now';
-    if (diff < 3600) return `${Math.floor(diff/60)}m ago`;
-    if (diff < 86400) return `${days[dt.getDay()]} ${h}:${m} ${ampm}`;
-    return `${months[dt.getMonth()]} ${dt.getDate()} · ${h}:${m} ${ampm}`;
+    const diff = Math.floor((Date.now() - dt.getTime()) / 1000);
+    if (diff < 45)        return 'Just now';
+    if (diff < 3600)      return `${Math.max(1, Math.floor(diff/60))}m ago`;
+    if (diff < 86400)     return `${Math.floor(diff/3600)}h ago`;
+    if (diff < 604800)    return `${Math.floor(diff/86400)}d ago`;
+    if (diff < 2592000)   return `${Math.floor(diff/604800)}w ago`;
+    if (diff < 31536000)  return `${Math.floor(diff/2592000)}mo ago`;
+    return `${Math.floor(diff/31536000)}y ago`;
   } catch { return ''; }
 }
 function fmtDuration(s) {
@@ -965,6 +967,7 @@ async function fetchContradictions(topic, items) {
 const TIER_LABEL = { verified: 'Verified', reported: 'Reported', unverified: 'Unverified' };
 function SourcesDisagree({ topic, items }) {
   const [data, setData] = useState(null);
+  const [expanded, setExpanded] = useState(false);
   useEffect(() => {
     let alive = true;
     if (!topic || !items || items.length < 3) { setData(null); return () => { alive = false; }; }
@@ -976,11 +979,14 @@ function SourcesDisagree({ topic, items }) {
     return () => { alive = false; };
   }, [topic, items]);
   if (!data || !Array.isArray(data.conflicts) || data.conflicts.length === 0) return null;
+  // Denser cluster: show the consensus + the top conflict; collapse the rest under
+  // a single expand (Google-News tightness).
+  const shown = expanded ? data.conflicts : data.conflicts.slice(0, 1);
   return (
     <div className="disagree-panel">
       <div className="disagree-head"><span className="disagree-dot"/> Sources disagree</div>
       {data.consensus && <div className="disagree-consensus"><strong>Most agree:</strong> {data.consensus}</div>}
-      {data.conflicts.map((c, i) => (
+      {shown.map((c, i) => (
         <div key={i} className="disagree-conflict">
           <div className="disagree-issue">{c.issue}</div>
           {c.positions.map((p, j) => (
@@ -992,6 +998,11 @@ function SourcesDisagree({ topic, items }) {
           ))}
         </div>
       ))}
+      {data.conflicts.length > 1 && (
+        <button className="cluster-more" onClick={() => setExpanded(e => !e)}>
+          {expanded ? 'Show less ▴' : `See ${data.conflicts.length - 1} more ▾`}
+        </button>
+      )}
     </div>
   );
 }
@@ -1014,6 +1025,7 @@ async function fetchDiscover(category, keywords, followedSources) {
 // only when a genuine gap exists; each item is tagged "Not in your sources".
 function CoverageGap({ category, keywords, followedSources }) {
   const [items, setItems] = useState([]);
+  const [expanded, setExpanded] = useState(false);
   const kwKey = (keywords || []).join('|');
   const srcKey = (followedSources || []).join('|');
   useEffect(() => {
@@ -1024,21 +1036,28 @@ function CoverageGap({ category, keywords, followedSources }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [category, kwKey, srcKey]);
   if (!items.length) return null;
+  // Denser cluster: one header tag, compact rows (headline + the outlets covering
+  // it), collapsed to the top 2 with a single expand.
+  const shown = expanded ? items : items.slice(0, 2);
   return (
     <div className="gap-panel">
       <div className="gap-head">
         <span className="gap-title">You may be missing this</span>
-        <span className="gap-sub">Widely covered — but not in your sources</span>
+        <span className="gap-tag">Not in your sources</span>
       </div>
       <div className="gap-list">
-        {items.map((it, i) => (
+        {shown.map((it, i) => (
           <a key={i} className="gap-item" href={it.link} target="_blank" rel="noreferrer">
-            <span className="gap-tag">Not in your sources</span>
             <span className="gap-item-title">{it.title}</span>
-            <span className="gap-item-meta">{it.outletCount} outlets · {it.source}</span>
+            <span className="gap-item-meta">{(it.outlets && it.outlets.length ? it.outlets : [it.source]).slice(0, 3).join(', ')}{it.outletCount > 3 ? ` +${it.outletCount - 3} more` : ''}</span>
           </a>
         ))}
       </div>
+      {items.length > 2 && (
+        <button className="cluster-more" onClick={() => setExpanded(e => !e)}>
+          {expanded ? 'Show less ▴' : `See ${items.length - 2} more ▾`}
+        </button>
+      )}
     </div>
   );
 }
@@ -2403,8 +2422,8 @@ body:not(.dark) .pill-bar{
 }
 .gn-lead-text{display:flex;flex-direction:column;justify-content:center;}
 .gn-lead-title{
-  /* NBC bold-display feel */
-  font-size:30px;font-weight:900;line-height:1.12;
+  /* NBC bold-display feel — dominant hero weight, tokenized */
+  font-size:var(--fs-hero);font-weight:900;line-height:1.12;
   letter-spacing:-0.7px;color:var(--text);margin:0 0 12px;
   display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden;
 }
@@ -2787,16 +2806,20 @@ body:not(.dark) .pill-bar{
 .disagree-claim{color:var(--text);}
 .disagree-src{color:var(--text3);font-size:var(--fs-meta);}
 /* Coverage gap — "You may be missing this" panel (General, below Trending) */
-.gap-panel{border:1px dashed var(--border);border-radius:10px;padding:12px 14px;margin:0 0 20px;background:var(--surface2);}
-.gap-head{display:flex;align-items:baseline;gap:8px;flex-wrap:wrap;margin-bottom:10px;}
+.gap-panel{border:1px dashed var(--border);border-radius:10px;padding:10px 12px;margin:0 0 20px;background:var(--surface2);}
+.gap-head{display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;margin-bottom:6px;}
 .gap-title{font-size:var(--fs-body);font-weight:800;color:var(--text);}
 .gap-sub{font-size:var(--fs-meta);color:var(--text3);}
-.gap-list{display:grid;gap:8px;}
-.gap-item{display:flex;flex-direction:column;gap:3px;padding:9px 11px;border-radius:8px;background:var(--surface);border:1px solid var(--border);text-decoration:none;transition:border-color 0.15s ease;}
-.gap-item:hover{border-color:var(--accent);}
-.gap-tag{align-self:flex-start;font-size:8px;font-weight:800;text-transform:uppercase;letter-spacing:0.06em;color:#b45309;background:rgba(217,119,6,0.12);padding:1px 7px;border-radius:10px;}
-.gap-item-title{font-size:var(--fs-body);font-weight:600;color:var(--text);line-height:1.35;}
+.gap-list{display:grid;gap:0;}
+.gap-item{display:flex;flex-direction:column;gap:1px;padding:6px 2px;border-top:1px solid var(--border);text-decoration:none;}
+.gap-list .gap-item:first-child{border-top:none;}
+.gap-item:hover .gap-item-title{color:var(--accent);}
+.gap-tag{font-size:8px;font-weight:800;text-transform:uppercase;letter-spacing:0.06em;color:#b45309;background:rgba(217,119,6,0.12);padding:1px 7px;border-radius:10px;}
+.gap-item-title{font-size:var(--fs-body);font-weight:600;color:var(--text);line-height:1.3;}
 .gap-item-meta{font-size:var(--fs-meta);color:var(--text3);}
+/* Shared "See N more" expander for the clustered panels. */
+.cluster-more{background:none;border:none;color:var(--accent);font-size:var(--fs-meta);font-weight:700;cursor:pointer;padding:6px 2px 0;font-family:inherit;}
+.cluster-more:hover{text-decoration:underline;}
 .team-hub-clear{
   font-size:12px;font-weight:600;color:var(--text3);
   background:none;border:1px solid var(--border);border-radius:14px;
@@ -8540,7 +8563,7 @@ export default function App() {
                   : <div className="snap-feed">
                       {teamItems.slice(0,20).map((a,i)=>(
                         <Fragment key={a.link||i}>
-                          <SnapshotCard a={a} meta={CATS.sports} isSaved={isSavedFn(a)} onSave={onSave} onRead={onRead} onPerspectives={setPerspArticle} formatDate={fmtDate}/>
+                          <SnapshotCard a={a} meta={CATS.sports} isSaved={isSavedFn(a)} onSave={onSave} onRead={onRead} onPerspectives={setPerspArticle} formatDate={fmtDate} hideImage={i>=3}/>
                           {i===2 && <XPulse topic={teamName} variant="feed"/>}
                         </Fragment>
                       ))}
@@ -8765,7 +8788,7 @@ export default function App() {
           : <div className="snap-feed">
               {entityItems.slice(0, 20).map((a, i) => (
                 <Fragment key={a.link || i}>
-                  <SnapshotCard a={a} meta={cc} isSaved={isSavedFn(a)} onSave={onSave} onRead={onRead} onPerspectives={setPerspArticle} formatDate={fmtDate}/>
+                  <SnapshotCard a={a} meta={cc} isSaved={isSavedFn(a)} onSave={onSave} onRead={onRead} onPerspectives={setPerspArticle} formatDate={fmtDate} hideImage={i>=3}/>
                   {i === 2 && <XPulse topic={entity} variant="feed"/>}
                 </Fragment>
               ))}
@@ -9151,7 +9174,7 @@ export default function App() {
                 :<div className="snap-feed">
                   {feedItems.slice(activeKw||activeSrc||search?0:3,20).map((a,i)=>(
                     <Fragment key={a.link||i}>
-                      <SnapshotCard a={a} meta={CATS[cat]||CATS.general} isSaved={isSavedFn(a)} onSave={onSave} onRead={onRead} onPerspectives={setPerspArticle} formatDate={fmtDate}/>
+                      <SnapshotCard a={a} meta={CATS[cat]||CATS.general} isSaved={isSavedFn(a)} onSave={onSave} onRead={onRead} onPerspectives={setPerspArticle} formatDate={fmtDate} hideImage={i>=3}/>
                       {i===2 && <XPulse topic={cc?.label||cat} variant="feed"/>}
                     </Fragment>
                   ))}
@@ -9926,7 +9949,7 @@ export default function App() {
                 :<div className="snap-feed" style={{padding:'12px 0 0'}}>
                     {newsItems.slice(0, 15).map((a, i) => (
                       <Fragment key={a.link||i}>
-                        <SnapshotCard a={a} meta={CATS.finance} isSaved={isSavedFn(a)} onSave={onSave} onRead={onRead} onPerspectives={setPerspArticle} formatDate={fmtDate}/>
+                        <SnapshotCard a={a} meta={CATS.finance} isSaved={isSavedFn(a)} onSave={onSave} onRead={onRead} onPerspectives={setPerspArticle} formatDate={fmtDate} hideImage={i>=3}/>
                         {i===2 && <XPulse topic="Markets" variant="feed"/>}
                       </Fragment>
                     ))}

@@ -20,7 +20,7 @@ import './SnapshotCard.css';
 
 const defaultFormatDate = d => { try { return new Date(d).toLocaleString(); } catch { return ''; } };
 
-export function SnapshotCard({ a, meta = {}, isSaved, onSave, onRead, onPerspectives, formatDate = defaultFormatDate }) {
+export function SnapshotCard({ a, meta = {}, isSaved, onSave, onRead, onPerspectives, formatDate = defaultFormatDate, hideImage = false }) {
   const color = meta.color;
   const bg = meta.bg;
   const [imgErr, setImgErr] = useState(false);
@@ -53,7 +53,7 @@ export function SnapshotCard({ a, meta = {}, isSaved, onSave, onRead, onPerspect
           </button>
         </div>
       </div>
-      {a.img && !imgErr && <img className="snap-thumb" src={a.img} loading="lazy" alt="" onError={() => setImgErr(true)} />}
+      {a.img && !imgErr && !hideImage && <img className="snap-thumb" src={a.img} loading="lazy" alt="" onError={() => setImgErr(true)} />}
     </article>
   );
 }

@@ -50,7 +50,8 @@
   /* One font-size scale — headline / subhead / body / meta (+ lead for heroes).
      Shared shell components consume these; new/refactored UI should too, instead
      of one-off px sizes. */
-  --fs-lead:22px;    /* hero / lead headline */
+  --fs-hero:30px;    /* dominant lead/hero headline — must out-weigh list items */
+  --fs-lead:22px;    /* large secondary / mobile hero headline */
   --fs-headline:16px;/* card & section headline */
   --fs-subhead:14px; /* secondary headline / strong label */
   --fs-body:13px;    /* body copy */
