@@ -1609,7 +1609,7 @@ body:not(.dark) .pill-bar{
 ═══════════════════════════════════════════ */
 .page{max-width:1400px;margin:0 auto;padding:28px 24px;}
 .page-grid{display:grid;grid-template-columns:2.1fr 1fr;gap:28px;align-items:start;} /* main ~68% / sidebar ~32% (CNBC/NBC ratio) */
-.feed-col{display:flex;flex-direction:column;gap:0;}
+.feed-col{display:flex;flex-direction:column;gap:0;min-width:0;} /* min-width:0 so the column shrinks to its grid track instead of its content width */
 
 /* Page header row: label + customize button */
 .page-header-row{
@@ -2403,37 +2403,36 @@ body:not(.dark) .pill-bar{
    Lead card (full-width, large image) + 3-column equal grid below.
    Used on General homepage, Sports article feed, Markets news, Pop Culture,
    Bloom Energy. Cards inside use the unified .fc class. */
+/* Top Stories — ONE row: hero (~53%) + a vertical rail of compact secondaries. */
 .gn-grid{
-  display:flex;flex-direction:column;gap:24px;
-  margin-bottom:32px;
+  display:grid;grid-template-columns:53% 1fr;gap:22px;align-items:start;
+  margin-bottom:28px;
 }
 .gn-lead{
-  display:grid;grid-template-columns: 1.6fr 1fr;gap:24px;
-  cursor:pointer;
-  padding-bottom:24px;border-bottom:1px solid var(--border);
-  transition:opacity 0.15s;
+  display:flex;flex-direction:column;gap:12px;
+  cursor:pointer;transition:opacity 0.15s;
 }
 .gn-lead:hover{opacity:0.92;}
 .gn-lead-img{
-  width:100%;aspect-ratio:21/9;
+  width:100%;aspect-ratio:16/10;
   background-size:cover;background-position:center top;
   border-radius:8px;background-color:var(--surface2);
   position:relative;
 }
-.gn-lead-text{display:flex;flex-direction:column;justify-content:center;}
+.gn-lead-text{display:flex;flex-direction:column;}
 .gn-lead-title{
-  /* NBC bold-display feel — dominant hero weight, tokenized */
-  font-size:var(--fs-hero);font-weight:900;line-height:1.12;
-  letter-spacing:-0.7px;color:var(--text);margin:0 0 12px;
+  /* Top-Stories-module hero — smaller than the page hero token, per Pass G addendum */
+  font-size:20px;font-weight:700;line-height:1.2;
+  letter-spacing:-0.3px;color:var(--text);margin:0 0 8px;
   display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden;
 }
 .gn-lead-desc{
-  font-size:15px;line-height:1.5;color:var(--text2);
-  margin:0 0 12px;
-  display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden;
+  font-size:14px;font-weight:400;line-height:1.45;color:var(--text2);
+  margin:0 0 8px;
+  display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;
 }
 .gn-lead-meta{
-  font-size:var(--fs-meta);color:var(--text3);
+  font-size:12px;color:var(--text3);
   display:flex;align-items:center;gap:6px;
 }
 .gn-lead-source{
@@ -2441,37 +2440,35 @@ body:not(.dark) .pill-bar{
   text-transform:uppercase;letter-spacing:0.06em;font-size:10px;
 }
 
-/* Grid of equal cards below the lead */
+/* Secondary rail — compact horizontal cards stacked beside the hero (no 2nd row). */
 .gn-row{
-  display:grid;grid-template-columns:repeat(3, 1fr);gap:20px;
+  display:flex;flex-direction:column;gap:14px;
 }
 .gn-card{
-  display:flex;flex-direction:column;gap:10px;cursor:pointer;
-  transition:opacity 0.12s;
+  display:grid;grid-template-columns:92px minmax(0,1fr);grid-template-rows:auto auto;
+  column-gap:11px;row-gap:3px;cursor:pointer;transition:opacity 0.12s;
 }
 .gn-card:hover{opacity:0.9;}
-.gn-card-img{
-  width:100%;height:200px;
+.gn-card-img,.gn-card-img-ph{
+  grid-column:1;grid-row:1 / span 2;
+  width:92px;height:64px;
   background-size:cover;background-position:center top;
-  border-radius:4px;background-color:var(--surface2);
-}
-.gn-card-img-ph{
-  width:100%;height:200px;
-  background:var(--surface2);border-radius:4px;
+  border-radius:6px;background-color:var(--surface2);
 }
 .gn-card-title{
-  font-family:var(--font-serif);
-  font-size:var(--fs-headline);font-weight:700;line-height:1.25;
-  letter-spacing:-0.2px;color:var(--text);margin:0;overflow-wrap:break-word;
+  grid-column:2;grid-row:1;
+  font-size:15px;font-weight:600;line-height:1.28;
+  letter-spacing:-0.1px;color:var(--text);margin:0;overflow-wrap:break-word;
   display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden;
 }
 .gn-card-meta{
-  font-size:10px;color:var(--text3);
+  grid-column:2;grid-row:2;
+  font-size:12px;color:var(--text3);
   display:flex;gap:5px;align-items:center;
 }
 .gn-card-source{
   font-weight:800;color:var(--text2);
-  text-transform:uppercase;letter-spacing:0.05em;font-size:9px;
+  text-transform:uppercase;letter-spacing:0.05em;font-size:11px;
 }
 
 /* Per-vertical card top-border accents */
@@ -2492,21 +2489,13 @@ body:not(.dark) .pill-bar{
   margin-right:8px;
 }
 
-/* Mobile: collapse to 1 column */
+/* Tablet/mobile: Top Stories collapses to one column — hero, then the rail below. */
 @media (max-width:900px){
-  .gn-lead{grid-template-columns:1fr;gap:14px;}
-  .gn-lead-title{font-size:24px;}
-  .gn-row{grid-template-columns:repeat(2, 1fr);gap:14px;}
-  .gn-card-title{font-size:var(--fs-subhead);}
+  .gn-grid{grid-template-columns:1fr;gap:18px;}
 }
 @media (max-width:640px){
-  .gn-lead{padding-bottom:18px;}
-  .gn-lead-title{font-size:var(--fs-lead);-webkit-line-clamp:3;}
-  .gn-lead-desc{-webkit-line-clamp:2;font-size:var(--fs-subhead);}
-  .gn-row{grid-template-columns:1fr;gap:18px;}
-  .gn-card{flex-direction:row;gap:12px;}
-  .gn-card-img,.gn-card-img-ph{width:120px;height:80px;aspect-ratio:auto;flex-shrink:0;}
-  .gn-card-title{-webkit-line-clamp:3;}
+  .gn-lead-img{aspect-ratio:16/9;}
+  .gn-card-img,.gn-card-img-ph{width:104px;height:70px;}
 }
 
 /* BUSINESS PAGE Bloomberg-style — orange accent + dense feel.
@@ -9009,6 +8998,11 @@ export default function App() {
           </div>
         )}
 
+        {/* Desktop: main column + sidebar run together from the very top of the
+            content (68/32), so Top Stories sits inside the 68% column, not full-width. */}
+        <div className="page-grid">
+          <div className="feed-col">
+
         {/* ── BUSINESS + ENERGY filter pills — reuses the Sports league-pill component ── */}
         {isMergedBiz && !activeKw && !activeSrc && !search && (
           <div className="sport-tabs" style={{marginBottom:'12px'}}>
@@ -9107,8 +9101,6 @@ export default function App() {
           </div>
         )}
 
-        <div className="page-grid">
-          <div className="feed-col">
             <div className="page-header-row">
               <span className="page-header" style={{fontFamily:'var(--font-sans)'}}>
                 {cc.label}{feedItems.length>0?` — ${feedItems.length} articles`:''}
