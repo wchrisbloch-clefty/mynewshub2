@@ -1312,6 +1312,10 @@ body{
    same max-width, flush (no card chrome). */
 .topbar-wx{background:var(--surface);border-bottom:1px solid var(--border2);}
 .topbar-wx .rnw-card{max-width:1400px;margin:0 auto;padding:0 var(--s4);border:none;border-radius:0;background:none;}
+/* Scoreboard band in the top bar (below weather, above nav — Pass G item 3). */
+.topbar-scores{background:var(--surface);border-bottom:1px solid var(--border2);}
+.topbar-scores .home-scores{max-width:1400px;margin:0 auto;padding:7px var(--s4);border:none;border-radius:0;background:none;overflow:visible;}
+.topbar-wrap.shrunk .topbar-scores{display:none;}
 .topbar-wx .rnw-row{padding:8px 0;}
 .topbar-wx .rnw-forecast{padding-left:var(--s4);padding-right:var(--s4);}
 .ss-flag{display:inline-flex;align-items:center;gap:6px;flex-shrink:0;
@@ -7186,7 +7190,8 @@ function LastUpdated({ timestamp, onRefresh }) {
 function TopBar({tab, setTab, search, setSearch, dark, setDark,
                  onCustomize, onRefresh, breakingItems, onTickerClick,
                  hidden, shrunk, mobileSearchOpen, onMobileSearchToggle, weatherCities, hiddenIndices,
-                 onAnalyze, searchHistory, trendingTopics, onAccount, signedIn}) {
+                 onAnalyze, searchHistory, trendingTopics, onAccount, signedIn,
+                 scores, favTeams, onGoToSports}) {
   const [searchFocused, setSearchFocused] = useState(false);
   const [quotes, setQuotes] = useState({});
   const [showBreaking, setShowBreaking] = useState(true);
@@ -7277,6 +7282,14 @@ function TopBar({tab, setTab, search, setSearch, dark, setDark,
       {/* Home-only weather, stacked under the ticker as one contained top block. */}
       {tab==='general' && (
         <div className="topbar-wx"><RightNowWeather cities={weatherCities}/></div>
+      )}
+
+      {/* Scoreboard sits below weather and above the category nav (Pass G item 3).
+          Self-hides when nothing is live; collapses when the header shrinks on scroll. */}
+      {tab==='general' && (
+        <div className="topbar-scores">
+          <ActiveScoresBar scores={scores} favTeams={favTeams} onGoToSports={onGoToSports}/>
+        </div>
       )}
 
       {/* ━━━ DESKTOP: nav bar ━━━ */}
@@ -8952,12 +8965,8 @@ export default function App() {
             <span className="nsp-dot"/> ↑ {pendingNew[cat].length} new {pendingNew[cat].length===1?'story':'stories'}
           </button>
         )}
-        {/* Live Scores — General only, anchored at the very top under the nav.
-            Favorite/followed teams sort to the front and get an accent highlight
-            (Sports has its own scoreboard). Self-hides when nothing is live. */}
-        {cat === 'general' && !activeKw && !activeSrc && !search && (
-          <ActiveScoresBar scores={scores} favTeams={[...teams, ...myTeams.map(t=>({match:t.name}))]} onGoToSports={() => handleTabChange('sports')}/>
-        )}
+        {/* Live Scores moved to the top bar (below weather, above the category nav —
+            Pass G item 3). Rendered by <TopBar>; no longer here in the feed column. */}
         {/* HOME: unified Following row (topics + teams) above the category feeds.
             Always shown on Home so the "+ Add" search-and-add is reachable even when
             nothing is followed yet. */}
@@ -10004,7 +10013,9 @@ export default function App() {
           onAnalyze={() => setShowAnalyze(true)}
           searchHistory={searchHistory}
           trendingTopics={homeTrendingTopics}
-          onAccount={()=>setShowAuth(true)} signedIn={!!userId}/>
+          onAccount={()=>setShowAuth(true)} signedIn={!!userId}
+          scores={scores} favTeams={[...teams, ...myTeams.map(t=>({match:t.name}))]}
+          onGoToSports={() => handleTabChange('sports')}/>
 
         {/* Pull-to-refresh indicator (mobile, touch-only) */}
         {isMobile && <PtrIndicator distance={ptrDistance} threshold={70} refreshing={refreshing}/>}
