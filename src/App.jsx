@@ -1608,7 +1608,7 @@ body:not(.dark) .pill-bar{
    PAGE SHELL
 ═══════════════════════════════════════════ */
 .page{max-width:1400px;margin:0 auto;padding:28px 24px;}
-.page-grid{display:grid;grid-template-columns:1fr 280px;gap:40px;align-items:start;}
+.page-grid{display:grid;grid-template-columns:2.1fr 1fr;gap:28px;align-items:start;} /* main ~68% / sidebar ~32% (CNBC/NBC ratio) */
 .feed-col{display:flex;flex-direction:column;gap:0;}
 
 /* Page header row: label + customize button */
@@ -6175,7 +6175,14 @@ function Sidebar({cat, arts, kw, health, activeKw, setActiveKw, activeSource, se
   // Today's Topics: merge user keywords + auto-derived trending topics with counts
   const topicItems = useMemo(() => {
     const autoTopics = getTrendingTopics(catArts, 14);
-    const allLabels = [...new Set([...catKws, ...autoTopics])];
+    // Case-insensitive dedup so "Houston" (keyword) and "houston" (auto-topic)
+    // collapse to one tag; user-keyword casing wins (listed first).
+    const seen = new Set();
+    const allLabels = [];
+    for (const t of [...catKws, ...autoTopics]) {
+      const key = String(t).toLowerCase();
+      if (!seen.has(key)) { seen.add(key); allLabels.push(t); }
+    }
     return allLabels.map(t => ({
       label: t,
       count: catArts.filter(a => (a.title+' '+(a.desc||'')).toLowerCase().includes(t.toLowerCase())).length,
