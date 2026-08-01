@@ -1312,10 +1312,17 @@ body{
    same max-width, flush (no card chrome). */
 .topbar-wx{background:var(--surface);border-bottom:1px solid var(--border2);}
 .topbar-wx .rnw-card{max-width:1400px;margin:0 auto;padding:0 var(--s4);border:none;border-radius:0;background:none;}
-/* Scoreboard band in the top bar (below weather, above nav — Pass G item 3). */
-.topbar-scores{background:var(--surface);border-bottom:1px solid var(--border2);}
-.topbar-scores .home-scores{max-width:1400px;margin:0 auto;padding:7px var(--s4);border:none;border-radius:0;background:none;overflow:visible;}
+/* Scoreboard band in the top bar (below weather, above nav — Pass G item 3).
+   Dark ESPN theme so the homepage strip matches the Sports-page strip (item 6). */
+.topbar-scores{background:#0c1c2c;border-bottom:1px solid #1a2c3e;}
+.topbar-scores .home-scores{max-width:1400px;margin:0 auto;padding:8px var(--s4) 10px;border:none;border-radius:0;background:none;overflow:visible;}
 .topbar-wrap.shrunk .topbar-scores{display:none;}
+/* Right-edge fade cue: partial cards read as "scroll for more," not a cutoff. */
+.topbar-scores .home-scores,.sports-score-strip{position:relative;}
+.topbar-scores .home-scores::after,.sports-score-strip::after{
+  content:'';position:absolute;top:0;right:0;bottom:0;width:34px;pointer-events:none;
+  background:linear-gradient(90deg,rgba(12,28,44,0),#0c1c2c);
+}
 .topbar-wx .rnw-row{padding:8px 0;}
 .topbar-wx .rnw-forecast{padding-left:var(--s4);padding-right:var(--s4);}
 .ss-flag{display:inline-flex;align-items:center;gap:6px;flex-shrink:0;
@@ -1426,7 +1433,7 @@ body{
 .trending-follow:hover{color:var(--accent);}
 .trending-follow.on{color:var(--amber);}
 /* Numbers read as data everywhere — scores, clocks, timestamps that lacked it. */
-.sb-status,.sst-status,.hs-status,.rn-fresh,.gn-lead-meta,.fc-meta,.today-item-src,.pod-meta,.snap-time{font-variant-numeric:tabular-nums;}
+.sb-status,.score-tile-status,.rn-fresh,.gn-lead-meta,.fc-meta,.today-item-src,.pod-meta,.snap-time{font-variant-numeric:tabular-nums;}
 
 /* ═══════════════════════════════════════════
    PILL BAR — editorial data strip
@@ -2660,55 +2667,62 @@ body:not(.dark) .pill-bar{
 @media (min-width:1025px) and (max-width:1100px){
   .sports-score-strip{margin-left:-16px;margin-right:-16px;}
 }
-.sports-score-strip-inner{
+.sports-score-strip-inner{padding-bottom:2px;scroll-snap-type:x proximity;}
+
+/* ── SHARED SCOREBOARD (Pass G item 6) ─────────────────────────────────────────
+   One ESPN-style horizontal card strip + tile theme, used identically by the
+   homepage strip (.home-scores) and the Sports-page strip (.sports-score-strip).
+   The right-edge fade signals "scroll for more" so partial cards read as
+   scrollable, never as a hard cutoff. */
+.score-strip-scroll{
   display:flex;gap:8px;
   overflow-x:auto;scrollbar-width:none;
   -webkit-overflow-scrolling:touch;
-  scroll-snap-type:x proximity;
-  padding-bottom:2px;
 }
-.sports-score-strip-inner::-webkit-scrollbar{display:none;}
-.sst-tile{
+.score-strip-scroll::-webkit-scrollbar{display:none;}
+.score-tile{
   position:relative;
   flex-shrink:0;scroll-snap-align:start;
   background:#162635;border:1px solid #243446;
   border-radius:7px;padding:6px 9px;
-  min-width:110px;cursor:pointer;
+  min-width:120px;max-width:140px;cursor:pointer;
   transition:border-color 0.15s, transform 0.1s;
 }
-.sst-tile:hover{border-color:#3b5168;transform:translateY(-1px);}
-.sst-tile.live{border-color:#ef4444;background:#2a1f1f;}
-.sst-tile.fav{border-color:#f59e0b;background:#221c10;}
-.sst-tile.fav.live{border-color:#ef4444;}
-.sst-fav-star{
+.score-tile:hover{border-color:#3b5168;transform:translateY(-1px);}
+.score-tile.live{border-color:#ef4444;background:#2a1f1f;}
+.score-tile.fav{border-color:#f59e0b;background:#221c10;}
+.score-tile.fav.live{border-color:#ef4444;}
+.score-tile-star{
   position:absolute;top:6px;right:8px;
   color:#fbbf24;font-size:10px;
 }
-.sst-league-badge{
+.score-tile-league{
   font-size:9px;font-weight:800;color:rgba(255,255,255,0.45);
   text-transform:uppercase;letter-spacing:0.1em;margin-bottom:7px;
 }
-.sst-row{
+.score-tile-row{
   display:flex;justify-content:space-between;align-items:center;
   font-size:12px;color:rgba(255,255,255,0.85);
-  font-variant-numeric:tabular-nums;padding:2px 0;
+  font-variant-numeric:tabular-nums;padding:2px 0;gap:8px;
 }
-.sst-team{font-weight:600;letter-spacing:-0.2px;max-width:88px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
-.sst-team.win{color:#fff;font-weight:800;}
-.sst-team.loss{color:rgba(255,255,255,0.4);}
-.sst-score{font-weight:900;font-size:var(--fs-subhead);color:#fff;min-width:22px;text-align:right;}
-.sst-score.win{color:#22c55e;}
-.sst-score.loss{color:rgba(255,255,255,0.35);}
-.sst-status{
+.score-tile-side{display:flex;align-items:center;gap:5px;min-width:0;}
+.score-tile-logo{width:14px;height:14px;object-fit:contain;flex-shrink:0;}
+.score-tile-team{font-weight:600;letter-spacing:-0.2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.score-tile-team.win{color:#fff;font-weight:800;}
+.score-tile-team.loss{color:rgba(255,255,255,0.4);}
+.score-tile-score{font-weight:900;font-size:var(--fs-subhead);color:#fff;min-width:22px;text-align:right;}
+.score-tile-score.win{color:#22c55e;}
+.score-tile-score.loss{color:rgba(255,255,255,0.35);}
+.score-tile-status{
   font-size:9px;color:rgba(255,255,255,0.55);
   text-transform:uppercase;letter-spacing:0.05em;
   margin-top:4px;display:flex;align-items:center;gap:4px;
   border-top:1px solid rgba(255,255,255,0.07);padding-top:4px;
 }
-.sst-status.live{color:#ef4444;font-weight:700;}
-.sst-status.final{color:rgba(255,255,255,0.4);}
-.sst-status.pre{color:#60a5fa;}
-.sst-live-dot{
+.score-tile-status.live{color:#ef4444;font-weight:700;}
+.score-tile-status.final{color:rgba(255,255,255,0.4);}
+.score-tile-status.pre{color:#60a5fa;}
+.score-tile-dot{
   width:5px;height:5px;border-radius:50%;background:#ef4444;
   animation:pulse-badge 1.4s ease-in-out infinite;
 }
@@ -2945,7 +2959,7 @@ body:not(.dark) .pill-bar{
 }
 @media (max-width:640px){
   .sports-score-strip{margin:-12px -12px 14px;padding:12px;}
-  .sst-tile{min-width:118px;padding:9px 11px;}
+  .score-tile{min-width:120px;padding:9px 11px;}
   .sport-tab{padding:10px 12px;font-size:12px;min-height:44px;}
   .team-pill-group{border-radius:18px;}
   .team-pill{padding:7px 12px;font-size:var(--fs-meta);min-height:36px;}
@@ -4393,14 +4407,13 @@ kbd{display:inline-block;padding:1px 5px;border:1px solid var(--border);border-r
 .fc-act.explain-on{border-color:#b45309;color:#b45309;background:#fffbeb;}
 
 /* ACTIVE SCORES STRIP — compact live games on General homepage */
-.home-scores{
-  margin-bottom:14px;background:var(--surface);
-  border:1px solid var(--border);border-radius:var(--radius);
-  overflow:hidden;
-}
+/* Homepage strip shares the Sports-page ESPN theme (Pass G item 6). It lives in
+   the dark .topbar-scores band (see .topbar-scores rules), so the band itself is
+   transparent here; only the head + shared .score-tile cards render. */
+.home-scores{background:none;}
 .home-scores-head{
   display:flex;align-items:center;justify-content:space-between;
-  padding:5px 12px;background:var(--navy);
+  padding:0 2px 6px;background:none;
 }
 .home-scores-label{
   font-size:9px;font-weight:800;color:rgba(255,255,255,0.9);
@@ -4414,31 +4427,6 @@ kbd{display:inline-block;padding:1px 5px;border:1px solid var(--border);border-r
   background:none;border:none;cursor:pointer;font-family:inherit;
 }
 .home-scores-see-all:hover{color:#fff;}
-.home-scores-scroll{
-  display:flex;overflow-x:auto;scrollbar-width:none;gap:0;
-  -webkit-overflow-scrolling:touch;
-}
-.home-scores-scroll::-webkit-scrollbar{display:none;}
-.hs-tile{
-  flex-shrink:0;min-width:112px;padding:6px 11px;
-  border-right:1px solid var(--border2);cursor:pointer;
-  transition:background 0.12s;
-}
-.hs-tile:last-child{border-right:none;}
-/* Followed/favorite team's game — subtle accent highlight, sorted to the front. */
-.hs-tile.fav{border:1px solid var(--accent);border-radius:8px;background:var(--accent-bg);}
-.hs-fav-dot{color:var(--amber);margin-right:4px;}
-.hs-tile:hover{background:var(--surface2);}
-.hs-league{font-size:8px;font-weight:800;color:var(--text3);text-transform:uppercase;letter-spacing:0.08em;margin-bottom:3px;}
-.hs-team-row{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:1px 0;}
-.hs-team-name{font-size:var(--fs-meta);font-weight:600;color:var(--text);flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
-.hs-team-score{font-size:var(--fs-body);font-weight:900;color:var(--text);font-variant-numeric:tabular-nums;min-width:24px;text-align:right;}
-.hs-team-score.winner{color:var(--green);}
-.hs-status{font-size:8px;margin-top:3px;text-transform:uppercase;letter-spacing:0.05em;border-top:1px solid var(--border2);padding-top:3px;}
-.hs-status.live{color:var(--red);font-weight:700;display:flex;align-items:center;gap:4px;}
-.hs-status.live::before{content:'●';animation:score-pulse 1.2s ease-in-out infinite;}
-.hs-status.final{color:var(--text3);}
-.hs-status.pre{color:#3b82f6;}
 
 /* SEARCH RESULTS BANNER */
 .search-results-banner{
@@ -4611,8 +4599,6 @@ kbd{display:inline-block;padding:1px 5px;border:1px solid var(--border);border-r
   .gn-lead-img{aspect-ratio:16/7;max-height:180px;}
   .sports-hero-img{aspect-ratio:16/7;max-height:170px;}
   .hero-lead-img{aspect-ratio:16/7;max-height:180px;}
-  .home-scores{margin-left:-12px;margin-right:-12px;border-radius:0;border-left:none;border-right:none;}
-  .hs-tile{min-width:120px;padding:9px 11px;}
   .trending-bar{padding:8px 0 12px;}
   .trending-chip{font-size:10px;padding:4px 9px;}
   /* Mobile trending section — more prominent at top of feed */
@@ -5296,6 +5282,46 @@ function AudioListen({ text, title }) {
 
 
 // ─── ACTIVE SCORES BAR — compact live/final games for General homepage ────────
+// Shared ESPN-style score tile — the SAME card on the homepage strip
+// (ActiveScoresBar) and the Sports-page strip (SportsScoreStrip), so the
+// scoreboard looks like one component everywhere (Pass G item 6). Each strip
+// prepares `_leagueLabel` + `_fav` on the game before handing it here.
+const SCORE_LEAGUE_LABEL = { nfl:'NFL', nba:'NBA', mlb:'MLB', cfb:'CFB', cbb:'CBB' };
+function ScoreTile({ g }) {
+  const live = g.state === 'in';
+  const final = g.state === 'post';
+  const home = g.homeAbbr || g.homeName || 'HOME';
+  const away = g.awayAbbr || g.awayName || 'AWAY';
+  const h = parseInt(g.homeScore) || 0, a = parseInt(g.awayScore) || 0;
+  const homeWin = final && h > a, awayWin = final && a > h;
+  const hideLogo = e => { e.currentTarget.style.visibility = 'hidden'; };
+  return (
+    <div className={`score-tile ${live ? 'live' : ''} ${g._fav ? 'fav' : ''}`}
+      onClick={() => g.link && window.open(g.link, '_blank')}>
+      {g._fav && <span className="score-tile-star">★</span>}
+      {g._leagueLabel && <div className="score-tile-league">{g._leagueLabel}</div>}
+      <div className="score-tile-row">
+        <span className="score-tile-side">
+          {g.awayLogo && <img className="score-tile-logo" src={g.awayLogo} alt="" loading="lazy" onError={hideLogo}/>}
+          <span className={`score-tile-team ${awayWin ? 'win' : final ? 'loss' : ''}`}>{away}</span>
+        </span>
+        <span className={`score-tile-score ${awayWin ? 'win' : final ? 'loss' : ''}`}>{g.awayScore || '—'}</span>
+      </div>
+      <div className="score-tile-row">
+        <span className="score-tile-side">
+          {g.homeLogo && <img className="score-tile-logo" src={g.homeLogo} alt="" loading="lazy" onError={hideLogo}/>}
+          <span className={`score-tile-team ${homeWin ? 'win' : final ? 'loss' : ''}`}>{home}</span>
+        </span>
+        <span className={`score-tile-score ${homeWin ? 'win' : final ? 'loss' : ''}`}>{g.homeScore || '—'}</span>
+      </div>
+      <div className={`score-tile-status ${live ? 'live' : final ? 'final' : 'pre'}`}>
+        {live && <span className="score-tile-dot"/>}
+        {g.status || (final ? 'FINAL' : fmtDate(g.date))}
+      </div>
+    </div>
+  );
+}
+
 function ActiveScoresBar({ scores, onGoToSports, favTeams }) {
   // Followed/favorite teams' games sort to the FRONT and get an accent highlight;
   // then live games; then the rest. `favTeams` is a list of {match} terms built from
@@ -5307,14 +5333,12 @@ function ActiveScoresBar({ scores, onGoToSports, favTeams }) {
     if (!all.length) return [];
     const isLive = g => g.state === 'in';
     return all
-      .map(g => ({ ...g, _fav: !!favoriteInList(g, favTeams || []) }))
+      .map(g => ({ ...g, _fav: !!favoriteInList(g, favTeams || []), _leagueLabel: SCORE_LEAGUE_LABEL[g._league] || (g._league || '').toUpperCase() }))
       .sort((a, b) => ((a._fav ? 0 : 1) - (b._fav ? 0 : 1)) || ((isLive(a) ? 0 : 1) - (isLive(b) ? 0 : 1)))
-      .slice(0, 10);
+      .slice(0, 12);
   }, [scores, favTeams]);
 
   if (!games.length) return null;
-
-  const LEAGUE_LABEL = { nfl:'NFL', nba:'NBA', mlb:'MLB', cfb:'CFB', cbb:'CBB' };
 
   return (
     <div className="home-scores">
@@ -5322,27 +5346,8 @@ function ActiveScoresBar({ scores, onGoToSports, favTeams }) {
         <span className="home-scores-label">Live Scores</span>
         <button className="home-scores-see-all" onClick={onGoToSports}>Sports →</button>
       </div>
-      <div className="home-scores-scroll">
-        {games.map((g, i) => {
-          const homeWin = g.state === 'post' && parseInt(g.homeScore) > parseInt(g.awayScore);
-          const awayWin = g.state === 'post' && parseInt(g.awayScore) > parseInt(g.homeScore);
-          return (
-            <div key={`${g._league}-${i}`} className={`hs-tile ${g._fav ? 'fav' : ''}`} onClick={() => g.link && window.open(g.link, '_blank')}>
-              <div className="hs-league">{g._fav && <span className="hs-fav-dot">★</span>}{LEAGUE_LABEL[g._league] || g._league.toUpperCase()}</div>
-              <div className="hs-team-row">
-                <span className="hs-team-name">{g.awayAbbr || g.awayName}</span>
-                <span className={`hs-team-score ${awayWin ? 'winner' : ''}`}>{g.awayScore || '–'}</span>
-              </div>
-              <div className="hs-team-row">
-                <span className="hs-team-name">{g.homeAbbr || g.homeName}</span>
-                <span className={`hs-team-score ${homeWin ? 'winner' : ''}`}>{g.homeScore || '–'}</span>
-              </div>
-              <div className={`hs-status ${g.state === 'in' ? 'live' : 'final'}`}>
-                {g.state === 'in' ? g.status || 'Live' : 'Final'}
-              </div>
-            </div>
-          );
-        })}
+      <div className="score-strip-scroll home-scores-scroll">
+        {games.map((g, i) => <ScoreTile key={`${g._league}-${i}`} g={g}/>)}
       </div>
     </div>
   );
@@ -7026,9 +7031,11 @@ function MiniScoreboardStrip({ scores, onOpen }) {
 // Click any tile → opens ESPN game page.
 function SportsScoreStrip({ scores, teams }) {
   const tiles = useMemo(() => {
-    const all = Object.values(scores || {}).flat().filter(isGameActive);
+    // Keep each game's league key so the shared tile can show a consistent badge.
+    const all = Object.entries(scores || {})
+      .flatMap(([key, gs]) => (gs || []).map(g => ({ ...g, _league: key })))
+      .filter(isGameActive);
     if (!all.length) return [];
-    const isLive = g => g.state === 'in';
     const isFav  = g => !!favoriteInList(g, teams);
     // Chronological: live first, upcoming by start time, finals by recency; favs float up within each group
     return [...all].sort((a, b) => {
@@ -7040,7 +7047,8 @@ function SportsScoreStrip({ scores, teams }) {
       const ta = a.date ? new Date(a.date).getTime() : 0;
       const tb = b.date ? new Date(b.date).getTime() : 0;
       return stateOrd(a) === 2 ? tb - ta : ta - tb; // finals newest first; live/upcoming earliest first
-    }).slice(0, 14);
+    }).slice(0, 14)
+      .map(g => ({ ...g, _fav: isFav(g), _leagueLabel: SCORE_LEAGUE_LABEL[g._league] || (g._league || '').toUpperCase() }));
   }, [scores, teams]);
 
   if (tiles.length === 0) return (
@@ -7051,36 +7059,8 @@ function SportsScoreStrip({ scores, teams }) {
 
   return (
     <div className="sports-score-strip">
-      <div className="sports-score-strip-inner">
-        {tiles.map(g => {
-          const live = g.state === 'in';
-          const final = g.state === 'post';
-          const fav = favoriteInList(g, teams);
-          const home = g.homeAbbr || g.homeName || 'HOME';
-          const away = g.awayAbbr || g.awayName || 'AWAY';
-          const h = parseInt(g.homeScore)||0, a = parseInt(g.awayScore)||0;
-          const homeWin = final && h>a, awayWin = final && a>h;
-          return (
-            <div key={g.id}
-              className={`sst-tile ${live?'live':''} ${fav?'fav':''}`}
-              onClick={()=>g.link && window.open(g.link, '_blank')}>
-              {fav && <span className="sst-fav-star">★</span>}
-              {g.league && <div className="sst-league-badge">{g.league.toUpperCase()}</div>}
-              <div className="sst-row">
-                <span className={`sst-team ${awayWin?'win':final?'loss':''}`}>{away}</span>
-                <span className={`sst-score ${awayWin?'win':final?'loss':''}`}>{g.awayScore || '—'}</span>
-              </div>
-              <div className="sst-row">
-                <span className={`sst-team ${homeWin?'win':final?'loss':''}`}>{home}</span>
-                <span className={`sst-score ${homeWin?'win':final?'loss':''}`}>{g.homeScore || '—'}</span>
-              </div>
-              <div className={`sst-status ${live?'live':final?'final':'pre'}`}>
-                {live && <span className="sst-live-dot"/>}
-                {g.status || (final?'FINAL':fmtDate(g.date))}
-              </div>
-            </div>
-          );
-        })}
+      <div className="score-strip-scroll sports-score-strip-inner">
+        {tiles.map(g => <ScoreTile key={g.id} g={g}/>)}
       </div>
     </div>
   );
