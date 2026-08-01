@@ -6201,11 +6201,14 @@ function Sidebar({cat, arts, kw, health, activeKw, setActiveKw, activeSource, se
 
       {showScoreboard && <Scoreboard scores={scores} loading={scoresLoading}/>}
 
-      {/* Trending headlines */}
+      {/* The default "Trending in [cat]" list duplicated the main-column State of Play
+          (same data), so it's removed. This section now renders ONLY when a keyword or
+          source filter is active — a useful contextual list, not a duplicate. */}
+      {(activeKw || activeSource) && (
       <div className="sidebar-section">
         <div className="sidebar-sec-head">
           <span className="sidebar-sec-label">
-            {activeKw ? `${activeKw}` : activeSource ? `${activeSource}` : `Trending in ${cc.label}`}
+            {activeKw ? `${activeKw}` : `${activeSource}`}
           </span>
         </div>
         {sbItems.length === 0
@@ -6221,6 +6224,7 @@ function Sidebar({cat, arts, kw, health, activeKw, setActiveKw, activeSource, se
             ))
         }
       </div>
+      )}
 
       {/* Today's Topics Panel — always visible, auto-derived + user keywords */}
       {topicItems.length > 0 && (
