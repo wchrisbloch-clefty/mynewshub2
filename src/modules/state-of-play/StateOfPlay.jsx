@@ -8,9 +8,13 @@
 //   meta        ({ color, label })  accent color + display label for the section
 //   onRead      (fn)     called with an article when a row is tapped
 //   formatDate  (fn)     (pubDate) -> string; defaults to a locale time string
+//   gapItems    (array)  Coverage-Gap stories ({ title, link, outlets, source, outletCount }) —
+//                        widely-covered stories none of the reader's own sources carried.
+//                        Folded into this same ranked list as extra rows, tagged
+//                        "Not in your sources" — no separate panel.
 //
-// Renders nothing when fewer than 3 items. Styling: co-located StateOfPlay.css +
-// design tokens (src/styles/tokens.css).
+// Renders nothing when fewer than 3 ranked items and no gap items. Styling:
+// co-located StateOfPlay.css + design tokens (src/styles/tokens.css).
 
 import { useMemo } from 'react';
 import { rankClusters } from '../clustering';
@@ -18,12 +22,16 @@ import './StateOfPlay.css';
 
 const defaultFormatDate = d => { try { return new Date(d).toLocaleString(); } catch { return ''; } };
 
-export function StateOfPlay({ items, meta = {}, onRead, formatDate = defaultFormatDate, collapsed = false, onToggleCollapse }) {
+export function StateOfPlay({ items, meta = {}, onRead, formatDate = defaultFormatDate, collapsed = false, onToggleCollapse, gapItems = [] }) {
   const color = meta.color;
   const label = meta.label || '';
   // Ranked by heat, capped at 2 per publisher (no single-source flood).
   const top = useMemo(() => rankClusters(items, { max: 2, limit: 5 }), [items]);
+  // Coverage-Gap rows fold into the same list (top 3), continuing the count.
+  const gaps = (gapItems || []).slice(0, 3);
 
+  // Need a real ranked list to hang the module on; a couple of gap rows alone
+  // isn't a "State of Play".
   if (top.length < 3) return null;
 
   return (
@@ -53,6 +61,24 @@ export function StateOfPlay({ items, meta = {}, onRead, formatDate = defaultForm
             </span>
           </button>
         ))}
+        {gaps.map((g, i) => {
+          const outlets = (g.outlets && g.outlets.length ? g.outlets : [g.source]).filter(Boolean);
+          return (
+            <a key={g.link || `gap-${i}`} className="sop-item sop-item-gap" href={g.link}
+              target="_blank" rel="noreferrer">
+              <span className="sop-num sop-num-gap">{String(top.length + i + 1).padStart(2, '0')}</span>
+              <span className="sop-item-title">{g.title}</span>
+              <span className="sop-item-meta">
+                <span className="sop-gap-tag" style={{ borderColor: color, color }}>Not in your sources</span>
+                {outlets.length > 0 && (
+                  <span className="sop-item-time">
+                    {outlets.slice(0, 2).join(', ')}{g.outletCount > 2 ? ` +${g.outletCount - 2}` : ''}
+                  </span>
+                )}
+              </span>
+            </a>
+          );
+        })}
       </div>
     </section>
   );

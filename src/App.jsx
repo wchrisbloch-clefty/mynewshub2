@@ -8829,6 +8829,9 @@ export default function App() {
     const [pcWebLoading, setPcWebLoading] = useState(false);
     const [enWebResults, setEnWebResults] = useState([]);
     const [enWebLoading, setEnWebLoading] = useState(false);
+    // Coverage-Gap stories, folded into the State of Play list as tagged rows
+    // (Home + merged Business/Markets only). No standalone "You may be missing this" panel.
+    const [gapItems, setGapItems] = useState([]);
 
     const PC_SUBTABS = [
       { key:'all',         label:'All',         emoji:'' },
@@ -8911,6 +8914,25 @@ export default function App() {
 
     const isHome = cat === 'general';
     const catKws = kw[cat] || [];
+
+    // ── COVERAGE GAP (folded into State of Play) — widely-covered stories none of the
+    //    reader's own sources carried. Home keys off this category; the merged
+    //    Business+Markets page keys off both business + markets keywords/sources. ──
+    const gapCat = isMergedBiz ? 'business' : cat;
+    const gapKws = isMergedBiz ? [...(kw.business||[]), ...(kw.finance||[])] : catKws;
+    const gapSrcs = isMergedBiz
+      ? [...(feeds.business||[]), ...(feeds.finance||[])].filter(f=>f.on).map(f=>f.name)
+      : (feeds[cat]||[]).filter(f=>f.on).map(f=>f.name);
+    const gapOn = (isHome || isMergedBiz) && !activeKw && !activeSrc && !search;
+    const gapKwKey = gapKws.join('|');
+    const gapSrcKey = gapSrcs.join('|');
+    useEffect(() => {
+      let alive = true;
+      if (!gapOn || !gapKws.length) { setGapItems([]); return () => { alive = false; }; }
+      fetchDiscover(gapCat, gapKws, gapSrcs).then(r => { if (alive) setGapItems((r && r.items) || []); });
+      return () => { alive = false; };
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [gapCat, gapKwKey, gapSrcKey, gapOn]);
 
     const otherCatSections = useMemo(() => {
       if (!isHome) return [];
@@ -9014,10 +9036,12 @@ export default function App() {
           </div>
         )}
 
-        {/* ── STATE OF PLAY strip — top of every category, collapsible (per-category memory) ── */}
+        {/* ── STATE OF PLAY strip — top of every category, collapsible (per-category memory).
+            Coverage-Gap stories ("Not in your sources") are folded in as tagged rows on
+            Home + the merged Business/Markets page — no separate panel. ── */}
         {!activeKw && !activeSrc && !search && (
           <StateOfPlay items={activeFilteredItems} meta={CATS[cat]||CATS.general} onRead={onRead} formatDate={fmtDate}
-            collapsed={sopCollapsed} onToggleCollapse={toggleSop}/>
+            collapsed={sopCollapsed} onToggleCollapse={toggleSop} gapItems={gapItems}/>
         )}
 
         {/* My Teams thumbnail teaser removed from General — the followed-teams module
@@ -9031,21 +9055,8 @@ export default function App() {
             isTopicFollowed={isTopicFollowed} toggleTopic={toggleTopic}/>
         )}
 
-        {/* ── COVERAGE GAP — "You may be missing this" (General only, below Trending,
-            above the feed). A wider discovery scan surfaces widely-covered stories
-            none of the reader's own sources carried; never mixed into the feed. ── */}
-        {isHome && !activeKw && !activeSrc && !search && (
-          <CoverageGap category={cat} keywords={catKws}
-            followedSources={(feeds[cat]||[]).filter(f=>f.on).map(f=>f.name)}/>
-        )}
-
-        {/* Coverage Gap on the merged Business+Markets page — keyed off the reader's own
-            business + markets sources. */}
-        {isMergedBiz && !activeKw && !activeSrc && !search && (
-          <CoverageGap category="business"
-            keywords={[...(kw.business||[]),...(kw.finance||[])]}
-            followedSources={[...(feeds.business||[]),...(feeds.finance||[])].filter(f=>f.on).map(f=>f.name)}/>
-        )}
+        {/* Coverage Gap is no longer a standalone "You may be missing this" panel —
+            its stories are folded into the State of Play list above as tagged rows. */}
 
         {/* ── HOME: Top of Hour strip (image cards) ── */}
         {isHome && !activeKw && !activeSrc && !search && (

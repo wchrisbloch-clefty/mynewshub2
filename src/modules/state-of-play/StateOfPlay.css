@@ -14,4 +14,9 @@
 .sop-item-meta{display:flex;align-items:center;gap:8px;flex-shrink:0;}
 .sop-item-sources{font-family:var(--font-publicsans);font-size:10px;font-weight:700;color:var(--accent);background:var(--surface2);border-radius:10px;padding:2px 8px;white-space:nowrap;}
 .sop-item-time{font-family:var(--font-publicsans);font-size:var(--fs-meta);color:var(--text3);white-space:nowrap;}
-@media(max-width:640px){ .sop-strip{padding:12px 14px;} }
+/* Coverage-gap rows folded into the list: dimmer number + "Not in your sources" tag. */
+.sop-item-gap{text-decoration:none;}
+.sop-num-gap{opacity:0.5;}
+.sop-item-gap .sop-item-title{font-weight:600;}
+.sop-gap-tag{font-family:var(--font-publicsans);font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.03em;border:1px solid;border-radius:10px;padding:2px 8px;white-space:nowrap;opacity:0.9;}
+@media(max-width:640px){ .sop-strip{padding:12px 14px;} .sop-gap-tag{display:none;} }
