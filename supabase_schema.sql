@@ -34,3 +34,21 @@ create index newshub_cached_extracts_created_at_idx on public.newshub_cached_ext
 alter table public.newshub_cached_extracts enable row level security;
 create policy "newshub_cache_select_all" on public.newshub_cached_extracts for select using (true);
 create policy "newshub_cache_insert_all" on public.newshub_cached_extracts for insert with check (true);
+
+-- Saved articles — dedicated table so a reader's saves follow them across devices.
+-- One row per (user, article url); RLS scopes every row to its owner.
+create table public.newshub_saved (
+  id          bigint generated always as identity primary key,
+  user_id     uuid not null references auth.users(id) on delete cascade,
+  url         text not null,
+  title       text,
+  source      text,
+  tier        text,
+  saved_at    timestamptz not null default now(),
+  unique (user_id, url)
+);
+create index newshub_saved_user_id_saved_at_idx on public.newshub_saved (user_id, saved_at desc);
+alter table public.newshub_saved enable row level security;
+create policy "newshub_saved_select_own" on public.newshub_saved for select using (auth.uid() = user_id);
+create policy "newshub_saved_insert_own" on public.newshub_saved for insert with check (auth.uid() = user_id);
+create policy "newshub_saved_delete_own" on public.newshub_saved for delete using (auth.uid() = user_id);
