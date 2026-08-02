@@ -1315,14 +1315,14 @@ body{
 .topbar-wx .rnw-card{max-width:1400px;margin:0 auto;padding:0 var(--s4);border:none;border-radius:0;background:none;}
 /* Scoreboard band in the top bar (below weather, above nav — Pass G item 3).
    Dark ESPN theme so the homepage strip matches the Sports-page strip (item 6). */
-.topbar-scores{background:#0c1c2c;border-bottom:1px solid #1a2c3e;}
-.topbar-scores .home-scores{max-width:1400px;margin:0 auto;padding:8px var(--s4) 10px;border:none;border-radius:0;background:none;overflow:visible;}
+.topbar-scores{background:var(--surface2);border-bottom:1px solid var(--border2);}
+.topbar-scores .home-scores{max-width:1400px;margin:0 auto;padding:6px var(--s4) 8px;border:none;border-radius:0;background:none;overflow:visible;}
 .topbar-wrap.shrunk .topbar-scores{display:none;}
 /* Right-edge fade cue: partial cards read as "scroll for more," not a cutoff. */
 .topbar-scores .home-scores,.sports-score-strip{position:relative;}
 .topbar-scores .home-scores::after,.sports-score-strip::after{
   content:'';position:absolute;top:0;right:0;bottom:0;width:34px;pointer-events:none;
-  background:linear-gradient(90deg,rgba(12,28,44,0),#0c1c2c);
+  background:linear-gradient(90deg,transparent,var(--surface2));
 }
 .topbar-wx .rnw-row{padding:8px 0;}
 .topbar-wx .rnw-forecast{padding-left:var(--s4);padding-right:var(--s4);}
@@ -2650,16 +2650,16 @@ body:not(.dark) .pill-bar{
 /* SPORTS PAGE outer */
 .sports-page{padding-top:0;}
 
-/* SCOREBOARD STRIP — Yahoo Sports' signature dark navy bar */
+/* SCOREBOARD STRIP — light band that blends with the page (Pass H item 2). */
 .sports-score-strip{
-  background:#0c1c2c;
+  background:var(--surface2);
   margin:-28px -24px 18px;
-  padding:14px 24px;
-  border-top:1px solid #1a2c3e;
-  border-bottom:1px solid #1a2c3e;
+  padding:9px 24px;
+  border-top:1px solid var(--border2);
+  border-bottom:1px solid var(--border2);
 }
-.sports-score-strip.empty{padding:18px 24px;text-align:center;}
-.sports-score-strip-empty{color:rgba(255,255,255,0.5);font-size:var(--fs-meta);font-style:italic;letter-spacing:0.04em;}
+.sports-score-strip.empty{padding:14px 24px;text-align:center;}
+.sports-score-strip-empty{color:var(--text3);font-size:var(--fs-meta);font-style:italic;letter-spacing:0.04em;}
 /* Full-bleed strip: its negative horizontal margin must match the page's padding
    at each breakpoint, otherwise it overshoots the viewport (horizontal scroll). */
 @media (min-width:641px) and (max-width:1024px){
@@ -2681,50 +2681,52 @@ body:not(.dark) .pill-bar{
   -webkit-overflow-scrolling:touch;
 }
 .score-strip-scroll::-webkit-scrollbar{display:none;}
+/* Light, compact tile: white/surface card, dark text for names + scores; colour
+   is reserved for status accents (live/final/winner), not the whole tile. */
 .score-tile{
   position:relative;
   flex-shrink:0;scroll-snap-align:start;
-  background:#162635;border:1px solid #243446;
-  border-radius:7px;padding:6px 9px;
-  min-width:120px;max-width:140px;cursor:pointer;
+  background:var(--surface);border:1px solid var(--border);
+  border-radius:7px;padding:5px 9px;
+  min-width:112px;max-width:132px;cursor:pointer;
   transition:border-color 0.15s, transform 0.1s;
 }
-.score-tile:hover{border-color:#3b5168;transform:translateY(-1px);}
-.score-tile.live{border-color:#ef4444;background:#2a1f1f;}
-.score-tile.fav{border-color:#f59e0b;background:#221c10;}
-.score-tile.fav.live{border-color:#ef4444;}
+.score-tile:hover{border-color:var(--accent);transform:translateY(-1px);}
+.score-tile.live{border-color:var(--red);}
+.score-tile.fav{border-color:var(--accent);}
+.score-tile.fav.live{border-color:var(--red);}
 .score-tile-star{
-  position:absolute;top:6px;right:8px;
-  color:#fbbf24;font-size:10px;
+  position:absolute;top:5px;right:8px;
+  color:var(--amber);font-size:10px;
 }
 .score-tile-league{
-  font-size:9px;font-weight:800;color:rgba(255,255,255,0.45);
-  text-transform:uppercase;letter-spacing:0.1em;margin-bottom:7px;
+  font-size:8px;font-weight:800;color:var(--text3);
+  text-transform:uppercase;letter-spacing:0.08em;margin-bottom:3px;
 }
 .score-tile-row{
   display:flex;justify-content:space-between;align-items:center;
-  font-size:12px;color:rgba(255,255,255,0.85);
-  font-variant-numeric:tabular-nums;padding:2px 0;gap:8px;
+  font-size:12px;color:var(--text);
+  font-variant-numeric:tabular-nums;padding:1px 0;gap:8px;
 }
 .score-tile-side{display:flex;align-items:center;gap:5px;min-width:0;}
 .score-tile-logo{width:14px;height:14px;object-fit:contain;flex-shrink:0;}
-.score-tile-team{font-weight:600;letter-spacing:-0.2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
-.score-tile-team.win{color:#fff;font-weight:800;}
-.score-tile-team.loss{color:rgba(255,255,255,0.4);}
-.score-tile-score{font-weight:900;font-size:var(--fs-subhead);color:#fff;min-width:22px;text-align:right;}
-.score-tile-score.win{color:#22c55e;}
-.score-tile-score.loss{color:rgba(255,255,255,0.35);}
+.score-tile-team{font-weight:600;letter-spacing:-0.2px;color:var(--text2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.score-tile-team.win{color:var(--text);font-weight:800;}
+.score-tile-team.loss{color:var(--text3);}
+.score-tile-score{font-weight:900;font-size:var(--fs-body);color:var(--text);min-width:22px;text-align:right;}
+.score-tile-score.win{color:var(--green);}
+.score-tile-score.loss{color:var(--text3);}
 .score-tile-status{
-  font-size:9px;color:rgba(255,255,255,0.55);
+  font-size:9px;color:var(--text3);
   text-transform:uppercase;letter-spacing:0.05em;
-  margin-top:4px;display:flex;align-items:center;gap:4px;
-  border-top:1px solid rgba(255,255,255,0.07);padding-top:4px;
+  margin-top:3px;display:flex;align-items:center;gap:4px;
+  border-top:1px solid var(--border2);padding-top:3px;
 }
-.score-tile-status.live{color:#ef4444;font-weight:700;}
-.score-tile-status.final{color:rgba(255,255,255,0.4);}
-.score-tile-status.pre{color:#60a5fa;}
+.score-tile-status.live{color:var(--red);font-weight:700;}
+.score-tile-status.final{color:var(--text3);}
+.score-tile-status.pre{color:#3b82f6;}
 .score-tile-dot{
-  width:5px;height:5px;border-radius:50%;background:#ef4444;
+  width:5px;height:5px;border-radius:50%;background:var(--red);
   animation:pulse-badge 1.4s ease-in-out infinite;
 }
 
@@ -4408,26 +4410,26 @@ kbd{display:inline-block;padding:1px 5px;border:1px solid var(--border);border-r
 .fc-act.explain-on{border-color:#b45309;color:#b45309;background:#fffbeb;}
 
 /* ACTIVE SCORES STRIP — compact live games on General homepage */
-/* Homepage strip shares the Sports-page ESPN theme (Pass G item 6). It lives in
-   the dark .topbar-scores band (see .topbar-scores rules), so the band itself is
-   transparent here; only the head + shared .score-tile cards render. */
+/* Homepage strip shares the Sports-page light theme (Pass H item 2). It lives in
+   the light .topbar-scores band, so the band itself is transparent here; only the
+   head + shared .score-tile cards render. */
 .home-scores{background:none;}
 .home-scores-head{
   display:flex;align-items:center;justify-content:space-between;
-  padding:0 2px 6px;background:none;
+  padding:0 2px 5px;background:none;
 }
 .home-scores-label{
-  font-size:9px;font-weight:800;color:rgba(255,255,255,0.9);
+  font-size:9px;font-weight:800;color:var(--text2);
   text-transform:uppercase;letter-spacing:0.12em;
   display:flex;align-items:center;gap:6px;
 }
 .home-scores-label::before{content:'●';color:var(--green);font-size:7px;animation:score-pulse 2s ease-in-out infinite;}
 @keyframes score-pulse{0%,100%{opacity:1;}50%{opacity:0.4;}}
 .home-scores-see-all{
-  font-size:10px;font-weight:600;color:rgba(255,255,255,0.6);
+  font-size:10px;font-weight:600;color:var(--text3);
   background:none;border:none;cursor:pointer;font-family:inherit;
 }
-.home-scores-see-all:hover{color:#fff;}
+.home-scores-see-all:hover{color:var(--accent);}
 
 /* SEARCH RESULTS BANNER */
 .search-results-banner{
@@ -9050,21 +9052,8 @@ export default function App() {
             </div>
           </section>
         )}
-        {/* First-run onboarding card */}
-        {isHome && !onboardingDismissed && !activeKw && !activeSrc && !search && (
-          <div className="onboarding-card">
-            <div className="onboarding-body">
-              <div className="onboarding-title">Welcome to MyNewsHub ✦</div>
-              <div className="onboarding-tips">
-                <span className="onboarding-tip"><strong>Click any article</strong> to open the AI reader — Summarize, Key Points, Bias Check</span>
-                <span className="onboarding-tip"><strong>"Brief" button</strong> (top bar) → paste any article, transcript, or YouTube video for a breakdown</span>
-                <span className="onboarding-tip"><IconGear/> <strong>Customize</strong> → add/remove sources, set keywords, build your feed</span>
-              </div>
-              <button className="onboarding-dismiss" onClick={dismissOnboarding}>Got it, dismiss</button>
-            </div>
-            <button className="onboarding-x" onClick={dismissOnboarding}>✕</button>
-          </div>
-        )}
+        {/* Welcome/onboarding banner removed (Pass H item 1): it wasn't driving
+            meaningful onboarding value and kept reappearing. */}
 
         {/* Desktop: main column + sidebar run together from the very top of the
             content (68/32), so Top Stories sits inside the 68% column, not full-width. */}
