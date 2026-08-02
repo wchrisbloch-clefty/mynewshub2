@@ -3809,7 +3809,11 @@ body{overscroll-behavior-y:contain;}
   .page-grid,.pod-page,.today-main,.fin-grid{grid-template-columns:1fr!important;gap:20px;}
   .hero-row{grid-template-columns:1fr;}
   .today-grid{grid-template-columns:1fr;}
-  .sidebar{order:2;}.feed-col{order:1;}
+  /* Single-column: the sidebar stacks below the main feed as a full-width section
+     (State of Play, Trending, Today's Briefing, Across, Sources), with a top rule
+     instead of the desktop left border. */
+  .sidebar{order:2;border-left:none;padding-left:0;border-top:2px solid var(--border);padding-top:22px;margin-top:10px;}
+  .feed-col{order:1;}
   .fin-indices{grid-template-columns:1fr;}
 }
 @media (max-width:900px){
@@ -3916,9 +3920,10 @@ body{overscroll-behavior-y:contain;}
   .social-page-header{flex-direction:column;align-items:stretch;}
   .sb-games{padding:4px 6px 8px;}
   .sb-league-head{padding:10px 12px;min-height:44px;}
-  .sidebar{display:none;} /* sidebar hidden on mobile — content only */
+  /* Sidebar now stacks single-column on mobile (Pass J follow-up) — its modules
+     (State of Play, Trending, Briefing, Across) must not vanish on small screens. */
 
-  .pod-page{gap:20px;grid-template-columns:1fr;} /* sidebar is display:none here — collapse the empty 268px track or it forces horizontal overflow */
+  .pod-page{gap:20px;grid-template-columns:1fr;}
   .pod-card{padding:12px;}
   .pod-btn{padding:8px 12px;font-size:var(--fs-meta);min-height:44px;}
   .pod-show-item{padding:12px 0;min-height:44px;}
@@ -3966,8 +3971,7 @@ body{overscroll-behavior-y:contain;}
   .fc-thumb,.fc-thumb-ph{width:120px;height:90px;}
   .sport-tabs{gap:6px;}
   .sport-tab{padding:7px 12px;font-size:var(--fs-body);}
-  .sidebar{display:none;}
-  /* Show slimmed sidebar on iPad landscape (≥900px) */
+  /* Sidebar stacks below the feed on iPad (styled in the ≤1100px block). */
 }
 
 /* ═══════════════════════════════════════════
