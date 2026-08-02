@@ -8348,6 +8348,9 @@ export default function App() {
     const toggleSop = () => setSopCollapsed(v => { const nx = !v; sv('sopCollapsed_sports', nx); return nx; });
     const [sportWebResults, setSportWebResults] = useState([]);
     const [sportWebLoading, setSportWebLoading] = useState(false);
+    // Coverage-Gap stories for the active team, folded into the team's State of
+    // Play list as tagged rows (Pass G item 9) — no standalone panel.
+    const [teamGapItems, setTeamGapItems] = useState([]);
 
     // v36: Fetch web results when a specific league tab is active
     useEffect(() => {
@@ -8435,6 +8438,17 @@ export default function App() {
       return clusterStories(allItems.filter(a => (a.title + ' ' + (a.desc||'')).toLowerCase().includes(q)));
     }, [teamName, allItems]);
     const teamHero = teamItems.find(a => a.img) || null;
+
+    // Fetch the team's Coverage-Gap items (widely-covered team news the reader's
+    // own sports sources missed) to fold into the team State of Play list.
+    useEffect(() => {
+      let alive = true;
+      if (!teamName) { setTeamGapItems([]); return () => { alive = false; }; }
+      const srcs = (feeds.sports || []).filter(f => f.on).map(f => f.name);
+      fetchDiscover('sports', [teamName], srcs).then(r => { if (alive) setTeamGapItems((r && r.items) || []); });
+      return () => { alive = false; };
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [teamName]);
 
     const heroItems = sportItems.filter(a => a.img);
     const lead = heroItems[0] || null;
@@ -8549,14 +8563,12 @@ export default function App() {
             </div>
             <div className="page-grid">
               <div className="feed-col">
+                {/* Coverage Gap is folded into this list as "Not in your sources" rows
+                    (Pass G item 9) — no standalone "You may be missing this" panel. */}
                 <StateOfPlay items={teamItems} meta={CATS.sports} onRead={onRead} formatDate={fmtDate}
-                  collapsed={sopCollapsed} onToggleCollapse={toggleSop}/>
+                  collapsed={sopCollapsed} onToggleCollapse={toggleSop} gapItems={teamGapItems}/>
                 <TrendingPills label={`Trending · ${teamName}`} items={teamItems} onOpen={t=>setSearch(t.toLowerCase())} isTopicFollowed={isTopicFollowed} toggleTopic={toggleTopic}/>
                 <SourcesDisagree topic={teamName} items={teamItems}/>
-                {/* Same Coverage Gap mechanism: outside coverage of this team the reader's
-                    own sources missed (widely covered, capped at 'reported' tier). */}
-                <CoverageGap category="sports" keywords={[teamName]}
-                  followedSources={(feeds.sports||[]).filter(f=>f.on).map(f=>f.name)}/>
                 {teamItems.length === 0
                   ? <div className="empty-state"><div className="empty-icon"></div><div className="empty-msg">No recent stories for {teamName}</div><button className="refresh-btn" onClick={()=>loadCat('sports')}>Refresh</button></div>
                   : <div className="snap-feed">
@@ -8918,13 +8930,18 @@ export default function App() {
 
     // ── COVERAGE GAP (folded into State of Play) — widely-covered stories none of the
     //    reader's own sources carried. Home keys off this category; the merged
-    //    Business+Markets page keys off both business + markets keywords/sources. ──
+    //    Business+Markets page keys off both business + markets keywords/sources;
+    //    Energy (bloom) keys off its keywords + the active sub-tab so the gap
+    //    re-ranks with the State of Play list per Power / Oil & Gas / etc. ──
+    const isEnergy = cat === 'bloom';
     const gapCat = isMergedBiz ? 'business' : cat;
-    const gapKws = isMergedBiz ? [...(kw.business||[]), ...(kw.finance||[])] : catKws;
+    const gapKws = isMergedBiz ? [...(kw.business||[]), ...(kw.finance||[])]
+      : isEnergy ? (enSubTab !== 'all' ? [...catKws, ...(EN_KWS[enSubTab] || [])] : catKws)
+      : catKws;
     const gapSrcs = isMergedBiz
       ? [...(feeds.business||[]), ...(feeds.finance||[])].filter(f=>f.on).map(f=>f.name)
       : (feeds[cat]||[]).filter(f=>f.on).map(f=>f.name);
-    const gapOn = (isHome || isMergedBiz) && !activeKw && !activeSrc && !search;
+    const gapOn = (isHome || isMergedBiz || isEnergy) && !activeKw && !activeSrc && !search;
     const gapKwKey = gapKws.join('|');
     const gapSrcKey = gapSrcs.join('|');
     useEffect(() => {
