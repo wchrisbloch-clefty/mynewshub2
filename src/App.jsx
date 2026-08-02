@@ -49,7 +49,8 @@ import { MarketsSurface, useMarkets } from './modules/markets-surface';
 import { parseRoute, buildPath } from './modules/routing';
 import { ChatBot } from './modules/concierge';
 // Icons: single set (lucide-react), fixed size per context — item 7.
-import { Settings, RefreshCw, Moon, Sun, User } from 'lucide-react';
+import { Settings, RefreshCw, Moon, Sun, User,
+  Zap, Droplet, Leaf, TrendingUp, Scale, LayoutGrid, Film, Music, BookOpen, Laugh } from 'lucide-react';
 import { isCloudSyncEnabled, getUserId, signInWithEmail, signOut, onAuthStateChange, loadProfileFromCloud, saveProfileToCloud, emitEvent } from './lib/cloudSync';
 
 // ─── CATEGORIES ───────────────────────────────────────────────────────────────
@@ -4469,23 +4470,28 @@ kbd{display:inline-block;padding:1px 5px;border:1px solid var(--border);border-r
 .search-results-clear:hover{color:var(--accent);border-color:var(--accent);}
 /* chat styles moved to src/modules/concierge/Concierge.css */
 
-/* ═══ v36: POP CULTURE SUB-TABS ═══ */
+/* ═══ POP CULTURE / ENERGY SUB-TABS — compact icon pills (Pass I item 3).
+   Horizontal scroll instead of wrapping, matching the Sports pill scale. ═══ */
 .pc-subtabs{
-  display:flex;gap:8px;flex-wrap:wrap;
-  padding:8px 0 16px;
+  display:flex;gap:5px;flex-wrap:nowrap;
+  padding:2px 0 12px;
   overflow-x:auto;scrollbar-width:none;
+  -webkit-overflow-scrolling:touch;
 }
 .pc-subtabs::-webkit-scrollbar{display:none;}
 .pc-subtab{
   display:inline-flex;align-items:center;gap:5px;
-  padding:7px 15px;border-radius:22px;
+  padding:5px 12px;border-radius:16px;
   background:var(--surface2);border:1.5px solid var(--border);
-  font-size:12px;font-weight:600;color:var(--text2);
-  cursor:pointer;white-space:nowrap;transition:all 0.14s;
-  font-family:var(--font-sans);
+  font-size:12px;font-weight:700;color:var(--text2);
+  cursor:pointer;white-space:nowrap;flex-shrink:0;transition:all 0.14s;
+  font-family:var(--font-sans);min-height:30px;
 }
+.pc-subtab svg{flex-shrink:0;}
 .pc-subtab:hover{background:var(--surface);color:var(--text);border-color:var(--text3);}
 .pc-subtab.active{background:#db2777;color:#fff;border-color:#db2777;box-shadow:0 2px 8px rgba(219,39,119,0.35);}
+/* Energy reuses the pill component but with its own accent (not Pop Culture pink). */
+.en-subtabs .pc-subtab.active{background:var(--accent);border-color:var(--accent);box-shadow:0 2px 8px var(--accent-bg);}
 @media(max-width:640px){
   .pc-subtab{padding:8px 12px;font-size:12px;min-height:44px;}
 }
@@ -8945,11 +8951,11 @@ export default function App() {
     const [gapItems, setGapItems] = useState([]);
 
     const PC_SUBTABS = [
-      { key:'all',         label:'All',         emoji:'' },
-      { key:'shows',       label:'Shows/Movies', emoji:'' },
-      { key:'music',       label:'Music',        emoji:'' },
-      { key:'books',       label:'Books',        emoji:'' },
-      { key:'comedy',      label:'Comedy',       emoji:'' },
+      { key:'all',         label:'All',          icon:LayoutGrid },
+      { key:'shows',       label:'Shows/Movies', icon:Film },
+      { key:'music',       label:'Music',        icon:Music },
+      { key:'books',       label:'Books',        icon:BookOpen },
+      { key:'comedy',      label:'Comedy',       icon:Laugh },
     ];
     const PC_KWS = {
       shows:  ['movie','film','tv','streaming','netflix','hbo','disney','show','series','premiere','season','episode','cinema','trailer','oscar','emmy','golden globe'],
@@ -8959,12 +8965,12 @@ export default function App() {
     };
 
     const EN_SUBTABS = [
-      { key:'all',     label:'All',           emoji:'' },
-      { key:'power',   label:'Power',         emoji:'' },
-      { key:'oilgas',  label:'Oil & Gas',     emoji:'' },
-      { key:'clean',   label:'Clean Energy',  emoji:'' },
-      { key:'markets', label:'Markets',       emoji:'' },
-      { key:'policy',  label:'Policy',        emoji:'' },
+      { key:'all',     label:'All',           icon:LayoutGrid },
+      { key:'power',   label:'Power',         icon:Zap },
+      { key:'oilgas',  label:'Oil & Gas',     icon:Droplet },
+      { key:'clean',   label:'Clean Energy',  icon:Leaf },
+      { key:'markets', label:'Markets',       icon:TrendingUp },
+      { key:'policy',  label:'Policy',        icon:Scale },
     ];
     const EN_KWS = {
       power:   ['power','electric','grid','utility','electricity','megawatt','kilowatt','nuclear','coal','natural gas','transmission','substation','generation','powerplant','baseload'],
@@ -9230,7 +9236,7 @@ export default function App() {
             {PC_SUBTABS.map(t => (
               <button key={t.key} className={`pc-subtab ${pcSubTab===t.key?'active':''}`}
                 onClick={()=>{setPcSubTab(t.key);window.scrollTo({top:0,behavior:'instant'});}}>
-                {t.emoji} {t.label}
+                <t.icon size={14} strokeWidth={2.2}/>{t.label}
               </button>
             ))}
           </div>
@@ -9279,11 +9285,11 @@ export default function App() {
               </div>
             </div>
             {cat === 'bloom' && !activeKw && !activeSrc && !search && (
-              <div className="pc-subtabs" style={{marginBottom:'8px',marginTop:'0'}}>
+              <div className="pc-subtabs en-subtabs" style={{marginBottom:'8px',marginTop:'0'}}>
                 {EN_SUBTABS.map(t => (
                   <button key={t.key} className={`pc-subtab ${enSubTab===t.key?'active':''}`}
                     onClick={()=>{setEnSubTab(t.key);window.scrollTo({top:0,behavior:'instant'});}}>
-                    {t.label}
+                    <t.icon size={14} strokeWidth={2.2}/>{t.label}
                   </button>
                 ))}
               </div>
