@@ -2741,11 +2741,12 @@ body:not(.dark) .pill-bar{
   animation:pulse-badge 1.4s ease-in-out infinite;
 }
 
-/* SPORT TABS — ESPN-style larger tabs */
+/* SPORT TABS — ESPN/Yahoo-style compact pill row (Pass I item 2): tighter gaps,
+   shorter pills, horizontal scroll (never wraps to a second line). */
 .sport-tabs{
-  display:flex;flex-wrap:nowrap;gap:6px;
-  padding:0 0 14px 0;
-  margin-bottom:16px;
+  display:flex;flex-wrap:nowrap;gap:5px;
+  padding:0 0 10px 0;
+  margin-bottom:12px;
   overflow-x:auto;scrollbar-width:none;
   -webkit-overflow-scrolling:touch;touch-action:pan-x;
 }
@@ -2753,21 +2754,24 @@ body:not(.dark) .pill-bar{
 .sport-tab{
   background:var(--surface2);
   border:1.5px solid var(--border);
-  border-radius:22px;
-  padding:8px 18px;font-size:var(--fs-body);font-weight:700;
+  border-radius:16px;
+  padding:5px 12px;font-size:12px;font-weight:700;
   color:var(--text2);cursor:pointer;font-family:inherit;
   white-space:nowrap;flex-shrink:0;
   transition:all 0.15s;
-  display:inline-flex;align-items:center;gap:6px;
+  display:inline-flex;align-items:center;gap:5px;
   -webkit-tap-highlight-color:transparent;
-  min-height:38px;
+  min-height:30px;
 }
 .sport-tab:hover{background:var(--surface);color:var(--text);border-color:var(--text3);}
 .sport-tab.active{
   background:var(--accent);color:#fff;border-color:var(--accent);
   box-shadow:var(--shadow-sm);
 }
-.sport-tab-emoji{font-size:15px;}
+.sport-tab-emoji{font-size:13px;}
+/* Team icon inside a pill: keep it legible on the blue active pill. */
+.sport-tab .team-logo{width:16px;height:16px;border-radius:5px;}
+.sport-tab.active .team-logo-ph{background:rgba(255,255,255,0.9);}
 
 /* ── LEAGUE HEADER — ESPN-style hero banner ── */
 .sport-league-header{
@@ -8552,15 +8556,15 @@ export default function App() {
     if (feedItems.length === 0 && sportItems.length > 0) feedItems = sportItems; // never blank when stories exist
 
     const SPORT_TABS = [
-      { key:'all',    label:'All' },
-      { key:'nfl',    label:'NFL',            emoji:'' },
-      { key:'nba',    label:'NBA',            emoji:'' },
-      { key:'mlb',    label:'MLB',            emoji:'' },
-      { key:'cfb',    label:'NCAAF',          emoji:'' },
-      { key:'cbb',    label:'NCAAB',          emoji:'' },
-      { key:'cbase',  label:'College Baseball',emoji:'' },
-      { key:'racing', label:'Horse Racing',   emoji:'' },
-      { key:'golf',   label:'Golf',           emoji:'' },
+      { key:'all',    label:'All',             emoji:'🏆' },
+      { key:'nfl',    label:'NFL',             emoji:'🏈' },
+      { key:'nba',    label:'NBA',             emoji:'🏀' },
+      { key:'mlb',    label:'MLB',             emoji:'⚾' },
+      { key:'cfb',    label:'NCAAF',           emoji:'🏈' },
+      { key:'cbb',    label:'NCAAB',           emoji:'🏀' },
+      { key:'cbase',  label:'College Baseball',emoji:'⚾' },
+      { key:'racing', label:'Horse Racing',    emoji:'🏇' },
+      { key:'golf',   label:'Golf',            emoji:'⛳' },
     ];
 
     // Keep the active subcategory chip scrolled into view (on load + on change).
@@ -8612,7 +8616,7 @@ export default function App() {
               <button key={(t.team||'')+i}
                 className={`sport-tab ${activeTeam && activeTeam.team===t.team && activeTeam.league===t.league ? 'active' : ''}`}
                 onClick={()=>{ setActiveTeam(activeTeam && activeTeam.team===t.team ? null : t); setTimeout(scrollToFeed,80); }}>
-                {t.emoji && <span className="sport-tab-emoji">{t.emoji}</span>}
+                <TeamLogo name={t.team} league={t.league} size={16}/>
                 {t.team}
               </button>
             ))}
@@ -8629,6 +8633,7 @@ export default function App() {
               const s = teamSlug(n);
               return (
                 <button key={s} className={`sport-tab ${tertiary===s?'active':''}`} onClick={()=>navigate('sports', sportTab, s)}>
+                  <TeamLogo name={n} league={sportTab} size={16}/>
                   {n}
                 </button>
               );
