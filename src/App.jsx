@@ -7540,6 +7540,10 @@ function RightNowWeather({ cities }) {
 // ─── HOUSTON (Home-only local news row) ───────────────────────────────────────
 // Filters the already-loaded feed to local Houston sources.
 const HOUSTON_SOURCES = ['KHOU Houston', 'Chron.com', 'Click2Houston', 'Houston Public Media', 'Houston Chronicle'];
+// Cross-module dedup identity: a normalized title key (same convention as dedupe()),
+// so the same story is caught across modules even when different sources give it
+// different URLs (e.g. a clustered State-of-Play item vs the raw Houston-source item).
+const storyKey = a => (((a && a.title) || '').slice(0, 60).toLowerCase().replace(/\s+/g, ''));
 function HoustonRow({ items, onRead, formatDate }) {
   // Items are computed by the caller (FeedPage) so they share the page's
   // cross-module dedup set (Pass I item 1).
@@ -7605,8 +7609,11 @@ function AcrossHub({ sections, onRead, onSeeAll, formatDate }) {
 // ChatBot now lives in ./modules/concierge
 
 // ─── TOP OF HOUR STRIP ────────────────────────────────────────────────────────
-function TopOfHourStrip({ catLead, arts, onRead }) {
+function TopOfHourStrip({ catLead, arts, onRead, stories: storiesProp }) {
   const stories = useMemo(() => {
+    // Caller (FeedPage) computes the picks for cross-module dedup and passes them
+    // here so the strip shows exactly the deduped set; fall back to self-compute.
+    if (storiesProp) return storiesProp;
     const picks = catLead && catLead.img ? [catLead] : (catLead ? [] : []);
     const used = new Set(catLead ? [catLead.link] : []);
     const catOrder = ['sports','business','finance','bloom','popculture','general','tech'];
@@ -7625,7 +7632,7 @@ function TopOfHourStrip({ catLead, arts, onRead }) {
       }
     }
     return picks.slice(0,4);
-  }, [catLead, arts]);
+  }, [catLead, arts, storiesProp]);
   if (stories.length < 1) return null;
   return (
     <div className="toh-strip">
@@ -9087,19 +9094,40 @@ export default function App() {
     // on the SAME page — on every category, not just General. Priority order:
     // Top Stories → State of Play → Houston → main feed.
     const topStoryItems = useMemo(() => {
-      if (isHome || !catLead) return [];   // category Top Stories = the gn-grid (hero + 3)
+      if (isHome) {
+        // Home Top Stories = TopOfHourStrip picks (catLead + cross-category images).
+        // Mirror its selection exactly so State of Play + the feed exclude what it
+        // actually shows — otherwise the hero repeats as State of Play #1.
+        const picks = catLead && catLead.img ? [catLead] : [];
+        const used = new Set(catLead ? [catLead.link] : []);
+        const catOrder = ['sports','business','finance','bloom','popculture','general','tech'];
+        for (const c of catOrder) {
+          if (picks.length >= 4) break;
+          const item = (arts[c]||[]).find(a => a.img && !used.has(a.link));
+          if (item) { picks.push({ ...item, cat: item.cat || c }); used.add(item.link); }
+        }
+        for (const c of catOrder) {
+          if (picks.length >= 4) break;
+          for (const a of (arts[c]||[])) {
+            if (picks.length >= 4) break;
+            if (a.img && !used.has(a.link)) { picks.push({ ...a, cat: a.cat || c }); used.add(a.link); }
+          }
+        }
+        return picks.slice(0, 4);
+      }
+      if (!catLead) return [];   // category Top Stories = the gn-grid (hero + 3)
       const secondaries = feedItems.slice(0, 6).filter(a => a.img).slice(0, 3)
         .concat(feedItems.slice(0, 6).filter(a => !a.img)).slice(0, 3);
       return [catLead, ...secondaries];
-    }, [isHome, catLead, feedItems]);
-    const topStoryLinks = useMemo(() => new Set(topStoryItems.map(a => a.link)), [topStoryItems]);
+    }, [isHome, catLead, feedItems, arts]);
+    const topStoryKeys = useMemo(() => new Set(topStoryItems.map(storyKey)), [topStoryItems]);
     // State of Play ranks only from what Top Stories didn't already take.
     const sopSourceItems = useMemo(
-      () => activeFilteredItems.filter(a => !topStoryLinks.has(a.link)),
-      [activeFilteredItems, topStoryLinks]);
-    const sopShownLinks = useMemo(() => {
+      () => activeFilteredItems.filter(a => !topStoryKeys.has(storyKey(a))),
+      [activeFilteredItems, topStoryKeys]);
+    const sopShownKeys = useMemo(() => {
       const ranked = rankClusters(sopSourceItems, { max: 2, limit: 5 });
-      return new Set(ranked.length >= 3 ? ranked.map(a => a.link) : []);
+      return new Set(ranked.length >= 3 ? ranked.map(storyKey) : []);
     }, [sopSourceItems]);
     // Houston Local (General) claims its stories too.
     const houstonItems = useMemo(() => {
@@ -9107,16 +9135,17 @@ export default function App() {
       const seen = new Set();
       return Object.values(arts || {}).flat()
         .filter(a => HOUSTON_SOURCES.includes(a.source))
-        .filter(a => !topStoryLinks.has(a.link) && !sopShownLinks.has(a.link))
-        .filter(a => { const k = (a.title || '').slice(0, 60); if (seen.has(k)) return false; seen.add(k); return true; })
+        .filter(a => !topStoryKeys.has(storyKey(a)) && !sopShownKeys.has(storyKey(a)))
+        .filter(a => { const k = storyKey(a); if (seen.has(k)) return false; seen.add(k); return true; })
         .sort((a, b) => new Date(b.pubDate) - new Date(a.pubDate))
         .slice(0, 6);
-    }, [isHome, arts, topStoryLinks, sopShownLinks]);
-    const houstonLinks = useMemo(() => new Set(houstonItems.map(a => a.link)), [houstonItems]);
-    // The main feed excludes everything already placed above it.
+    }, [isHome, arts, topStoryKeys, sopShownKeys]);
+    const houstonKeys = useMemo(() => new Set(houstonItems.map(storyKey)), [houstonItems]);
+    // The main feed excludes everything already placed above it (by title key, so
+    // the same story from a different source can't slip back in).
     const dedupedFeed = useMemo(
-      () => feedItems.filter(a => !topStoryLinks.has(a.link) && !sopShownLinks.has(a.link) && !houstonLinks.has(a.link)),
-      [feedItems, topStoryLinks, sopShownLinks, houstonLinks]);
+      () => feedItems.filter(a => !topStoryKeys.has(storyKey(a)) && !sopShownKeys.has(storyKey(a)) && !houstonKeys.has(storyKey(a))),
+      [feedItems, topStoryKeys, sopShownKeys, houstonKeys]);
 
     // ── COVERAGE GAP (folded into State of Play) — widely-covered stories none of the
     //    reader's own sources carried. Home keys off this category; the merged
@@ -9244,7 +9273,7 @@ export default function App() {
             module below it provides a breathing-room break before the next image block
             (Pass H item 3). ── */}
         {isHome && !activeKw && !activeSrc && !search && (
-          <TopOfHourStrip catLead={catLead} arts={arts} onRead={onRead}/>
+          <TopOfHourStrip catLead={catLead} arts={arts} onRead={onRead} stories={topStoryItems}/>
         )}
 
         {/* State of Play moved into the sidebar (Pass J item 2). Across MyNewsHub also
