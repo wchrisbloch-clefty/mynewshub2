@@ -1380,16 +1380,19 @@ body{
 .houston-head{display:flex;align-items:baseline;gap:8px;margin-bottom:10px;}
 .houston-label{font-family:var(--font-archivo);font-weight:800;font-size:var(--fs-headline);color:var(--text);letter-spacing:-0.2px;}
 .houston-sub{font-family:var(--font-publicsans);font-size:var(--fs-meta);font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:var(--text3);}
-.houston-scroll{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:var(--s3);}
-.houston-card{background:var(--surface);border:1px solid var(--border2);border-radius:var(--radius);overflow:hidden;cursor:pointer;text-align:left;padding:0 0 10px;display:flex;flex-direction:column;font-family:inherit;}
+/* Horizontal scroll strip (Pass H item 3) — a compact rail instead of a full-width
+   3-up grid row, so consecutive image blocks don't stack into a tall wall. */
+.houston-scroll{display:flex;gap:var(--s3);overflow-x:auto;scroll-snap-type:x proximity;scrollbar-width:none;-webkit-overflow-scrolling:touch;}
+.houston-scroll::-webkit-scrollbar{display:none;}
+.houston-card{flex:0 0 232px;scroll-snap-align:start;background:var(--surface);border:1px solid var(--border2);border-radius:var(--radius);overflow:hidden;cursor:pointer;text-align:left;padding:0 0 10px;display:flex;flex-direction:column;font-family:inherit;}
 .houston-card:hover{border-color:var(--accent);}
 .houston-img{width:100%;aspect-ratio:16/9;object-fit:cover;background:var(--surface2);margin-bottom:8px;}
 .houston-img-ph{display:flex;align-items:center;justify-content:center;background:linear-gradient(135deg,var(--surface2),var(--surface));}
 .houston-card-title{font-family:var(--font-publicsans);font-size:var(--fs-body);font-weight:600;line-height:1.35;color:var(--text);padding:0 10px;margin-bottom:6px;overflow-wrap:anywhere;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden;}
 .houston-card-meta{font-family:var(--font-publicsans);font-size:10px;color:var(--text3);padding:0 10px;display:flex;gap:5px;flex-wrap:wrap;font-variant-numeric:tabular-nums;}
 @media(max-width:640px){
-  .houston-scroll{grid-template-columns:none;grid-auto-flow:column;grid-auto-columns:78%;overflow-x:auto;scroll-snap-type:x mandatory;-webkit-overflow-scrolling:touch;}
-  .houston-card{scroll-snap-align:start;}
+  .houston-scroll{scroll-snap-type:x mandatory;}
+  .houston-card{flex-basis:82%;}
 }
 /* Following row (My Topics + My Teams) */
 .following-row{display:flex;align-items:center;gap:var(--s3);flex-wrap:wrap;margin-bottom:var(--s4);padding-bottom:var(--s3);border-bottom:1px solid var(--border2);}
@@ -1622,6 +1625,14 @@ body:not(.dark) .pill-bar{
 .page{max-width:1400px;margin:0 auto;padding:28px 24px;}
 .page-grid{display:grid;grid-template-columns:2.1fr 1fr;gap:28px;align-items:start;} /* main ~68% / sidebar ~32% (CNBC/NBC ratio) */
 .feed-col{display:flex;flex-direction:column;gap:0;min-width:0;} /* min-width:0 so the column shrinks to its grid track instead of its content width */
+/* Full-width region below the hero grid (Pass H item 4): once the sidebar's
+   content ends, the main feed uses the whole width instead of leaving an empty
+   32% gutter. At desktop widths the article list runs 2-up so wide rows stay
+   readable. */
+.feed-below{display:flex;flex-direction:column;gap:0;}
+@media(min-width:1280px){
+  .feed-below .snap-feed{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:20px;align-items:start;}
+}
 
 /* Page header row: label + customize button */
 .page-header-row{
@@ -3415,6 +3426,11 @@ body:not(.dark) .pill-bar{
   border-radius:6px;background-size:cover;background-position:center;
   background-color:var(--surface2);
 }
+/* Robust thumbnail (Pass H item 6): placeholder underneath + real <img> on top that
+   hides itself on load error, so a broken URL never leaves a grey box. */
+.gf-thumb-wrap{position:relative;width:80px;height:60px;flex-shrink:0;border-radius:6px;overflow:hidden;background:var(--surface2);}
+.gf-thumb-wrap .gf-thumb-ph{position:absolute;inset:0;width:100%;height:100%;background:linear-gradient(135deg,var(--surface2),var(--surface));}
+.gf-thumb-img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;display:block;}
 .gf-body{flex:1;min-width:0;display:flex;flex-direction:column;gap:4px;}
 .gf-title{
   font-size:var(--fs-subhead);font-weight:600;color:var(--text);
@@ -6160,7 +6176,7 @@ function Scoreboard({scores, loading, compact=false}) {
 }
 
 // ─── GHOST SIDEBAR ────────────────────────────────────────────────────────────
-function Sidebar({cat, arts, kw, health, activeKw, setActiveKw, activeSource, setActiveSource, onRead, scores, scoresLoading, showScoreboard, recommended, showBriefing, onOpenBriefing, briefingExcludeCats, onTopicOpen}) {
+function Sidebar({cat, arts, kw, health, activeKw, setActiveKw, activeSource, setActiveSource, onRead, scores, scoresLoading, showScoreboard, recommended, showBriefing, onOpenBriefing, briefingExcludeCats, onTopicOpen, trendingItems, isTopicFollowed, toggleTopic, onTrendingOpen}) {
   const cc = CATS[cat]||CATS.general;
   const catKws = kw[cat]||[];
   const catArts = arts[cat]||[];
@@ -6262,6 +6278,15 @@ function Sidebar({cat, arts, kw, health, activeKw, setActiveKw, activeSource, se
               </span>
             ))}
           </div>
+        </div>
+      )}
+
+      {/* Trending Now — moved out of the main column (Pass H item 5) so it sits with
+          Today's Topics as one topic-discovery group in the sidebar. */}
+      {trendingItems && (
+        <div className="sidebar-section sidebar-trending">
+          <TrendingPills label="Trending Now" items={trendingItems}
+            onOpen={onTrendingOpen} isTopicFollowed={isTopicFollowed} toggleTopic={toggleTopic}/>
         </div>
       )}
 
@@ -7481,6 +7506,47 @@ function HoustonRow({ arts, onRead, formatDate }) {
         ))}
       </div>
     </section>
+  );
+}
+
+// ─── ACROSS MYNEWSHUB ─────────────────────────────────────────────────────────
+// Cross-category recirculation: a few stories from each other category. Rendered
+// high on the General page (right after State of Play) so it's actually reached
+// (Pass H item 6). Thumbnails use the placeholder-under-<img> pattern so a broken
+// image URL falls back cleanly instead of leaving a grey box.
+function AcrossHub({ sections, onRead, onSeeAll, formatDate }) {
+  if (!sections || !sections.length) return null;
+  return (
+    <div className="other-cat-sections">
+      <div className="other-cat-divider"><span>Across MyNewsHub</span></div>
+      {sections.map(section => (
+        <section key={section.cat} className="other-cat-section">
+          <div className="other-cat-head">
+            <span className="other-cat-label" style={{ color: section.cc.color }}>
+              {section.cc.emoji} {section.cc.label}
+            </span>
+            <button className="other-cat-link" onClick={() => onSeeAll(section.cat)}>
+              See all in {section.cc.label} →
+            </button>
+          </div>
+          {section.items.map((a, i) => (
+            <div key={a.link || i} className="gf-item" onClick={() => onRead(a)}>
+              <div className="gf-thumb-wrap">
+                <div className="gf-thumb-ph"/>
+                {a.img && <img className="gf-thumb-img" src={a.img} alt="" loading="lazy"
+                  onError={e => { e.currentTarget.style.display = 'none'; }}/>}
+              </div>
+              <div className="gf-body">
+                <div className="gf-title">{a.title}</div>
+                <div className="gf-meta">
+                  <span>{a.source}</span><span>·</span><span>{formatDate(a.pubDate)}</span>
+                </div>
+              </div>
+            </div>
+          ))}
+        </section>
+      ))}
+    </div>
   );
 }
 
@@ -9070,37 +9136,27 @@ export default function App() {
           </div>
         )}
 
-        {/* ── STATE OF PLAY strip — top of every category, collapsible (per-category memory).
-            Coverage-Gap stories ("Not in your sources") are folded in as tagged rows on
-            Home + the merged Business/Markets page — no separate panel. ── */}
+        {/* ── HOME: Top Stories (image cards) — sits first; the text-only State of Play
+            module below it provides a breathing-room break before the next image block
+            (Pass H item 3). ── */}
+        {isHome && !activeKw && !activeSrc && !search && (
+          <TopOfHourStrip catLead={catLead} arts={arts} onRead={onRead}/>
+        )}
+
+        {/* ── STATE OF PLAY strip — collapsible (per-category memory). Coverage-Gap
+            stories ("Not in your sources") are folded in as tagged rows on Home + the
+            merged Business/Markets page — no separate panel. On Home it sits between
+            Top Stories and the next image block as a text-only breather. ── */}
         {!activeKw && !activeSrc && !search && (
           <StateOfPlay items={activeFilteredItems} meta={CATS[cat]||CATS.general} onRead={onRead} formatDate={fmtDate}
             collapsed={sopCollapsed} onToggleCollapse={toggleSop} gapItems={gapItems}/>
         )}
 
-        {/* My Teams thumbnail teaser removed from General — the followed-teams module
-            lives on the Sports page only (avoids Home↔Sports duplication and the extra
-            above-the-fold scroll). Live scores now sit at the top of the page. */}
-
-        {/* ── TRENDING NOW — hottest clusters; tapping a pill opens that entity's hub ── */}
-        {!activeKw && !activeSrc && !search && (
-          <TrendingPills label="Trending Now" items={activeFilteredItems}
-            onOpen={t => navigate(cat, 'topic', teamSlug(t))}
-            isTopicFollowed={isTopicFollowed} toggleTopic={toggleTopic}/>
-        )}
-
-        {/* Coverage Gap is no longer a standalone "You may be missing this" panel —
-            its stories are folded into the State of Play list above as tagged rows. */}
-
-        {/* ── HOME: Top of Hour strip (image cards) ── */}
-        {isHome && !activeKw && !activeSrc && !search && (
-          <TopOfHourStrip catLead={catLead} arts={arts} onRead={onRead}/>
-        )}
-
-        {/* ── HOME: Houston local row ── */}
-        {isHome && !activeKw && !activeSrc && !search && (
-          <HoustonRow arts={arts} onRead={onRead} formatDate={fmtDate}/>
-        )}
+        {/* Across MyNewsHub + Houston Local render full-width below the grid (see
+            <div className="feed-below">) so the sidebar column doesn't reserve a tall
+            empty gutter beside them (Pass H item 4); Across still sits right after
+            State of Play (Pass H item 6). Trending Now now lives in the sidebar
+            (Pass H item 5). */}
 
         {/* Category pages: lead image grid */}
         {!activeKw && !activeSrc && catLead && !isHome && (
@@ -9145,6 +9201,35 @@ export default function App() {
               </button>
             ))}
           </div>
+        )}
+
+          </div>{/* /feed-col — hero + discovery region shares the row with the sidebar */}
+          <Sidebar cat={cat} arts={arts} kw={kw} health={health}
+            activeKw={activeKw} setActiveKw={k=>{setActiveKw(k);setActiveSrc(null);}}
+            activeSource={activeSrc} setActiveSource={s=>{setActiveSrc(s);setActiveKw(null);}}
+            onRead={onRead} scores={scores} scoresLoading={scoresLoading}
+            showScoreboard={cat==='sports'} recommended={recommended}
+            onTopicOpen={label => navigate(cat, 'topic', teamSlug(label))}
+            trendingItems={!activeKw && !activeSrc && !search ? activeFilteredItems : null}
+            isTopicFollowed={isTopicFollowed} toggleTopic={toggleTopic}
+            onTrendingOpen={t => navigate(cat, 'topic', teamSlug(t))}
+            showBriefing={isHome} onOpenBriefing={() => handleTabChange('briefing')} briefingExcludeCats={briefingExclude}/>
+        </div>{/* /page-grid */}
+
+        {/* ── Full-width region below the grid: once the sidebar's content ends the
+            layout drops to a single column instead of reserving an empty gutter
+            (Pass H item 4). Across MyNewsHub + Houston lead it off. ── */}
+        <div className="feed-below">
+
+        {/* ── Across MyNewsHub — cross-category recirculation, right after the
+            State-of-Play break (Pass H item 6). ── */}
+        {isHome && !activeKw && !activeSrc && !search && otherCatSections.length > 0 && (
+          <AcrossHub sections={otherCatSections} onRead={onRead} onSeeAll={handleTabChange} formatDate={fmtDate}/>
+        )}
+
+        {/* ── HOME: Houston local row ── */}
+        {isHome && !activeKw && !activeSrc && !search && (
+          <HoustonRow arts={arts} onRead={onRead} formatDate={fmtDate}/>
         )}
 
             <div className="page-header-row">
@@ -9330,54 +9415,12 @@ export default function App() {
               </div>
             )}
 
-            {/* v24a: General homepage absorbs Today's "from each category" role.
-                3 stories from each other category, with See all links. */}
-            {isHome && !activeKw && !activeSrc && otherCatSections.length > 0 && (
-              <div className="other-cat-sections">
-                <div className="other-cat-divider">
-                  <span>Across MyNewsHub</span>
-                </div>
-                {otherCatSections.map(section => (
-                  <section key={section.cat} className="other-cat-section">
-                    <div className="other-cat-head">
-                      <span className="other-cat-label" style={{color:section.cc.color}}>
-                        {section.cc.emoji} {section.cc.label}
-                      </span>
-                      <button className="other-cat-link" onClick={()=>handleTabChange(section.cat)}>
-                        See all in {section.cc.label} →
-                      </button>
-                    </div>
-                    {section.items.map((a, i) => (
-                      <div key={i} className="gf-item" onClick={()=>onRead(a)}>
-                        {a.img
-                          ? <div className="gf-thumb" style={{backgroundImage:`url(${a.img})`}}/>
-                          : <div className="gf-thumb-ph"/>}
-                        <div className="gf-body">
-                          <div className="gf-title">{a.title}</div>
-                          <div className="gf-meta">
-                            <span>{a.source}</span>
-                            <span>·</span>
-                            <span>{fmtDate(a.pubDate)}</span>
-                          </div>
-                        </div>
-                      </div>
-                    ))}
-                  </section>
-                ))}
-              </div>
-            )}
+            {/* Across MyNewsHub moved up — it now renders right after State of Play
+                (Pass H item 6, see <AcrossHub> above), not at the page bottom. */}
 
             <SocialFollows cat={cat} social={social}/>
             <SourceFooter cat={cat} feeds={feeds} arts={arts}/>
-          </div>
-          <Sidebar cat={cat} arts={arts} kw={kw} health={health}
-            activeKw={activeKw} setActiveKw={k=>{setActiveKw(k);setActiveSrc(null);}}
-            activeSource={activeSrc} setActiveSource={s=>{setActiveSrc(s);setActiveKw(null);}}
-            onRead={onRead} scores={scores} scoresLoading={scoresLoading}
-            showScoreboard={cat==='sports'} recommended={recommended}
-            onTopicOpen={label => navigate(cat, 'topic', teamSlug(label))}
-            showBriefing={isHome} onOpenBriefing={() => handleTabChange('briefing')} briefingExcludeCats={briefingExclude}/>
-        </div>
+        </div>{/* /feed-below */}
       </div>
     );
   };
