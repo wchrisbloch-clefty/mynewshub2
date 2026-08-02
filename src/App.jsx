@@ -38,17 +38,19 @@
 
 import { useState, useEffect, useCallback, useMemo, useRef, Fragment } from 'react';
 // Extracted, dependency-isolated capability modules (see src/modules/*/README.md)
-import { clusterStories, hotClusterTopics, TREND_STOP, decodeEntities, capByPublisher } from './modules/clustering';
+import { clusterStories, hotClusterTopics, rankClusters, TREND_STOP, decodeEntities, capByPublisher } from './modules/clustering';
 import { extractContent, extractionFallbackMessage } from './modules/extractor';
 import { retrieveFeedContext, buildFeedContextBlock } from './modules/retrieval';
 import { XPulse } from './modules/x-pulse';
 import { StateOfPlay } from './modules/state-of-play';
 import { SnapshotCard, CoverageList } from './modules/snapshot-card';
+import { FollowSourceContext, FollowSourceChip } from './modules/follow-source';
 import { MarketsSurface, useMarkets } from './modules/markets-surface';
 import { parseRoute, buildPath } from './modules/routing';
 import { ChatBot } from './modules/concierge';
 // Icons: single set (lucide-react), fixed size per context — item 7.
-import { Settings, RefreshCw, Moon, Sun, User } from 'lucide-react';
+import { Settings, RefreshCw, Moon, Sun, User,
+  Zap, Droplet, Leaf, TrendingUp, Scale, LayoutGrid, Film, Music, BookOpen, Laugh, Trophy } from 'lucide-react';
 import { isCloudSyncEnabled, getUserId, signInWithEmail, signOut, onAuthStateChange, loadProfileFromCloud, saveProfileToCloud, emitEvent } from './lib/cloudSync';
 
 // ─── CATEGORIES ───────────────────────────────────────────────────────────────
@@ -1312,6 +1314,17 @@ body{
    same max-width, flush (no card chrome). */
 .topbar-wx{background:var(--surface);border-bottom:1px solid var(--border2);}
 .topbar-wx .rnw-card{max-width:1400px;margin:0 auto;padding:0 var(--s4);border:none;border-radius:0;background:none;}
+/* Scoreboard band in the top bar (below weather, above nav — Pass G item 3).
+   Dark ESPN theme so the homepage strip matches the Sports-page strip (item 6). */
+.topbar-scores{background:var(--surface2);border-bottom:1px solid var(--border2);}
+.topbar-scores .home-scores{max-width:1400px;margin:0 auto;padding:6px var(--s4) 8px;border:none;border-radius:0;background:none;overflow:visible;}
+.topbar-wrap.shrunk .topbar-scores{display:none;}
+/* Right-edge fade cue: partial cards read as "scroll for more," not a cutoff. */
+.topbar-scores .home-scores,.sports-score-strip{position:relative;}
+.topbar-scores .home-scores::after,.sports-score-strip::after{
+  content:'';position:absolute;top:0;right:0;bottom:0;width:34px;pointer-events:none;
+  background:linear-gradient(90deg,transparent,var(--surface2));
+}
 .topbar-wx .rnw-row{padding:8px 0;}
 .topbar-wx .rnw-forecast{padding-left:var(--s4);padding-right:var(--s4);}
 .ss-flag{display:inline-flex;align-items:center;gap:6px;flex-shrink:0;
@@ -1368,16 +1381,19 @@ body{
 .houston-head{display:flex;align-items:baseline;gap:8px;margin-bottom:10px;}
 .houston-label{font-family:var(--font-archivo);font-weight:800;font-size:var(--fs-headline);color:var(--text);letter-spacing:-0.2px;}
 .houston-sub{font-family:var(--font-publicsans);font-size:var(--fs-meta);font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:var(--text3);}
-.houston-scroll{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:var(--s3);}
-.houston-card{background:var(--surface);border:1px solid var(--border2);border-radius:var(--radius);overflow:hidden;cursor:pointer;text-align:left;padding:0 0 10px;display:flex;flex-direction:column;font-family:inherit;}
+/* Horizontal scroll strip (Pass H item 3) — a compact rail instead of a full-width
+   3-up grid row, so consecutive image blocks don't stack into a tall wall. */
+.houston-scroll{display:flex;gap:var(--s3);overflow-x:auto;scroll-snap-type:x proximity;scrollbar-width:none;-webkit-overflow-scrolling:touch;}
+.houston-scroll::-webkit-scrollbar{display:none;}
+.houston-card{flex:0 0 232px;scroll-snap-align:start;background:var(--surface);border:1px solid var(--border2);border-radius:var(--radius);overflow:hidden;cursor:pointer;text-align:left;padding:0 0 10px;display:flex;flex-direction:column;font-family:inherit;}
 .houston-card:hover{border-color:var(--accent);}
 .houston-img{width:100%;aspect-ratio:16/9;object-fit:cover;background:var(--surface2);margin-bottom:8px;}
 .houston-img-ph{display:flex;align-items:center;justify-content:center;background:linear-gradient(135deg,var(--surface2),var(--surface));}
 .houston-card-title{font-family:var(--font-publicsans);font-size:var(--fs-body);font-weight:600;line-height:1.35;color:var(--text);padding:0 10px;margin-bottom:6px;overflow-wrap:anywhere;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden;}
 .houston-card-meta{font-family:var(--font-publicsans);font-size:10px;color:var(--text3);padding:0 10px;display:flex;gap:5px;flex-wrap:wrap;font-variant-numeric:tabular-nums;}
 @media(max-width:640px){
-  .houston-scroll{grid-template-columns:none;grid-auto-flow:column;grid-auto-columns:78%;overflow-x:auto;scroll-snap-type:x mandatory;-webkit-overflow-scrolling:touch;}
-  .houston-card{scroll-snap-align:start;}
+  .houston-scroll{scroll-snap-type:x mandatory;}
+  .houston-card{flex-basis:82%;}
 }
 /* Following row (My Topics + My Teams) */
 .following-row{display:flex;align-items:center;gap:var(--s3);flex-wrap:wrap;margin-bottom:var(--s4);padding-bottom:var(--s3);border-bottom:1px solid var(--border2);}
@@ -1422,7 +1438,7 @@ body{
 .trending-follow:hover{color:var(--accent);}
 .trending-follow.on{color:var(--amber);}
 /* Numbers read as data everywhere — scores, clocks, timestamps that lacked it. */
-.sb-status,.sst-status,.hs-status,.rn-fresh,.gn-lead-meta,.fc-meta,.today-item-src,.pod-meta,.snap-time{font-variant-numeric:tabular-nums;}
+.sb-status,.score-tile-status,.rn-fresh,.gn-lead-meta,.fc-meta,.today-item-src,.pod-meta,.snap-time{font-variant-numeric:tabular-nums;}
 
 /* ═══════════════════════════════════════════
    PILL BAR — editorial data strip
@@ -1608,8 +1624,19 @@ body:not(.dark) .pill-bar{
    PAGE SHELL
 ═══════════════════════════════════════════ */
 .page{max-width:1400px;margin:0 auto;padding:28px 24px;}
-.page-grid{display:grid;grid-template-columns:1fr 280px;gap:40px;align-items:start;}
-.feed-col{display:flex;flex-direction:column;gap:0;}
+.page-grid{display:grid;grid-template-columns:2.1fr 1fr;gap:28px;align-items:start;} /* main ~68% / sidebar ~32% (CNBC/NBC ratio) */
+.feed-col{display:flex;flex-direction:column;gap:0;min-width:0;} /* min-width:0 so the column shrinks to its grid track instead of its content width */
+/* State of Play lives in the sidebar on desktop; the main-column hoisted copy is
+   hidden here and only shown ≤1100px (see the single-column media block). */
+.sop-hoist{display:none;}
+/* Full-width region below the hero grid (Pass H item 4): once the sidebar's
+   content ends, the main feed uses the whole width instead of leaving an empty
+   32% gutter. At desktop widths the article list runs 2-up so wide rows stay
+   readable. */
+.feed-below{display:flex;flex-direction:column;gap:0;}
+@media(min-width:1280px){
+  .feed-below .snap-feed{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:20px;align-items:start;}
+}
 
 /* Page header row: label + customize button */
 .page-header-row{
@@ -1788,6 +1815,8 @@ body:not(.dark) .pill-bar{
 .sidebar{
   display:flex;flex-direction:column;gap:24px;min-width:0;
   border-left:1px solid var(--border2);padding-left:28px;
+  /* Flows in normal document scroll along with the main column — no sticky/fixed
+     positioning and no internal scroll container. */
 }
 
 /* Ghost sidebar section */
@@ -1858,6 +1887,22 @@ body:not(.dark) .pill-bar{
 .ttp-chip.active{color:#fff !important;border-color:transparent !important;}
 .ttp-chip.saved{border-style:dashed;}
 .ttp-count{font-size:9px;font-weight:700;opacity:0.6;}
+/* Follow star on the merged Trending chips (Pass J item 3). */
+.ttp-chip-star{background:none;border:none;cursor:pointer;font-size:11px;line-height:1;color:var(--text4);padding:0 0 0 1px;margin-left:1px;}
+.ttp-chip-star.on{color:var(--amber);}
+.ttp-chip-star:hover{color:var(--amber);}
+.ttp-chip.active .ttp-chip-star{color:rgba(255,255,255,0.85);}
+
+/* Across MyNewsHub — compact text list in the sidebar (Pass J item 4). */
+.sb-across-cat{margin-bottom:12px;}
+.sb-across-cat:last-child{margin-bottom:0;}
+.sb-across-clabel{background:none;border:none;cursor:pointer;font-family:inherit;padding:0 0 5px;font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:0.08em;display:block;}
+.sb-across-clabel:hover{text-decoration:underline;}
+.sb-across-item{cursor:pointer;padding:5px 0;border-top:1px solid var(--border2);}
+.sb-across-cat .sb-across-item:first-of-type{border-top:none;}
+.sb-across-title{font-family:var(--font-archivo);font-weight:600;font-size:12px;line-height:1.3;color:var(--text);display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;}
+.sb-across-item:hover .sb-across-title{color:var(--accent);}
+.sb-across-src{font-size:10px;color:var(--text3);margin-top:2px;}
 
 /* Sources pill grid */
 .src-pills{display:flex;flex-wrap:wrap;gap:5px;}
@@ -2403,37 +2448,36 @@ body:not(.dark) .pill-bar{
    Lead card (full-width, large image) + 3-column equal grid below.
    Used on General homepage, Sports article feed, Markets news, Pop Culture,
    Bloom Energy. Cards inside use the unified .fc class. */
+/* Top Stories — ONE row: hero (~53%) + a vertical rail of compact secondaries. */
 .gn-grid{
-  display:flex;flex-direction:column;gap:24px;
-  margin-bottom:32px;
+  display:grid;grid-template-columns:53% 1fr;gap:22px;align-items:start;
+  margin-bottom:28px;
 }
 .gn-lead{
-  display:grid;grid-template-columns: 1.6fr 1fr;gap:24px;
-  cursor:pointer;
-  padding-bottom:24px;border-bottom:1px solid var(--border);
-  transition:opacity 0.15s;
+  display:flex;flex-direction:column;gap:12px;
+  cursor:pointer;transition:opacity 0.15s;
 }
 .gn-lead:hover{opacity:0.92;}
 .gn-lead-img{
-  width:100%;aspect-ratio:21/9;
+  width:100%;aspect-ratio:16/10;
   background-size:cover;background-position:center top;
   border-radius:8px;background-color:var(--surface2);
   position:relative;
 }
-.gn-lead-text{display:flex;flex-direction:column;justify-content:center;}
+.gn-lead-text{display:flex;flex-direction:column;}
 .gn-lead-title{
-  /* NBC bold-display feel — dominant hero weight, tokenized */
-  font-size:var(--fs-hero);font-weight:900;line-height:1.12;
-  letter-spacing:-0.7px;color:var(--text);margin:0 0 12px;
+  /* Top-Stories-module hero — smaller than the page hero token, per Pass G addendum */
+  font-size:20px;font-weight:700;line-height:1.2;
+  letter-spacing:-0.3px;color:var(--text);margin:0 0 8px;
   display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden;
 }
 .gn-lead-desc{
-  font-size:15px;line-height:1.5;color:var(--text2);
-  margin:0 0 12px;
-  display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden;
+  font-size:14px;font-weight:400;line-height:1.45;color:var(--text2);
+  margin:0 0 8px;
+  display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;
 }
 .gn-lead-meta{
-  font-size:var(--fs-meta);color:var(--text3);
+  font-size:12px;color:var(--text3);
   display:flex;align-items:center;gap:6px;
 }
 .gn-lead-source{
@@ -2441,37 +2485,35 @@ body:not(.dark) .pill-bar{
   text-transform:uppercase;letter-spacing:0.06em;font-size:10px;
 }
 
-/* Grid of equal cards below the lead */
+/* Secondary rail — compact horizontal cards stacked beside the hero (no 2nd row). */
 .gn-row{
-  display:grid;grid-template-columns:repeat(3, 1fr);gap:20px;
+  display:flex;flex-direction:column;gap:14px;
 }
 .gn-card{
-  display:flex;flex-direction:column;gap:10px;cursor:pointer;
-  transition:opacity 0.12s;
+  display:grid;grid-template-columns:92px minmax(0,1fr);grid-template-rows:auto auto;
+  column-gap:11px;row-gap:3px;cursor:pointer;transition:opacity 0.12s;
 }
 .gn-card:hover{opacity:0.9;}
-.gn-card-img{
-  width:100%;height:200px;
+.gn-card-img,.gn-card-img-ph{
+  grid-column:1;grid-row:1 / span 2;
+  width:92px;height:64px;
   background-size:cover;background-position:center top;
-  border-radius:4px;background-color:var(--surface2);
-}
-.gn-card-img-ph{
-  width:100%;height:200px;
-  background:var(--surface2);border-radius:4px;
+  border-radius:6px;background-color:var(--surface2);
 }
 .gn-card-title{
-  font-family:var(--font-serif);
-  font-size:var(--fs-headline);font-weight:700;line-height:1.25;
-  letter-spacing:-0.2px;color:var(--text);margin:0;overflow-wrap:break-word;
+  grid-column:2;grid-row:1;
+  font-size:15px;font-weight:600;line-height:1.28;
+  letter-spacing:-0.1px;color:var(--text);margin:0;overflow-wrap:break-word;
   display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden;
 }
 .gn-card-meta{
-  font-size:10px;color:var(--text3);
+  grid-column:2;grid-row:2;
+  font-size:12px;color:var(--text3);
   display:flex;gap:5px;align-items:center;
 }
 .gn-card-source{
   font-weight:800;color:var(--text2);
-  text-transform:uppercase;letter-spacing:0.05em;font-size:9px;
+  text-transform:uppercase;letter-spacing:0.05em;font-size:11px;
 }
 
 /* Per-vertical card top-border accents */
@@ -2492,21 +2534,15 @@ body:not(.dark) .pill-bar{
   margin-right:8px;
 }
 
-/* Mobile: collapse to 1 column */
-@media (max-width:900px){
-  .gn-lead{grid-template-columns:1fr;gap:14px;}
-  .gn-lead-title{font-size:24px;}
-  .gn-row{grid-template-columns:repeat(2, 1fr);gap:14px;}
-  .gn-card-title{font-size:var(--fs-subhead);}
+/* Tablet/mobile: Top Stories collapses to one column — hero, then the rail below.
+   Cap the rail at 2 secondaries (not 3) to avoid over-stacking on small screens. */
+@media (max-width:1024px){
+  .gn-grid{grid-template-columns:1fr;gap:18px;}
+  .gn-row .gn-card:nth-child(n+3){display:none;}
 }
 @media (max-width:640px){
-  .gn-lead{padding-bottom:18px;}
-  .gn-lead-title{font-size:var(--fs-lead);-webkit-line-clamp:3;}
-  .gn-lead-desc{-webkit-line-clamp:2;font-size:var(--fs-subhead);}
-  .gn-row{grid-template-columns:1fr;gap:18px;}
-  .gn-card{flex-direction:row;gap:12px;}
-  .gn-card-img,.gn-card-img-ph{width:120px;height:80px;aspect-ratio:auto;flex-shrink:0;}
-  .gn-card-title{-webkit-line-clamp:3;}
+  .gn-lead-img{aspect-ratio:16/9;}
+  .gn-card-img,.gn-card-img-ph{width:104px;height:70px;}
 }
 
 /* BUSINESS PAGE Bloomberg-style — orange accent + dense feel.
@@ -2647,16 +2683,16 @@ body:not(.dark) .pill-bar{
 /* SPORTS PAGE outer */
 .sports-page{padding-top:0;}
 
-/* SCOREBOARD STRIP — Yahoo Sports' signature dark navy bar */
+/* SCOREBOARD STRIP — light band that blends with the page (Pass H item 2). */
 .sports-score-strip{
-  background:#0c1c2c;
+  background:var(--surface2);
   margin:-28px -24px 18px;
-  padding:14px 24px;
-  border-top:1px solid #1a2c3e;
-  border-bottom:1px solid #1a2c3e;
+  padding:9px 24px;
+  border-top:1px solid var(--border2);
+  border-bottom:1px solid var(--border2);
 }
-.sports-score-strip.empty{padding:18px 24px;text-align:center;}
-.sports-score-strip-empty{color:rgba(255,255,255,0.5);font-size:var(--fs-meta);font-style:italic;letter-spacing:0.04em;}
+.sports-score-strip.empty{padding:14px 24px;text-align:center;}
+.sports-score-strip-empty{color:var(--text3);font-size:var(--fs-meta);font-style:italic;letter-spacing:0.04em;}
 /* Full-bleed strip: its negative horizontal margin must match the page's padding
    at each breakpoint, otherwise it overshoots the viewport (horizontal scroll). */
 @media (min-width:641px) and (max-width:1024px){
@@ -2665,64 +2701,74 @@ body:not(.dark) .pill-bar{
 @media (min-width:1025px) and (max-width:1100px){
   .sports-score-strip{margin-left:-16px;margin-right:-16px;}
 }
-.sports-score-strip-inner{
+.sports-score-strip-inner{padding-bottom:2px;scroll-snap-type:x proximity;}
+
+/* ── SHARED SCOREBOARD (Pass G item 6) ─────────────────────────────────────────
+   One ESPN-style horizontal card strip + tile theme, used identically by the
+   homepage strip (.home-scores) and the Sports-page strip (.sports-score-strip).
+   The right-edge fade signals "scroll for more" so partial cards read as
+   scrollable, never as a hard cutoff. */
+.score-strip-scroll{
   display:flex;gap:8px;
   overflow-x:auto;scrollbar-width:none;
   -webkit-overflow-scrolling:touch;
-  scroll-snap-type:x proximity;
-  padding-bottom:2px;
 }
-.sports-score-strip-inner::-webkit-scrollbar{display:none;}
-.sst-tile{
+.score-strip-scroll::-webkit-scrollbar{display:none;}
+/* Light, compact tile: white/surface card, dark text for names + scores; colour
+   is reserved for status accents (live/final/winner), not the whole tile. */
+.score-tile{
   position:relative;
   flex-shrink:0;scroll-snap-align:start;
-  background:#162635;border:1px solid #243446;
-  border-radius:7px;padding:6px 9px;
-  min-width:110px;cursor:pointer;
+  background:var(--surface);border:1px solid var(--border);
+  border-radius:7px;padding:5px 9px;
+  min-width:112px;max-width:132px;cursor:pointer;
   transition:border-color 0.15s, transform 0.1s;
 }
-.sst-tile:hover{border-color:#3b5168;transform:translateY(-1px);}
-.sst-tile.live{border-color:#ef4444;background:#2a1f1f;}
-.sst-tile.fav{border-color:#f59e0b;background:#221c10;}
-.sst-tile.fav.live{border-color:#ef4444;}
-.sst-fav-star{
-  position:absolute;top:6px;right:8px;
-  color:#fbbf24;font-size:10px;
+.score-tile:hover{border-color:var(--accent);transform:translateY(-1px);}
+.score-tile.live{border-color:var(--red);}
+.score-tile.fav{border-color:var(--accent);}
+.score-tile.fav.live{border-color:var(--red);}
+.score-tile-star{
+  position:absolute;top:5px;right:8px;
+  color:var(--amber);font-size:10px;
 }
-.sst-league-badge{
-  font-size:9px;font-weight:800;color:rgba(255,255,255,0.45);
-  text-transform:uppercase;letter-spacing:0.1em;margin-bottom:7px;
+.score-tile-league{
+  font-size:8px;font-weight:800;color:var(--text3);
+  text-transform:uppercase;letter-spacing:0.08em;margin-bottom:3px;
 }
-.sst-row{
+.score-tile-row{
   display:flex;justify-content:space-between;align-items:center;
-  font-size:12px;color:rgba(255,255,255,0.85);
-  font-variant-numeric:tabular-nums;padding:2px 0;
+  font-size:12px;color:var(--text);
+  font-variant-numeric:tabular-nums;padding:1px 0;gap:8px;
 }
-.sst-team{font-weight:600;letter-spacing:-0.2px;max-width:88px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
-.sst-team.win{color:#fff;font-weight:800;}
-.sst-team.loss{color:rgba(255,255,255,0.4);}
-.sst-score{font-weight:900;font-size:var(--fs-subhead);color:#fff;min-width:22px;text-align:right;}
-.sst-score.win{color:#22c55e;}
-.sst-score.loss{color:rgba(255,255,255,0.35);}
-.sst-status{
-  font-size:9px;color:rgba(255,255,255,0.55);
+.score-tile-side{display:flex;align-items:center;gap:5px;min-width:0;}
+.score-tile-logo{width:14px;height:14px;object-fit:contain;flex-shrink:0;}
+.score-tile-team{font-weight:600;letter-spacing:-0.2px;color:var(--text2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.score-tile-team.win{color:var(--text);font-weight:800;}
+.score-tile-team.loss{color:var(--text3);}
+.score-tile-score{font-weight:900;font-size:var(--fs-body);color:var(--text);min-width:22px;text-align:right;}
+.score-tile-score.win{color:var(--green);}
+.score-tile-score.loss{color:var(--text3);}
+.score-tile-status{
+  font-size:9px;color:var(--text3);
   text-transform:uppercase;letter-spacing:0.05em;
-  margin-top:4px;display:flex;align-items:center;gap:4px;
-  border-top:1px solid rgba(255,255,255,0.07);padding-top:4px;
+  margin-top:3px;display:flex;align-items:center;gap:4px;
+  border-top:1px solid var(--border2);padding-top:3px;
 }
-.sst-status.live{color:#ef4444;font-weight:700;}
-.sst-status.final{color:rgba(255,255,255,0.4);}
-.sst-status.pre{color:#60a5fa;}
-.sst-live-dot{
-  width:5px;height:5px;border-radius:50%;background:#ef4444;
+.score-tile-status.live{color:var(--red);font-weight:700;}
+.score-tile-status.final{color:var(--text3);}
+.score-tile-status.pre{color:#3b82f6;}
+.score-tile-dot{
+  width:5px;height:5px;border-radius:50%;background:var(--red);
   animation:pulse-badge 1.4s ease-in-out infinite;
 }
 
-/* SPORT TABS — ESPN-style larger tabs */
+/* SPORT TABS — ESPN/Yahoo-style compact pill row (Pass I item 2): tighter gaps,
+   shorter pills, horizontal scroll (never wraps to a second line). */
 .sport-tabs{
-  display:flex;flex-wrap:nowrap;gap:6px;
-  padding:0 0 14px 0;
-  margin-bottom:16px;
+  display:flex;flex-wrap:nowrap;gap:5px;
+  padding:0 0 10px 0;
+  margin-bottom:12px;
   overflow-x:auto;scrollbar-width:none;
   -webkit-overflow-scrolling:touch;touch-action:pan-x;
 }
@@ -2730,21 +2776,24 @@ body:not(.dark) .pill-bar{
 .sport-tab{
   background:var(--surface2);
   border:1.5px solid var(--border);
-  border-radius:22px;
-  padding:8px 18px;font-size:var(--fs-body);font-weight:700;
+  border-radius:16px;
+  padding:5px 12px;font-size:12px;font-weight:700;
   color:var(--text2);cursor:pointer;font-family:inherit;
   white-space:nowrap;flex-shrink:0;
   transition:all 0.15s;
-  display:inline-flex;align-items:center;gap:6px;
+  display:inline-flex;align-items:center;gap:5px;
   -webkit-tap-highlight-color:transparent;
-  min-height:38px;
+  min-height:30px;
 }
 .sport-tab:hover{background:var(--surface);color:var(--text);border-color:var(--text3);}
 .sport-tab.active{
   background:var(--accent);color:#fff;border-color:var(--accent);
   box-shadow:var(--shadow-sm);
 }
-.sport-tab-emoji{font-size:15px;}
+.sport-tab-emoji{font-size:13px;}
+/* Team icon inside a pill: keep it legible on the blue active pill. */
+.sport-tab .team-logo{width:16px;height:16px;border-radius:5px;}
+.sport-tab.active .team-logo-ph{background:rgba(255,255,255,0.9);}
 
 /* ── LEAGUE HEADER — ESPN-style hero banner ── */
 .sport-league-header{
@@ -2950,7 +2999,7 @@ body:not(.dark) .pill-bar{
 }
 @media (max-width:640px){
   .sports-score-strip{margin:-12px -12px 14px;padding:12px;}
-  .sst-tile{min-width:118px;padding:9px 11px;}
+  .score-tile{min-width:120px;padding:9px 11px;}
   .sport-tab{padding:10px 12px;font-size:12px;min-height:44px;}
   .team-pill-group{border-radius:18px;}
   .team-pill{padding:7px 12px;font-size:var(--fs-meta);min-height:36px;}
@@ -3403,6 +3452,11 @@ body:not(.dark) .pill-bar{
   border-radius:6px;background-size:cover;background-position:center;
   background-color:var(--surface2);
 }
+/* Robust thumbnail (Pass H item 6): placeholder underneath + real <img> on top that
+   hides itself on load error, so a broken URL never leaves a grey box. */
+.gf-thumb-wrap{position:relative;width:80px;height:60px;flex-shrink:0;border-radius:6px;overflow:hidden;background:var(--surface2);}
+.gf-thumb-wrap .gf-thumb-ph{position:absolute;inset:0;width:100%;height:100%;background:linear-gradient(135deg,var(--surface2),var(--surface));}
+.gf-thumb-img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;display:block;}
 .gf-body{flex:1;min-width:0;display:flex;flex-direction:column;gap:4px;}
 .gf-title{
   font-size:var(--fs-subhead);font-weight:600;color:var(--text);
@@ -3758,8 +3812,16 @@ body{overscroll-behavior-y:contain;}
   .page-grid,.pod-page,.today-main,.fin-grid{grid-template-columns:1fr!important;gap:20px;}
   .hero-row{grid-template-columns:1fr;}
   .today-grid{grid-template-columns:1fr;}
-  .sidebar{order:2;}.feed-col{order:1;}
+  /* Single-column: the sidebar stacks below the main feed as a full-width section
+     (Trending, Today's Briefing, Across, Sources), with a top rule instead of the
+     desktop left border. State of Play is hoisted out of it (below) to sit right
+     after Top Stories. */
+  .sidebar{order:2;border-left:none;padding-left:0;border-top:2px solid var(--border);padding-top:22px;margin-top:10px;}
+  .feed-col{order:1;}
   .fin-indices{grid-template-columns:1fr;}
+  /* Hoist State of Play into the main column near the top; hide the sidebar copy. */
+  .sop-hoist{display:block;margin-bottom:22px;}
+  .sidebar .sop-sidebar{display:none;}
 }
 @media (max-width:900px){
   .bloom-strip{grid-template-columns:1fr 1fr;}
@@ -3865,9 +3927,10 @@ body{overscroll-behavior-y:contain;}
   .social-page-header{flex-direction:column;align-items:stretch;}
   .sb-games{padding:4px 6px 8px;}
   .sb-league-head{padding:10px 12px;min-height:44px;}
-  .sidebar{display:none;} /* sidebar hidden on mobile — content only */
+  /* Sidebar now stacks single-column on mobile (Pass J follow-up) — its modules
+     (State of Play, Trending, Briefing, Across) must not vanish on small screens. */
 
-  .pod-page{gap:20px;grid-template-columns:1fr;} /* sidebar is display:none here — collapse the empty 268px track or it forces horizontal overflow */
+  .pod-page{gap:20px;grid-template-columns:1fr;}
   .pod-card{padding:12px;}
   .pod-btn{padding:8px 12px;font-size:var(--fs-meta);min-height:44px;}
   .pod-show-item{padding:12px 0;min-height:44px;}
@@ -3906,18 +3969,16 @@ body{overscroll-behavior-y:contain;}
   .page-grid{grid-template-columns:1fr;gap:20px;}
   .home-hero-row{grid-template-columns:1fr;gap:16px;}
   .home-hero-side{max-width:100%;}
-  .gn-grid{grid-template-columns:1fr 1fr;gap:16px;}
-  /* Use 16/9 aspect + max-height to prevent overflow on iPad portrait (810px) */
-  .gn-card-img,.gn-card-img-ph{aspect-ratio:16/9;height:auto;max-height:170px;}
-  .gn-lead-img{aspect-ratio:16/9;height:auto;max-height:220px;}
-  .gn-lead-title{font-size:26px;}
+  /* iPad: Top Stories is single column — hero full width, secondaries stacked below. */
+  .gn-grid{grid-template-columns:1fr;gap:18px;}
+  .gn-lead-img{aspect-ratio:16/9;height:auto;max-height:300px;}
+  .gn-lead-title{font-size:20px;}
   .gn-lead-solo .gn-lead-title{font-size:28px;}
   .fc-title{font-size:var(--fs-headline);}
   .fc-thumb,.fc-thumb-ph{width:120px;height:90px;}
   .sport-tabs{gap:6px;}
   .sport-tab{padding:7px 12px;font-size:var(--fs-body);}
-  .sidebar{display:none;}
-  /* Show slimmed sidebar on iPad landscape (≥900px) */
+  /* Sidebar stacks below the feed on iPad (styled in the ≤1100px block). */
 }
 
 /* ═══════════════════════════════════════════
@@ -4270,16 +4331,16 @@ kbd{display:inline-block;padding:1px 5px;border:1px solid var(--border);border-r
 }
 .pod-title:hover{color:var(--accent);}
 
-/* gn-grid: editorial card titles use serif */
+/* gn-grid: editorial card titles use serif. Top-Stories-module sizes (Pass G). */
 .gn-lead-title{
   font-family:var(--font-serif);
-  font-size:var(--fs-lead);font-weight:700;line-height:1.2;letter-spacing:-0.2px;
+  font-size:20px;font-weight:700;line-height:1.2;letter-spacing:-0.2px;
   color:var(--text);margin:0 0 10px;
   display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden;
 }
 .gn-card-title{
   font-family:var(--font-serif);
-  font-size:15px;font-weight:700;line-height:1.3;color:var(--text);
+  font-size:15px;font-weight:600;line-height:1.3;color:var(--text);
   display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden;
   margin-bottom:8px;letter-spacing:-0.1px;overflow-wrap:break-word;
 }
@@ -4399,52 +4460,26 @@ kbd{display:inline-block;padding:1px 5px;border:1px solid var(--border);border-r
 .fc-act.explain-on{border-color:#b45309;color:#b45309;background:#fffbeb;}
 
 /* ACTIVE SCORES STRIP — compact live games on General homepage */
-.home-scores{
-  margin-bottom:14px;background:var(--surface);
-  border:1px solid var(--border);border-radius:var(--radius);
-  overflow:hidden;
-}
+/* Homepage strip shares the Sports-page light theme (Pass H item 2). It lives in
+   the light .topbar-scores band, so the band itself is transparent here; only the
+   head + shared .score-tile cards render. */
+.home-scores{background:none;}
 .home-scores-head{
   display:flex;align-items:center;justify-content:space-between;
-  padding:5px 12px;background:var(--navy);
+  padding:0 2px 5px;background:none;
 }
 .home-scores-label{
-  font-size:9px;font-weight:800;color:rgba(255,255,255,0.9);
+  font-size:9px;font-weight:800;color:var(--text2);
   text-transform:uppercase;letter-spacing:0.12em;
   display:flex;align-items:center;gap:6px;
 }
 .home-scores-label::before{content:'●';color:var(--green);font-size:7px;animation:score-pulse 2s ease-in-out infinite;}
 @keyframes score-pulse{0%,100%{opacity:1;}50%{opacity:0.4;}}
 .home-scores-see-all{
-  font-size:10px;font-weight:600;color:rgba(255,255,255,0.6);
+  font-size:10px;font-weight:600;color:var(--text3);
   background:none;border:none;cursor:pointer;font-family:inherit;
 }
-.home-scores-see-all:hover{color:#fff;}
-.home-scores-scroll{
-  display:flex;overflow-x:auto;scrollbar-width:none;gap:0;
-  -webkit-overflow-scrolling:touch;
-}
-.home-scores-scroll::-webkit-scrollbar{display:none;}
-.hs-tile{
-  flex-shrink:0;min-width:112px;padding:6px 11px;
-  border-right:1px solid var(--border2);cursor:pointer;
-  transition:background 0.12s;
-}
-.hs-tile:last-child{border-right:none;}
-/* Followed/favorite team's game — subtle accent highlight, sorted to the front. */
-.hs-tile.fav{border:1px solid var(--accent);border-radius:8px;background:var(--accent-bg);}
-.hs-fav-dot{color:var(--amber);margin-right:4px;}
-.hs-tile:hover{background:var(--surface2);}
-.hs-league{font-size:8px;font-weight:800;color:var(--text3);text-transform:uppercase;letter-spacing:0.08em;margin-bottom:3px;}
-.hs-team-row{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:1px 0;}
-.hs-team-name{font-size:var(--fs-meta);font-weight:600;color:var(--text);flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
-.hs-team-score{font-size:var(--fs-body);font-weight:900;color:var(--text);font-variant-numeric:tabular-nums;min-width:24px;text-align:right;}
-.hs-team-score.winner{color:var(--green);}
-.hs-status{font-size:8px;margin-top:3px;text-transform:uppercase;letter-spacing:0.05em;border-top:1px solid var(--border2);padding-top:3px;}
-.hs-status.live{color:var(--red);font-weight:700;display:flex;align-items:center;gap:4px;}
-.hs-status.live::before{content:'●';animation:score-pulse 1.2s ease-in-out infinite;}
-.hs-status.final{color:var(--text3);}
-.hs-status.pre{color:#3b82f6;}
+.home-scores-see-all:hover{color:var(--accent);}
 
 /* SEARCH RESULTS BANNER */
 .search-results-banner{
@@ -4464,23 +4499,28 @@ kbd{display:inline-block;padding:1px 5px;border:1px solid var(--border);border-r
 .search-results-clear:hover{color:var(--accent);border-color:var(--accent);}
 /* chat styles moved to src/modules/concierge/Concierge.css */
 
-/* ═══ v36: POP CULTURE SUB-TABS ═══ */
+/* ═══ POP CULTURE / ENERGY SUB-TABS — compact icon pills (Pass I item 3).
+   Horizontal scroll instead of wrapping, matching the Sports pill scale. ═══ */
 .pc-subtabs{
-  display:flex;gap:8px;flex-wrap:wrap;
-  padding:8px 0 16px;
+  display:flex;gap:5px;flex-wrap:nowrap;
+  padding:2px 0 12px;
   overflow-x:auto;scrollbar-width:none;
+  -webkit-overflow-scrolling:touch;
 }
 .pc-subtabs::-webkit-scrollbar{display:none;}
 .pc-subtab{
   display:inline-flex;align-items:center;gap:5px;
-  padding:7px 15px;border-radius:22px;
+  padding:5px 12px;border-radius:16px;
   background:var(--surface2);border:1.5px solid var(--border);
-  font-size:12px;font-weight:600;color:var(--text2);
-  cursor:pointer;white-space:nowrap;transition:all 0.14s;
-  font-family:var(--font-sans);
+  font-size:12px;font-weight:700;color:var(--text2);
+  cursor:pointer;white-space:nowrap;flex-shrink:0;transition:all 0.14s;
+  font-family:var(--font-sans);min-height:30px;
 }
+.pc-subtab svg{flex-shrink:0;}
 .pc-subtab:hover{background:var(--surface);color:var(--text);border-color:var(--text3);}
 .pc-subtab.active{background:#db2777;color:#fff;border-color:#db2777;box-shadow:0 2px 8px rgba(219,39,119,0.35);}
+/* Energy reuses the pill component but with its own accent (not Pop Culture pink). */
+.en-subtabs .pc-subtab.active{background:var(--accent);border-color:var(--accent);box-shadow:0 2px 8px var(--accent-bg);}
 @media(max-width:640px){
   .pc-subtab{padding:8px 12px;font-size:12px;min-height:44px;}
 }
@@ -4562,7 +4602,7 @@ kbd{display:inline-block;padding:1px 5px;border:1px solid var(--border);border-r
   .gn-card{flex-direction:row;gap:12px;padding:12px 0;border-bottom:1px solid var(--border2);border-radius:0;}
   .gn-card:last-child{border-bottom:none;}
   .gn-card-img,.gn-card-img-ph{width:100px;height:72px;aspect-ratio:auto;flex-shrink:0;border-radius:6px;}
-  .gn-card-title{font-size:var(--fs-subhead);-webkit-line-clamp:3;font-weight:700;}
+  .gn-card-title{font-size:15px;-webkit-line-clamp:3;font-weight:600;}
   .gn-card-meta{font-size:10px;}
   /* gn-grid on mobile: single column lead only, no grid */
   .gn-grid{grid-template-columns:1fr;}
@@ -4617,8 +4657,6 @@ kbd{display:inline-block;padding:1px 5px;border:1px solid var(--border);border-r
   .gn-lead-img{aspect-ratio:16/7;max-height:180px;}
   .sports-hero-img{aspect-ratio:16/7;max-height:170px;}
   .hero-lead-img{aspect-ratio:16/7;max-height:180px;}
-  .home-scores{margin-left:-12px;margin-right:-12px;border-radius:0;border-left:none;border-right:none;}
-  .hs-tile{min-width:120px;padding:9px 11px;}
   .trending-bar{padding:8px 0 12px;}
   .trending-chip{font-size:10px;padding:4px 9px;}
   /* Mobile trending section — more prominent at top of feed */
@@ -4882,15 +4920,18 @@ kbd{display:inline-block;padding:1px 5px;border:1px solid var(--border);border-r
   font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:0.12em;
   color:var(--text3);
 }
-/* Bento grid: story size reflects priority. The lead spans a 2×2 block; the four
-   secondaries fill the remaining cells. One column on mobile (see media query). */
+/* ONE ROW (Pass G item 4): a tall hero (~53%) on the left + a rail of up to three
+   compact secondaries stacked on the right — never a second row of picture-cards.
+   The hero spans all three rail rows so the module is one band, not a grid of
+   equal boxes. One column on mobile (see media query). */
 .toh-grid{
   display:grid;
-  grid-template-columns:repeat(4,1fr);
-  grid-auto-rows:188px;
+  grid-template-columns:53% 1fr;
+  grid-auto-rows:104px;
   gap:14px;
 }
-.toh-card-lead{grid-column:span 2;grid-row:span 2;}
+.toh-card-lead{grid-column:1;grid-row:1 / span 3;}
+.toh-card:not(.toh-card-lead){grid-column:2;}
 .toh-card{
   position:relative;border-radius:10px;overflow:hidden;
   cursor:pointer;display:block;
@@ -4898,11 +4939,12 @@ kbd{display:inline-block;padding:1px 5px;border:1px solid var(--border);border-r
   transition:transform 0.2s,box-shadow 0.2s;
 }
 .toh-card:hover{transform:translateY(-2px);box-shadow:0 12px 40px rgba(0,0,0,0.22);}
-/* Card height comes from the bento grid rows now, not an aspect-ratio spacer. */
+/* Card height comes from the grid rows now, not an aspect-ratio spacer. */
 .toh-card::before{content:none;}
-.toh-img,.toh-img-ph{
-  position:absolute;inset:0;
-  background-size:cover;background-position:center top;
+.toh-img-ph{position:absolute;inset:0;background-size:cover;background-position:center top;}
+.toh-img{
+  position:absolute;inset:0;width:100%;height:100%;
+  object-fit:cover;object-position:center top;display:block;
 }
 .toh-img-ph{
   display:flex;align-items:center;justify-content:center;
@@ -4938,11 +4980,16 @@ kbd{display:inline-block;padding:1px 5px;border:1px solid var(--border);border-r
   font-size:10px;color:rgba(255,255,255,0.6);
   font-weight:600;font-family:var(--font-sans);
 }
-/* Tablet: 2-col */
-@media(max-width:1000px) and (min-width:641px){
-  .toh-grid{grid-template-columns:repeat(2,1fr);grid-auto-rows:156px;}
-  .toh-card-lead{grid-column:span 2;grid-row:span 2;}
+/* Tablet/iPad: single column — hero on top, then the secondaries stacked. Cap at
+   hero + 2 secondaries so it never becomes a tall wall of picture-cards. */
+@media(max-width:1024px){
+  .toh-grid{grid-template-columns:1fr;grid-auto-rows:168px;}
+  .toh-card-lead{grid-column:auto;grid-row:auto;}
+  /* Secondaries must also drop to the single column — the desktop rule pins them to
+     column 2, which on a 1-col grid creates a phantom column and a blank gap. */
+  .toh-card:not(.toh-card-lead){grid-column:auto;}
   .toh-card-lead .toh-title{font-size:20px;}
+  .toh-card:nth-child(n+4){display:none;}
 }
 /* Mobile: single column, stacking order preserved (lead first). */
 @media(max-width:640px){
@@ -5302,6 +5349,46 @@ function AudioListen({ text, title }) {
 
 
 // ─── ACTIVE SCORES BAR — compact live/final games for General homepage ────────
+// Shared ESPN-style score tile — the SAME card on the homepage strip
+// (ActiveScoresBar) and the Sports-page strip (SportsScoreStrip), so the
+// scoreboard looks like one component everywhere (Pass G item 6). Each strip
+// prepares `_leagueLabel` + `_fav` on the game before handing it here.
+const SCORE_LEAGUE_LABEL = { nfl:'NFL', nba:'NBA', mlb:'MLB', cfb:'CFB', cbb:'CBB' };
+function ScoreTile({ g }) {
+  const live = g.state === 'in';
+  const final = g.state === 'post';
+  const home = g.homeAbbr || g.homeName || 'HOME';
+  const away = g.awayAbbr || g.awayName || 'AWAY';
+  const h = parseInt(g.homeScore) || 0, a = parseInt(g.awayScore) || 0;
+  const homeWin = final && h > a, awayWin = final && a > h;
+  const hideLogo = e => { e.currentTarget.style.visibility = 'hidden'; };
+  return (
+    <div className={`score-tile ${live ? 'live' : ''} ${g._fav ? 'fav' : ''}`}
+      onClick={() => g.link && window.open(g.link, '_blank')}>
+      {g._fav && <span className="score-tile-star">★</span>}
+      {g._leagueLabel && <div className="score-tile-league">{g._leagueLabel}</div>}
+      <div className="score-tile-row">
+        <span className="score-tile-side">
+          {g.awayLogo && <img className="score-tile-logo" src={g.awayLogo} alt="" loading="lazy" onError={hideLogo}/>}
+          <span className={`score-tile-team ${awayWin ? 'win' : final ? 'loss' : ''}`}>{away}</span>
+        </span>
+        <span className={`score-tile-score ${awayWin ? 'win' : final ? 'loss' : ''}`}>{g.awayScore || '—'}</span>
+      </div>
+      <div className="score-tile-row">
+        <span className="score-tile-side">
+          {g.homeLogo && <img className="score-tile-logo" src={g.homeLogo} alt="" loading="lazy" onError={hideLogo}/>}
+          <span className={`score-tile-team ${homeWin ? 'win' : final ? 'loss' : ''}`}>{home}</span>
+        </span>
+        <span className={`score-tile-score ${homeWin ? 'win' : final ? 'loss' : ''}`}>{g.homeScore || '—'}</span>
+      </div>
+      <div className={`score-tile-status ${live ? 'live' : final ? 'final' : 'pre'}`}>
+        {live && <span className="score-tile-dot"/>}
+        {g.status || (final ? 'FINAL' : fmtDate(g.date))}
+      </div>
+    </div>
+  );
+}
+
 function ActiveScoresBar({ scores, onGoToSports, favTeams }) {
   // Followed/favorite teams' games sort to the FRONT and get an accent highlight;
   // then live games; then the rest. `favTeams` is a list of {match} terms built from
@@ -5313,14 +5400,12 @@ function ActiveScoresBar({ scores, onGoToSports, favTeams }) {
     if (!all.length) return [];
     const isLive = g => g.state === 'in';
     return all
-      .map(g => ({ ...g, _fav: !!favoriteInList(g, favTeams || []) }))
+      .map(g => ({ ...g, _fav: !!favoriteInList(g, favTeams || []), _leagueLabel: SCORE_LEAGUE_LABEL[g._league] || (g._league || '').toUpperCase() }))
       .sort((a, b) => ((a._fav ? 0 : 1) - (b._fav ? 0 : 1)) || ((isLive(a) ? 0 : 1) - (isLive(b) ? 0 : 1)))
-      .slice(0, 10);
+      .slice(0, 12);
   }, [scores, favTeams]);
 
   if (!games.length) return null;
-
-  const LEAGUE_LABEL = { nfl:'NFL', nba:'NBA', mlb:'MLB', cfb:'CFB', cbb:'CBB' };
 
   return (
     <div className="home-scores">
@@ -5328,27 +5413,8 @@ function ActiveScoresBar({ scores, onGoToSports, favTeams }) {
         <span className="home-scores-label">Live Scores</span>
         <button className="home-scores-see-all" onClick={onGoToSports}>Sports →</button>
       </div>
-      <div className="home-scores-scroll">
-        {games.map((g, i) => {
-          const homeWin = g.state === 'post' && parseInt(g.homeScore) > parseInt(g.awayScore);
-          const awayWin = g.state === 'post' && parseInt(g.awayScore) > parseInt(g.homeScore);
-          return (
-            <div key={`${g._league}-${i}`} className={`hs-tile ${g._fav ? 'fav' : ''}`} onClick={() => g.link && window.open(g.link, '_blank')}>
-              <div className="hs-league">{g._fav && <span className="hs-fav-dot">★</span>}{LEAGUE_LABEL[g._league] || g._league.toUpperCase()}</div>
-              <div className="hs-team-row">
-                <span className="hs-team-name">{g.awayAbbr || g.awayName}</span>
-                <span className={`hs-team-score ${awayWin ? 'winner' : ''}`}>{g.awayScore || '–'}</span>
-              </div>
-              <div className="hs-team-row">
-                <span className="hs-team-name">{g.homeAbbr || g.homeName}</span>
-                <span className={`hs-team-score ${homeWin ? 'winner' : ''}`}>{g.homeScore || '–'}</span>
-              </div>
-              <div className={`hs-status ${g.state === 'in' ? 'live' : 'final'}`}>
-                {g.state === 'in' ? g.status || 'Live' : 'Final'}
-              </div>
-            </div>
-          );
-        })}
+      <div className="score-strip-scroll home-scores-scroll">
+        {games.map((g, i) => <ScoreTile key={`${g._league}-${i}`} g={g}/>)}
       </div>
     </div>
   );
@@ -6152,7 +6218,8 @@ function Scoreboard({scores, loading, compact=false}) {
 }
 
 // ─── GHOST SIDEBAR ────────────────────────────────────────────────────────────
-function Sidebar({cat, arts, kw, health, activeKw, setActiveKw, activeSource, setActiveSource, onRead, scores, scoresLoading, showScoreboard, recommended, showBriefing, onOpenBriefing, briefingExcludeCats, onTopicOpen}) {
+function Sidebar({cat, arts, kw, health, activeKw, setActiveKw, activeSource, setActiveSource, onRead, scores, scoresLoading, showScoreboard, recommended, showBriefing, onOpenBriefing, briefingExcludeCats, onTopicOpen, trendingItems, isTopicFollowed, toggleTopic, onTrendingOpen,
+  sopItems, sopGapItems, sopMeta, sopCollapsed, onToggleSop, formatDate, acrossSections, onAcrossSeeAll}) {
   const cc = CATS[cat]||CATS.general;
   const catKws = kw[cat]||[];
   const catArts = arts[cat]||[];
@@ -6175,7 +6242,14 @@ function Sidebar({cat, arts, kw, health, activeKw, setActiveKw, activeSource, se
   // Today's Topics: merge user keywords + auto-derived trending topics with counts
   const topicItems = useMemo(() => {
     const autoTopics = getTrendingTopics(catArts, 14);
-    const allLabels = [...new Set([...catKws, ...autoTopics])];
+    // Case-insensitive dedup so "Houston" (keyword) and "houston" (auto-topic)
+    // collapse to one tag; user-keyword casing wins (listed first).
+    const seen = new Set();
+    const allLabels = [];
+    for (const t of [...catKws, ...autoTopics]) {
+      const key = String(t).toLowerCase();
+      if (!seen.has(key)) { seen.add(key); allLabels.push(t); }
+    }
     return allLabels.map(t => ({
       label: t,
       count: catArts.filter(a => (a.title+' '+(a.desc||'')).toLowerCase().includes(t.toLowerCase())).length,
@@ -6204,11 +6278,14 @@ function Sidebar({cat, arts, kw, health, activeKw, setActiveKw, activeSource, se
 
       {showScoreboard && <Scoreboard scores={scores} loading={scoresLoading}/>}
 
-      {/* Trending headlines */}
+      {/* The default "Trending in [cat]" list duplicated the main-column State of Play
+          (same data), so it's removed. This section now renders ONLY when a keyword or
+          source filter is active — a useful contextual list, not a duplicate. */}
+      {(activeKw || activeSource) && (
       <div className="sidebar-section">
         <div className="sidebar-sec-head">
           <span className="sidebar-sec-label">
-            {activeKw ? `${activeKw}` : activeSource ? `${activeSource}` : `Trending in ${cc.label}`}
+            {activeKw ? `${activeKw}` : `${activeSource}`}
           </span>
         </div>
         {sbItems.length === 0
@@ -6224,29 +6301,77 @@ function Sidebar({cat, arts, kw, health, activeKw, setActiveKw, activeSource, se
             ))
         }
       </div>
+      )}
 
-      {/* Today's Topics Panel — always visible, auto-derived + user keywords */}
+      {/* 1) STATE OF PLAY — moved into the sidebar (Pass J item 2), consistent
+            sidebar-module styling, Coverage-Gap rows in a stacked (non-inline) layout. */}
+      {sopItems && !activeKw && !activeSource && (
+        <StateOfPlay variant="sidebar" items={sopItems} gapItems={sopGapItems||[]}
+          meta={sopMeta||cc} onRead={onRead} formatDate={formatDate||fmtDate}
+          collapsed={sopCollapsed} onToggleCollapse={onToggleSop}/>
+      )}
+
+      {/* 2) TRENDING — Trending Now + Today's Topics merged into one module (Pass J
+            item 3): same "what's hot" data, one visual treatment (phrase + count,
+            tap to open the topic hub, star to follow). */}
       {topicItems.length > 0 && (
         <div className="sidebar-section">
           <div className="sidebar-sec-head">
-            <span className="sidebar-sec-label">Today's Topics</span>
+            <span className="sidebar-sec-label">Trending</span>
             {activeKw && <button className="sidebar-sec-action" onClick={()=>setActiveKw(null)}>Clear</button>}
           </div>
           <div className="ttp-chips">
-            {topicItems.map((t, i) => (
-              <span key={i}
-                className={`ttp-chip${activeKw===t.label?' active':''}${t.isSaved?' saved':''}`}
-                style={activeKw===t.label ? {background:cc.color} : {}}
-                onClick={()=>handleTopicClick(t.label)}>
-                {t.label}
-                <span className="ttp-count">{t.count}</span>
-              </span>
-            ))}
+            {topicItems.map((t, i) => {
+              const followed = isTopicFollowed?.(t.label);
+              return (
+                <span key={i}
+                  className={`ttp-chip${activeKw===t.label?' active':''}${t.isSaved?' saved':''}`}
+                  style={activeKw===t.label ? {background:cc.color} : {}}
+                  onClick={()=>handleTopicClick(t.label)}>
+                  {t.label}
+                  <span className="ttp-count">{t.count}</span>
+                  {toggleTopic && (
+                    <button className={`ttp-chip-star${followed?' on':''}`}
+                      onClick={e=>{e.stopPropagation();toggleTopic(t.label);}}
+                      aria-label={followed?'Unfollow topic':'Follow topic'}>{followed?'★':'☆'}</button>
+                  )}
+                </span>
+              );
+            })}
           </div>
         </div>
       )}
 
-      {/* Sources — collapsible pill grid */}
+      {/* 3) TODAY'S BRIEFING — its own module (Pass J item 3): pulls from followed
+            morning-email/newsletter sources, distinct from State of Play. BriefingTeaser
+            already renders a consistent .sidebar-section with its own label. */}
+      {showBriefing && (
+        <BriefingTeaser arts={arts} excludeCats={briefingExcludeCats||[]} onOpenFull={onOpenBriefing} compact={true}/>
+      )}
+
+      {/* 4) ACROSS MYNEWSHUB — cross-category recirculation, moved into the sidebar
+            (Pass J item 4), General only. Text-only compact rows for the narrow column. */}
+      {acrossSections && acrossSections.length > 0 && !activeKw && !activeSource && (
+        <div className="sidebar-section sb-across">
+          <div className="sidebar-sec-head"><span className="sidebar-sec-label">Across MyNewsHub</span></div>
+          {acrossSections.slice(0, 4).map(section => (
+            <div key={section.cat} className="sb-across-cat">
+              <button className="sb-across-clabel" style={{color:section.cc.color}} onClick={()=>onAcrossSeeAll(section.cat)}>
+                {section.cc.label} →
+              </button>
+              {section.items.slice(0, 2).map((a, i) => (
+                <div key={i} className="sb-across-item" onClick={()=>onRead(a)}>
+                  <div className="sb-across-title">{a.title}</div>
+                  <div className="sb-across-src">{a.source} · {(formatDate||fmtDate)(a.pubDate)}</div>
+                </div>
+              ))}
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* 5) SOURCES — collapsed by default; kept so source filter/health stays reachable
+            without opening Customize. */}
       {sources.length > 0 && (
         <div className="sidebar-section">
           <div className="sidebar-sec-head">
@@ -6282,30 +6407,6 @@ function Sidebar({cat, arts, kw, health, activeKw, setActiveKw, activeSource, se
               )}
             </>
           )}
-        </div>
-      )}
-
-      {/* v36: For You — personalized recommendations based on reading/search history */}
-      {recommended && recommended.length > 0 && (
-        <div className="sidebar-section rec-section">
-          <div className="sidebar-sec-head">
-            <span className="sidebar-sec-label">For You</span>
-            <span className="rec-section-sub">Based on your interests</span>
-          </div>
-          {recommended.slice(0, 5).map((a, i) => (
-            <div key={i} className="rec-row" onClick={()=>onRead(a)}>
-              {a.img && <div className="rec-thumb" style={{backgroundImage:`url(${a.img})`}}/>}
-              <div className="rec-body">
-                <div className="rec-title">{a.title}</div>
-                <div className="rec-src">{a.source} · {fmtDate(a.pubDate)}</div>
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
-      {showBriefing && (
-        <div className="sidebar-briefing-wrap">
-          <BriefingTeaser arts={arts} excludeCats={briefingExcludeCats||[]} onOpenFull={onOpenBriefing} compact={true}/>
         </div>
       )}
     </div>
@@ -7021,9 +7122,11 @@ function MiniScoreboardStrip({ scores, onOpen }) {
 // Click any tile → opens ESPN game page.
 function SportsScoreStrip({ scores, teams }) {
   const tiles = useMemo(() => {
-    const all = Object.values(scores || {}).flat().filter(isGameActive);
+    // Keep each game's league key so the shared tile can show a consistent badge.
+    const all = Object.entries(scores || {})
+      .flatMap(([key, gs]) => (gs || []).map(g => ({ ...g, _league: key })))
+      .filter(isGameActive);
     if (!all.length) return [];
-    const isLive = g => g.state === 'in';
     const isFav  = g => !!favoriteInList(g, teams);
     // Chronological: live first, upcoming by start time, finals by recency; favs float up within each group
     return [...all].sort((a, b) => {
@@ -7035,7 +7138,8 @@ function SportsScoreStrip({ scores, teams }) {
       const ta = a.date ? new Date(a.date).getTime() : 0;
       const tb = b.date ? new Date(b.date).getTime() : 0;
       return stateOrd(a) === 2 ? tb - ta : ta - tb; // finals newest first; live/upcoming earliest first
-    }).slice(0, 14);
+    }).slice(0, 14)
+      .map(g => ({ ...g, _fav: isFav(g), _leagueLabel: SCORE_LEAGUE_LABEL[g._league] || (g._league || '').toUpperCase() }));
   }, [scores, teams]);
 
   if (tiles.length === 0) return (
@@ -7046,36 +7150,8 @@ function SportsScoreStrip({ scores, teams }) {
 
   return (
     <div className="sports-score-strip">
-      <div className="sports-score-strip-inner">
-        {tiles.map(g => {
-          const live = g.state === 'in';
-          const final = g.state === 'post';
-          const fav = favoriteInList(g, teams);
-          const home = g.homeAbbr || g.homeName || 'HOME';
-          const away = g.awayAbbr || g.awayName || 'AWAY';
-          const h = parseInt(g.homeScore)||0, a = parseInt(g.awayScore)||0;
-          const homeWin = final && h>a, awayWin = final && a>h;
-          return (
-            <div key={g.id}
-              className={`sst-tile ${live?'live':''} ${fav?'fav':''}`}
-              onClick={()=>g.link && window.open(g.link, '_blank')}>
-              {fav && <span className="sst-fav-star">★</span>}
-              {g.league && <div className="sst-league-badge">{g.league.toUpperCase()}</div>}
-              <div className="sst-row">
-                <span className={`sst-team ${awayWin?'win':final?'loss':''}`}>{away}</span>
-                <span className={`sst-score ${awayWin?'win':final?'loss':''}`}>{g.awayScore || '—'}</span>
-              </div>
-              <div className="sst-row">
-                <span className={`sst-team ${homeWin?'win':final?'loss':''}`}>{home}</span>
-                <span className={`sst-score ${homeWin?'win':final?'loss':''}`}>{g.homeScore || '—'}</span>
-              </div>
-              <div className={`sst-status ${live?'live':final?'final':'pre'}`}>
-                {live && <span className="sst-live-dot"/>}
-                {g.status || (final?'FINAL':fmtDate(g.date))}
-              </div>
-            </div>
-          );
-        })}
+      <div className="score-strip-scroll sports-score-strip-inner">
+        {tiles.map(g => <ScoreTile key={g.id} g={g}/>)}
       </div>
     </div>
   );
@@ -7185,7 +7261,8 @@ function LastUpdated({ timestamp, onRefresh }) {
 function TopBar({tab, setTab, search, setSearch, dark, setDark,
                  onCustomize, onRefresh, breakingItems, onTickerClick,
                  hidden, shrunk, mobileSearchOpen, onMobileSearchToggle, weatherCities, hiddenIndices,
-                 onAnalyze, searchHistory, trendingTopics, onAccount, signedIn}) {
+                 onAnalyze, searchHistory, trendingTopics, onAccount, signedIn,
+                 scores, favTeams, onGoToSports}) {
   const [searchFocused, setSearchFocused] = useState(false);
   const [quotes, setQuotes] = useState({});
   const [showBreaking, setShowBreaking] = useState(true);
@@ -7206,8 +7283,8 @@ function TopBar({tab, setTab, search, setSearch, dark, setDark,
   const tickerItems = hasBreaking?[...breakingItems,...breakingItems]:[];
 
   // v24a: Desktop nav per user: General · Business · Markets · Bloom · Sports · Pop Culture · Briefing · Podcasts · Saved
-  const ALL_TABS = ['general','business','finance','tech','sports','health','popculture','briefing','podcasts','sources','saved'];
-  const TAB_LABELS = {business:'Business & Energy',finance:'Markets',tech:'AI & Tech',health:'Health',popculture:'Pop Culture',podcasts:'Podcasts',sources:'Sources',saved:'Saved',briefing:'Briefing'};
+  const ALL_TABS = ['general','business','bloom','tech','sports','health','popculture','briefing','podcasts','sources','saved'];
+  const TAB_LABELS = {business:'Business & Markets',bloom:'Energy',finance:'Markets',tech:'AI & Tech',health:'Health',popculture:'Pop Culture',podcasts:'Podcasts',sources:'Sources',saved:'Saved',briefing:'Briefing'};
   const TAB_CLASS  = {general:'t-general',sports:'t-sports',business:'t-business',finance:'t-finance',bloom:'t-bloom',tech:'t-tech',popculture:'t-popculture',podcasts:'t-podcasts'};
 
   // v24a Mobile chip bar per user: General · Business · Markets · Energy · Sports · Pop Culture
@@ -7215,7 +7292,7 @@ function TopBar({tab, setTab, search, setSearch, dark, setDark,
   const MOBILE_CHIPS = [
     { key:'general',    label:'News',       color:CATS.general.color },
     { key:'business',   label:'Business',   color:CATS.business.color },
-    { key:'finance',    label:'Markets',    color:CATS.finance.color },
+    { key:'bloom',      label:'Energy',     color:CATS.bloom.color },
     { key:'tech',       label:'AI & Tech',  color:CATS.tech.color },
     { key:'sports',     label:'Sports',     color:CATS.sports.color },
     { key:'health',     label:'Health',     color:CATS.health.color },
@@ -7278,6 +7355,14 @@ function TopBar({tab, setTab, search, setSearch, dark, setDark,
         <div className="topbar-wx"><RightNowWeather cities={weatherCities}/></div>
       )}
 
+      {/* Scoreboard sits below weather and above the category nav (Pass G item 3).
+          Self-hides when nothing is live; collapses when the header shrinks on scroll. */}
+      {tab==='general' && (
+        <div className="topbar-scores">
+          <ActiveScoresBar scores={scores} favTeams={favTeams} onGoToSports={onGoToSports}/>
+        </div>
+      )}
+
       {/* ━━━ DESKTOP: nav bar ━━━ */}
       <div className="nav-bar">
         <div className="nav-bar-inner">
@@ -7287,7 +7372,7 @@ function TopBar({tab, setTab, search, setSearch, dark, setDark,
           </div>
           <div className="nav-tabs">
             {ALL_TABS.map(t=>(
-              <button key={t} className={`nav-tab ${TAB_CLASS[t]||''} ${tab===t?'active':''}`}
+              <button key={t} className={`nav-tab ${TAB_CLASS[t]||''} ${(tab===t || (t==='business' && tab==='finance'))?'active':''}`}
                 onClick={()=>{setTab(t);setSearch('');}}>
                 {TAB_LABELS[t]||(t.charAt(0).toUpperCase()+t.slice(1))}
               </button>
@@ -7455,16 +7540,14 @@ function RightNowWeather({ cities }) {
 // ─── HOUSTON (Home-only local news row) ───────────────────────────────────────
 // Filters the already-loaded feed to local Houston sources.
 const HOUSTON_SOURCES = ['KHOU Houston', 'Chron.com', 'Click2Houston', 'Houston Public Media', 'Houston Chronicle'];
-function HoustonRow({ arts, onRead, formatDate }) {
-  const items = useMemo(() => {
-    const seen = new Set();
-    return Object.values(arts || {}).flat()
-      .filter(a => HOUSTON_SOURCES.includes(a.source))
-      .filter(a => { const k = (a.title || '').slice(0, 60); if (seen.has(k)) return false; seen.add(k); return true; })
-      .sort((a, b) => new Date(b.pubDate) - new Date(a.pubDate))
-      .slice(0, 6);
-  }, [arts]);
-  if (items.length < 2) return null;
+// Cross-module dedup identity: a normalized title key (same convention as dedupe()),
+// so the same story is caught across modules even when different sources give it
+// different URLs (e.g. a clustered State-of-Play item vs the raw Houston-source item).
+const storyKey = a => (((a && a.title) || '').slice(0, 60).toLowerCase().replace(/\s+/g, ''));
+function HoustonRow({ items, onRead, formatDate }) {
+  // Items are computed by the caller (FeedPage) so they share the page's
+  // cross-module dedup set (Pass I item 1).
+  if (!items || items.length < 2) return null;
   return (
     <section className="houston-row">
       <div className="houston-head"><span className="houston-label">Houston</span><span className="houston-sub">Local</span></div>
@@ -7481,31 +7564,75 @@ function HoustonRow({ arts, onRead, formatDate }) {
   );
 }
 
+// ─── ACROSS MYNEWSHUB ─────────────────────────────────────────────────────────
+// Cross-category recirculation: a few stories from each other category. Rendered
+// high on the General page (right after State of Play) so it's actually reached
+// (Pass H item 6). Thumbnails use the placeholder-under-<img> pattern so a broken
+// image URL falls back cleanly instead of leaving a grey box.
+function AcrossHub({ sections, onRead, onSeeAll, formatDate }) {
+  if (!sections || !sections.length) return null;
+  return (
+    <div className="other-cat-sections">
+      <div className="other-cat-divider"><span>Across MyNewsHub</span></div>
+      {sections.map(section => (
+        <section key={section.cat} className="other-cat-section">
+          <div className="other-cat-head">
+            <span className="other-cat-label" style={{ color: section.cc.color }}>
+              {section.cc.emoji} {section.cc.label}
+            </span>
+            <button className="other-cat-link" onClick={() => onSeeAll(section.cat)}>
+              See all in {section.cc.label} →
+            </button>
+          </div>
+          {section.items.map((a, i) => (
+            <div key={a.link || i} className="gf-item" onClick={() => onRead(a)}>
+              <div className="gf-thumb-wrap">
+                <div className="gf-thumb-ph"/>
+                {a.img && <img className="gf-thumb-img" src={a.img} alt="" loading="lazy"
+                  onError={e => { e.currentTarget.style.display = 'none'; }}/>}
+              </div>
+              <div className="gf-body">
+                <div className="gf-title">{a.title}</div>
+                <div className="gf-meta">
+                  <span>{a.source}</span><span>·</span><span>{formatDate(a.pubDate)}</span>
+                </div>
+              </div>
+            </div>
+          ))}
+        </section>
+      ))}
+    </div>
+  );
+}
+
 // ─── MAIN APP ─────────────────────────────────────────────────────────────────
 // ChatBot now lives in ./modules/concierge
 
 // ─── TOP OF HOUR STRIP ────────────────────────────────────────────────────────
-function TopOfHourStrip({ catLead, arts, onRead }) {
+function TopOfHourStrip({ catLead, arts, onRead, stories: storiesProp }) {
   const stories = useMemo(() => {
+    // Caller (FeedPage) computes the picks for cross-module dedup and passes them
+    // here so the strip shows exactly the deduped set; fall back to self-compute.
+    if (storiesProp) return storiesProp;
     const picks = catLead && catLead.img ? [catLead] : (catLead ? [] : []);
     const used = new Set(catLead ? [catLead.link] : []);
     const catOrder = ['sports','business','finance','bloom','popculture','general','tech'];
-    // Two passes so the bento fills to 5: one per category first (variety), then
-    // top up from any category if some feeds were empty.
+    // One row: hero + up to 3 secondaries (4 total). Two passes — one per category
+    // first (variety), then top up from any category if some feeds were empty.
     for (const c of catOrder) {
-      if (picks.length >= 5) break;
+      if (picks.length >= 4) break;
       const item = (arts[c]||[]).find(a => a.img && !used.has(a.link));
       if (item) { picks.push({...item, cat: item.cat||c}); used.add(item.link); }
     }
     for (const c of catOrder) {
-      if (picks.length >= 5) break;
+      if (picks.length >= 4) break;
       for (const a of (arts[c]||[])) {
-        if (picks.length >= 5) break;
+        if (picks.length >= 4) break;
         if (a.img && !used.has(a.link)) { picks.push({...a, cat: a.cat||c}); used.add(a.link); }
       }
     }
-    return picks.slice(0,5);
-  }, [catLead, arts]);
+    return picks.slice(0,4);
+  }, [catLead, arts, storiesProp]);
   if (stories.length < 1) return null;
   return (
     <div className="toh-strip">
@@ -7517,9 +7644,11 @@ function TopOfHourStrip({ catLead, arts, onRead }) {
           const cc = CATS[a.cat] || CATS.general;
           return (
             <article key={i} className={`toh-card${i===0?' toh-card-lead':''}`} onClick={() => onRead(a)}>
-              {a.img
-                ? <div className="toh-img" style={{backgroundImage:`url(${a.img})`}}/>
-                : <div className="toh-img-ph"><span className="ph-label">{a.source}</span></div>}
+              {/* Placeholder sits underneath; the real image loads on top and hides
+                  itself if the URL fails, so a broken image never leaves a grey slot. */}
+              <div className="toh-img-ph"><span className="ph-label">{a.source}</span></div>
+              {a.img && <img className="toh-img" src={a.img} alt="" loading="lazy"
+                onError={e => { e.currentTarget.style.display = 'none'; }}/>}
               <div className="toh-grad"/>
               <div className="toh-body">
                 <span className="toh-cat" style={{background:cc.color}}>{cc.label}</span>
@@ -7783,8 +7912,8 @@ function AuthModal({ onClose, onSend, status, email, setEmail, userId, onSignOut
 }
 
 export default function App() {
-  const [tab, setTab]           = useState(()=>{ const c=parseRoute().category; return c==='bloom'?'business':c; });
-  const [subcat, setSubcat]     = useState(()=>{ const r=parseRoute(); return r.category==='bloom'?'energy':r.subcategory; }); // URL-driven subcategory
+  const [tab, setTab]           = useState(()=>parseRoute().category);
+  const [subcat, setSubcat]     = useState(()=>parseRoute().subcategory); // URL-driven subcategory
   const [tertiary, setTertiary] = useState(()=>parseRoute().tertiary);    // URL-driven team (Tier 3)
   const [myTeams, setMyTeams]   = useState(()=>ld('myTeams', []));        // followed teams {name,league,slug}
   const toggleMyTeam = (t) => setMyTeams(prev => {
@@ -7817,6 +7946,36 @@ export default function App() {
   const [kw, setKw]             = useState(()=>ld('kw',DEFAULT_KW));
   const [alerts, setAlerts]     = useState(()=>ld('alerts',['Texans','Astros','Kentucky','Clemson','ERCOT','Bloom Energy','fuel cell','hurricane','earthquake','breaking']));
   const [feeds, setFeeds]       = useState(()=>ld('feeds',DEFAULT_FEEDS));
+  // ── FOLLOW-A-SOURCE-FROM-FEED (Pass G item 7) ───────────────────────────────
+  // "Followed" = present and enabled in any category's feed list (the same list
+  // Customize manages). followSource enables an existing entry or, if the source
+  // is new (e.g. a Coverage Gap outlet), appends it to the active tab's list.
+  const isSourceFollowed = useCallback((name) => {
+    if (!name) return true;
+    const n = name.trim().toLowerCase();
+    return Object.values(feeds || {}).some(list =>
+      (list || []).some(f => f.on && (f.name || '').trim().toLowerCase() === n));
+  }, [feeds]);
+  const followSource = useCallback((name, url = '') => {
+    if (!name) return;
+    const n = name.trim().toLowerCase();
+    setFeeds(prev => {
+      const next = JSON.parse(JSON.stringify(prev || {}));
+      let found = false;
+      for (const c of Object.keys(next)) {
+        for (const f of (next[c] || [])) {
+          if ((f.name || '').trim().toLowerCase() === n) { f.on = true; found = true; }
+        }
+      }
+      if (!found) {
+        const cat = tab || 'general';
+        if (!next[cat]) next[cat] = [];
+        next[cat].push({ name, url: url || SOURCE_URLS[name] || '', on: true, tier: 'reported' });
+      }
+      sv('feeds', next);
+      return next;
+    });
+  }, [tab]);
   const [urgent, setUrgent]     = useState(()=>ld('urgent',DEFAULT_URGENT));
   const [watchlist, setWatchlist]= useState(()=>ld('watchlist',DEFAULT_WATCHLIST));
   // v23: customizable favorite teams. Defaults to SCORE_TEAMS; user can add/remove via Customize.
@@ -8247,8 +8406,6 @@ export default function App() {
   // Phase 2: apply a route (category + optional subcategory) to app state and
   // refetch the feed. Called both by navigate() (user clicks) and popstate (back).
   const applyRoute = (category, subcategory, tertiary) => {
-    // Business + Energy merged: Energy is now a filter pill within Business, not a top-level category.
-    if (category === 'bloom') { subcategory = (subcategory && subcategory !== 'all') ? subcategory : 'energy'; category = 'business'; }
     setTab(category); setSubcat(subcategory || null); setTertiary(tertiary || null);
     setSearch('');setActiveKw(null);setActiveSrc(null);
     setMobileSearchOpen(false);
@@ -8257,14 +8414,13 @@ export default function App() {
     if (CAT_TABS.includes(category)) setLastFeedTab(category);
     // Refetch feed whenever the category changes (or first visit).
     if(!['saved','podcasts','social','sources'].includes(category)&&!(arts[category]||[]).length)loadCat(category);
-    if(category==='business'&&!(arts.bloom||[]).length)loadCat('bloom'); // Energy feeds power the merged page
+    if(category==='business'&&!(arts.finance||[]).length)loadCat('finance'); // Markets news powers the merged Business+Markets "All" view
     if(category==='finance')loadMarketData();
   };
 
   // Phase 2/5: the URL is the single source of truth. navigate() writes the path
   // (/:category/:subcategory?/:team?), then applies it. Chips call this, never local state.
   const navigate = (category, subcategory=null, tertiary=null) => {
-    if (category === 'bloom') { subcategory = (subcategory && subcategory !== 'all') ? subcategory : 'energy'; category = 'business'; }
     const path = buildPath(category, subcategory, tertiary);
     if (typeof window!=='undefined' && window.location.pathname !== path) {
       window.history.pushState({category,subcategory,tertiary}, '', path);
@@ -8324,7 +8480,7 @@ export default function App() {
     return { total, topSources, topCats };
   }, [clicks, readLinks, arts]);
 
-  const NEWS_CATS = ['general','sports','business','tech','popculture','comedy','health'];
+  const NEWS_CATS = ['general','sports','business','bloom','tech','popculture','comedy','health'];
   const homeTrendingTopics = useMemo(() => getTrendingTopics(arts), [arts]);
 
   // ─── FEED PAGE ─────────────────────────────────────────────────────────
@@ -8349,6 +8505,9 @@ export default function App() {
     const toggleSop = () => setSopCollapsed(v => { const nx = !v; sv('sopCollapsed_sports', nx); return nx; });
     const [sportWebResults, setSportWebResults] = useState([]);
     const [sportWebLoading, setSportWebLoading] = useState(false);
+    // Coverage-Gap stories for the active team, folded into the team's State of
+    // Play list as tagged rows (Pass G item 9) — no standalone panel.
+    const [teamGapItems, setTeamGapItems] = useState([]);
 
     // v36: Fetch web results when a specific league tab is active
     useEffect(() => {
@@ -8437,6 +8596,17 @@ export default function App() {
     }, [teamName, allItems]);
     const teamHero = teamItems.find(a => a.img) || null;
 
+    // Fetch the team's Coverage-Gap items (widely-covered team news the reader's
+    // own sports sources missed) to fold into the team State of Play list.
+    useEffect(() => {
+      let alive = true;
+      if (!teamName) { setTeamGapItems([]); return () => { alive = false; }; }
+      const srcs = (feeds.sports || []).filter(f => f.on).map(f => f.name);
+      fetchDiscover('sports', [teamName], srcs).then(r => { if (alive) setTeamGapItems((r && r.items) || []); });
+      return () => { alive = false; };
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [teamName]);
+
     const heroItems = sportItems.filter(a => a.img);
     const lead = heroItems[0] || null;
     // Exclude the hero by object identity (not link equality): in sparse/out-of-
@@ -8445,16 +8615,19 @@ export default function App() {
     let feedItems = lead ? sportItems.filter(a => a !== lead) : sportItems;
     if (feedItems.length === 0 && sportItems.length > 0) feedItems = sportItems; // never blank when stories exist
 
+    // League pills are text-only (Pass J item 7): lucide-react has no per-league
+    // glyphs and emoji rendered inconsistently. Team pills below carry real icons
+    // (TeamLogo). "All" gets a lucide Trophy so the leading pill still reads as sports.
     const SPORT_TABS = [
-      { key:'all',    label:'All' },
-      { key:'nfl',    label:'NFL',            emoji:'' },
-      { key:'nba',    label:'NBA',            emoji:'' },
-      { key:'mlb',    label:'MLB',            emoji:'' },
-      { key:'cfb',    label:'NCAAF',          emoji:'' },
-      { key:'cbb',    label:'NCAAB',          emoji:'' },
-      { key:'cbase',  label:'College Baseball',emoji:'' },
-      { key:'racing', label:'Horse Racing',   emoji:'' },
-      { key:'golf',   label:'Golf',           emoji:'' },
+      { key:'all',    label:'All',             icon:Trophy },
+      { key:'nfl',    label:'NFL' },
+      { key:'nba',    label:'NBA' },
+      { key:'mlb',    label:'MLB' },
+      { key:'cfb',    label:'NCAAF' },
+      { key:'cbb',    label:'NCAAB' },
+      { key:'cbase',  label:'College Baseball' },
+      { key:'racing', label:'Horse Racing' },
+      { key:'golf',   label:'Golf' },
     ];
 
     // Keep the active subcategory chip scrolled into view (on load + on change).
@@ -8491,7 +8664,7 @@ export default function App() {
             <button key={t.key}
               className={`sport-tab ${sportTab===t.key?'active':''}`}
               onClick={()=>{setSportTab(t.key); setActiveTeam(null); setTimeout(scrollToFeed,80);}}>
-              {t.emoji && <span className="sport-tab-emoji">{t.emoji}</span>}
+              {t.icon && <t.icon size={14} strokeWidth={2.2}/>}
               {t.label}
             </button>
           ))}
@@ -8506,7 +8679,7 @@ export default function App() {
               <button key={(t.team||'')+i}
                 className={`sport-tab ${activeTeam && activeTeam.team===t.team && activeTeam.league===t.league ? 'active' : ''}`}
                 onClick={()=>{ setActiveTeam(activeTeam && activeTeam.team===t.team ? null : t); setTimeout(scrollToFeed,80); }}>
-                {t.emoji && <span className="sport-tab-emoji">{t.emoji}</span>}
+                <TeamLogo name={t.team} league={t.league} size={16}/>
                 {t.team}
               </button>
             ))}
@@ -8523,6 +8696,7 @@ export default function App() {
               const s = teamSlug(n);
               return (
                 <button key={s} className={`sport-tab ${tertiary===s?'active':''}`} onClick={()=>navigate('sports', sportTab, s)}>
+                  <TeamLogo name={n} league={sportTab} size={16}/>
                   {n}
                 </button>
               );
@@ -8550,14 +8724,12 @@ export default function App() {
             </div>
             <div className="page-grid">
               <div className="feed-col">
+                {/* Coverage Gap is folded into this list as "Not in your sources" rows
+                    (Pass G item 9) — no standalone "You may be missing this" panel. */}
                 <StateOfPlay items={teamItems} meta={CATS.sports} onRead={onRead} formatDate={fmtDate}
-                  collapsed={sopCollapsed} onToggleCollapse={toggleSop}/>
+                  collapsed={sopCollapsed} onToggleCollapse={toggleSop} gapItems={teamGapItems}/>
                 <TrendingPills label={`Trending · ${teamName}`} items={teamItems} onOpen={t=>setSearch(t.toLowerCase())} isTopicFollowed={isTopicFollowed} toggleTopic={toggleTopic}/>
                 <SourcesDisagree topic={teamName} items={teamItems}/>
-                {/* Same Coverage Gap mechanism: outside coverage of this team the reader's
-                    own sources missed (widely covered, capped at 'reported' tier). */}
-                <CoverageGap category="sports" keywords={[teamName]}
-                  followedSources={(feeds.sports||[]).filter(f=>f.on).map(f=>f.name)}/>
                 {teamItems.length === 0
                   ? <div className="empty-state"><div className="empty-icon"></div><div className="empty-msg">No recent stories for {teamName}</div><button className="refresh-btn" onClick={()=>loadCat('sports')}>Refresh</button></div>
                   : <div className="snap-feed">
@@ -8572,7 +8744,8 @@ export default function App() {
               <Sidebar cat="sports" arts={arts} kw={kw} health={health}
                 activeKw={activeKw} setActiveKw={k=>{setActiveKw(k);setActiveSrc(null);}}
                 activeSource={activeSrc} setActiveSource={s=>{setActiveSrc(s);setActiveKw(null);}}
-                onRead={onRead} scores={scores} scoresLoading={scoresLoading} showScoreboard={false}/>
+                onRead={onRead} scores={scores} scoresLoading={scoresLoading} showScoreboard={false}
+                isTopicFollowed={isTopicFollowed} toggleTopic={toggleTopic}/>
             </div>
           </>
         )}
@@ -8618,11 +8791,7 @@ export default function App() {
           </div>
         )}
 
-        {/* ── STATE OF PLAY — collapsible top-stories block (shared shell), main list view ── */}
-        {!teamName && !activeTeam && !activeSrc && !search && (
-          <StateOfPlay items={sportItems} meta={CATS.sports} onRead={onRead} formatDate={fmtDate}
-            collapsed={sopCollapsed} onToggleCollapse={toggleSop}/>
-        )}
+        {/* State of Play moved into the sidebar (Pass J item 2). */}
 
         {/* ── HERO + FEED ── */}
         {!teamName && <div className="page-grid" ref={feedRef}>
@@ -8751,7 +8920,10 @@ export default function App() {
             activeKw={activeKw} setActiveKw={k=>{setActiveKw(k);setActiveSrc(null);}}
             activeSource={activeSrc} setActiveSource={s=>{setActiveSrc(s);setActiveKw(null);}}
             onRead={onRead} scores={scores} scoresLoading={scoresLoading}
-            showScoreboard={false} recommended={recommended}/>
+            showScoreboard={false} recommended={recommended}
+            isTopicFollowed={isTopicFollowed} toggleTopic={toggleTopic}
+            sopItems={!activeTeam && !activeSrc && !search ? sportItems : null}
+            sopMeta={CATS.sports} sopCollapsed={sopCollapsed} onToggleSop={toggleSop} formatDate={fmtDate}/>
         </div>}
       </div>
     );
@@ -8807,21 +8979,20 @@ export default function App() {
     const toggleSop = () => setSopCollapsed(v => { const nx = !v; sv('sopCollapsed_'+cat, nx); return nx; });
     // Business + Energy merged into one category with All / Business / Energy filter pills.
     const isMergedBiz = cat === 'business';
+    // Business + Markets merged: 'all' shows business + markets NEWS combined; 'business'
+    // shows business only; the 'Markets' pill navigates to the full Markets page (FinancePage).
     const bizFilter = isMergedBiz ? (subcat || 'all') : 'all';
-    const setBizFilter = (key) => navigate('business', key === 'all' ? null : key);
-    const BIZ_TABS = [{key:'all',label:'All'},{key:'business',label:'Business'},{key:'energy',label:'Energy'}];
     useEffect(() => {
-      if (cat === 'business' && !(arts.bloom||[]).length && !loading.bloom) loadCat('bloom');
+      if (cat === 'business' && !(arts.finance||[]).length && !loading.finance) loadCat('finance');
       // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [cat]);
     // Apply story clustering before sorting so cluster metadata is available
     const rawItems = isMergedBiz
       ? (bizFilter === 'business' ? sorted('business')
-         : bizFilter === 'energy' ? sorted('bloom')
-         : [...sorted('business'), ...sorted('bloom')].sort((a,b)=>new Date(b.pubDate)-new Date(a.pubDate)))
+         : [...sorted('business'), ...sorted('finance')].sort((a,b)=>new Date(b.pubDate)-new Date(a.pubDate)))
       : sorted(cat);
     const items=useMemo(()=>clusterStories(rawItems),[rawItems]);
-    const isLoading = isMergedBiz ? (loading.business || loading.bloom) : loading[cat];
+    const isLoading = isMergedBiz ? (loading.business || loading.finance) : loading[cat];
 
     // Phase 2: subcategory is URL-driven (never local state). Chips navigate.
     const pcSubTab = cat === 'popculture' ? (subcat || 'all') : 'all';
@@ -8832,13 +9003,16 @@ export default function App() {
     const [pcWebLoading, setPcWebLoading] = useState(false);
     const [enWebResults, setEnWebResults] = useState([]);
     const [enWebLoading, setEnWebLoading] = useState(false);
+    // Coverage-Gap stories, folded into the State of Play list as tagged rows
+    // (Home + merged Business/Markets only). No standalone "You may be missing this" panel.
+    const [gapItems, setGapItems] = useState([]);
 
     const PC_SUBTABS = [
-      { key:'all',         label:'All',         emoji:'' },
-      { key:'shows',       label:'Shows/Movies', emoji:'' },
-      { key:'music',       label:'Music',        emoji:'' },
-      { key:'books',       label:'Books',        emoji:'' },
-      { key:'comedy',      label:'Comedy',       emoji:'' },
+      { key:'all',         label:'All',          icon:LayoutGrid },
+      { key:'shows',       label:'Shows/Movies', icon:Film },
+      { key:'music',       label:'Music',        icon:Music },
+      { key:'books',       label:'Books',        icon:BookOpen },
+      { key:'comedy',      label:'Comedy',       icon:Laugh },
     ];
     const PC_KWS = {
       shows:  ['movie','film','tv','streaming','netflix','hbo','disney','show','series','premiere','season','episode','cinema','trailer','oscar','emmy','golden globe'],
@@ -8848,12 +9022,12 @@ export default function App() {
     };
 
     const EN_SUBTABS = [
-      { key:'all',     label:'All',           emoji:'' },
-      { key:'power',   label:'Power',         emoji:'' },
-      { key:'oilgas',  label:'Oil & Gas',     emoji:'' },
-      { key:'clean',   label:'Clean Energy',  emoji:'' },
-      { key:'markets', label:'Markets',       emoji:'' },
-      { key:'policy',  label:'Policy',        emoji:'' },
+      { key:'all',     label:'All',           icon:LayoutGrid },
+      { key:'power',   label:'Power',         icon:Zap },
+      { key:'oilgas',  label:'Oil & Gas',     icon:Droplet },
+      { key:'clean',   label:'Clean Energy',  icon:Leaf },
+      { key:'markets', label:'Markets',       icon:TrendingUp },
+      { key:'policy',  label:'Policy',        icon:Scale },
     ];
     const EN_KWS = {
       power:   ['power','electric','grid','utility','electricity','megawatt','kilowatt','nuclear','coal','natural gas','transmission','substation','generation','powerplant','baseload'],
@@ -8915,6 +9089,88 @@ export default function App() {
     const isHome = cat === 'general';
     const catKws = kw[cat] || [];
 
+    // ── CROSS-MODULE DEDUP (Pass I item 1) ──────────────────────────────────────
+    // A story placed in a top-of-page module is excluded from every other module
+    // on the SAME page — on every category, not just General. Priority order:
+    // Top Stories → State of Play → Houston → main feed.
+    const topStoryItems = useMemo(() => {
+      if (isHome) {
+        // Home Top Stories = TopOfHourStrip picks (catLead + cross-category images).
+        // Mirror its selection exactly so State of Play + the feed exclude what it
+        // actually shows — otherwise the hero repeats as State of Play #1.
+        const picks = catLead && catLead.img ? [catLead] : [];
+        const used = new Set(catLead ? [catLead.link] : []);
+        const catOrder = ['sports','business','finance','bloom','popculture','general','tech'];
+        for (const c of catOrder) {
+          if (picks.length >= 4) break;
+          const item = (arts[c]||[]).find(a => a.img && !used.has(a.link));
+          if (item) { picks.push({ ...item, cat: item.cat || c }); used.add(item.link); }
+        }
+        for (const c of catOrder) {
+          if (picks.length >= 4) break;
+          for (const a of (arts[c]||[])) {
+            if (picks.length >= 4) break;
+            if (a.img && !used.has(a.link)) { picks.push({ ...a, cat: a.cat || c }); used.add(a.link); }
+          }
+        }
+        return picks.slice(0, 4);
+      }
+      if (!catLead) return [];   // category Top Stories = the gn-grid (hero + 3)
+      const secondaries = feedItems.slice(0, 6).filter(a => a.img).slice(0, 3)
+        .concat(feedItems.slice(0, 6).filter(a => !a.img)).slice(0, 3);
+      return [catLead, ...secondaries];
+    }, [isHome, catLead, feedItems, arts]);
+    const topStoryKeys = useMemo(() => new Set(topStoryItems.map(storyKey)), [topStoryItems]);
+    // State of Play ranks only from what Top Stories didn't already take.
+    const sopSourceItems = useMemo(
+      () => activeFilteredItems.filter(a => !topStoryKeys.has(storyKey(a))),
+      [activeFilteredItems, topStoryKeys]);
+    const sopShownKeys = useMemo(() => {
+      const ranked = rankClusters(sopSourceItems, { max: 2, limit: 5 });
+      return new Set(ranked.length >= 3 ? ranked.map(storyKey) : []);
+    }, [sopSourceItems]);
+    // Houston Local (General) claims its stories too.
+    const houstonItems = useMemo(() => {
+      if (!isHome) return [];
+      const seen = new Set();
+      return Object.values(arts || {}).flat()
+        .filter(a => HOUSTON_SOURCES.includes(a.source))
+        .filter(a => !topStoryKeys.has(storyKey(a)) && !sopShownKeys.has(storyKey(a)))
+        .filter(a => { const k = storyKey(a); if (seen.has(k)) return false; seen.add(k); return true; })
+        .sort((a, b) => new Date(b.pubDate) - new Date(a.pubDate))
+        .slice(0, 6);
+    }, [isHome, arts, topStoryKeys, sopShownKeys]);
+    const houstonKeys = useMemo(() => new Set(houstonItems.map(storyKey)), [houstonItems]);
+    // The main feed excludes everything already placed above it (by title key, so
+    // the same story from a different source can't slip back in).
+    const dedupedFeed = useMemo(
+      () => feedItems.filter(a => !topStoryKeys.has(storyKey(a)) && !sopShownKeys.has(storyKey(a)) && !houstonKeys.has(storyKey(a))),
+      [feedItems, topStoryKeys, sopShownKeys, houstonKeys]);
+
+    // ── COVERAGE GAP (folded into State of Play) — widely-covered stories none of the
+    //    reader's own sources carried. Home keys off this category; the merged
+    //    Business+Markets page keys off both business + markets keywords/sources;
+    //    Energy (bloom) keys off its keywords + the active sub-tab so the gap
+    //    re-ranks with the State of Play list per Power / Oil & Gas / etc. ──
+    const isEnergy = cat === 'bloom';
+    const gapCat = isMergedBiz ? 'business' : cat;
+    const gapKws = isMergedBiz ? [...(kw.business||[]), ...(kw.finance||[])]
+      : isEnergy ? (enSubTab !== 'all' ? [...catKws, ...(EN_KWS[enSubTab] || [])] : catKws)
+      : catKws;
+    const gapSrcs = isMergedBiz
+      ? [...(feeds.business||[]), ...(feeds.finance||[])].filter(f=>f.on).map(f=>f.name)
+      : (feeds[cat]||[]).filter(f=>f.on).map(f=>f.name);
+    const gapOn = (isHome || isMergedBiz || isEnergy) && !activeKw && !activeSrc && !search;
+    const gapKwKey = gapKws.join('|');
+    const gapSrcKey = gapSrcs.join('|');
+    useEffect(() => {
+      let alive = true;
+      if (!gapOn || !gapKws.length) { setGapItems([]); return () => { alive = false; }; }
+      fetchDiscover(gapCat, gapKws, gapSrcs).then(r => { if (alive) setGapItems((r && r.items) || []); });
+      return () => { alive = false; };
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [gapCat, gapKwKey, gapSrcKey, gapOn]);
+
     const otherCatSections = useMemo(() => {
       if (!isHome) return [];
       const otherCats = ['business','finance','bloom','sports','popculture'];
@@ -8933,12 +9189,8 @@ export default function App() {
             <span className="nsp-dot"/> ↑ {pendingNew[cat].length} new {pendingNew[cat].length===1?'story':'stories'}
           </button>
         )}
-        {/* Live Scores — General only, anchored at the very top under the nav.
-            Favorite/followed teams sort to the front and get an accent highlight
-            (Sports has its own scoreboard). Self-hides when nothing is live. */}
-        {cat === 'general' && !activeKw && !activeSrc && !search && (
-          <ActiveScoresBar scores={scores} favTeams={[...teams, ...myTeams.map(t=>({match:t.name}))]} onGoToSports={() => handleTabChange('sports')}/>
-        )}
+        {/* Live Scores moved to the top bar (below weather, above the category nav —
+            Pass G item 3). Rendered by <TopBar>; no longer here in the feed column. */}
         {/* HOME: unified Following row (topics + teams) above the category feeds.
             Always shown on Home so the "+ Add" search-and-add is reachable even when
             nothing is followed yet. */}
@@ -8986,74 +9238,47 @@ export default function App() {
             </div>
           </section>
         )}
-        {/* First-run onboarding card */}
-        {isHome && !onboardingDismissed && !activeKw && !activeSrc && !search && (
-          <div className="onboarding-card">
-            <div className="onboarding-body">
-              <div className="onboarding-title">Welcome to MyNewsHub ✦</div>
-              <div className="onboarding-tips">
-                <span className="onboarding-tip"><strong>Click any article</strong> to open the AI reader — Summarize, Key Points, Bias Check</span>
-                <span className="onboarding-tip"><strong>"Brief" button</strong> (top bar) → paste any article, transcript, or YouTube video for a breakdown</span>
-                <span className="onboarding-tip"><IconGear/> <strong>Customize</strong> → add/remove sources, set keywords, build your feed</span>
-              </div>
-              <button className="onboarding-dismiss" onClick={dismissOnboarding}>Got it, dismiss</button>
-            </div>
-            <button className="onboarding-x" onClick={dismissOnboarding}>✕</button>
+        {/* Welcome/onboarding banner removed (Pass H item 1): it wasn't driving
+            meaningful onboarding value and kept reappearing. */}
+
+        {/* Desktop: main column + sidebar run together from the very top of the
+            content (68/32), so Top Stories sits inside the 68% column, not full-width. */}
+        <div className="page-grid">
+          <div className="feed-col">
+
+        {/* ── BUSINESS + MARKETS filter pills — reuses the Sports league-pill component.
+            Markets routes to the full Markets page (FinancePage). ── */}
+        {isMergedBiz && !activeKw && !activeSrc && !search && (
+          <div className="sport-tabs" style={{marginBottom:'12px'}}>
+            <button className={`sport-tab ${bizFilter==='all'?'active':''}`} onClick={()=>navigate('business')}>All</button>
+            <button className={`sport-tab ${bizFilter==='business'?'active':''}`} onClick={()=>navigate('business','business')}>Business</button>
+            <button className="sport-tab" onClick={()=>navigate('finance')}>Markets</button>
           </div>
         )}
 
-        {/* ── BUSINESS + ENERGY filter pills — reuses the Sports league-pill component ── */}
-        {isMergedBiz && !activeKw && !activeSrc && !search && (
-          <div className="sport-tabs" style={{marginBottom:'12px'}}>
-            {BIZ_TABS.map(t => (
-              <button key={t.key} className={`sport-tab ${bizFilter===t.key?'active':''}`}
-                onClick={()=>setBizFilter(t.key)}>{t.label}</button>
+        {/* ── ENERGY sub-category pills — at the top of the page, matching the Sports
+            league/team pill position + format (Pass J item 8). ── */}
+        {cat === 'bloom' && !activeKw && !activeSrc && !search && (
+          <div className="pc-subtabs en-subtabs" style={{marginBottom:'12px'}}>
+            {EN_SUBTABS.map(t => (
+              <button key={t.key} className={`pc-subtab ${enSubTab===t.key?'active':''}`}
+                onClick={()=>{setEnSubTab(t.key);window.scrollTo({top:0,behavior:'instant'});}}>
+                <t.icon size={14} strokeWidth={2.2}/>{t.label}
+              </button>
             ))}
           </div>
         )}
 
-        {/* ── STATE OF PLAY strip — top of every category, collapsible (per-category memory) ── */}
-        {!activeKw && !activeSrc && !search && (
-          <StateOfPlay items={activeFilteredItems} meta={CATS[cat]||CATS.general} onRead={onRead} formatDate={fmtDate}
-            collapsed={sopCollapsed} onToggleCollapse={toggleSop}/>
-        )}
-
-        {/* My Teams thumbnail teaser removed from General — the followed-teams module
-            lives on the Sports page only (avoids Home↔Sports duplication and the extra
-            above-the-fold scroll). Live scores now sit at the top of the page. */}
-
-        {/* ── TRENDING NOW — hottest clusters; tapping a pill opens that entity's hub ── */}
-        {!activeKw && !activeSrc && !search && (
-          <TrendingPills label="Trending Now" items={activeFilteredItems}
-            onOpen={t => navigate(cat, 'topic', teamSlug(t))}
-            isTopicFollowed={isTopicFollowed} toggleTopic={toggleTopic}/>
-        )}
-
-        {/* ── COVERAGE GAP — "You may be missing this" (General only, below Trending,
-            above the feed). A wider discovery scan surfaces widely-covered stories
-            none of the reader's own sources carried; never mixed into the feed. ── */}
+        {/* ── HOME: Top Stories (image cards) — sits first; the text-only State of Play
+            module below it provides a breathing-room break before the next image block
+            (Pass H item 3). ── */}
         {isHome && !activeKw && !activeSrc && !search && (
-          <CoverageGap category={cat} keywords={catKws}
-            followedSources={(feeds[cat]||[]).filter(f=>f.on).map(f=>f.name)}/>
+          <TopOfHourStrip catLead={catLead} arts={arts} onRead={onRead} stories={topStoryItems}/>
         )}
 
-        {/* Coverage Gap on the merged Business/Energy page — same panel/tier-capping,
-            keyed off the active filter's keywords vs the reader's own biz+energy sources. */}
-        {isMergedBiz && !activeKw && !activeSrc && !search && (
-          <CoverageGap category="business"
-            keywords={bizFilter==='energy' ? (kw.bloom||[]) : (kw.business||[])}
-            followedSources={[...(feeds.business||[]),...(feeds.bloom||[])].filter(f=>f.on).map(f=>f.name)}/>
-        )}
-
-        {/* ── HOME: Top of Hour strip (image cards) ── */}
-        {isHome && !activeKw && !activeSrc && !search && (
-          <TopOfHourStrip catLead={catLead} arts={arts} onRead={onRead}/>
-        )}
-
-        {/* ── HOME: Houston local row ── */}
-        {isHome && !activeKw && !activeSrc && !search && (
-          <HoustonRow arts={arts} onRead={onRead} formatDate={fmtDate}/>
-        )}
+        {/* State of Play moved into the sidebar (Pass J item 2). Across MyNewsHub also
+            moved into the sidebar (Pass J item 4). The main column is now just
+            Top Stories → Houston Local (General) → main feed (Pass J item 6). */}
 
         {/* Category pages: lead image grid */}
         {!activeKw && !activeSrc && catLead && !isHome && (
@@ -9070,9 +9295,7 @@ export default function App() {
               </div>
             </article>
             <div className="gn-row">
-              {feedItems.slice(0, 6).filter(a=>a.img).slice(0, 3).concat(
-                feedItems.slice(0, 6).filter(a=>!a.img)
-              ).slice(0, 3).map((a, i) => (
+              {topStoryItems.slice(1).map((a, i) => (
                 <article key={i} className={`gn-card ${cat}`} onClick={()=>onRead(a)}>
                   {a.img
                     ? <div className="gn-card-img" style={{backgroundImage:`url(${a.img})`}}/>
@@ -9088,20 +9311,40 @@ export default function App() {
           </div>
         )}
 
+        {/* State of Play hoisted into the main column right after Top Stories — shown
+            only on mobile/tablet (≤1100px), where the sidebar stacks below the feed and
+            would otherwise bury it. On desktop this copy is display:none and the sidebar
+            copy renders instead (see .sop-hoist CSS). */}
+        {!activeKw && !activeSrc && !search && (
+          <div className="sop-hoist">
+            <StateOfPlay variant="sidebar" items={sopSourceItems} gapItems={gapItems}
+              meta={CATS[cat]||CATS.general} onRead={onRead} formatDate={fmtDate}
+              collapsed={sopCollapsed} onToggleCollapse={toggleSop}/>
+          </div>
+        )}
+
         {/* Pop Culture sub-tabs */}
         {cat === 'popculture' && !activeKw && !activeSrc && !search && (
           <div className="pc-subtabs">
             {PC_SUBTABS.map(t => (
               <button key={t.key} className={`pc-subtab ${pcSubTab===t.key?'active':''}`}
                 onClick={()=>{setPcSubTab(t.key);window.scrollTo({top:0,behavior:'instant'});}}>
-                {t.emoji} {t.label}
+                <t.icon size={14} strokeWidth={2.2}/>{t.label}
               </button>
             ))}
           </div>
         )}
 
-        <div className="page-grid">
-          <div className="feed-col">
+        {/* Main column continues in the grid alongside the (now tall) sidebar, which
+            holds State of Play + Trending + Briefing + Across + Sources (Pass J). ── */}
+
+        {/* Across MyNewsHub moved into the sidebar (Pass J item 4). */}
+
+        {/* ── HOME: Houston local row ── */}
+        {isHome && !activeKw && !activeSrc && !search && (
+          <HoustonRow items={houstonItems} onRead={onRead} formatDate={fmtDate}/>
+        )}
+
             <div className="page-header-row">
               <span className="page-header" style={{fontFamily:'var(--font-sans)'}}>
                 {cc.label}{feedItems.length>0?` — ${feedItems.length} articles`:''}
@@ -9115,16 +9358,8 @@ export default function App() {
                 <button className="page-customize-btn" onClick={()=>openCustomize('sources',cat)}><IconGear/> Customize</button>
               </div>
             </div>
-            {cat === 'bloom' && !activeKw && !activeSrc && !search && (
-              <div className="pc-subtabs" style={{marginBottom:'8px',marginTop:'0'}}>
-                {EN_SUBTABS.map(t => (
-                  <button key={t.key} className={`pc-subtab ${enSubTab===t.key?'active':''}`}
-                    onClick={()=>{setEnSubTab(t.key);window.scrollTo({top:0,behavior:'instant'});}}>
-                    {t.label}
-                  </button>
-                ))}
-              </div>
-            )}
+            {/* Energy sub-category pills moved to the top of the page (Pass J item 8) —
+                see the block at the start of the feed column. */}
             {cat === 'bloom' && enSubTab !== 'all' && !activeKw && !activeSrc && !search && (
               <div className="sport-hub-banner" style={{background:'linear-gradient(135deg,#0369a1 0%,#0284c7 100%)'}}>
                 <div className="sport-hub-inner">
@@ -9172,7 +9407,7 @@ export default function App() {
               :feedItems.length===0
                 ?<div className="empty-state"><div className="empty-icon"></div><div className="empty-msg">{activeKw||activeSrc?'No articles match this filter':search?`No internal results for "${search}"`:'No articles loaded yet'}</div><button className="refresh-btn" onClick={refreshAll}>Refresh</button></div>
                 :<div className="snap-feed">
-                  {feedItems.slice(activeKw||activeSrc||search?0:3,20).map((a,i)=>(
+                  {(activeKw||activeSrc||search ? feedItems.slice(0,20) : dedupedFeed.slice(0,20)).map((a,i)=>(
                     <Fragment key={a.link||i}>
                       <SnapshotCard a={a} meta={CATS[cat]||CATS.general} isSaved={isSavedFn(a)} onSave={onSave} onRead={onRead} onPerspectives={setPerspArticle} formatDate={fmtDate} hideImage={i>=3}/>
                       {i===2 && <XPulse topic={cc?.label||cat} variant="feed"/>}
@@ -9285,54 +9520,26 @@ export default function App() {
               </div>
             )}
 
-            {/* v24a: General homepage absorbs Today's "from each category" role.
-                3 stories from each other category, with See all links. */}
-            {isHome && !activeKw && !activeSrc && otherCatSections.length > 0 && (
-              <div className="other-cat-sections">
-                <div className="other-cat-divider">
-                  <span>Across MyNewsHub</span>
-                </div>
-                {otherCatSections.map(section => (
-                  <section key={section.cat} className="other-cat-section">
-                    <div className="other-cat-head">
-                      <span className="other-cat-label" style={{color:section.cc.color}}>
-                        {section.cc.emoji} {section.cc.label}
-                      </span>
-                      <button className="other-cat-link" onClick={()=>handleTabChange(section.cat)}>
-                        See all in {section.cc.label} →
-                      </button>
-                    </div>
-                    {section.items.map((a, i) => (
-                      <div key={i} className="gf-item" onClick={()=>onRead(a)}>
-                        {a.img
-                          ? <div className="gf-thumb" style={{backgroundImage:`url(${a.img})`}}/>
-                          : <div className="gf-thumb-ph"/>}
-                        <div className="gf-body">
-                          <div className="gf-title">{a.title}</div>
-                          <div className="gf-meta">
-                            <span>{a.source}</span>
-                            <span>·</span>
-                            <span>{fmtDate(a.pubDate)}</span>
-                          </div>
-                        </div>
-                      </div>
-                    ))}
-                  </section>
-                ))}
-              </div>
-            )}
+            {/* Across MyNewsHub moved up — it now renders right after State of Play
+                (Pass H item 6, see <AcrossHub> above), not at the page bottom. */}
 
             <SocialFollows cat={cat} social={social}/>
             <SourceFooter cat={cat} feeds={feeds} arts={arts}/>
-          </div>
+          </div>{/* /feed-col */}
           <Sidebar cat={cat} arts={arts} kw={kw} health={health}
             activeKw={activeKw} setActiveKw={k=>{setActiveKw(k);setActiveSrc(null);}}
             activeSource={activeSrc} setActiveSource={s=>{setActiveSrc(s);setActiveKw(null);}}
             onRead={onRead} scores={scores} scoresLoading={scoresLoading}
             showScoreboard={cat==='sports'} recommended={recommended}
             onTopicOpen={label => navigate(cat, 'topic', teamSlug(label))}
+            isTopicFollowed={isTopicFollowed} toggleTopic={toggleTopic}
+            sopItems={!activeKw && !activeSrc && !search ? sopSourceItems : null}
+            sopGapItems={gapItems} sopMeta={CATS[cat]||CATS.general}
+            sopCollapsed={sopCollapsed} onToggleSop={toggleSop} formatDate={fmtDate}
+            acrossSections={isHome && !activeKw && !activeSrc && !search ? otherCatSections : null}
+            onAcrossSeeAll={handleTabChange}
             showBriefing={isHome} onOpenBriefing={() => handleTabChange('briefing')} briefingExcludeCats={briefingExclude}/>
-        </div>
+        </div>{/* /page-grid */}
       </div>
     );
   };
@@ -9837,6 +10044,12 @@ export default function App() {
             </div>
           </div>
         </div>
+        {/* Business + Markets filter pills — Markets is this page; All/Business route to the feed. */}
+        <div className="sport-tabs" style={{marginBottom:'12px'}}>
+          <button className="sport-tab" onClick={()=>navigate('business')}>All</button>
+          <button className="sport-tab" onClick={()=>navigate('business','business')}>Business</button>
+          <button className="sport-tab active" onClick={()=>navigate('finance')}>Markets</button>
+        </div>
         {/* Ticker rail + movers — extracted MarketsSurface module */}
         <MarketsSurface mkt={mkt} loading={mktLoading} error={mktErr}/>
 
@@ -9974,6 +10187,7 @@ export default function App() {
   return (
     <>
       <style>{GLOBAL_CSS}</style>
+      <FollowSourceContext.Provider value={{ isSourceFollowed, followSource }}>
       <div className={`hub${dark?' dark':''}`} {...swipeHandlers}>
         <TopBar tab={tab} setTab={handleTabChange} search={search} setSearch={setSearch}
           dark={dark} setDark={setDark}
@@ -9987,7 +10201,9 @@ export default function App() {
           onAnalyze={() => setShowAnalyze(true)}
           searchHistory={searchHistory}
           trendingTopics={homeTrendingTopics}
-          onAccount={()=>setShowAuth(true)} signedIn={!!userId}/>
+          onAccount={()=>setShowAuth(true)} signedIn={!!userId}
+          scores={scores} favTeams={[...teams, ...myTeams.map(t=>({match:t.name}))]}
+          onGoToSports={() => handleTabChange('sports')}/>
 
         {/* Pull-to-refresh indicator (mobile, touch-only) */}
         {isMobile && <PtrIndicator distance={ptrDistance} threshold={70} refreshing={refreshing}/>}
@@ -10063,6 +10279,7 @@ export default function App() {
       {/* v26b: email magic-link sign-in */}
       {showAuth && <AuthModal onClose={()=>{setShowAuth(false);setAuthStatus('');}} onSend={handleSendMagicLink}
         status={authStatus} email={authEmail} setEmail={setAuthEmail} userId={userId} onSignOut={handleSignOut}/>}
+      </FollowSourceContext.Provider>
     </>
   );
 }

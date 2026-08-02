@@ -16,6 +16,7 @@
 // Styling: co-located SnapshotCard.css + design tokens (src/styles/tokens.css).
 
 import { useState } from 'react';
+import { FollowSourceChip } from '../follow-source';
 import './SnapshotCard.css';
 
 const defaultFormatDate = d => { try { return new Date(d).toLocaleString(); } catch { return ''; } };
@@ -32,6 +33,7 @@ export function SnapshotCard({ a, meta = {}, isSaved, onSave, onRead, onPerspect
       <div className="snap-main">
         <div className="snap-meta">
           <span className="snap-source" style={{ color }}>{a.source}</span>
+          <FollowSourceChip name={a.source} url={a.sourceUrl}/>
           {a.author && <span className="snap-byline">{a.author}</span>}
           {a.isAlert && <span className="snap-live">● LIVE</span>}
           {topKw && <span className="snap-tag" style={{ background: bg, color }}>{topKw}</span>}
