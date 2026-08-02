@@ -38,7 +38,7 @@
 
 import { useState, useEffect, useCallback, useMemo, useRef, Fragment } from 'react';
 // Extracted, dependency-isolated capability modules (see src/modules/*/README.md)
-import { clusterStories, hotClusterTopics, TREND_STOP, decodeEntities, capByPublisher } from './modules/clustering';
+import { clusterStories, hotClusterTopics, rankClusters, TREND_STOP, decodeEntities, capByPublisher } from './modules/clustering';
 import { extractContent, extractionFallbackMessage } from './modules/extractor';
 import { retrieveFeedContext, buildFeedContextBlock } from './modules/retrieval';
 import { XPulse } from './modules/x-pulse';
@@ -7483,16 +7483,10 @@ function RightNowWeather({ cities }) {
 // ─── HOUSTON (Home-only local news row) ───────────────────────────────────────
 // Filters the already-loaded feed to local Houston sources.
 const HOUSTON_SOURCES = ['KHOU Houston', 'Chron.com', 'Click2Houston', 'Houston Public Media', 'Houston Chronicle'];
-function HoustonRow({ arts, onRead, formatDate }) {
-  const items = useMemo(() => {
-    const seen = new Set();
-    return Object.values(arts || {}).flat()
-      .filter(a => HOUSTON_SOURCES.includes(a.source))
-      .filter(a => { const k = (a.title || '').slice(0, 60); if (seen.has(k)) return false; seen.add(k); return true; })
-      .sort((a, b) => new Date(b.pubDate) - new Date(a.pubDate))
-      .slice(0, 6);
-  }, [arts]);
-  if (items.length < 2) return null;
+function HoustonRow({ items, onRead, formatDate }) {
+  // Items are computed by the caller (FeedPage) so they share the page's
+  // cross-module dedup set (Pass I item 1).
+  if (!items || items.length < 2) return null;
   return (
     <section className="houston-row">
       <div className="houston-head"><span className="houston-label">Houston</span><span className="houston-sub">Local</span></div>
@@ -9027,6 +9021,42 @@ export default function App() {
     const isHome = cat === 'general';
     const catKws = kw[cat] || [];
 
+    // ── CROSS-MODULE DEDUP (Pass I item 1) ──────────────────────────────────────
+    // A story placed in a top-of-page module is excluded from every other module
+    // on the SAME page — on every category, not just General. Priority order:
+    // Top Stories → State of Play → Houston → main feed.
+    const topStoryItems = useMemo(() => {
+      if (isHome || !catLead) return [];   // category Top Stories = the gn-grid (hero + 3)
+      const secondaries = feedItems.slice(0, 6).filter(a => a.img).slice(0, 3)
+        .concat(feedItems.slice(0, 6).filter(a => !a.img)).slice(0, 3);
+      return [catLead, ...secondaries];
+    }, [isHome, catLead, feedItems]);
+    const topStoryLinks = useMemo(() => new Set(topStoryItems.map(a => a.link)), [topStoryItems]);
+    // State of Play ranks only from what Top Stories didn't already take.
+    const sopSourceItems = useMemo(
+      () => activeFilteredItems.filter(a => !topStoryLinks.has(a.link)),
+      [activeFilteredItems, topStoryLinks]);
+    const sopShownLinks = useMemo(() => {
+      const ranked = rankClusters(sopSourceItems, { max: 2, limit: 5 });
+      return new Set(ranked.length >= 3 ? ranked.map(a => a.link) : []);
+    }, [sopSourceItems]);
+    // Houston Local (General) claims its stories too.
+    const houstonItems = useMemo(() => {
+      if (!isHome) return [];
+      const seen = new Set();
+      return Object.values(arts || {}).flat()
+        .filter(a => HOUSTON_SOURCES.includes(a.source))
+        .filter(a => !topStoryLinks.has(a.link) && !sopShownLinks.has(a.link))
+        .filter(a => { const k = (a.title || '').slice(0, 60); if (seen.has(k)) return false; seen.add(k); return true; })
+        .sort((a, b) => new Date(b.pubDate) - new Date(a.pubDate))
+        .slice(0, 6);
+    }, [isHome, arts, topStoryLinks, sopShownLinks]);
+    const houstonLinks = useMemo(() => new Set(houstonItems.map(a => a.link)), [houstonItems]);
+    // The main feed excludes everything already placed above it.
+    const dedupedFeed = useMemo(
+      () => feedItems.filter(a => !topStoryLinks.has(a.link) && !sopShownLinks.has(a.link) && !houstonLinks.has(a.link)),
+      [feedItems, topStoryLinks, sopShownLinks, houstonLinks]);
+
     // ── COVERAGE GAP (folded into State of Play) — widely-covered stories none of the
     //    reader's own sources carried. Home keys off this category; the merged
     //    Business+Markets page keys off both business + markets keywords/sources;
@@ -9148,7 +9178,7 @@ export default function App() {
             merged Business/Markets page — no separate panel. On Home it sits between
             Top Stories and the next image block as a text-only breather. ── */}
         {!activeKw && !activeSrc && !search && (
-          <StateOfPlay items={activeFilteredItems} meta={CATS[cat]||CATS.general} onRead={onRead} formatDate={fmtDate}
+          <StateOfPlay items={sopSourceItems} meta={CATS[cat]||CATS.general} onRead={onRead} formatDate={fmtDate}
             collapsed={sopCollapsed} onToggleCollapse={toggleSop} gapItems={gapItems}/>
         )}
 
@@ -9173,9 +9203,7 @@ export default function App() {
               </div>
             </article>
             <div className="gn-row">
-              {feedItems.slice(0, 6).filter(a=>a.img).slice(0, 3).concat(
-                feedItems.slice(0, 6).filter(a=>!a.img)
-              ).slice(0, 3).map((a, i) => (
+              {topStoryItems.slice(1).map((a, i) => (
                 <article key={i} className={`gn-card ${cat}`} onClick={()=>onRead(a)}>
                   {a.img
                     ? <div className="gn-card-img" style={{backgroundImage:`url(${a.img})`}}/>
@@ -9229,7 +9257,7 @@ export default function App() {
 
         {/* ── HOME: Houston local row ── */}
         {isHome && !activeKw && !activeSrc && !search && (
-          <HoustonRow arts={arts} onRead={onRead} formatDate={fmtDate}/>
+          <HoustonRow items={houstonItems} onRead={onRead} formatDate={fmtDate}/>
         )}
 
             <div className="page-header-row">
@@ -9302,7 +9330,7 @@ export default function App() {
               :feedItems.length===0
                 ?<div className="empty-state"><div className="empty-icon"></div><div className="empty-msg">{activeKw||activeSrc?'No articles match this filter':search?`No internal results for "${search}"`:'No articles loaded yet'}</div><button className="refresh-btn" onClick={refreshAll}>Refresh</button></div>
                 :<div className="snap-feed">
-                  {feedItems.slice(activeKw||activeSrc||search?0:3,20).map((a,i)=>(
+                  {(activeKw||activeSrc||search ? feedItems.slice(0,20) : dedupedFeed.slice(0,20)).map((a,i)=>(
                     <Fragment key={a.link||i}>
                       <SnapshotCard a={a} meta={CATS[cat]||CATS.general} isSaved={isSavedFn(a)} onSave={onSave} onRead={onRead} onPerspectives={setPerspArticle} formatDate={fmtDate} hideImage={i>=3}/>
                       {i===2 && <XPulse topic={cc?.label||cat} variant="feed"/>}
