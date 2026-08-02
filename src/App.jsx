@@ -1626,6 +1626,9 @@ body:not(.dark) .pill-bar{
 .page{max-width:1400px;margin:0 auto;padding:28px 24px;}
 .page-grid{display:grid;grid-template-columns:2.1fr 1fr;gap:28px;align-items:start;} /* main ~68% / sidebar ~32% (CNBC/NBC ratio) */
 .feed-col{display:flex;flex-direction:column;gap:0;min-width:0;} /* min-width:0 so the column shrinks to its grid track instead of its content width */
+/* State of Play lives in the sidebar on desktop; the main-column hoisted copy is
+   hidden here and only shown ≤1100px (see the single-column media block). */
+.sop-hoist{display:none;}
 /* Full-width region below the hero grid (Pass H item 4): once the sidebar's
    content ends, the main feed uses the whole width instead of leaving an empty
    32% gutter. At desktop widths the article list runs 2-up so wide rows stay
@@ -3810,11 +3813,15 @@ body{overscroll-behavior-y:contain;}
   .hero-row{grid-template-columns:1fr;}
   .today-grid{grid-template-columns:1fr;}
   /* Single-column: the sidebar stacks below the main feed as a full-width section
-     (State of Play, Trending, Today's Briefing, Across, Sources), with a top rule
-     instead of the desktop left border. */
+     (Trending, Today's Briefing, Across, Sources), with a top rule instead of the
+     desktop left border. State of Play is hoisted out of it (below) to sit right
+     after Top Stories. */
   .sidebar{order:2;border-left:none;padding-left:0;border-top:2px solid var(--border);padding-top:22px;margin-top:10px;}
   .feed-col{order:1;}
   .fin-indices{grid-template-columns:1fr;}
+  /* Hoist State of Play into the main column near the top; hide the sidebar copy. */
+  .sop-hoist{display:block;margin-bottom:22px;}
+  .sidebar .sop-sidebar{display:none;}
 }
 @media (max-width:900px){
   .bloom-strip{grid-template-columns:1fr 1fr;}
@@ -4978,6 +4985,9 @@ kbd{display:inline-block;padding:1px 5px;border:1px solid var(--border);border-r
 @media(max-width:1024px){
   .toh-grid{grid-template-columns:1fr;grid-auto-rows:168px;}
   .toh-card-lead{grid-column:auto;grid-row:auto;}
+  /* Secondaries must also drop to the single column — the desktop rule pins them to
+     column 2, which on a 1-col grid creates a phantom column and a blank gap. */
+  .toh-card:not(.toh-card-lead){grid-column:auto;}
   .toh-card-lead .toh-title{font-size:20px;}
   .toh-card:nth-child(n+4){display:none;}
 }
@@ -9269,6 +9279,18 @@ export default function App() {
                 </article>
               ))}
             </div>
+          </div>
+        )}
+
+        {/* State of Play hoisted into the main column right after Top Stories — shown
+            only on mobile/tablet (≤1100px), where the sidebar stacks below the feed and
+            would otherwise bury it. On desktop this copy is display:none and the sidebar
+            copy renders instead (see .sop-hoist CSS). */}
+        {!activeKw && !activeSrc && !search && (
+          <div className="sop-hoist">
+            <StateOfPlay variant="sidebar" items={sopSourceItems} gapItems={gapItems}
+              meta={CATS[cat]||CATS.general} onRead={onRead} formatDate={fmtDate}
+              collapsed={sopCollapsed} onToggleCollapse={toggleSop}/>
           </div>
         )}
 
