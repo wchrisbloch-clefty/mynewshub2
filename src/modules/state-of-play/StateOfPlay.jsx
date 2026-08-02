@@ -23,9 +23,10 @@ import './StateOfPlay.css';
 
 const defaultFormatDate = d => { try { return new Date(d).toLocaleString(); } catch { return ''; } };
 
-export function StateOfPlay({ items, meta = {}, onRead, formatDate = defaultFormatDate, collapsed = false, onToggleCollapse, gapItems = [] }) {
+export function StateOfPlay({ items, meta = {}, onRead, formatDate = defaultFormatDate, collapsed = false, onToggleCollapse, gapItems = [], variant = 'strip' }) {
   const color = meta.color;
   const label = meta.label || '';
+  const sidebar = variant === 'sidebar';
   // Ranked by heat, capped at 2 per publisher (no single-source flood).
   const top = useMemo(() => rankClusters(items, { max: 2, limit: 5 }), [items]);
   // Coverage-Gap rows fold into the same list (top 3), continuing the count.
@@ -36,10 +37,10 @@ export function StateOfPlay({ items, meta = {}, onRead, formatDate = defaultForm
   if (top.length < 3) return null;
 
   return (
-    <section className="sop-strip">
+    <section className={`sop-strip${sidebar ? ' sop-sidebar' : ''}`}>
       <div className="sop-head">
         <span className="sop-label" style={{ borderColor: color, color }}>State of Play</span>
-        <span className="sop-sub">{label} — what’s driving the day</span>
+        {!sidebar && <span className="sop-sub">{label} — what’s driving the day</span>}
         {onToggleCollapse && (
           <button className="sop-collapse" onClick={onToggleCollapse}
             aria-expanded={!collapsed} aria-label={collapsed ? 'Expand State of Play' : 'Collapse State of Play'}>
@@ -64,18 +65,39 @@ export function StateOfPlay({ items, meta = {}, onRead, formatDate = defaultForm
         ))}
         {gaps.map((g, i) => {
           const outlets = (g.outlets && g.outlets.length ? g.outlets : [g.source]).filter(Boolean);
+          const num = String(top.length + i + 1).padStart(2, '0');
+          const outletText = outlets.length > 0
+            ? `${outlets.slice(0, 2).join(', ')}${g.outletCount > 2 ? ` +${g.outletCount - 2}` : ''}` : '';
+          // Sidebar: stack the badge/outlets under the headline and put Follow on its
+          // own right-aligned line — the inline row is too wide for 32% (Pass J item 2).
+          if (sidebar) {
+            return (
+              <a key={g.link || `gap-${i}`} className="sop-item sop-item-gap sop-item-gap-stacked" href={g.link}
+                target="_blank" rel="noreferrer">
+                <div className="sop-gap-headline">
+                  <span className="sop-num sop-num-gap">{num}</span>
+                  <span className="sop-item-title">{g.title}</span>
+                </div>
+                <div className="sop-gap-below">
+                  <span className="sop-gap-tag" style={{ borderColor: color, color }}>Not in your sources</span>
+                  {outletText && <span className="sop-item-time">{outletText}</span>}
+                </div>
+                {outlets[0] && (
+                  <div className="sop-gap-follow" onClick={e => e.preventDefault()}>
+                    <FollowSourceChip name={outlets[0]}/>
+                  </div>
+                )}
+              </a>
+            );
+          }
           return (
             <a key={g.link || `gap-${i}`} className="sop-item sop-item-gap" href={g.link}
               target="_blank" rel="noreferrer">
-              <span className="sop-num sop-num-gap">{String(top.length + i + 1).padStart(2, '0')}</span>
+              <span className="sop-num sop-num-gap">{num}</span>
               <span className="sop-item-title">{g.title}</span>
               <span className="sop-item-meta">
                 <span className="sop-gap-tag" style={{ borderColor: color, color }}>Not in your sources</span>
-                {outlets.length > 0 && (
-                  <span className="sop-item-time">
-                    {outlets.slice(0, 2).join(', ')}{g.outletCount > 2 ? ` +${g.outletCount - 2}` : ''}
-                  </span>
-                )}
+                {outletText && <span className="sop-item-time">{outletText}</span>}
                 {/* Follow the lead outlet straight from the gap row (Pass G item 7). */}
                 {outlets[0] && <FollowSourceChip name={outlets[0]}/>}
               </span>

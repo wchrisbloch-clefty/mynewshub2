@@ -1812,7 +1812,12 @@ body:not(.dark) .pill-bar{
 .sidebar{
   display:flex;flex-direction:column;gap:24px;min-width:0;
   border-left:1px solid var(--border2);padding-left:28px;
+  /* Sticky so the sidebar's modules follow the reader down the long feed instead of
+     leaving a blank gutter beside the feed tail (Pass J). align-self:start keeps it
+     from stretching to the feed-column height. */
+  position:sticky;top:72px;align-self:start;
 }
+@media (max-width:1024px){ .sidebar{position:static;} }
 
 /* Ghost sidebar section */
 .gs-section{display:flex;flex-direction:column;gap:0;}
@@ -1882,6 +1887,22 @@ body:not(.dark) .pill-bar{
 .ttp-chip.active{color:#fff !important;border-color:transparent !important;}
 .ttp-chip.saved{border-style:dashed;}
 .ttp-count{font-size:9px;font-weight:700;opacity:0.6;}
+/* Follow star on the merged Trending chips (Pass J item 3). */
+.ttp-chip-star{background:none;border:none;cursor:pointer;font-size:11px;line-height:1;color:var(--text4);padding:0 0 0 1px;margin-left:1px;}
+.ttp-chip-star.on{color:var(--amber);}
+.ttp-chip-star:hover{color:var(--amber);}
+.ttp-chip.active .ttp-chip-star{color:rgba(255,255,255,0.85);}
+
+/* Across MyNewsHub — compact text list in the sidebar (Pass J item 4). */
+.sb-across-cat{margin-bottom:12px;}
+.sb-across-cat:last-child{margin-bottom:0;}
+.sb-across-clabel{background:none;border:none;cursor:pointer;font-family:inherit;padding:0 0 5px;font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:0.08em;display:block;}
+.sb-across-clabel:hover{text-decoration:underline;}
+.sb-across-item{cursor:pointer;padding:5px 0;border-top:1px solid var(--border2);}
+.sb-across-cat .sb-across-item:first-of-type{border-top:none;}
+.sb-across-title{font-family:var(--font-archivo);font-weight:600;font-size:12px;line-height:1.3;color:var(--text);display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;}
+.sb-across-item:hover .sb-across-title{color:var(--accent);}
+.sb-across-src{font-size:10px;color:var(--text3);margin-top:2px;}
 
 /* Sources pill grid */
 .src-pills{display:flex;flex-wrap:wrap;gap:5px;}
@@ -6186,7 +6207,8 @@ function Scoreboard({scores, loading, compact=false}) {
 }
 
 // ─── GHOST SIDEBAR ────────────────────────────────────────────────────────────
-function Sidebar({cat, arts, kw, health, activeKw, setActiveKw, activeSource, setActiveSource, onRead, scores, scoresLoading, showScoreboard, recommended, showBriefing, onOpenBriefing, briefingExcludeCats, onTopicOpen, trendingItems, isTopicFollowed, toggleTopic, onTrendingOpen}) {
+function Sidebar({cat, arts, kw, health, activeKw, setActiveKw, activeSource, setActiveSource, onRead, scores, scoresLoading, showScoreboard, recommended, showBriefing, onOpenBriefing, briefingExcludeCats, onTopicOpen, trendingItems, isTopicFollowed, toggleTopic, onTrendingOpen,
+  sopItems, sopGapItems, sopMeta, sopCollapsed, onToggleSop, formatDate, acrossSections, onAcrossSeeAll}) {
   const cc = CATS[cat]||CATS.general;
   const catKws = kw[cat]||[];
   const catArts = arts[cat]||[];
@@ -6270,37 +6292,75 @@ function Sidebar({cat, arts, kw, health, activeKw, setActiveKw, activeSource, se
       </div>
       )}
 
-      {/* Today's Topics Panel — always visible, auto-derived + user keywords */}
+      {/* 1) STATE OF PLAY — moved into the sidebar (Pass J item 2), consistent
+            sidebar-module styling, Coverage-Gap rows in a stacked (non-inline) layout. */}
+      {sopItems && !activeKw && !activeSource && (
+        <StateOfPlay variant="sidebar" items={sopItems} gapItems={sopGapItems||[]}
+          meta={sopMeta||cc} onRead={onRead} formatDate={formatDate||fmtDate}
+          collapsed={sopCollapsed} onToggleCollapse={onToggleSop}/>
+      )}
+
+      {/* 2) TRENDING — Trending Now + Today's Topics merged into one module (Pass J
+            item 3): same "what's hot" data, one visual treatment (phrase + count,
+            tap to open the topic hub, star to follow). */}
       {topicItems.length > 0 && (
         <div className="sidebar-section">
           <div className="sidebar-sec-head">
-            <span className="sidebar-sec-label">Today's Topics</span>
+            <span className="sidebar-sec-label">Trending</span>
             {activeKw && <button className="sidebar-sec-action" onClick={()=>setActiveKw(null)}>Clear</button>}
           </div>
           <div className="ttp-chips">
-            {topicItems.map((t, i) => (
-              <span key={i}
-                className={`ttp-chip${activeKw===t.label?' active':''}${t.isSaved?' saved':''}`}
-                style={activeKw===t.label ? {background:cc.color} : {}}
-                onClick={()=>handleTopicClick(t.label)}>
-                {t.label}
-                <span className="ttp-count">{t.count}</span>
-              </span>
-            ))}
+            {topicItems.map((t, i) => {
+              const followed = isTopicFollowed?.(t.label);
+              return (
+                <span key={i}
+                  className={`ttp-chip${activeKw===t.label?' active':''}${t.isSaved?' saved':''}`}
+                  style={activeKw===t.label ? {background:cc.color} : {}}
+                  onClick={()=>handleTopicClick(t.label)}>
+                  {t.label}
+                  <span className="ttp-count">{t.count}</span>
+                  {toggleTopic && (
+                    <button className={`ttp-chip-star${followed?' on':''}`}
+                      onClick={e=>{e.stopPropagation();toggleTopic(t.label);}}
+                      aria-label={followed?'Unfollow topic':'Follow topic'}>{followed?'★':'☆'}</button>
+                  )}
+                </span>
+              );
+            })}
           </div>
         </div>
       )}
 
-      {/* Trending Now — moved out of the main column (Pass H item 5) so it sits with
-          Today's Topics as one topic-discovery group in the sidebar. */}
-      {trendingItems && (
-        <div className="sidebar-section sidebar-trending">
-          <TrendingPills label="Trending Now" items={trendingItems}
-            onOpen={onTrendingOpen} isTopicFollowed={isTopicFollowed} toggleTopic={toggleTopic}/>
+      {/* 3) TODAY'S BRIEFING — its own module (Pass J item 3): pulls from followed
+            morning-email/newsletter sources, distinct from State of Play. BriefingTeaser
+            already renders a consistent .sidebar-section with its own label. */}
+      {showBriefing && (
+        <BriefingTeaser arts={arts} excludeCats={briefingExcludeCats||[]} onOpenFull={onOpenBriefing} compact={true}/>
+      )}
+
+      {/* 4) ACROSS MYNEWSHUB — cross-category recirculation, moved into the sidebar
+            (Pass J item 4), General only. Text-only compact rows for the narrow column. */}
+      {acrossSections && acrossSections.length > 0 && !activeKw && !activeSource && (
+        <div className="sidebar-section sb-across">
+          <div className="sidebar-sec-head"><span className="sidebar-sec-label">Across MyNewsHub</span></div>
+          {acrossSections.slice(0, 4).map(section => (
+            <div key={section.cat} className="sb-across-cat">
+              <button className="sb-across-clabel" style={{color:section.cc.color}} onClick={()=>onAcrossSeeAll(section.cat)}>
+                {section.cc.label} →
+              </button>
+              {section.items.slice(0, 2).map((a, i) => (
+                <div key={i} className="sb-across-item" onClick={()=>onRead(a)}>
+                  <div className="sb-across-title">{a.title}</div>
+                  <div className="sb-across-src">{a.source} · {(formatDate||fmtDate)(a.pubDate)}</div>
+                </div>
+              ))}
+            </div>
+          ))}
         </div>
       )}
 
-      {/* Sources — collapsible pill grid */}
+      {/* 5) SOURCES — collapsed by default; kept so source filter/health stays reachable
+            without opening Customize. */}
       {sources.length > 0 && (
         <div className="sidebar-section">
           <div className="sidebar-sec-head">
@@ -6336,30 +6396,6 @@ function Sidebar({cat, arts, kw, health, activeKw, setActiveKw, activeSource, se
               )}
             </>
           )}
-        </div>
-      )}
-
-      {/* v36: For You — personalized recommendations based on reading/search history */}
-      {recommended && recommended.length > 0 && (
-        <div className="sidebar-section rec-section">
-          <div className="sidebar-sec-head">
-            <span className="sidebar-sec-label">For You</span>
-            <span className="rec-section-sub">Based on your interests</span>
-          </div>
-          {recommended.slice(0, 5).map((a, i) => (
-            <div key={i} className="rec-row" onClick={()=>onRead(a)}>
-              {a.img && <div className="rec-thumb" style={{backgroundImage:`url(${a.img})`}}/>}
-              <div className="rec-body">
-                <div className="rec-title">{a.title}</div>
-                <div className="rec-src">{a.source} · {fmtDate(a.pubDate)}</div>
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
-      {showBriefing && (
-        <div className="sidebar-briefing-wrap">
-          <BriefingTeaser arts={arts} excludeCats={briefingExcludeCats||[]} onOpenFull={onOpenBriefing} compact={true}/>
         </div>
       )}
     </div>
@@ -8690,7 +8726,8 @@ export default function App() {
               <Sidebar cat="sports" arts={arts} kw={kw} health={health}
                 activeKw={activeKw} setActiveKw={k=>{setActiveKw(k);setActiveSrc(null);}}
                 activeSource={activeSrc} setActiveSource={s=>{setActiveSrc(s);setActiveKw(null);}}
-                onRead={onRead} scores={scores} scoresLoading={scoresLoading} showScoreboard={false}/>
+                onRead={onRead} scores={scores} scoresLoading={scoresLoading} showScoreboard={false}
+                isTopicFollowed={isTopicFollowed} toggleTopic={toggleTopic}/>
             </div>
           </>
         )}
@@ -8736,11 +8773,7 @@ export default function App() {
           </div>
         )}
 
-        {/* ── STATE OF PLAY — collapsible top-stories block (shared shell), main list view ── */}
-        {!teamName && !activeTeam && !activeSrc && !search && (
-          <StateOfPlay items={sportItems} meta={CATS.sports} onRead={onRead} formatDate={fmtDate}
-            collapsed={sopCollapsed} onToggleCollapse={toggleSop}/>
-        )}
+        {/* State of Play moved into the sidebar (Pass J item 2). */}
 
         {/* ── HERO + FEED ── */}
         {!teamName && <div className="page-grid" ref={feedRef}>
@@ -8869,7 +8902,10 @@ export default function App() {
             activeKw={activeKw} setActiveKw={k=>{setActiveKw(k);setActiveSrc(null);}}
             activeSource={activeSrc} setActiveSource={s=>{setActiveSrc(s);setActiveKw(null);}}
             onRead={onRead} scores={scores} scoresLoading={scoresLoading}
-            showScoreboard={false} recommended={recommended}/>
+            showScoreboard={false} recommended={recommended}
+            isTopicFollowed={isTopicFollowed} toggleTopic={toggleTopic}
+            sopItems={!activeTeam && !activeSrc && !search ? sportItems : null}
+            sopMeta={CATS.sports} sopCollapsed={sopCollapsed} onToggleSop={toggleSop} formatDate={fmtDate}/>
         </div>}
       </div>
     );
@@ -9200,20 +9236,9 @@ export default function App() {
           <TopOfHourStrip catLead={catLead} arts={arts} onRead={onRead}/>
         )}
 
-        {/* ── STATE OF PLAY strip — collapsible (per-category memory). Coverage-Gap
-            stories ("Not in your sources") are folded in as tagged rows on Home + the
-            merged Business/Markets page — no separate panel. On Home it sits between
-            Top Stories and the next image block as a text-only breather. ── */}
-        {!activeKw && !activeSrc && !search && (
-          <StateOfPlay items={sopSourceItems} meta={CATS[cat]||CATS.general} onRead={onRead} formatDate={fmtDate}
-            collapsed={sopCollapsed} onToggleCollapse={toggleSop} gapItems={gapItems}/>
-        )}
-
-        {/* Across MyNewsHub + Houston Local render full-width below the grid (see
-            <div className="feed-below">) so the sidebar column doesn't reserve a tall
-            empty gutter beside them (Pass H item 4); Across still sits right after
-            State of Play (Pass H item 6). Trending Now now lives in the sidebar
-            (Pass H item 5). */}
+        {/* State of Play moved into the sidebar (Pass J item 2). Across MyNewsHub also
+            moved into the sidebar (Pass J item 4). The main column is now just
+            Top Stories → Houston Local (General) → main feed (Pass J item 6). */}
 
         {/* Category pages: lead image grid */}
         {!activeKw && !activeSrc && catLead && !isHome && (
@@ -9258,29 +9283,10 @@ export default function App() {
           </div>
         )}
 
-          </div>{/* /feed-col — hero + discovery region shares the row with the sidebar */}
-          <Sidebar cat={cat} arts={arts} kw={kw} health={health}
-            activeKw={activeKw} setActiveKw={k=>{setActiveKw(k);setActiveSrc(null);}}
-            activeSource={activeSrc} setActiveSource={s=>{setActiveSrc(s);setActiveKw(null);}}
-            onRead={onRead} scores={scores} scoresLoading={scoresLoading}
-            showScoreboard={cat==='sports'} recommended={recommended}
-            onTopicOpen={label => navigate(cat, 'topic', teamSlug(label))}
-            trendingItems={!activeKw && !activeSrc && !search ? activeFilteredItems : null}
-            isTopicFollowed={isTopicFollowed} toggleTopic={toggleTopic}
-            onTrendingOpen={t => navigate(cat, 'topic', teamSlug(t))}
-            showBriefing={isHome} onOpenBriefing={() => handleTabChange('briefing')} briefingExcludeCats={briefingExclude}/>
-        </div>{/* /page-grid */}
+        {/* Main column continues in the grid alongside the (now tall) sidebar, which
+            holds State of Play + Trending + Briefing + Across + Sources (Pass J). ── */}
 
-        {/* ── Full-width region below the grid: once the sidebar's content ends the
-            layout drops to a single column instead of reserving an empty gutter
-            (Pass H item 4). Across MyNewsHub + Houston lead it off. ── */}
-        <div className="feed-below">
-
-        {/* ── Across MyNewsHub — cross-category recirculation, right after the
-            State-of-Play break (Pass H item 6). ── */}
-        {isHome && !activeKw && !activeSrc && !search && otherCatSections.length > 0 && (
-          <AcrossHub sections={otherCatSections} onRead={onRead} onSeeAll={handleTabChange} formatDate={fmtDate}/>
-        )}
+        {/* Across MyNewsHub moved into the sidebar (Pass J item 4). */}
 
         {/* ── HOME: Houston local row ── */}
         {isHome && !activeKw && !activeSrc && !search && (
@@ -9467,7 +9473,21 @@ export default function App() {
 
             <SocialFollows cat={cat} social={social}/>
             <SourceFooter cat={cat} feeds={feeds} arts={arts}/>
-        </div>{/* /feed-below */}
+          </div>{/* /feed-col */}
+          <Sidebar cat={cat} arts={arts} kw={kw} health={health}
+            activeKw={activeKw} setActiveKw={k=>{setActiveKw(k);setActiveSrc(null);}}
+            activeSource={activeSrc} setActiveSource={s=>{setActiveSrc(s);setActiveKw(null);}}
+            onRead={onRead} scores={scores} scoresLoading={scoresLoading}
+            showScoreboard={cat==='sports'} recommended={recommended}
+            onTopicOpen={label => navigate(cat, 'topic', teamSlug(label))}
+            isTopicFollowed={isTopicFollowed} toggleTopic={toggleTopic}
+            sopItems={!activeKw && !activeSrc && !search ? sopSourceItems : null}
+            sopGapItems={gapItems} sopMeta={CATS[cat]||CATS.general}
+            sopCollapsed={sopCollapsed} onToggleSop={toggleSop} formatDate={fmtDate}
+            acrossSections={isHome && !activeKw && !activeSrc && !search ? otherCatSections : null}
+            onAcrossSeeAll={handleTabChange}
+            showBriefing={isHome} onOpenBriefing={() => handleTabChange('briefing')} briefingExcludeCats={briefingExclude}/>
+        </div>{/* /page-grid */}
       </div>
     );
   };
