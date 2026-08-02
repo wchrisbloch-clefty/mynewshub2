@@ -1,0 +1,10 @@
+/* "+ Follow" chip — sits next to a source name; consumes design tokens. */
+.follow-src-chip{
+  font-family:var(--font-publicsans);
+  font-size:9px;font-weight:800;text-transform:uppercase;letter-spacing:0.04em;
+  color:var(--accent);background:var(--accent-bg);
+  border:1px solid var(--accent);border-radius:10px;
+  padding:1px 7px;margin-left:2px;cursor:pointer;line-height:1.5;white-space:nowrap;
+  flex-shrink:0;transition:background 0.12s,color 0.12s;
+}
+.follow-src-chip:hover{background:var(--accent);color:#fff;}

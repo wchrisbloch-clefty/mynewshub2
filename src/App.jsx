@@ -44,6 +44,7 @@ import { retrieveFeedContext, buildFeedContextBlock } from './modules/retrieval'
 import { XPulse } from './modules/x-pulse';
 import { StateOfPlay } from './modules/state-of-play';
 import { SnapshotCard, CoverageList } from './modules/snapshot-card';
+import { FollowSourceContext, FollowSourceChip } from './modules/follow-source';
 import { MarketsSurface, useMarkets } from './modules/markets-surface';
 import { parseRoute, buildPath } from './modules/routing';
 import { ChatBot } from './modules/concierge';
@@ -7819,6 +7820,36 @@ export default function App() {
   const [kw, setKw]             = useState(()=>ld('kw',DEFAULT_KW));
   const [alerts, setAlerts]     = useState(()=>ld('alerts',['Texans','Astros','Kentucky','Clemson','ERCOT','Bloom Energy','fuel cell','hurricane','earthquake','breaking']));
   const [feeds, setFeeds]       = useState(()=>ld('feeds',DEFAULT_FEEDS));
+  // ── FOLLOW-A-SOURCE-FROM-FEED (Pass G item 7) ───────────────────────────────
+  // "Followed" = present and enabled in any category's feed list (the same list
+  // Customize manages). followSource enables an existing entry or, if the source
+  // is new (e.g. a Coverage Gap outlet), appends it to the active tab's list.
+  const isSourceFollowed = useCallback((name) => {
+    if (!name) return true;
+    const n = name.trim().toLowerCase();
+    return Object.values(feeds || {}).some(list =>
+      (list || []).some(f => f.on && (f.name || '').trim().toLowerCase() === n));
+  }, [feeds]);
+  const followSource = useCallback((name, url = '') => {
+    if (!name) return;
+    const n = name.trim().toLowerCase();
+    setFeeds(prev => {
+      const next = JSON.parse(JSON.stringify(prev || {}));
+      let found = false;
+      for (const c of Object.keys(next)) {
+        for (const f of (next[c] || [])) {
+          if ((f.name || '').trim().toLowerCase() === n) { f.on = true; found = true; }
+        }
+      }
+      if (!found) {
+        const cat = tab || 'general';
+        if (!next[cat]) next[cat] = [];
+        next[cat].push({ name, url: url || SOURCE_URLS[name] || '', on: true, tier: 'reported' });
+      }
+      sv('feeds', next);
+      return next;
+    });
+  }, [tab]);
   const [urgent, setUrgent]     = useState(()=>ld('urgent',DEFAULT_URGENT));
   const [watchlist, setWatchlist]= useState(()=>ld('watchlist',DEFAULT_WATCHLIST));
   // v23: customizable favorite teams. Defaults to SCORE_TEAMS; user can add/remove via Customize.
@@ -10005,6 +10036,7 @@ export default function App() {
   return (
     <>
       <style>{GLOBAL_CSS}</style>
+      <FollowSourceContext.Provider value={{ isSourceFollowed, followSource }}>
       <div className={`hub${dark?' dark':''}`} {...swipeHandlers}>
         <TopBar tab={tab} setTab={handleTabChange} search={search} setSearch={setSearch}
           dark={dark} setDark={setDark}
@@ -10096,6 +10128,7 @@ export default function App() {
       {/* v26b: email magic-link sign-in */}
       {showAuth && <AuthModal onClose={()=>{setShowAuth(false);setAuthStatus('');}} onSend={handleSendMagicLink}
         status={authStatus} email={authEmail} setEmail={setAuthEmail} userId={userId} onSignOut={handleSignOut}/>}
+      </FollowSourceContext.Provider>
     </>
   );
 }

@@ -18,6 +18,7 @@
 
 import { useMemo } from 'react';
 import { rankClusters } from '../clustering';
+import { FollowSourceChip } from '../follow-source';
 import './StateOfPlay.css';
 
 const defaultFormatDate = d => { try { return new Date(d).toLocaleString(); } catch { return ''; } };
@@ -75,6 +76,8 @@ export function StateOfPlay({ items, meta = {}, onRead, formatDate = defaultForm
                     {outlets.slice(0, 2).join(', ')}{g.outletCount > 2 ? ` +${g.outletCount - 2}` : ''}
                   </span>
                 )}
+                {/* Follow the lead outlet straight from the gap row (Pass G item 7). */}
+                {outlets[0] && <FollowSourceChip name={outlets[0]}/>}
               </span>
             </a>
           );
