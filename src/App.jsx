@@ -50,7 +50,7 @@ import { parseRoute, buildPath } from './modules/routing';
 import { ChatBot } from './modules/concierge';
 // Icons: single set (lucide-react), fixed size per context — item 7.
 import { Settings, RefreshCw, Moon, Sun, User,
-  Zap, Droplet, Leaf, TrendingUp, Scale, LayoutGrid, Film, Music, BookOpen, Laugh } from 'lucide-react';
+  Zap, Droplet, Leaf, TrendingUp, Scale, LayoutGrid, Film, Music, BookOpen, Laugh, Trophy } from 'lucide-react';
 import { isCloudSyncEnabled, getUserId, signInWithEmail, signOut, onAuthStateChange, loadProfileFromCloud, saveProfileToCloud, emitEvent } from './lib/cloudSync';
 
 // ─── CATEGORIES ───────────────────────────────────────────────────────────────
@@ -8561,16 +8561,19 @@ export default function App() {
     let feedItems = lead ? sportItems.filter(a => a !== lead) : sportItems;
     if (feedItems.length === 0 && sportItems.length > 0) feedItems = sportItems; // never blank when stories exist
 
+    // League pills are text-only (Pass J item 7): lucide-react has no per-league
+    // glyphs and emoji rendered inconsistently. Team pills below carry real icons
+    // (TeamLogo). "All" gets a lucide Trophy so the leading pill still reads as sports.
     const SPORT_TABS = [
-      { key:'all',    label:'All',             emoji:'🏆' },
-      { key:'nfl',    label:'NFL',             emoji:'🏈' },
-      { key:'nba',    label:'NBA',             emoji:'🏀' },
-      { key:'mlb',    label:'MLB',             emoji:'⚾' },
-      { key:'cfb',    label:'NCAAF',           emoji:'🏈' },
-      { key:'cbb',    label:'NCAAB',           emoji:'🏀' },
-      { key:'cbase',  label:'College Baseball',emoji:'⚾' },
-      { key:'racing', label:'Horse Racing',    emoji:'🏇' },
-      { key:'golf',   label:'Golf',            emoji:'⛳' },
+      { key:'all',    label:'All',             icon:Trophy },
+      { key:'nfl',    label:'NFL' },
+      { key:'nba',    label:'NBA' },
+      { key:'mlb',    label:'MLB' },
+      { key:'cfb',    label:'NCAAF' },
+      { key:'cbb',    label:'NCAAB' },
+      { key:'cbase',  label:'College Baseball' },
+      { key:'racing', label:'Horse Racing' },
+      { key:'golf',   label:'Golf' },
     ];
 
     // Keep the active subcategory chip scrolled into view (on load + on change).
@@ -8607,7 +8610,7 @@ export default function App() {
             <button key={t.key}
               className={`sport-tab ${sportTab===t.key?'active':''}`}
               onClick={()=>{setSportTab(t.key); setActiveTeam(null); setTimeout(scrollToFeed,80);}}>
-              {t.emoji && <span className="sport-tab-emoji">{t.emoji}</span>}
+              {t.icon && <t.icon size={14} strokeWidth={2.2}/>}
               {t.label}
             </button>
           ))}
@@ -9177,6 +9180,19 @@ export default function App() {
           </div>
         )}
 
+        {/* ── ENERGY sub-category pills — at the top of the page, matching the Sports
+            league/team pill position + format (Pass J item 8). ── */}
+        {cat === 'bloom' && !activeKw && !activeSrc && !search && (
+          <div className="pc-subtabs en-subtabs" style={{marginBottom:'12px'}}>
+            {EN_SUBTABS.map(t => (
+              <button key={t.key} className={`pc-subtab ${enSubTab===t.key?'active':''}`}
+                onClick={()=>{setEnSubTab(t.key);window.scrollTo({top:0,behavior:'instant'});}}>
+                <t.icon size={14} strokeWidth={2.2}/>{t.label}
+              </button>
+            ))}
+          </div>
+        )}
+
         {/* ── HOME: Top Stories (image cards) — sits first; the text-only State of Play
             module below it provides a breathing-room break before the next image block
             (Pass H item 3). ── */}
@@ -9284,16 +9300,8 @@ export default function App() {
                 <button className="page-customize-btn" onClick={()=>openCustomize('sources',cat)}><IconGear/> Customize</button>
               </div>
             </div>
-            {cat === 'bloom' && !activeKw && !activeSrc && !search && (
-              <div className="pc-subtabs en-subtabs" style={{marginBottom:'8px',marginTop:'0'}}>
-                {EN_SUBTABS.map(t => (
-                  <button key={t.key} className={`pc-subtab ${enSubTab===t.key?'active':''}`}
-                    onClick={()=>{setEnSubTab(t.key);window.scrollTo({top:0,behavior:'instant'});}}>
-                    <t.icon size={14} strokeWidth={2.2}/>{t.label}
-                  </button>
-                ))}
-              </div>
-            )}
+            {/* Energy sub-category pills moved to the top of the page (Pass J item 8) —
+                see the block at the start of the feed column. */}
             {cat === 'bloom' && enSubTab !== 'all' && !activeKw && !activeSrc && !search && (
               <div className="sport-hub-banner" style={{background:'linear-gradient(135deg,#0369a1 0%,#0284c7 100%)'}}>
                 <div className="sport-hub-inner">
