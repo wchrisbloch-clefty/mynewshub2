@@ -4862,15 +4862,18 @@ kbd{display:inline-block;padding:1px 5px;border:1px solid var(--border);border-r
   font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:0.12em;
   color:var(--text3);
 }
-/* Bento grid: story size reflects priority. The lead spans a 2×2 block; the four
-   secondaries fill the remaining cells. One column on mobile (see media query). */
+/* ONE ROW (Pass G item 4): a tall hero (~53%) on the left + a rail of up to three
+   compact secondaries stacked on the right — never a second row of picture-cards.
+   The hero spans all three rail rows so the module is one band, not a grid of
+   equal boxes. One column on mobile (see media query). */
 .toh-grid{
   display:grid;
-  grid-template-columns:repeat(4,1fr);
-  grid-auto-rows:188px;
+  grid-template-columns:53% 1fr;
+  grid-auto-rows:104px;
   gap:14px;
 }
-.toh-card-lead{grid-column:span 2;grid-row:span 2;}
+.toh-card-lead{grid-column:1;grid-row:1 / span 3;}
+.toh-card:not(.toh-card-lead){grid-column:2;}
 .toh-card{
   position:relative;border-radius:10px;overflow:hidden;
   cursor:pointer;display:block;
@@ -4878,11 +4881,12 @@ kbd{display:inline-block;padding:1px 5px;border:1px solid var(--border);border-r
   transition:transform 0.2s,box-shadow 0.2s;
 }
 .toh-card:hover{transform:translateY(-2px);box-shadow:0 12px 40px rgba(0,0,0,0.22);}
-/* Card height comes from the bento grid rows now, not an aspect-ratio spacer. */
+/* Card height comes from the grid rows now, not an aspect-ratio spacer. */
 .toh-card::before{content:none;}
-.toh-img,.toh-img-ph{
-  position:absolute;inset:0;
-  background-size:cover;background-position:center top;
+.toh-img-ph{position:absolute;inset:0;background-size:cover;background-position:center top;}
+.toh-img{
+  position:absolute;inset:0;width:100%;height:100%;
+  object-fit:cover;object-position:center top;display:block;
 }
 .toh-img-ph{
   display:flex;align-items:center;justify-content:center;
@@ -4918,11 +4922,13 @@ kbd{display:inline-block;padding:1px 5px;border:1px solid var(--border);border-r
   font-size:10px;color:rgba(255,255,255,0.6);
   font-weight:600;font-family:var(--font-sans);
 }
-/* Tablet: 2-col */
-@media(max-width:1000px) and (min-width:641px){
-  .toh-grid{grid-template-columns:repeat(2,1fr);grid-auto-rows:156px;}
-  .toh-card-lead{grid-column:span 2;grid-row:span 2;}
+/* Tablet/iPad: single column — hero on top, then the secondaries stacked. Cap at
+   hero + 2 secondaries so it never becomes a tall wall of picture-cards. */
+@media(max-width:1024px){
+  .toh-grid{grid-template-columns:1fr;grid-auto-rows:168px;}
+  .toh-card-lead{grid-column:auto;grid-row:auto;}
   .toh-card-lead .toh-title{font-size:20px;}
+  .toh-card:nth-child(n+4){display:none;}
 }
 /* Mobile: single column, stacking order preserved (lead first). */
 @media(max-width:640px){
@@ -7484,21 +7490,21 @@ function TopOfHourStrip({ catLead, arts, onRead }) {
     const picks = catLead && catLead.img ? [catLead] : (catLead ? [] : []);
     const used = new Set(catLead ? [catLead.link] : []);
     const catOrder = ['sports','business','finance','bloom','popculture','general','tech'];
-    // Two passes so the bento fills to 5: one per category first (variety), then
-    // top up from any category if some feeds were empty.
+    // One row: hero + up to 3 secondaries (4 total). Two passes — one per category
+    // first (variety), then top up from any category if some feeds were empty.
     for (const c of catOrder) {
-      if (picks.length >= 5) break;
+      if (picks.length >= 4) break;
       const item = (arts[c]||[]).find(a => a.img && !used.has(a.link));
       if (item) { picks.push({...item, cat: item.cat||c}); used.add(item.link); }
     }
     for (const c of catOrder) {
-      if (picks.length >= 5) break;
+      if (picks.length >= 4) break;
       for (const a of (arts[c]||[])) {
-        if (picks.length >= 5) break;
+        if (picks.length >= 4) break;
         if (a.img && !used.has(a.link)) { picks.push({...a, cat: a.cat||c}); used.add(a.link); }
       }
     }
-    return picks.slice(0,5);
+    return picks.slice(0,4);
   }, [catLead, arts]);
   if (stories.length < 1) return null;
   return (
@@ -7511,9 +7517,11 @@ function TopOfHourStrip({ catLead, arts, onRead }) {
           const cc = CATS[a.cat] || CATS.general;
           return (
             <article key={i} className={`toh-card${i===0?' toh-card-lead':''}`} onClick={() => onRead(a)}>
-              {a.img
-                ? <div className="toh-img" style={{backgroundImage:`url(${a.img})`}}/>
-                : <div className="toh-img-ph"><span className="ph-label">{a.source}</span></div>}
+              {/* Placeholder sits underneath; the real image loads on top and hides
+                  itself if the URL fails, so a broken image never leaves a grey slot. */}
+              <div className="toh-img-ph"><span className="ph-label">{a.source}</span></div>
+              {a.img && <img className="toh-img" src={a.img} alt="" loading="lazy"
+                onError={e => { e.currentTarget.style.display = 'none'; }}/>}
               <div className="toh-grad"/>
               <div className="toh-body">
                 <span className="toh-cat" style={{background:cc.color}}>{cc.label}</span>
