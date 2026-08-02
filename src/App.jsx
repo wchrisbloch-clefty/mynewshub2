@@ -1812,12 +1812,9 @@ body:not(.dark) .pill-bar{
 .sidebar{
   display:flex;flex-direction:column;gap:24px;min-width:0;
   border-left:1px solid var(--border2);padding-left:28px;
-  /* Sticky so the sidebar's modules follow the reader down the long feed instead of
-     leaving a blank gutter beside the feed tail (Pass J). align-self:start keeps it
-     from stretching to the feed-column height. */
-  position:sticky;top:72px;align-self:start;
+  /* Flows in normal document scroll along with the main column — no sticky/fixed
+     positioning and no internal scroll container. */
 }
-@media (max-width:1024px){ .sidebar{position:static;} }
 
 /* Ghost sidebar section */
 .gs-section{display:flex;flex-direction:column;gap:0;}
