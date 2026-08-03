@@ -1011,16 +1011,29 @@ function SourcesDisagree({ topic, items }) {
 
 // Coverage-gap discovery: stories multiple wider outlets cover that none of the
 // reader's own sources touched. Capped at 'reported' tier by the API.
-async function fetchDiscover(category, keywords, followedSources) {
+async function fetchDiscover(category, keywords, followedSources, mode = 'gap') {
   try {
     const r = await fetch('/api/discover', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ category, keywords, followedSources }),
+      body: JSON.stringify({ category, keywords, followedSources, mode }),
       signal: AbortSignal.timeout(15000),
     });
     if (!r.ok) return { items: [] };
     return await r.json();
   } catch { return { items: [] }; }
+}
+
+// Team/league name → wide-scan search keyword. Short mascot names ("Rockets",
+// "Heat") are ambiguous on an open web search, so we qualify them with the league
+// (Rockets → "Rockets NBA") to pull the right sport's coverage across all outlets.
+const LEAGUE_QUALIFIER = {
+  nfl: 'NFL', nba: 'NBA', mlb: 'MLB',
+  cfb: 'college football', cbb: 'college basketball',
+  cbase: 'college baseball', racing: 'horse racing', golf: 'golf',
+};
+function teamScanKeyword(name, league) {
+  const q = LEAGUE_QUALIFIER[league];
+  return q ? `${name} ${q}` : name;
 }
 
 // "You may be missing this" — compact panel, distinct from the main feed. Renders
@@ -2217,7 +2230,7 @@ body:not(.dark) .pill-bar{
 .fin-table{width:100%;border-collapse:collapse;font-variant-numeric:tabular-nums;}
 .fin-table thead th{
   background:var(--surface2);
-  font-size:9px;font-weight:700;color:var(--text3);
+  font-size:var(--fs-meta);font-weight:700;color:var(--text3);
   text-transform:uppercase;letter-spacing:0.07em;
   padding:7px 16px;border-bottom:1px solid var(--border);
 }
@@ -2231,15 +2244,15 @@ body:not(.dark) .pill-bar{
 .fin-sym{font-weight:800;font-size:var(--fs-body);color:var(--accent);letter-spacing:-0.2px;}
 .fin-name{color:var(--text3);font-size:var(--fs-meta);font-weight:400;padding-left:0;}
 .fin-px{font-variant-numeric:tabular-nums;text-align:right;font-weight:600;font-size:var(--fs-body);}
-.fin-up{color:#16a34a;}
-.fin-down{color:#dc2626;}
+.fin-up{color:var(--pos);}
+.fin-down{color:var(--neg);}
 .fin-pct-pill{
   display:inline-block;
   background:rgba(22,163,74,0.12);border-radius:6px;padding:2px 7px;
   font-size:var(--fs-meta);font-weight:700;font-variant-numeric:tabular-nums;
 }
 .fin-down .fin-pct-pill{background:rgba(220,38,38,0.1);}
-.fin-empty{padding:32px;text-align:center;color:var(--text3);font-style:italic;font-size:12px;}
+.fin-empty{padding:32px;text-align:center;color:var(--text3);font-style:italic;font-size:var(--fs-body);}
 /* Watchlist compact rows */
 .fin-wl-row{cursor:pointer;transition:background 0.1s;}
 .fin-wl-row:hover,.fin-wl-row.expanded{background:var(--surface2);}
@@ -6219,7 +6232,7 @@ function Scoreboard({scores, loading, compact=false}) {
 
 // ─── GHOST SIDEBAR ────────────────────────────────────────────────────────────
 function Sidebar({cat, arts, kw, health, activeKw, setActiveKw, activeSource, setActiveSource, onRead, scores, scoresLoading, showScoreboard, recommended, showBriefing, onOpenBriefing, briefingExcludeCats, onTopicOpen, trendingItems, isTopicFollowed, toggleTopic, onTrendingOpen,
-  sopItems, sopGapItems, sopMeta, sopCollapsed, onToggleSop, formatDate, acrossSections, onAcrossSeeAll}) {
+  sopItems, sopGapItems, sopMeta, sopCollapsed, onToggleSop, formatDate, acrossSections, onAcrossSeeAll, followingModule}) {
   const cc = CATS[cat]||CATS.general;
   const catKws = kw[cat]||[];
   const catArts = arts[cat]||[];
@@ -6369,6 +6382,11 @@ function Sidebar({cat, arts, kw, health, activeKw, setActiveKw, activeSource, se
           ))}
         </div>
       )}
+
+      {/* 4b) FOLLOWING — relocated out of the General-page full-width banner into the
+            sidebar directly below Across MyNewsHub (Pass K item 3). Reuses the existing
+            follow-chip pills + "+ Add"; General only (injected as a prop by FeedPage). */}
+      {followingModule && !activeKw && !activeSource && followingModule}
 
       {/* 5) SOURCES — collapsed by default; kept so source filter/health stays reachable
             without opening Customize. */}
@@ -8508,6 +8526,30 @@ export default function App() {
     // Coverage-Gap stories for the active team, folded into the team's State of
     // Play list as tagged rows (Pass G item 9) — no standalone panel.
     const [teamGapItems, setTeamGapItems] = useState([]);
+    // Wide multi-source scan for the active team (Pass K item 1). The team story feed
+    // must not be scoped to ESPN's sports feed alone — it runs the same wide scan as
+    // Coverage Gap (any outlet that mentions the team), so niche/local teams (e.g. the
+    // Rockets) surface real stories instead of an empty state. Covers BOTH the URL-driven
+    // Tier-3 team page (teamName) and the My-Teams hub (activeTeam).
+    const [teamWideItems, setTeamWideItems] = useState([]);
+    const teamEntityName = teamName || (activeTeam && activeTeam.team) || null;
+    const teamEntityLeague = teamName ? sportTab : (activeTeam && activeTeam.league) || null;
+    useEffect(() => {
+      let alive = true;
+      if (!teamEntityName) { setTeamWideItems([]); return () => { alive = false; }; }
+      const kw = teamScanKeyword(teamEntityName, teamEntityLeague);
+      fetchDiscover('sports', [kw], [], 'feed').then(r => { if (alive) setTeamWideItems((r && r.items) || []); });
+      return () => { alive = false; };
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [teamEntityName, teamEntityLeague]);
+    // Keep only wide-scan rows that actually name the team (the qualified query already
+    // scopes the search, but clustering can pull an adjacent headline in) and drop any
+    // already present in the local sports feed, deduped by title.
+    const teamWideFiltered = useMemo(() => {
+      if (!teamEntityName) return [];
+      const q = teamEntityName.toLowerCase();
+      return teamWideItems.filter(a => (a.title || '').toLowerCase().includes(q));
+    }, [teamWideItems, teamEntityName]);
 
     // v36: Fetch web results when a specific league tab is active
     useEffect(() => {
@@ -8555,6 +8597,10 @@ export default function App() {
           const text = (a.title + ' ' + (a.desc||'')).toLowerCase();
           return text.includes(m) || (teamShort.length > 3 && text.includes(teamShort));
         });
+        // Fold in the wide multi-source scan (Pass K item 1) so the team feed isn't
+        // limited to ESPN/CBS — any outlet that covers this team surfaces here.
+        const have = new Set(items.map(storyKey));
+        items = [...items, ...teamWideFiltered.filter(a => !have.has(storyKey(a)))];
       } else if (sportTab !== 'all') {
         // Sport-tab filter: keep articles mentioning any team in this sport,
         // OR keep any article from sport-specific kw (broad fallback).
@@ -8585,15 +8631,21 @@ export default function App() {
         return new Date(b.pubDate) - new Date(a.pubDate);
       });
       return scored;
-    }, [allItems, activeTeam, sportTab, teams, visibleTeams]);
+    }, [allItems, activeTeam, sportTab, teams, visibleTeams, teamWideFiltered]);
 
     // Hero = first article with image
     // Tier 3: team feed reuses the Phase 2 engine (narrower query) + clusterStories.
     const teamItems = useMemo(() => {
       if (!teamName) return [];
       const q = teamName.toLowerCase();
-      return clusterStories(allItems.filter(a => (a.title + ' ' + (a.desc||'')).toLowerCase().includes(q)));
-    }, [teamName, allItems]);
+      const local = clusterStories(allItems.filter(a => (a.title + ' ' + (a.desc||'')).toLowerCase().includes(q)));
+      // Merge the wide multi-source scan (Pass K item 1) — stories from ANY outlet that
+      // mention the team, not just the reader's ESPN/CBS sports feeds. Local (richer:
+      // images, descriptions) first, then wide-scan rows not already present.
+      const have = new Set(local.map(storyKey));
+      const merged = [...local, ...teamWideFiltered.filter(a => !have.has(storyKey(a)))];
+      return merged.sort((a, b) => new Date(b.pubDate || 0) - new Date(a.pubDate || 0));
+    }, [teamName, allItems, teamWideFiltered]);
     const teamHero = teamItems.find(a => a.img) || null;
 
     // Fetch the team's Coverage-Gap items (widely-covered team news the reader's
@@ -9181,6 +9233,51 @@ export default function App() {
       })).filter(s => s.items.length > 0);
     }, [isHome, arts]);
 
+    // Following module — relocated from the General-page full-width banner into the
+    // sidebar (Pass K item 3), rendered as a standard sidebar section with the existing
+    // follow-chip pills + "+ Add". General page only; injected into <Sidebar/> as a prop.
+    const followingModule = isHome ? (
+      <div className="sidebar-section sb-following">
+        <div className="sidebar-sec-head"><span className="sidebar-sec-label">Following</span></div>
+        <div className="following-chips">
+          {(() => {
+            const nameCounts = {};
+            myTeams.forEach(t => { const k = (t.name||'').toLowerCase(); nameCounts[k] = (nameCounts[k]||0) + 1; });
+            return myTeams.map((t, i) => {
+              const dup = nameCounts[(t.name||'').toLowerCase()] > 1;
+              return (
+                <span key={`tm-${i}`} className="following-chip following-chip-team" onClick={()=>navigate('sports', t.league, t.slug)}>
+                  <TeamLogo name={t.name} league={t.league} size={18}/>
+                  <span className="following-chip-name">{t.name}{dup ? ` · ${(t.league||'').toUpperCase()}` : ''}</span>
+                  <button className="following-chip-x" onClick={e=>{e.stopPropagation();toggleMyTeam(t);}} aria-label="Unfollow">×</button>
+                </span>
+              );
+            });
+          })()}
+          {myTopics.map((t, i) => (
+            <span key={`tp-${i}`} className="following-chip" onClick={()=>navigate('general','topic',teamSlug(t))}>
+              <span className="following-chip-name">{t}</span>
+              <button className="following-chip-x" onClick={e=>{e.stopPropagation();toggleTopic(t);}} aria-label="Unfollow">×</button>
+            </span>
+          ))}
+          {myTeams.length === 0 && myTopics.length === 0 && (
+            <span className="following-empty">Follow teams &amp; topics to build your row</span>
+          )}
+          <div className="follow-add-wrap">
+            <button className="following-add-btn" onClick={()=>setShowFollowAdd(v=>!v)} aria-expanded={showFollowAdd}>+ Add</button>
+            {showFollowAdd && (
+              <FollowAdd
+                isFollowingTeam={t => myTeams.some(x => x.slug === teamSlug(t.name) && x.league === t.league)}
+                isTopicFollowed={isTopicFollowed}
+                onAddTeam={t => toggleMyTeam({ name: t.name, league: t.league, slug: teamSlug(t.name) })}
+                onAddTopic={topic => toggleTopic(topic)}
+                onClose={() => setShowFollowAdd(false)}/>
+            )}
+          </div>
+        </div>
+      </div>
+    ) : null;
+
     return (
       <div className="page">
         {/* v46: "N new stories" pill — background poll staged fresh articles */}
@@ -9191,53 +9288,8 @@ export default function App() {
         )}
         {/* Live Scores moved to the top bar (below weather, above the category nav —
             Pass G item 3). Rendered by <TopBar>; no longer here in the feed column. */}
-        {/* HOME: unified Following row (topics + teams) above the category feeds.
-            Always shown on Home so the "+ Add" search-and-add is reachable even when
-            nothing is followed yet. */}
-        {isHome && !activeKw && !activeSrc && !search && (
-          <section className="following-row">
-            <span className="following-label">Following</span>
-            <div className="following-chips">
-              {(() => {
-                // Same team name under two sport tags (e.g. Kentucky CBB + CFB) are
-                // distinct follows — show the league on the chip so they don't read
-                // as a duplicate. Unique names stay clean.
-                const nameCounts = {};
-                myTeams.forEach(t => { const k = (t.name||'').toLowerCase(); nameCounts[k] = (nameCounts[k]||0) + 1; });
-                return myTeams.map((t, i) => {
-                  const dup = nameCounts[(t.name||'').toLowerCase()] > 1;
-                  return (
-                    <span key={`tm-${i}`} className="following-chip following-chip-team" onClick={()=>navigate('sports', t.league, t.slug)}>
-                      <TeamLogo name={t.name} league={t.league} size={18}/>
-                      <span className="following-chip-name">{t.name}{dup ? ` · ${(t.league||'').toUpperCase()}` : ''}</span>
-                      <button className="following-chip-x" onClick={e=>{e.stopPropagation();toggleMyTeam(t);}} aria-label="Unfollow">×</button>
-                    </span>
-                  );
-                });
-              })()}
-              {myTopics.map((t, i) => (
-                <span key={`tp-${i}`} className="following-chip" onClick={()=>navigate('general','topic',teamSlug(t))}>
-                  <span className="following-chip-name">{t}</span>
-                  <button className="following-chip-x" onClick={e=>{e.stopPropagation();toggleTopic(t);}} aria-label="Unfollow">×</button>
-                </span>
-              ))}
-              {myTeams.length === 0 && myTopics.length === 0 && (
-                <span className="following-empty">Follow teams &amp; topics to build your row</span>
-              )}
-              <div className="follow-add-wrap">
-                <button className="following-add-btn" onClick={()=>setShowFollowAdd(v=>!v)} aria-expanded={showFollowAdd}>+ Add</button>
-                {showFollowAdd && (
-                  <FollowAdd
-                    isFollowingTeam={t => myTeams.some(x => x.slug === teamSlug(t.name) && x.league === t.league)}
-                    isTopicFollowed={isTopicFollowed}
-                    onAddTeam={t => toggleMyTeam({ name: t.name, league: t.league, slug: teamSlug(t.name) })}
-                    onAddTopic={topic => toggleTopic(topic)}
-                    onClose={() => setShowFollowAdd(false)}/>
-                )}
-              </div>
-            </div>
-          </section>
-        )}
+        {/* Following row relocated into the sidebar (Pass K item 3) — see
+            `followingModule` passed to <Sidebar/> below. */}
         {/* Welcome/onboarding banner removed (Pass H item 1): it wasn't driving
             meaningful onboarding value and kept reappearing. */}
 
@@ -9538,6 +9590,7 @@ export default function App() {
             sopCollapsed={sopCollapsed} onToggleSop={toggleSop} formatDate={fmtDate}
             acrossSections={isHome && !activeKw && !activeSrc && !search ? otherCatSections : null}
             onAcrossSeeAll={handleTabChange}
+            followingModule={followingModule}
             showBriefing={isHome} onOpenBriefing={() => handleTabChange('briefing')} briefingExcludeCats={briefingExclude}/>
         </div>{/* /page-grid */}
       </div>

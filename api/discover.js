@@ -49,7 +49,8 @@ function parseGoogleNews(xml) {
     const title = decode((block.match(/<title>([\s\S]*?)<\/title>/) || [])[1] || '');
     const link = decode((block.match(/<link>([\s\S]*?)<\/link>/) || [])[1] || '');
     const source = decode((block.match(/<source[^>]*>([\s\S]*?)<\/source>/) || [])[1] || '');
-    if (title && link) items.push({ title: title.replace(/ - [^-]*$/, '').trim(), link, source: source || 'Web' });
+    const pubDate = decode((block.match(/<pubDate>([\s\S]*?)<\/pubDate>/) || [])[1] || '');
+    if (title && link) items.push({ title: title.replace(/ - [^-]*$/, '').trim(), link, source: source || 'Web', pubDate });
   }
   return items;
 }
@@ -81,6 +82,11 @@ export default async function handler(req, res) {
   const keywords = (Array.isArray(body.keywords) ? body.keywords : []).filter(Boolean).slice(0, 4);
   const followedNorm = (Array.isArray(body.followedSources) ? body.followedSources : []).map(norm).filter(Boolean);
   const category = String(body.category || 'general');
+  // mode 'gap' (default): coverage gaps only — clusters ≥2 outlets cover that none of
+  // the reader's sources touched. mode 'feed': the FULL wide multi-source scan for a
+  // topic/team/league — every matching story (≥1 outlet), no followed-source exclusion,
+  // so a followed team surfaces stories from ANY outlet, not just the reader's feeds.
+  const mode = body.mode === 'feed' ? 'feed' : 'gap';
   if (!keywords.length) return res.status(200).json({ items: [] });
 
   // Build discovery feed URLs (Google News topic search per keyword; HN for tech).
@@ -103,25 +109,41 @@ export default async function handler(req, res) {
     if (!placed) clusters.push({ key: titleKey(it.title), tokens: tk, items: [it], sources: new Set([norm(it.source)]) });
   }
 
-  // A gap = covered by ≥2 distinct discovery outlets AND none of the reader's sources.
-  const gaps = clusters
-    .filter(c => c.sources.size >= 2)
-    .filter(c => !c.items.some(it => isFollowed(it.source, followedNorm)))
-    .map(c => {
-      const lead = c.items[0];
-      const outlets = [...new Set(c.items.map(it => it.source).filter(Boolean))];
-      return {
-        title: lead.title,
-        link: lead.link,
-        source: lead.source,
-        outlets: outlets.slice(0, 5),
-        outletCount: c.sources.size,
-        tier: 'reported', // capped — found via a wide net, never 'verified'
-      };
-    })
-    .sort((a, b) => b.outletCount - a.outletCount)
-    .slice(0, 6);
+  const toItem = c => {
+    // Lead = most recent item in the cluster (feed) or first (gap ordering by outlets).
+    const lead = mode === 'feed'
+      ? c.items.slice().sort((a, b) => new Date(b.pubDate || 0) - new Date(a.pubDate || 0))[0]
+      : c.items[0];
+    const outlets = [...new Set(c.items.map(it => it.source).filter(Boolean))];
+    return {
+      title: lead.title,
+      link: lead.link,
+      source: lead.source,
+      pubDate: lead.pubDate || '',
+      outlets: outlets.slice(0, 5),
+      outletCount: c.sources.size,
+      tier: 'reported', // capped — found via a wide net, never 'verified'
+    };
+  };
+
+  let items;
+  if (mode === 'feed') {
+    // Full wide scan: every matching cluster (≥1 outlet), most-recent first, up to 24.
+    // No followed-source exclusion — a followed team gets stories from ANY outlet.
+    items = clusters
+      .map(toItem)
+      .sort((a, b) => new Date(b.pubDate || 0) - new Date(a.pubDate || 0))
+      .slice(0, 24);
+  } else {
+    // A gap = covered by ≥2 distinct discovery outlets AND none of the reader's sources.
+    items = clusters
+      .filter(c => c.sources.size >= 2)
+      .filter(c => !c.items.some(it => isFollowed(it.source, followedNorm)))
+      .map(toItem)
+      .sort((a, b) => b.outletCount - a.outletCount)
+      .slice(0, 6);
+  }
 
   res.setHeader('Cache-Control', 's-maxage=900, stale-while-revalidate=3600');
-  return res.status(200).json({ items: gaps });
+  return res.status(200).json({ items });
 }
