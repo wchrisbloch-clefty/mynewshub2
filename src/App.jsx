@@ -3832,9 +3832,11 @@ body{overscroll-behavior-y:contain;}
   .sidebar{order:2;border-left:none;padding-left:0;border-top:2px solid var(--border);padding-top:22px;margin-top:10px;}
   .feed-col{order:1;}
   .fin-indices{grid-template-columns:1fr;}
-  /* Hoist State of Play into the main column near the top; hide the sidebar copy. */
+  /* Hoist State of Play into the main column near the top; hide the sidebar copy —
+     but ONLY on grids that actually render a hoisted copy (General/category pages).
+     Sports has no hoist, so its sidebar State of Play must stay visible here. */
   .sop-hoist{display:block;margin-bottom:22px;}
-  .sidebar .sop-sidebar{display:none;}
+  .has-sop-hoist .sidebar .sop-sidebar{display:none;}
 }
 @media (max-width:900px){
   .bloom-strip{grid-template-columns:1fr 1fr;}
@@ -9302,7 +9304,7 @@ export default function App() {
 
         {/* Desktop: main column + sidebar run together from the very top of the
             content (68/32), so Top Stories sits inside the 68% column, not full-width. */}
-        <div className="page-grid">
+        <div className="page-grid has-sop-hoist">
           <div className="feed-col">
 
         {/* ── BUSINESS + MARKETS filter pills — reuses the Sports league-pill component.
