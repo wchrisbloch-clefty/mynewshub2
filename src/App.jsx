@@ -1027,9 +1027,15 @@ async function fetchDiscover(category, keywords, followedSources, mode = 'gap') 
 // "Heat") are ambiguous on an open web search, so we qualify them with the league
 // (Rockets → "Rockets NBA") to pull the right sport's coverage across all outlets.
 const LEAGUE_QUALIFIER = {
+  // Sports-tab keys (Tier-3 team page derives league from the URL tab).
   nfl: 'NFL', nba: 'NBA', mlb: 'MLB',
   cfb: 'college football', cbb: 'college basketball',
   cbase: 'college baseball', racing: 'horse racing', golf: 'golf',
+  // ESPN league slugs (the My-Teams hub's activeTeam.league uses these).
+  'college-football': 'college football',
+  'mens-college-basketball': 'college basketball',
+  'womens-college-basketball': 'college basketball',
+  'college-baseball': 'college baseball',
 };
 function teamScanKeyword(name, league) {
   const q = LEAGUE_QUALIFIER[league];
@@ -8534,8 +8540,28 @@ export default function App() {
     // Rockets) surface real stories instead of an empty state. Covers BOTH the URL-driven
     // Tier-3 team page (teamName) and the My-Teams hub (activeTeam).
     const [teamWideItems, setTeamWideItems] = useState([]);
-    const teamEntityName = teamName || (activeTeam && activeTeam.team) || null;
-    const teamEntityLeague = teamName ? sportTab : (activeTeam && activeTeam.league) || null;
+    // Resolve the active team entity for the wide scan. Two entry points with DIFFERENT
+    // field shapes, so we normalize:
+    //   • Tier-3 team page: teamName is a clean chip name ("Clemson"), league = URL tab
+    //     key ("cfb").
+    //   • My-Teams hub: activeTeam.match is the search term ("Clemson", "Houston Texans"),
+    //     activeTeam.team is a DISPLAY label ("Clemson FB", "UK Basketball"), and
+    //     activeTeam.league is an ESPN slug ("college-football").
+    // We search on the MATCH term (never the display label) and keep a set of filter
+    // "needles" — the match phrase, its mascot/last word, and the display label — so a
+    // suffixed label like "Clemson FB" or a city-prefixed "Houston Texans" still matches
+    // real headlines ("Clemson beats…", "Texans sign…").
+    const teamEntity = useMemo(() => {
+      if (teamName) return { name: teamName, league: sportTab, needles: [teamName] };
+      if (activeTeam) {
+        const match = activeTeam.match || activeTeam.team || '';
+        const last = match.split(/\s+/).filter(Boolean).pop();
+        return { name: match, league: activeTeam.league, needles: [match, last, activeTeam.team].filter(Boolean) };
+      }
+      return null;
+    }, [teamName, sportTab, activeTeam]);
+    const teamEntityName = teamEntity && teamEntity.name;
+    const teamEntityLeague = teamEntity && teamEntity.league;
     useEffect(() => {
       let alive = true;
       if (!teamEntityName) { setTeamWideItems([]); return () => { alive = false; }; }
@@ -8544,14 +8570,13 @@ export default function App() {
       return () => { alive = false; };
       // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [teamEntityName, teamEntityLeague]);
-    // Keep only wide-scan rows that actually name the team (the qualified query already
-    // scopes the search, but clustering can pull an adjacent headline in) and drop any
-    // already present in the local sports feed, deduped by title.
+    // Keep only wide-scan rows that name the team — match ANY needle (the scoped query
+    // already narrows the search; this just drops an adjacent headline clustering merged).
     const teamWideFiltered = useMemo(() => {
-      if (!teamEntityName) return [];
-      const q = teamEntityName.toLowerCase();
-      return teamWideItems.filter(a => (a.title || '').toLowerCase().includes(q));
-    }, [teamWideItems, teamEntityName]);
+      if (!teamEntity) return [];
+      const needles = teamEntity.needles.map(n => (n || '').toLowerCase()).filter(Boolean);
+      return teamWideItems.filter(a => { const t = (a.title || '').toLowerCase(); return needles.some(n => t.includes(n)); });
+    }, [teamWideItems, teamEntity]);
 
     // v36: Fetch web results when a specific league tab is active
     useEffect(() => {
