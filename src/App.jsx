@@ -8968,17 +8968,20 @@ export default function App() {
             <SourceFooter cat="sports" feeds={feeds} arts={arts}/>
           </div>
 
-          {/* State of Play is intentionally NOT shown on league/broad Sports views
-              (NFL, NBA, "All", etc.) — sopItems is null here. It appears only on
-              individual followed-team pages, which render their own in-column
-              StateOfPlay (see the teamName block above). */}
+          {/* State of Play scoping across Sports (three cases, three answers):
+              • "All" overview (sportTab==='all', no team) → SHOW (top-level category).
+              • League view (a specific league, no team) → HIDE — league-wide trending
+                is noise unless you follow every team; sopItems is null.
+              • Team hub (activeTeam set) → SHOW, scoped to that team (sportItems is
+                already team-filtered). The Tier-3 team page renders its own in-column
+                StateOfPlay in the teamName block above. */}
           <Sidebar cat="sports" arts={arts} kw={kw} health={health}
             activeKw={activeKw} setActiveKw={k=>{setActiveKw(k);setActiveSrc(null);}}
             activeSource={activeSrc} setActiveSource={s=>{setActiveSrc(s);setActiveKw(null);}}
             onRead={onRead} scores={scores} scoresLoading={scoresLoading}
             showScoreboard={false} recommended={recommended}
             isTopicFollowed={isTopicFollowed} toggleTopic={toggleTopic}
-            sopItems={null}
+            sopItems={(sportTab === 'all' || activeTeam) && !activeSrc && !search ? sportItems : null}
             sopMeta={CATS.sports} sopCollapsed={sopCollapsed} onToggleSop={toggleSop} formatDate={fmtDate}/>
         </div>}
       </div>
