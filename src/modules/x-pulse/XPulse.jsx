@@ -44,7 +44,7 @@ export function XPulse({ topic, variant, endpoint = '/api/x-pulse' }) {
       <div className="xp-head">
         <span className="xp-badge">𝕏 Pulse</span>
         <span className={`xp-sent ${sentClass}`}>{sentLabel}</span>
-        <span className="xp-note">street-level reaction · unverified</span>
+        <span className="xp-note">alternative perspective · inferred, unverified street signal</span>
       </div>
       <div className="xp-takes">
         {data.takes.slice(0, 3).map((t, i) => (

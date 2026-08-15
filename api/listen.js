@@ -166,7 +166,7 @@ async function summarizeText(title, text) {
     try {
       const r = await fetch('https://api.anthropic.com/v1/messages', {
         method: 'POST', headers: { 'Content-Type': 'application/json', 'x-api-key': anth, 'anthropic-version': '2023-06-01' },
-        body: JSON.stringify({ model: 'claude-sonnet-4-6', max_tokens: 320, messages: [{ role: 'user', content: prompt }] }),
+        body: JSON.stringify({ model: 'claude-sonnet-5', max_tokens: 320, messages: [{ role: 'user', content: prompt }] }),
         signal: AbortSignal.timeout(12000),
       });
       if (r.ok) { const d = await r.json(); const s = d?.content?.[0]?.text?.trim(); if (s) return { summary: s, provider: 'Claude' }; }
