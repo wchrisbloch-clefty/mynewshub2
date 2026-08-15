@@ -29,9 +29,17 @@ export function heatScore(a) {
   return (a._clusterSize || 1) * 12 + Math.max(0, 48 - ageH);
 }
 
+// Tier trust ranking — higher wins. Used so a cluster's representative (which carries
+// the "_clusterSize / N sources" credibility signal) is always the HIGHEST-tier member,
+// never merely the first one seen. Prevents an unverified/inferred item from inheriting
+// a multi-source credibility badge from higher-tier coverage it was clustered with.
+const TIER_RANK = { verified: 3, reported: 2, unverified: 1, inferred: 0 };
+function tierRank(a) { const t = a && (a._tier || a.tier); return t in TIER_RANK ? TIER_RANK[t] : 2; }
+
 // Groups articles covering the same story. Bigram Jaccard on titles (>=0.28)
-// within a 6-hour window. Returns one representative per cluster (the first seen),
-// annotated with _clusterSize and up to 5 _clusterSources.
+// within a 6-hour window. Returns one representative per cluster — the highest-tier
+// member (ties keep the first seen, which is also the most recent when input is sorted
+// newest-first) — annotated with _clusterSize and up to 5 _clusterSources.
 export function clusterStories(articles) {
   function bigrams(str) {
     const words = (str || '').toLowerCase().replace(/[^a-z0-9 ]/g, '').split(/\s+/).filter(w => w.length > 2);
@@ -70,8 +78,13 @@ export function clusterStories(articles) {
     }
 
     clustered.add(i);
+    // Representative = highest-tier member (provenance guard). Tie → first seen (a),
+    // preserving recency ordering. The credibility signal (_clusterSize) then attaches
+    // to the most trustworthy headline in the cluster, not whichever arrived first.
+    let rep = a, repRank = tierRank(a);
+    for (const m of cluster) { const rk = tierRank(m); if (rk > repRank) { rep = m; repRank = rk; } }
     result.push({
-      ...a,
+      ...rep,
       _clusterSize: cluster.length,
       _clusterSources: [...clusterSources].slice(0, 5),
       _clusterMembers: cluster, // every article in the cluster — powers Full Coverage
