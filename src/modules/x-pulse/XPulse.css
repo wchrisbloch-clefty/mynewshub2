@@ -18,4 +18,15 @@
 .xp-take:hover{border-color:var(--accent);}
 .xp-handle{font-family:var(--font-publicsans);font-size:var(--fs-meta);font-weight:700;color:var(--accent);}
 .xp-text{font-family:var(--font-publicsans);font-size:12px;line-height:1.45;color:var(--text2);}
+/* Collapsed trigger — no network call fires until this is tapped (cost control;
+   never auto-fires per feed item). Reads as a low-key, opt-in affordance. */
+.xp-trigger{display:inline-flex;align-items:center;gap:8px;margin:14px 0;padding:7px 12px;cursor:pointer;
+  border:1px dashed var(--border);background:var(--surface);border-radius:10px;font-family:inherit;
+  color:var(--text3);transition:border-color 0.12s,color 0.12s;}
+.xp-trigger:hover{border-color:var(--accent);color:var(--text2);}
+.xp-trigger-label{font-family:var(--font-publicsans);font-size:var(--fs-meta);font-weight:600;}
+.xp-close{margin-left:6px;background:none;border:none;cursor:pointer;color:var(--text4);font-size:16px;line-height:1;padding:0 2px;}
+.xp-close:hover{color:var(--text2);}
+.xp-loading{font-family:var(--font-publicsans);font-size:12px;color:var(--text3);font-style:italic;padding:2px 0;}
+.xp-empty{font-family:var(--font-publicsans);font-size:12px;color:var(--text3);padding:2px 0;}
 @media(max-width:640px){ .xp-note{width:100%;margin-left:0;} }
