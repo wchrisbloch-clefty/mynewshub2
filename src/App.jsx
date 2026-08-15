@@ -68,6 +68,32 @@ const CATS = {
   health:     { label:'Health & Longevity', color:'var(--accent)', bg:'var(--accent-bg)', emoji:'' },
 };
 
+// ── Energy subsector tagging (Pass L item 3) — classify an Energy (bloom) story into
+// the industry-standard segments so its badge reads e.g. "Downstream" instead of a
+// generic "Energy" wherever it surfaces (Top Stories, General, State of Play, Trending).
+// This does NOT create new filter categories — the Energy sub-tab rail is unchanged; it
+// only labels the article. Checked most-specific first; a story with no oil-&-gas value-
+// chain signal (e.g. pure clean-energy/policy) returns null and keeps the "Energy" label.
+const ENERGY_SUBSECTORS = [
+  { key:'petrochemical', label:'Petrochemical', kws:['petrochemical','petrochemicals','ethylene','propylene','olefin','olefins','naphtha','steam cracker','cracker plant','polyethylene','polypropylene','polymer','plastics','pvc','resin','feedstock','chemical plant'] },
+  { key:'downstream',    label:'Downstream',    kws:['refinery','refineries','refining','downstream','gasoline','diesel','jet fuel','retail fuel','fuel station','petrol station','pump price','refined product','crack spread','fuel terminal','marketing margin'] },
+  { key:'upstream',      label:'Upstream',      kws:['upstream','exploration','drilling','offshore drill','shale','fracking','frack','wellhead','oil well','rig count','e&p','wildcat','seismic','reserves','appraisal','spud','oilfield production'] },
+  { key:'oilgas',        label:'Oil & Gas',     kws:['oil','crude','opec','pipeline','lng','barrel','brent','wti','petroleum','midstream','natural gas','gas field'] },
+];
+function energySubsector(a) {
+  if (!a) return null;
+  const t = ((a.title || '') + ' ' + (a.desc || '')).toLowerCase();
+  for (const s of ENERGY_SUBSECTORS) { if (s.kws.some(k => t.includes(k))) return s; }
+  return null;
+}
+// Badge shown for a story's category. For Energy stories that carry a subsector signal,
+// the specific subsector wins; everything else uses its category label.
+function catBadge(a) {
+  const cc = CATS[a && a.cat] || CATS.general;
+  if (a && a.cat === 'bloom') { const s = energySubsector(a); if (s) return { label: s.label, color: cc.color, subsector: s.key }; }
+  return { label: cc.label, color: cc.color, subsector: null };
+}
+
 // One consistent line-icon (Feather stroke) for settings/customize affordances —
 // inherits text colour, single stroke weight. Replaces the old gear emoji in chrome.
 // Icon sizing scale — one fixed size per context (item 7). Nav/action icons in the
@@ -1895,17 +1921,23 @@ body:not(.dark) .pill-bar{
 }
 
 /* Today's Topics chips */
-.ttp-chips{display:flex;flex-wrap:wrap;gap:5px;}
+/* Merged Trending module (Pass L item 1) — one calm chip treatment for both the
+   trending phrases and the followed-topic tags. Faint hairline border, restrained
+   hover (no accent flood), a whisper-weight count that never competes with the label,
+   and a fixed min-height so count/star chips line up with plain ones. Spacing rhythm
+   matches the Sports/Energy/Pop-Culture filter pills. */
+.ttp-chips{display:flex;flex-wrap:wrap;gap:6px;}
 .ttp-chip{
-  display:inline-flex;align-items:center;gap:4px;
-  font-size:var(--fs-meta);font-weight:600;padding:5px 11px;border-radius:20px;
-  border:1px solid var(--border);background:var(--surface2);color:var(--text2);
-  cursor:pointer;transition:all 0.14s;white-space:nowrap;
+  display:inline-flex;align-items:center;gap:5px;min-height:28px;
+  font-size:var(--fs-meta);font-weight:600;padding:4px 11px;border-radius:16px;
+  border:1px solid var(--border2);background:var(--surface2);color:var(--text2);
+  cursor:pointer;transition:background 0.14s,border-color 0.14s,color 0.14s;white-space:nowrap;
 }
-.ttp-chip:hover{border-color:var(--accent);color:var(--accent);background:var(--surface);}
+.ttp-chip:hover{border-color:var(--border);color:var(--text);background:var(--surface);}
 .ttp-chip.active{color:#fff !important;border-color:transparent !important;}
 .ttp-chip.saved{border-style:dashed;}
-.ttp-count{font-size:9px;font-weight:700;opacity:0.6;}
+.ttp-count{font-size:9px;font-weight:700;color:var(--text4);font-variant-numeric:tabular-nums;}
+.ttp-chip.active .ttp-count{color:rgba(255,255,255,0.7);}
 /* Follow star on the merged Trending chips (Pass J item 3). */
 .ttp-chip-star{background:none;border:none;cursor:pointer;font-size:11px;line-height:1;color:var(--text4);padding:0 0 0 1px;margin-left:1px;}
 .ttp-chip-star.on{color:var(--amber);}
@@ -6332,36 +6364,9 @@ function Sidebar({cat, arts, kw, health, activeKw, setActiveKw, activeSource, se
           collapsed={sopCollapsed} onToggleCollapse={onToggleSop}/>
       )}
 
-      {/* 2) TRENDING — Trending Now + Today's Topics merged into one module (Pass J
-            item 3): same "what's hot" data, one visual treatment (phrase + count,
-            tap to open the topic hub, star to follow). */}
-      {topicItems.length > 0 && (
-        <div className="sidebar-section">
-          <div className="sidebar-sec-head">
-            <span className="sidebar-sec-label">Trending</span>
-            {activeKw && <button className="sidebar-sec-action" onClick={()=>setActiveKw(null)}>Clear</button>}
-          </div>
-          <div className="ttp-chips">
-            {topicItems.map((t, i) => {
-              const followed = isTopicFollowed?.(t.label);
-              return (
-                <span key={i}
-                  className={`ttp-chip${activeKw===t.label?' active':''}${t.isSaved?' saved':''}`}
-                  style={activeKw===t.label ? {background:cc.color} : {}}
-                  onClick={()=>handleTopicClick(t.label)}>
-                  {t.label}
-                  <span className="ttp-count">{t.count}</span>
-                  {toggleTopic && (
-                    <button className={`ttp-chip-star${followed?' on':''}`}
-                      onClick={e=>{e.stopPropagation();toggleTopic(t.label);}}
-                      aria-label={followed?'Unfollow topic':'Follow topic'}>{followed?'★':'☆'}</button>
-                  )}
-                </span>
-              );
-            })}
-          </div>
-        </div>
-      )}
+      {/* TRENDING moved BELOW Across MyNewsHub (Pass L item 2) — see the block after
+          Following. New sidebar order: State of Play → Today's Briefing → Across
+          MyNewsHub → Following → Trending → Sources. */}
 
       {/* 3) TODAY'S BRIEFING — its own module (Pass J item 3): pulls from followed
             morning-email/newsletter sources, distinct from State of Play. BriefingTeaser
@@ -6395,6 +6400,36 @@ function Sidebar({cat, arts, kw, health, activeKw, setActiveKw, activeSource, se
             sidebar directly below Across MyNewsHub (Pass K item 3). Reuses the existing
             follow-chip pills + "+ Add"; General only (injected as a prop by FeedPage). */}
       {followingModule && !activeKw && !activeSource && followingModule}
+
+      {/* TRENDING — Trending Now + Today's Topics merged into one calm chip module
+          (Pass J item 3; polished + relocated below Across in Pass L items 1-2). */}
+      {topicItems.length > 0 && (
+        <div className="sidebar-section">
+          <div className="sidebar-sec-head">
+            <span className="sidebar-sec-label">Trending</span>
+            {activeKw && <button className="sidebar-sec-action" onClick={()=>setActiveKw(null)}>Clear</button>}
+          </div>
+          <div className="ttp-chips">
+            {topicItems.map((t, i) => {
+              const followed = isTopicFollowed?.(t.label);
+              return (
+                <span key={i}
+                  className={`ttp-chip${activeKw===t.label?' active':''}${t.isSaved?' saved':''}`}
+                  style={activeKw===t.label ? {background:cc.color} : {}}
+                  onClick={()=>handleTopicClick(t.label)}>
+                  {t.label}
+                  <span className="ttp-count">{t.count}</span>
+                  {toggleTopic && (
+                    <button className={`ttp-chip-star${followed?' on':''}`}
+                      onClick={e=>{e.stopPropagation();toggleTopic(t.label);}}
+                      aria-label={followed?'Unfollow topic':'Follow topic'}>{followed?'★':'☆'}</button>
+                  )}
+                </span>
+              );
+            })}
+          </div>
+        </div>
+      )}
 
       {/* 5) SOURCES — collapsed by default; kept so source filter/health stays reachable
             without opening Customize. */}
@@ -7082,11 +7117,12 @@ function TrendingCarousel({ arts, kw, onRead }) {
       <div className="trending-row">
         {stories.map((a, i) => {
           const cc = CATS[a.cat] || CATS.general;
+          const badge = catBadge(a);
           return (
             <div key={i} className="trending-card" onClick={() => onRead(a)}>
               <div className="trending-card-meta">
                 <span className="trending-card-num">{i+1}</span>
-                <span className="trending-card-badge" style={{background:cc.bg,color:cc.color}}>{cc.label}</span>
+                <span className="trending-card-badge" style={{background:cc.bg,color:badge.color}}>{badge.label}</span>
               </div>
               <div className="trending-card-title">{a.title}</div>
               <div className="trending-card-src">{a.source} · {fmtDate(a.pubDate)}</div>
@@ -7667,7 +7703,7 @@ function TopOfHourStrip({ catLead, arts, onRead, stories: storiesProp }) {
       </div>
       <div className="toh-grid">
         {stories.map((a, i) => {
-          const cc = CATS[a.cat] || CATS.general;
+          const badge = catBadge(a);
           return (
             <article key={i} className={`toh-card${i===0?' toh-card-lead':''}`} onClick={() => onRead(a)}>
               {/* Placeholder sits underneath; the real image loads on top and hides
@@ -7677,7 +7713,7 @@ function TopOfHourStrip({ catLead, arts, onRead, stories: storiesProp }) {
                 onError={e => { e.currentTarget.style.display = 'none'; }}/>}
               <div className="toh-grad"/>
               <div className="toh-body">
-                <span className="toh-cat" style={{background:cc.color}}>{cc.label}</span>
+                <span className="toh-cat" style={{background:badge.color}}>{badge.label}</span>
                 <h3 className="toh-title">{a.title}</h3>
                 <div className="toh-meta">{a.source} · {fmtDate(a.pubDate)}</div>
               </div>
