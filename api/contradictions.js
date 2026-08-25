@@ -15,6 +15,10 @@
 // Only genuine FACTUAL disagreements (different numbers, opposite claims) — never
 // differences of tone or wording. Empty conflicts[] means "no real disagreement".
 
+// Model IDs come from the shared registry — see lib/ai-models.js before assuming a
+// provider failure is a bad key rather than a retired/renamed model.
+import { MODELS } from '../lib/ai-models.js';
+
 const TIER_RANK = { verified: 3, reported: 2, unverified: 1, '': 0 };
 
 async function readBody(req) {
@@ -57,7 +61,7 @@ async function callGroq(prompt) {
   try {
     const r = await fetch('https://api.groq.com/openai/v1/chat/completions', {
       method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${key}` },
-      body: JSON.stringify({ model: 'llama-3.3-70b-versatile', messages: [{ role: 'user', content: prompt }], max_tokens: 700, temperature: 0.2, response_format: { type: 'json_object' } }),
+      body: JSON.stringify({ model: MODELS.groq.id, messages: [{ role: 'user', content: prompt }], max_tokens: 700, temperature: 0.2, response_format: { type: 'json_object' } }),
       signal: AbortSignal.timeout(12000),
     });
     if (!r.ok) return null;
@@ -67,7 +71,7 @@ async function callGroq(prompt) {
 async function callGemini(prompt) {
   const key = process.env.GOOGLE_AI_KEY; if (!key) return null;
   try {
-    const r = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${key}`, {
+    const r = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${MODELS.gemini.id}:generateContent?key=${key}`, {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }], generationConfig: { maxOutputTokens: 700, temperature: 0.2, responseMimeType: 'application/json' } }),
       signal: AbortSignal.timeout(12000),
@@ -81,7 +85,7 @@ async function callGrok(prompt) {
   try {
     const r = await fetch('https://api.x.ai/v1/chat/completions', {
       method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${key}` },
-      body: JSON.stringify({ model: 'grok-3-mini', messages: [{ role: 'user', content: prompt }], max_tokens: 700, temperature: 0.2 }),
+      body: JSON.stringify({ model: MODELS.grok.id, messages: [{ role: 'user', content: prompt }], max_tokens: 700, temperature: 0.2 }),
       signal: AbortSignal.timeout(13000),
     });
     if (!r.ok) return null;
@@ -93,7 +97,7 @@ async function callClaude(prompt) {
   try {
     const r = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST', headers: { 'Content-Type': 'application/json', 'x-api-key': key, 'anthropic-version': '2023-06-01' },
-      body: JSON.stringify({ model: 'claude-sonnet-5', max_tokens: 700, messages: [{ role: 'user', content: prompt }] }),
+      body: JSON.stringify({ model: MODELS.claude.id, max_tokens: 700, messages: [{ role: 'user', content: prompt }] }),
       signal: AbortSignal.timeout(13000),
     });
     if (!r.ok) return null;

@@ -47,6 +47,7 @@ import { SnapshotCard, CoverageList } from './modules/snapshot-card';
 import { FollowSourceContext, FollowSourceChip } from './modules/follow-source';
 import { MarketsSurface, useMarkets } from './modules/markets-surface';
 import { parseRoute, buildPath } from './modules/routing';
+import { PROMPT_VERSION } from '../lib/ai-models.js';
 import { ChatBot } from './modules/concierge';
 // Icons: single set (lucide-react), fixed size per context — item 7.
 import { Settings, RefreshCw, Moon, Sun, User,
@@ -940,7 +941,10 @@ async function fetchAISummary({type, title, content, mode='summary', url}) {
     }
   }
   try {
-    const r = await fetch('/api/summarize', {
+    // `pv` puts the prompt version in the request URL, so it is part of the cache key:
+    // bumping PROMPT_VERSION after a buildSystem() change retires the old cached
+    // summaries instead of letting them be served for the rest of the stale window.
+    const r = await fetch(`/api/summarize?pv=${encodeURIComponent(PROMPT_VERSION)}`, {
       method:'POST', headers:{'Content-Type':'application/json'},
       body: JSON.stringify({type,title,content:body,mode}),
       signal: AbortSignal.timeout(mode==='briefing-gen'?25000:mode==='takeaways'?18000:22000),
@@ -948,12 +952,15 @@ async function fetchAISummary({type, title, content, mode='summary', url}) {
     if (!r.ok) {
       const e=await r.json().catch(()=>({}));
       const detail=e.error||`HTTP ${r.status}`;
+      // The API now says what each provider did; keep it out of the UI string but log it,
+      // so "everything timed out" is distinguishable from "no keys" when debugging.
+      if (Array.isArray(e.attempts)) console.warn('[summarize] cascade failed', e.attempts);
       if (r.status===500&&/API_KEY/i.test(detail)) return {summary:'',error:'No AI provider configured.'};
       if (r.status===504) return {summary:'',error:'Timed out — try again.'};
-      return {summary:'',error:`Unavailable (${detail.slice(0,100)})`};
+      return {summary:'',error:`Unavailable (${detail.slice(0,100)})`, attempts:e.attempts};
     }
     const data=await r.json();
-    return {summary:data.summary||'', error:'', provider:data.provider||'', fromPreview};
+    return {summary:data.summary||'', error:'', provider:data.provider||'', model:data.model||'', promptVersion:data.promptVersion||'', fromPreview};
   } catch(err) {
     return {summary:'',error:err.name==='TimeoutError'?'Timed out':'Network error'};
   }

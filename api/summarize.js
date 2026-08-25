@@ -1,13 +1,23 @@
-// /api/summarize.js — v5
-// Multi-provider AI cascade: Groq → Gemini → Grok → Perplexity → Claude
+// /api/summarize.js — v6
+// Multi-provider AI cascade: Groq → Groq-Fast → Gemini → Grok → Perplexity → Claude
 // Claude uses prompt caching. Supports modes: summary|takeaways|explain|briefing|briefing-gen
+//
+// Model IDs are NOT inline here — every one lives in ../lib/ai-models.js with the date it
+// was last confirmed working. A provider returning a non-ok response for a model that
+// worked yesterday almost always means a retired/renamed model, not a bad key: check that
+// registry (and /api/health) before rotating anything.
+//
+// Every cascade attempt is recorded, pass or fail, and a total failure returns the full
+// attempt list — "no keys configured" and "everything timed out" must not look identical.
 //
 // Env vars (Vercel → Settings → Environment Variables):
 //   GROQ_API_KEY        — free, console.groq.com
 //   GOOGLE_AI_KEY       — free, aistudio.google.com
-//   XAI_API_KEY         — grok-3-mini, console.x.ai (free tier)
-//   PERPLEXITY_API_KEY  — sonar model, perplexity.ai
+//   XAI_API_KEY         — console.x.ai (free tier)
+//   PERPLEXITY_API_KEY  — perplexity.ai
 //   ANTHROPIC_API_KEY   — paid fallback, console.anthropic.com
+
+import { MODELS, CASCADE_ORDER, CASCADE_TIMEOUTS, PROMPT_VERSION } from '../lib/ai-models.js';
 
 const MAX_INPUT       = 3000;
 const MAX_INPUT_LARGE = 5000; // briefing-gen mode
@@ -28,6 +38,10 @@ async function readBody(req) {
 }
 
 // ── System instructions ──────────────────────────────────────────────────────
+// PROMPT VERSIONING: any edit to buildSystem() below changes what a summary looks like,
+// and summaries are cached for 24h (7-day stale-while-revalidate). Bump PROMPT_VERSION in
+// lib/ai-models.js IN THE SAME COMMIT as the prompt change, or pre-improvement summaries
+// keep being served for up to a week with nothing to distinguish them.
 function buildSystem(type, mode) {
   const verb = type === 'podcast' ? 'podcast episode' : 'news article';
   if (mode === 'briefing-gen') {
@@ -82,142 +96,121 @@ function buildPrompt(type, title, content, mode) {
   return buildSystem(type, mode) + '\n\n' + buildUser(title, content, mode);
 }
 
-// ── Provider 1: Groq (Llama 3.3 70B, free, ~700 tok/s) ─────────────────────
-async function tryGroq(prompt, maxTokens) {
-  const key = process.env.GROQ_API_KEY;
-  if (!key) return null;
-  try {
-    const r = await fetch('https://api.groq.com/openai/v1/chat/completions', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${key}` },
-      body: JSON.stringify({
-        model: 'llama-3.3-70b-versatile',
-        messages: [{ role: 'user', content: prompt }],
-        max_tokens: maxTokens,
-        temperature: 0.3,
-      }),
-      signal: AbortSignal.timeout(10000),
-    });
-    if (!r.ok) return null;
-    const d = await r.json();
-    return d?.choices?.[0]?.message?.content?.trim() || null;
-  } catch { return null; }
+// ── Provider calls ───────────────────────────────────────────────────────────
+// Each call resolves to an ATTEMPT RECORD — never a bare null. A failure carries why:
+//   no-key        — the provider's env var is unset (nothing was sent)
+//   http-error    — the provider answered non-2xx; `status` says which (401/403 → key,
+//                   404/400 → almost certainly a retired/renamed model, 429 → rate limit)
+//   timeout       — the request exceeded this step's budget; `detail` says the budget
+//   network-error — fetch itself threw (DNS, TLS, socket) before any response
+//   empty-response— 2xx, but the body carried no usable text (filtered/truncated output)
+// Collapsing these into one null is what made a dead key and a dead network look the same.
+const TIMEOUTS = CASCADE_TIMEOUTS;
+
+// Provider error bodies are echoed back to the caller for debugging, so scrub the key
+// out of them first — Gemini in particular takes the key as a query parameter.
+function redact(text, secret) {
+  let s = String(text || '').replace(/key=[^&\s"']+/gi, 'key=[redacted]');
+  if (secret) s = s.split(secret).join('[redacted]');
+  return s;
 }
 
-// ── Provider 1.5: Groq Fast (llama-3.1-8b-instant, higher rate limits) ──────
-async function tryGroqFast(prompt, maxTokens) {
-  const key = process.env.GROQ_API_KEY;
-  if (!key) return null;
-  try {
-    const r = await fetch('https://api.groq.com/openai/v1/chat/completions', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${key}` },
-      body: JSON.stringify({
-        model: 'llama-3.1-8b-instant',
-        messages: [{ role: 'user', content: prompt }],
-        max_tokens: maxTokens,
-        temperature: 0.3,
-      }),
-      signal: AbortSignal.timeout(7000),
-    });
-    if (!r.ok) return null;
-    const d = await r.json();
-    return d?.choices?.[0]?.message?.content?.trim() || null;
-  } catch { return null; }
-}
-
-// ── Provider 2: Google Gemini (free 500 req/day) ────────────────────────────
-async function tryGemini(prompt, maxTokens) {
-  const key = process.env.GOOGLE_AI_KEY;
-  if (!key) return null;
-  try {
-    const r = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${key}`,
-      {
+function buildRequest(entry, apiKey, { prompt, system, user, maxTokens }) {
+  if (entry.api === 'gemini') {
+    return {
+      url: `${entry.endpoint}/${entry.id}:generateContent?key=${apiKey}`,
+      init: {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           contents: [{ parts: [{ text: prompt }] }],
           generationConfig: { maxOutputTokens: maxTokens, temperature: 0.3 },
         }),
-        signal: AbortSignal.timeout(12000),
-      }
-    );
-    if (!r.ok) return null;
-    const d = await r.json();
-    return d?.candidates?.[0]?.content?.parts?.[0]?.text?.trim() || null;
-  } catch { return null; }
-}
-
-// ── Provider 3: xAI Grok (OpenAI-compatible, free tier) ─────────────────────
-async function tryGrok(prompt, maxTokens) {
-  const key = process.env.XAI_API_KEY;
-  if (!key) return null;
-  try {
-    const r = await fetch('https://api.x.ai/v1/chat/completions', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${key}` },
-      body: JSON.stringify({
-        model: 'grok-3-mini',
-        messages: [{ role: 'user', content: prompt }],
-        max_tokens: maxTokens,
-        temperature: 0.3,
-      }),
-      signal: AbortSignal.timeout(12000),
-    });
-    if (!r.ok) return null;
-    const d = await r.json();
-    return d?.choices?.[0]?.message?.content?.trim() || null;
-  } catch { return null; }
-}
-
-// ── Provider 4: Perplexity (sonar model) ────────────────────────────────────
-async function tryPerplexity(prompt, maxTokens) {
-  const key = process.env.PERPLEXITY_API_KEY;
-  if (!key) return null;
-  try {
-    const r = await fetch('https://api.perplexity.ai/chat/completions', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${key}` },
-      body: JSON.stringify({
-        model: 'sonar',
-        messages: [{ role: 'user', content: prompt }],
-        max_tokens: maxTokens,
-        temperature: 0.3,
-      }),
-      signal: AbortSignal.timeout(14000),
-    });
-    if (!r.ok) return null;
-    const d = await r.json();
-    return d?.choices?.[0]?.message?.content?.trim() || null;
-  } catch { return null; }
-}
-
-// ── Provider 5: Anthropic Claude (paid, prompt caching) ─────────────────────
-async function tryClaude(system, user, maxTokens) {
-  const key = process.env.ANTHROPIC_API_KEY;
-  if (!key) return null;
-  try {
-    const r = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-api-key': key,
-        'anthropic-version': '2023-06-01',
-        'anthropic-beta': 'prompt-caching-2024-07-31',
       },
+    };
+  }
+  if (entry.api === 'anthropic') {
+    return {
+      url: entry.endpoint,
+      init: {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-api-key': apiKey,
+          'anthropic-version': '2023-06-01',
+          'anthropic-beta': 'prompt-caching-2024-07-31',
+        },
+        body: JSON.stringify({
+          model: entry.id,
+          max_tokens: maxTokens,
+          system: [{ type: 'text', text: system, cache_control: { type: 'ephemeral' } }],
+          messages: [{ role: 'user', content: user }],
+        }),
+      },
+    };
+  }
+  // openai-compatible: Groq, Groq-Fast, Grok, Perplexity
+  return {
+    url: entry.endpoint,
+    init: {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey}` },
       body: JSON.stringify({
-        model: 'claude-sonnet-5',
+        model: entry.id,
+        messages: [{ role: 'user', content: prompt }],
         max_tokens: maxTokens,
-        system: [{ type: 'text', text: system, cache_control: { type: 'ephemeral' } }],
-        messages: [{ role: 'user', content: user }],
+        temperature: 0.3,
       }),
-      signal: AbortSignal.timeout(12000),
-    });
-    if (!r.ok) return null;
-    const d = await r.json();
-    return d?.content?.[0]?.text?.trim() || null;
-  } catch { return null; }
+    },
+  };
+}
+
+function extractText(entry, data) {
+  if (entry.api === 'gemini')    return data?.candidates?.[0]?.content?.parts?.[0]?.text?.trim() || '';
+  if (entry.api === 'anthropic') return data?.content?.[0]?.text?.trim() || '';
+  return data?.choices?.[0]?.message?.content?.trim() || '';
+}
+
+async function callProvider(step, payload) {
+  const entry   = MODELS[step];
+  const timeout = TIMEOUTS[step] || 12000;
+  const apiKey  = process.env[entry.env];
+  const base    = { step, provider: entry.provider, model: entry.id };
+
+  if (!apiKey) return { ...base, ok: false, reason: 'no-key', detail: `${entry.env} unset`, ms: 0 };
+
+  const started = Date.now();
+  try {
+    const { url, init } = buildRequest(entry, apiKey, payload);
+    const r = await fetch(url, { ...init, signal: AbortSignal.timeout(timeout) });
+    const ms = Date.now() - started;
+    if (!r.ok) {
+      const body = await r.text().catch(() => '');
+      return { ...base, ok: false, reason: 'http-error', status: r.status, detail: redact(body, apiKey).slice(0, 200), ms };
+    }
+    const data = await r.json().catch(() => null);
+    const text = data ? extractText(entry, data) : '';
+    if (!text) return { ...base, ok: false, reason: 'empty-response', status: r.status, detail: 'no text in 2xx body', ms };
+    return { ...base, ok: true, text, ms };
+  } catch (err) {
+    const ms = Date.now() - started;
+    const timedOut = err?.name === 'TimeoutError' || err?.name === 'AbortError';
+    return {
+      ...base,
+      ok: false,
+      reason: timedOut ? 'timeout' : 'network-error',
+      detail: timedOut ? `exceeded ${timeout}ms` : redact(err?.message || String(err), apiKey).slice(0, 120),
+      ms,
+    };
+  }
+}
+
+// What the caller sees in `attempts` — the record minus the summary text.
+function toAttempt(r) {
+  const a = { provider: r.provider, model: r.model, reason: r.reason, ms: r.ms };
+  if (r.status) a.status = r.status;
+  if (r.detail) a.detail = r.detail;
+  return a;
 }
 
 // ── Handler ──────────────────────────────────────────────────────────────────
@@ -243,62 +236,52 @@ export default async function handler(req, res) {
   const t = String(title).slice(0, 500);
   const c = String(content).slice(0, maxInput);
 
-  const system = buildSystem(type, m);
-  const user   = buildUser(t, c, m);
-  const prompt = buildPrompt(type, t, c, m);
+  const payload = {
+    system: buildSystem(type, m),
+    user:   buildUser(t, c, m),
+    prompt: buildPrompt(type, t, c, m),
+    maxTokens,
+  };
 
-  // Cascade: Groq-70b → Groq-8b → Gemini → Grok → Perplexity → Claude
-  const groqResult = await tryGroq(prompt, maxTokens);
-  if (groqResult) {
-    res.setHeader('Cache-Control', 's-maxage=86400, stale-while-revalidate=604800');
-    return res.status(200).json({ summary: groqResult, provider: 'Groq' });
+  // Cascade: Groq-70b → Groq-8b → Gemini → Grok → Perplexity → Claude.
+  // Every failed step is kept so a total failure can say what actually happened, and a
+  // success can still show what it had to fall through to get there.
+  res.setHeader('X-Prompt-Version', PROMPT_VERSION);
+  const attempts = [];
+  for (const step of CASCADE_ORDER) {
+    const r = await callProvider(step, payload);
+    if (r.ok) {
+      res.setHeader('Cache-Control', 's-maxage=86400, stale-while-revalidate=604800');
+      return res.status(200).json({
+        summary: r.text,
+        provider: r.provider,
+        model: r.model,
+        promptVersion: PROMPT_VERSION,   // identifies which prompt produced a cached entry
+        ms: r.ms,
+        ...(attempts.length ? { attempts } : {}),
+      });
+    }
+    attempts.push(toAttempt(r));
   }
 
-  const groqFastResult = await tryGroqFast(prompt, maxTokens);
-  if (groqFastResult) {
-    res.setHeader('Cache-Control', 's-maxage=86400, stale-while-revalidate=604800');
-    return res.status(200).json({ summary: groqFastResult, provider: 'Groq' });
-  }
+  // Everything failed. Never cache a failure, and never report it as a bare "all failed".
+  res.setHeader('Cache-Control', 'no-store');
 
-  const geminiResult = await tryGemini(prompt, maxTokens);
-  if (geminiResult) {
-    res.setHeader('Cache-Control', 's-maxage=86400, stale-while-revalidate=604800');
-    return res.status(200).json({ summary: geminiResult, provider: 'Gemini' });
-  }
-
-  const grokResult = await tryGrok(prompt, maxTokens);
-  if (grokResult) {
-    res.setHeader('Cache-Control', 's-maxage=86400, stale-while-revalidate=604800');
-    return res.status(200).json({ summary: grokResult, provider: 'Grok' });
-  }
-
-  const perplexityResult = await tryPerplexity(prompt, maxTokens);
-  if (perplexityResult) {
-    res.setHeader('Cache-Control', 's-maxage=86400, stale-while-revalidate=604800');
-    return res.status(200).json({ summary: perplexityResult, provider: 'Perplexity' });
-  }
-
-  const claudeResult = await tryClaude(system, user, maxTokens);
-  if (claudeResult) {
-    res.setHeader('Cache-Control', 's-maxage=86400, stale-while-revalidate=604800');
-    return res.status(200).json({ summary: claudeResult, provider: 'Claude' });
-  }
-
-  // All five failed
-  const configured = [];
-  if (process.env.GROQ_API_KEY)        configured.push('Groq');
-  if (process.env.GOOGLE_AI_KEY)       configured.push('Gemini');
-  if (process.env.XAI_API_KEY)         configured.push('Grok');
-  if (process.env.PERPLEXITY_API_KEY)  configured.push('Perplexity');
-  if (process.env.ANTHROPIC_API_KEY)   configured.push('Claude');
-
-  if (configured.length === 0) {
+  if (attempts.every(a => a.reason === 'no-key')) {
     return res.status(500).json({
       error: 'No AI provider configured. Add GROQ_API_KEY (free) in Vercel → Settings → Environment Variables, then redeploy.',
+      attempts,
+      promptVersion: PROMPT_VERSION,
     });
   }
 
+  const tried = attempts.map(a => `${a.provider} (${a.model}): ${a.reason}${a.status ? ' ' + a.status : ''}`).join('; ');
   return res.status(502).json({
-    error: `All providers failed (tried: ${configured.join(', ')}). Try again in a moment.`,
+    error: `All providers failed — ${tried}. Try again in a moment.`,
+    attempts,
+    promptVersion: PROMPT_VERSION,
+    hint: attempts.some(a => a.reason === 'http-error' && [400, 404].includes(a.status))
+      ? 'A 400/404 from a provider usually means a retired or renamed model — check lib/ai-models.js before rotating keys.'
+      : undefined,
   });
 }
