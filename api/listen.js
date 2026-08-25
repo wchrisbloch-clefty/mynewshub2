@@ -4,7 +4,7 @@
 // *capture* the words instead of guessing from the description. Returns a `provenance`
 // flag so the UI can label the source honestly:
 //   'captions'   — real YouTube caption track
-//   'audio'      — real audio transcribed via Groq Whisper (whisper-large-v3)
+//   'audio'      — real audio transcribed via Groq Whisper (model: lib/ai-models.js)
 //   'show-notes' — neither reachable; fell back to the video/page description
 //
 // Reuses the same Vercel env vars as api/summarize.js — no new key required:
@@ -13,6 +13,10 @@
 // if it isn't, capture degrades gracefully to 'show-notes'.
 //
 // Standalone serverless function — does not import or alter api/summarize.js.
+
+// Model IDs come from the shared registry — see lib/ai-models.js before assuming a
+// provider failure is a bad key rather than a retired/renamed model.
+import { MODELS, AUX_MODELS } from '../lib/ai-models.js';
 
 const MAX_TRANSCRIPT = 8000;   // chars fed to the summarizer
 const MAX_AUDIO_BYTES = 24 * 1024 * 1024; // Groq Whisper free-tier friendly cap
@@ -107,7 +111,7 @@ async function transcribeAudio(url, key) {
   try {
     const fd = new FormData();
     fd.append('file', new Blob([buf], { type: contentType }), 'audio.mp3');
-    fd.append('model', 'whisper-large-v3');
+    fd.append('model', AUX_MODELS.whisper.id);
     fd.append('response_format', 'text');
     const r = await fetch('https://api.groq.com/openai/v1/audio/transcriptions', {
       method: 'POST',
@@ -144,7 +148,7 @@ async function summarizeText(title, text) {
     try {
       const r = await fetch('https://api.groq.com/openai/v1/chat/completions', {
         method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${groq}` },
-        body: JSON.stringify({ model: 'llama-3.3-70b-versatile', messages: [{ role: 'user', content: prompt }], max_tokens: 320, temperature: 0.3 }),
+        body: JSON.stringify({ model: MODELS.groq.id, messages: [{ role: 'user', content: prompt }], max_tokens: 320, temperature: 0.3 }),
         signal: AbortSignal.timeout(12000),
       });
       if (r.ok) { const d = await r.json(); const s = d?.choices?.[0]?.message?.content?.trim(); if (s) return { summary: s, provider: 'Groq' }; }
@@ -153,7 +157,7 @@ async function summarizeText(title, text) {
   const gem = process.env.GOOGLE_AI_KEY;
   if (gem) {
     try {
-      const r = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${gem}`, {
+      const r = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${MODELS.gemini.id}:generateContent?key=${gem}`, {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }], generationConfig: { maxOutputTokens: 320, temperature: 0.3 } }),
         signal: AbortSignal.timeout(12000),
@@ -166,7 +170,7 @@ async function summarizeText(title, text) {
     try {
       const r = await fetch('https://api.anthropic.com/v1/messages', {
         method: 'POST', headers: { 'Content-Type': 'application/json', 'x-api-key': anth, 'anthropic-version': '2023-06-01' },
-        body: JSON.stringify({ model: 'claude-sonnet-5', max_tokens: 320, messages: [{ role: 'user', content: prompt }] }),
+        body: JSON.stringify({ model: MODELS.claude.id, max_tokens: 320, messages: [{ role: 'user', content: prompt }] }),
         signal: AbortSignal.timeout(12000),
       });
       if (r.ok) { const d = await r.json(); const s = d?.content?.[0]?.text?.trim(); if (s) return { summary: s, provider: 'Claude' }; }

@@ -6,6 +6,10 @@
 // 200 so the client can simply render nothing. Cached per topic ~60s in memory
 // (per warm lambda) plus s-maxage at the edge.
 
+// Model IDs come from the shared registry — see lib/ai-models.js before assuming a
+// provider failure is a bad key rather than a retired/renamed model.
+import { MODELS } from '../lib/ai-models.js';
+
 const cache = new Map(); // topicKey -> { at, data }
 const TTL = 60_000;
 
@@ -43,9 +47,9 @@ Rules:
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${key}` },
       body: JSON.stringify({
-        // grok-3-mini is the model proven to authenticate with this key (also used
-        // by /api/summarize). Live Search is enabled per-request via search_parameters.
-        model: 'grok-3-mini',
+        // Same xAI model the summarize cascade uses (registry: lib/ai-models.js) — it is
+        // the one proven to authenticate with this key. Live Search is enabled per-request.
+        model: MODELS.grok.id,
         messages: [{ role: 'user', content: prompt }],
         temperature: 0.2,
         max_tokens: 800,
