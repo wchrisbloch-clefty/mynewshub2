@@ -1451,8 +1451,12 @@ body{
 .following-row{display:flex;align-items:center;gap:var(--s3);flex-wrap:wrap;margin-bottom:var(--s4);padding-bottom:var(--s3);border-bottom:1px solid var(--border2);}
 .following-label{font-family:var(--font-archivo);font-weight:800;font-size:12px;text-transform:uppercase;letter-spacing:0.07em;color:var(--text3);flex-shrink:0;}
 .following-chips{display:flex;gap:8px;flex-wrap:wrap;}
-.following-chip{display:inline-flex;align-items:center;gap:6px;background:var(--accent-bg);border:1px solid var(--border2);border-radius:16px;padding:4px 6px 4px 12px;cursor:pointer;font-family:var(--font-publicsans);}
+.following-chip{display:inline-flex;align-items:center;gap:6px;background:var(--accent-bg);border:1px solid var(--border2);border-radius:16px;padding:4px 6px 4px 12px;font-family:var(--font-publicsans);}
 .following-chip-team{padding-left:5px;}
+/* a11y (row 117): wrapper stays a <span>; the navigate action is the inner
+   .following-chip-main <button> and the × unfollow is a sibling <button>. */
+.following-chip-main{display:inline-flex;align-items:center;gap:6px;background:none;border:none;padding:0;margin:0;cursor:pointer;font:inherit;color:inherit;}
+.following-chip-main:focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:8px;}
 /* ── Team logos (ESPN CDN) + initials fallback (Sports only) ── */
 .team-logo{border-radius:6px;object-fit:contain;flex-shrink:0;background:var(--surface2);}
 .team-logo-ph{display:inline-flex;align-items:center;justify-content:center;font-family:var(--font-archivo);font-weight:800;color:var(--accent);letter-spacing:0.02em;line-height:1;}
@@ -1468,6 +1472,7 @@ body{
 .following-chip-name{font-size:12px;font-weight:600;color:var(--accent);}
 .following-chip-x{background:none;border:none;color:var(--text3);cursor:pointer;font-size:15px;line-height:1;padding:0 2px;border-radius:50%;}
 .following-chip-x:hover{color:var(--neg);}
+.following-chip-x:focus-visible{outline:2px solid var(--accent);outline-offset:1px;}
 .following-empty{font-size:12px;color:var(--text3);font-style:italic;}
 /* Search-and-add popover for teams/topics */
 .follow-add-wrap{position:relative;display:inline-block;}
@@ -1934,21 +1939,28 @@ body:not(.dark) .pill-bar{
    and a fixed min-height so count/star chips line up with plain ones. Spacing rhythm
    matches the Sports/Energy/Pop-Culture filter pills. */
 .ttp-chips{display:flex;flex-wrap:wrap;gap:6px;}
+/* a11y (row 117): the pill is a non-interactive wrapper; the primary "filter by topic"
+   action is the inner .ttp-chip-main <button> (aria-pressed = active), and the follow
+   star is a SIBLING <button> — never a <button> nested inside a <button>. */
 .ttp-chip{
   display:inline-flex;align-items:center;gap:5px;min-height:28px;
   font-size:var(--fs-meta);font-weight:600;padding:4px 11px;border-radius:16px;
   border:1px solid var(--border2);background:var(--surface2);color:var(--text2);
-  cursor:pointer;transition:background 0.14s,border-color 0.14s,color 0.14s;white-space:nowrap;
+  transition:background 0.14s,border-color 0.14s,color 0.14s;white-space:nowrap;
 }
 .ttp-chip:hover{border-color:var(--border);color:var(--text);background:var(--surface);}
 .ttp-chip.active{color:#fff !important;border-color:transparent !important;}
 .ttp-chip.saved{border-style:dashed;}
+.ttp-chip-main{display:inline-flex;align-items:center;gap:5px;background:none;border:none;padding:0;margin:0;font:inherit;color:inherit;letter-spacing:inherit;cursor:pointer;}
+.ttp-chip-main:focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:8px;}
+.ttp-chip.active .ttp-chip-main:focus-visible{outline-color:#fff;}
 .ttp-count{font-size:9px;font-weight:700;color:var(--text4);font-variant-numeric:tabular-nums;}
 .ttp-chip.active .ttp-count{color:rgba(255,255,255,0.7);}
-/* Follow star on the merged Trending chips (Pass J item 3). */
+/* Follow star — sibling button on the merged Trending chips (Pass J item 3). */
 .ttp-chip-star{background:none;border:none;cursor:pointer;font-size:11px;line-height:1;color:var(--text4);padding:0 0 0 1px;margin-left:1px;}
 .ttp-chip-star.on{color:var(--amber);}
 .ttp-chip-star:hover{color:var(--amber);}
+.ttp-chip-star:focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:50%;}
 .ttp-chip.active .ttp-chip-star{color:rgba(255,255,255,0.85);}
 
 /* Across MyNewsHub — compact text list in the sidebar (Pass J item 4). */
@@ -3230,8 +3242,9 @@ body:not(.dark) .pill-bar{
 .ms-search-wrap{padding:8px 16px 4px;}
 .ms-search-input{width:100%;padding:8px 12px;border-radius:20px;border:1px solid var(--border);background:var(--surface2);color:var(--text);font-size:var(--fs-subhead);outline:none;}
 .ms-trending{padding:6px 16px 10px;display:flex;gap:6px;flex-wrap:wrap;}
-.ms-trending-chip{font-size:var(--fs-meta);padding:3px 10px;border-radius:12px;background:var(--surface2);border:1px solid var(--border);color:var(--text2);cursor:pointer;white-space:nowrap;}
+.ms-trending-chip{font-family:inherit;font-size:var(--fs-meta);padding:3px 10px;border-radius:12px;background:var(--surface2);border:1px solid var(--border);color:var(--text2);cursor:pointer;white-space:nowrap;}
 .ms-trending-chip:hover{background:var(--accent);color:#fff;border-color:var(--accent);}
+.ms-trending-chip:focus-visible{outline:2px solid var(--accent);outline-offset:2px;}
 
 /* ═══════════════════════════════════════════
    v19 ADDITIONS — Editorial top band + enhanced briefing + tabbed sidebar
@@ -6422,14 +6435,17 @@ function Sidebar({cat, arts, kw, health, activeKw, setActiveKw, activeSource, se
               return (
                 <span key={i}
                   className={`ttp-chip${activeKw===t.label?' active':''}${t.isSaved?' saved':''}`}
-                  style={activeKw===t.label ? {background:cc.color} : {}}
-                  onClick={()=>handleTopicClick(t.label)}>
-                  {t.label}
-                  <span className="ttp-count">{t.count}</span>
+                  style={activeKw===t.label ? {background:cc.color} : {}}>
+                  <button type="button" className="ttp-chip-main"
+                    aria-pressed={activeKw===t.label}
+                    onClick={()=>handleTopicClick(t.label)}>
+                    {t.label}
+                    <span className="ttp-count">{t.count}</span>
+                  </button>
                   {toggleTopic && (
-                    <button className={`ttp-chip-star${followed?' on':''}`}
-                      onClick={e=>{e.stopPropagation();toggleTopic(t.label);}}
-                      aria-label={followed?'Unfollow topic':'Follow topic'}>{followed?'★':'☆'}</button>
+                    <button type="button" className={`ttp-chip-star${followed?' on':''}`}
+                      onClick={()=>toggleTopic(t.label)} aria-pressed={followed}
+                      aria-label={followed?`Unfollow ${t.label}`:`Follow ${t.label}`}>{followed?'★':'☆'}</button>
                   )}
                 </span>
               );
@@ -6942,7 +6958,7 @@ function MenuSheet({ tab, onTabChange, onClose, onCustomize, onRefresh, dark, se
         {trendingTopics && trendingTopics.length > 0 && (
           <div className="ms-trending">
             {trendingTopics.slice(0,6).map((t,i)=>(
-              <span key={i} className="ms-trending-chip" onClick={()=>{ onSearch(t); onClose(); }}>{t}</span>
+              <button type="button" key={i} className="ms-trending-chip" onClick={()=>{ onSearch(t); onClose(); }}>{t}</button>
             ))}
           </div>
         )}
@@ -9323,18 +9339,22 @@ export default function App() {
             return myTeams.map((t, i) => {
               const dup = nameCounts[(t.name||'').toLowerCase()] > 1;
               return (
-                <span key={`tm-${i}`} className="following-chip following-chip-team" onClick={()=>navigate('sports', t.league, t.slug)}>
-                  <TeamLogo name={t.name} league={t.league} size={18}/>
-                  <span className="following-chip-name">{t.name}{dup ? ` · ${(t.league||'').toUpperCase()}` : ''}</span>
-                  <button className="following-chip-x" onClick={e=>{e.stopPropagation();toggleMyTeam(t);}} aria-label="Unfollow">×</button>
+                <span key={`tm-${i}`} className="following-chip following-chip-team">
+                  <button type="button" className="following-chip-main" onClick={()=>navigate('sports', t.league, t.slug)}>
+                    <TeamLogo name={t.name} league={t.league} size={18}/>
+                    <span className="following-chip-name">{t.name}{dup ? ` · ${(t.league||'').toUpperCase()}` : ''}</span>
+                  </button>
+                  <button type="button" className="following-chip-x" onClick={()=>toggleMyTeam(t)} aria-label={`Unfollow ${t.name}`}>×</button>
                 </span>
               );
             });
           })()}
           {myTopics.map((t, i) => (
-            <span key={`tp-${i}`} className="following-chip" onClick={()=>navigate('general','topic',teamSlug(t))}>
-              <span className="following-chip-name">{t}</span>
-              <button className="following-chip-x" onClick={e=>{e.stopPropagation();toggleTopic(t);}} aria-label="Unfollow">×</button>
+            <span key={`tp-${i}`} className="following-chip">
+              <button type="button" className="following-chip-main" onClick={()=>navigate('general','topic',teamSlug(t))}>
+                <span className="following-chip-name">{t}</span>
+              </button>
+              <button type="button" className="following-chip-x" onClick={()=>toggleTopic(t)} aria-label={`Unfollow ${t}`}>×</button>
             </span>
           ))}
           {myTeams.length === 0 && myTopics.length === 0 && (
