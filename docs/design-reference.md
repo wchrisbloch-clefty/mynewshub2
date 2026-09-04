@@ -192,9 +192,11 @@ hand — keep them as a pre-flight checklist so the *next* one is caught before 
 - **Description:** Interactive chips need a native role, accessible name, state, keyboard operation, and visible focus.
 - **Do:** Prefer a `<button>` and expose pressed/selected state matching the visible label. — **Don't:** Use a clickable div or reveal the only action on hover.
 - **Code (Good):** `<button aria-pressed='true'>Open now</button>`. **(Bad):** `<div class='selected' onclick='toggle()'>Open now</div>`.
-- **Repo tie-in:** the strongest single upgrade available here — several interactive chips are `<span onClick>`
-  (e.g. `.ttp-chip`, `.following-chip`). Migrating them to `<button>` with `aria-pressed` on the active/followed
-  state (the follow star already toggles) is the concrete a11y follow-up when chips are next touched.
+- **Repo tie-in:** ✅ **DONE** (issue #59). `.ttp-chip`, `.following-chip`/`-team`, and `.ms-trending-chip`
+  were migrated from `<span onClick>` to `<button>`: the primary action is an inner `.ttp-chip-main` /
+  `.following-chip-main` button (with `aria-pressed` on the Trending filter/follow state) and the secondary
+  action (follow star / `×` unfollow) is a **sibling** button — no `<button>` nested inside a `<button>`.
+  Focus-visible outlines added; visuals unchanged. Keep this pattern for any new interactive chip.
 
 ### Row 118 — Accessibility · Contextual Live Badge Updates — **Severity: High**
 - **Description:** Async badge/count changes should announce a meaningful contextual status without moving focus.
