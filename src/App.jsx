@@ -95,6 +95,24 @@ function catBadge(a) {
   return { label: cc.label, color: cc.color, subsector: null };
 }
 
+// Cover image with a REAL labeled fallback. Fills its (position:relative) parent: a
+// branded placeholder sits underneath and the <img> loads on top; if the src is missing
+// OR fails to load (e.g. a hotlink-protected source like Thoroughbred Daily News that
+// 403s cross-site requests), the <img> hides and the labeled placeholder shows through —
+// never a blank box. Replaces bare `background-image` divs, which can't detect failure.
+function CoverImg({ src, label, alt = '' }) {
+  const [failed, setFailed] = useState(false);
+  useEffect(() => { setFailed(false); }, [src]);
+  return (
+    <>
+      <div className="cover-img-ph"><span className="cover-img-ph-label">{label || 'MyNewsHub'}</span></div>
+      {src && !failed && (
+        <img className="cover-img" src={src} alt={alt} loading="lazy" onError={() => setFailed(true)}/>
+      )}
+    </>
+  );
+}
+
 // One consistent line-icon (Feather stroke) for settings/customize affordances —
 // inherits text colour, single stroke weight. Replaces the old gear emoji in chrome.
 // Icon sizing scale — one fixed size per context (item 7). Nav/action icons in the
@@ -1383,7 +1401,15 @@ body{
   font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:0.09em;
   border:none;background:none;font-family:inherit;padding:0;}
 .ss-flag-markets{color:var(--text3);cursor:default;}
-.ss-flag-breaking{color:var(--red);cursor:pointer;}
+.ss-flag-breaking{color:var(--red);cursor:default;}
+/* The actual rotating breaking headline. Bounded width + ellipsis so it never crowds
+   the market ticker out (ticker keeps flex:1 = the remainder); tighter cap on mobile. */
+.ss-breaking-head{flex:0 1 auto;min-width:0;max-width:46%;text-align:left;
+  background:none;border:none;cursor:pointer;font-family:inherit;padding:0;
+  font-size:12px;font-weight:700;color:var(--text);line-height:1;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.ss-breaking-head:hover{color:var(--red);text-decoration:underline;}
+@media(max-width:640px){ .ss-breaking-head{max-width:44%;font-size:11px;} }
 .ss-pulse{width:7px;height:7px;border-radius:50%;background:var(--red);
   animation:ss-pulse 1.8s ease-out infinite;}
 @keyframes ss-pulse{0%{box-shadow:0 0 0 0 rgba(200,16,46,0.5);}70%{box-shadow:0 0 0 6px rgba(200,16,46,0);}100%{box-shadow:0 0 0 0 rgba(200,16,46,0);}}
@@ -1938,6 +1964,19 @@ body:not(.dark) .pill-bar{
    hover (no accent flood), a whisper-weight count that never competes with the label,
    and a fixed min-height so count/star chips line up with plain ones. Spacing rhythm
    matches the Sports/Energy/Pop-Culture filter pills. */
+/* Prediction Markets sidebar module (Pass: item 4) — market sentiment, not news. */
+.pm-tag{font-family:var(--font-publicsans);font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:0.04em;color:var(--text4);}
+.pm-list{display:flex;flex-direction:column;}
+.pm-row{display:flex;align-items:flex-start;gap:10px;padding:9px 0;border-top:1px solid var(--border2);text-decoration:none;}
+.pm-row:first-of-type{border-top:none;}
+.pm-row:hover .pm-q{color:var(--accent);}
+.pm-prob{flex-shrink:0;min-width:38px;text-align:right;font-family:var(--font-archivo);font-weight:800;font-size:15px;font-variant-numeric:tabular-nums;line-height:1.15;}
+.pm-prob.pm-hi{color:var(--pos);}
+.pm-prob.pm-lo{color:var(--neg);}
+.pm-prob.pm-mid{color:var(--text2);}
+.pm-body{display:flex;flex-direction:column;gap:2px;min-width:0;}
+.pm-q{font-family:var(--font-publicsans);font-size:12px;font-weight:600;line-height:1.3;color:var(--text);display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;overflow-wrap:anywhere;}
+.pm-src{font-family:var(--font-publicsans);font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:0.03em;color:var(--text3);}
 .ttp-chips{display:flex;flex-wrap:wrap;gap:6px;}
 /* a11y (row 117): the pill is a non-interactive wrapper; the primary "filter by topic"
    action is the inner .ttp-chip-main <button> (aria-pressed = active), and the follow
@@ -3528,6 +3567,15 @@ body:not(.dark) .pill-bar{
 .gf-thumb-wrap{position:relative;width:80px;height:60px;flex-shrink:0;border-radius:6px;overflow:hidden;background:var(--surface2);}
 .gf-thumb-wrap .gf-thumb-ph{position:absolute;inset:0;width:100%;height:100%;background:linear-gradient(135deg,var(--surface2),var(--surface));}
 .gf-thumb-img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;display:block;}
+/* Shared cover-image fallback (Pass: broken-image fix). Fills its position:relative
+   parent; the <CoverImg> React helper hides the <img> on load failure so the labeled
+   placeholder underneath shows through — never a blank box. */
+.cover-img-ph{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;text-align:center;padding:0 10px;border-radius:inherit;background:linear-gradient(135deg,var(--navy-light) 0%,var(--navy) 100%);}
+.cover-img-ph-label{font-family:var(--font-archivo);font-weight:800;font-size:13px;letter-spacing:0.02em;color:rgba(255,255,255,0.55);display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;overflow-wrap:anywhere;}
+.cover-img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;object-position:center top;border-radius:inherit;display:block;}
+/* Ensure the card-image containers clip the absolute CoverImg to their rounded box. */
+.gn-card-img{position:relative;overflow:hidden;}
+.gf-thumb{position:relative;overflow:hidden;}
 .gf-body{flex:1;min-width:0;display:flex;flex-direction:column;gap:4px;}
 .gf-title{
   font-size:var(--fs-subhead);font-weight:600;color:var(--text);
@@ -6290,6 +6338,55 @@ function Scoreboard({scores, loading, compact=false}) {
   );
 }
 
+// ─── PREDICTION MARKETS (Pass: item 4) ────────────────────────────────────────
+// Compact market-SENTIMENT snapshots (Polymarket + key-gated Kalshi), NOT reported
+// news: a labeled sidebar module, clearly separated from State of Play / the feed. The
+// `keywords` (followed topics + trending) steer which contracts surface. Fail-soft:
+// renders NOTHING when the API returns empty (no key, blocked egress, or no markets).
+async function fetchPredictionMarkets(keywords) {
+  try {
+    const r = await fetch('/api/prediction-markets', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ keywords: keywords || [] }),
+      signal: AbortSignal.timeout(12000),
+    });
+    if (!r.ok) return { markets: [] };
+    return await r.json();
+  } catch { return { markets: [] }; }
+}
+
+function PredictionMarkets({ keywords }) {
+  const [markets, setMarkets] = useState([]);
+  const kwKey = (keywords || []).slice(0, 20).join('|');
+  useEffect(() => {
+    let alive = true;
+    fetchPredictionMarkets((kwKey ? kwKey.split('|') : [])).then(r => { if (alive) setMarkets((r && r.markets) || []); });
+    return () => { alive = false; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [kwKey]);
+  if (!markets.length) return null;
+  const probClass = p => p >= 60 ? 'pm-hi' : p <= 40 ? 'pm-lo' : 'pm-mid';
+  return (
+    <div className="sidebar-section pm-section">
+      <div className="sidebar-sec-head">
+        <span className="sidebar-sec-label">Prediction Markets</span>
+        <span className="pm-tag">market sentiment · not news</span>
+      </div>
+      <div className="pm-list">
+        {markets.slice(0, 6).map((m, i) => (
+          <a key={i} className="pm-row" href={m.url} target="_blank" rel="noreferrer">
+            <span className={`pm-prob ${probClass(m.probability)}`}>{m.probability}%</span>
+            <span className="pm-body">
+              <span className="pm-q">{m.question}</span>
+              <span className="pm-src">{m.source}{m.matched ? '' : ' · trending'}</span>
+            </span>
+          </a>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 // ─── GHOST SIDEBAR ────────────────────────────────────────────────────────────
 function Sidebar({cat, arts, kw, health, activeKw, setActiveKw, activeSource, setActiveSource, onRead, scores, scoresLoading, showScoreboard, recommended, showBriefing, onOpenBriefing, briefingExcludeCats, onTopicOpen, trendingItems, isTopicFollowed, toggleTopic, onTrendingOpen,
   sopItems, sopGapItems, sopMeta, sopCollapsed, onToggleSop, formatDate, acrossSections, onAcrossSeeAll, followingModule}) {
@@ -6452,6 +6549,13 @@ function Sidebar({cat, arts, kw, health, activeKw, setActiveKw, activeSource, se
             })}
           </div>
         </div>
+      )}
+
+      {/* PREDICTION MARKETS (Pass: item 4) — compact market-sentiment snapshots near
+          Trending, steered by the same topic/trending keywords. Clearly labeled and
+          separated from reported news; self-hides when the API returns nothing. */}
+      {!activeKw && !activeSource && (
+        <PredictionMarkets keywords={topicItems.map(t => t.label)}/>
       )}
 
       {/* 5) SOURCES — collapsed by default; kept so source filter/health stays reachable
@@ -7262,7 +7366,8 @@ function HeroBand({ heroStories, heroIdx, setHeroIdx, paused, setPaused, onRead 
     >
       {/* LEFT: large lead */}
       <article className="hero-band-lead" onClick={()=>onRead(lead)}>
-        <div className="hero-band-img" style={{backgroundImage:`url(${lead.img})`}}>
+        <div className="hero-band-img">
+          <CoverImg src={lead.img} label={lead.source}/>
           <div className="hero-band-grad"/>
           <div className="hero-band-text-overlay">
             <div className="hero-band-badge" style={{background:(CATS[lead._cat]?.color||'#1d4ed8')}}>
@@ -7366,6 +7471,16 @@ function TopBar({tab, setTab, search, setSearch, dark, setDark,
 
   const hasBreaking = breakingItems&&breakingItems.length>0;
   const tickerItems = hasBreaking?[...breakingItems,...breakingItems]:[];
+  // Rotate the actual breaking HEADLINE next to the flag (every 5s) so the strip shows
+  // a real story, not just a label. When nothing qualifies, hasBreaking is false and the
+  // left segment reads "Markets" instead — never a labeled-but-empty "Breaking".
+  const [breakingIdx, setBreakingIdx] = useState(0);
+  useEffect(() => {
+    if (!hasBreaking || breakingItems.length < 2) return;
+    const iv = setInterval(() => setBreakingIdx(i => (i + 1) % breakingItems.length), 5000);
+    return () => clearInterval(iv);
+  }, [hasBreaking, breakingItems.length]);
+  const curBreaking = hasBreaking ? breakingItems[breakingIdx % breakingItems.length] : null;
 
   // v24a: Desktop nav per user: General · Business · Markets · Bloom · Sports · Pop Culture · Briefing · Podcasts · Saved
   const ALL_TABS = ['general','business','bloom','tech','sports','health','popculture','briefing','podcasts','sources','saved'];
@@ -7402,9 +7517,12 @@ function TopBar({tab, setTab, search, setSearch, dark, setDark,
       <div className="status-strip">
         <div className="status-strip-inner">
           {hasBreaking && showBreaking ? (
-            <button className="ss-flag ss-flag-breaking" onClick={()=>tickerItems[0]?.link&&window.open(tickerItems[0].link,'_blank')} title={tickerItems[0]?.title||'Breaking'}>
-              <span className="ss-pulse"/> Breaking
-            </button>
+            <>
+              <span className="ss-flag ss-flag-breaking"><span className="ss-pulse"/> Breaking</span>
+              <button className="ss-breaking-head" onClick={()=>curBreaking?.link&&window.open(curBreaking.link,'_blank')} title={curBreaking?.title||''}>
+                {curBreaking?.title}
+              </button>
+            </>
           ) : (
             <span className="ss-flag ss-flag-markets">Markets</span>
           )}
@@ -8937,7 +9055,8 @@ export default function App() {
             {/* Hero lead article */}
             {lead && (
               <article className="sports-hero" onClick={()=>onRead(lead)}>
-                <div className="sports-hero-img" style={{backgroundImage:`url(${lead.img})`}}>
+                <div className="sports-hero-img">
+                  <CoverImg src={lead.img} label={lead.source}/>
                   {lead._favScore > 0 && <span className="sports-hero-fav">★ MY TEAMS</span>}
                 </div>
                 <div className="sports-hero-text">
@@ -8959,9 +9078,7 @@ export default function App() {
                   feedItems.slice(0, 6).filter(a=>!a.img)
                 ).slice(0, 3).map((a, i) => (
                   <article key={i} className="gn-card" onClick={()=>onRead(a)}>
-                    {a.img
-                      ? <div className="gn-card-img" style={{backgroundImage:`url(${a.img})`}}/>
-                      : <div className="gn-card-img-ph"><span className="ph-label">{a.source}</span></div>}
+                    <div className="gn-card-img"><CoverImg src={a.img} label={a.source}/></div>
                     <h3 className="gn-card-title">{a.title}</h3>
                     <div className="gn-card-meta">
                       <span className="gn-card-source" style={{color:cc.color}}>{a.source}</span>
@@ -9429,35 +9546,13 @@ export default function App() {
             moved into the sidebar (Pass J item 4). The main column is now just
             Top Stories → Houston Local (General) → main feed (Pass J item 6). */}
 
-        {/* Category pages: lead image grid */}
+        {/* Category pages: Top Stories — same TopOfHourStrip treatment as General
+            (category tag overlaid on the image), so every category's hero is identical
+            instead of the old headline-floating-below-a-plain-image grid (Pass: card
+            consistency). Business, Energy, AI & Tech, Health, Pop Culture all route
+            through here, so they unify together. */}
         {!activeKw && !activeSrc && catLead && !isHome && (
-          <div className="gn-grid">
-            <article className="gn-lead" onClick={()=>onRead(catLead)}>
-              <div className="gn-lead-img" style={{backgroundImage:`url(${catLead.img})`}}/>
-              <div className="gn-lead-text">
-                <h1 className="gn-lead-title">{catLead.title}</h1>
-                {catLead.desc&&<p className="gn-lead-desc">{catLead.desc}</p>}
-                <div className="gn-lead-meta">
-                  <span className="gn-lead-source" style={{color:cc.color}}>{catLead.source}</span>
-                  <span>·</span><span>{fmtDate(catLead.pubDate)}</span>
-                </div>
-              </div>
-            </article>
-            <div className="gn-row">
-              {topStoryItems.slice(1).map((a, i) => (
-                <article key={i} className={`gn-card ${cat}`} onClick={()=>onRead(a)}>
-                  {a.img
-                    ? <div className="gn-card-img" style={{backgroundImage:`url(${a.img})`}}/>
-                    : <div className="gn-card-img-ph"><span className="ph-label">{a.source}</span></div>}
-                  <h3 className="gn-card-title">{a.title}</h3>
-                  <div className="gn-card-meta">
-                    <span className="gn-card-source" style={{color:cc.color}}>{a.source}</span>
-                    <span>·</span><span>{fmtDate(a.pubDate)}</span>
-                  </div>
-                </article>
-              ))}
-            </div>
-          </div>
+          <TopOfHourStrip stories={topStoryItems} catLead={catLead} arts={arts} onRead={onRead}/>
         )}
 
         {/* State of Play hoisted into the main column right after Top Stories — shown
@@ -9756,9 +9851,7 @@ export default function App() {
     return (
       <div className="ba-item">
         <div className="ba-main" onClick={()=>onRead(a)}>
-          {a.img
-            ? <div className="gf-thumb" style={{backgroundImage:`url(${a.img})`}}/>
-            : <div className="gf-thumb-ph"/>}
+          <div className="gf-thumb"><CoverImg src={a.img} label={a.source}/></div>
           <div className="gf-body">
             <div className="gf-title">{a.title}</div>
             <div className="gf-meta">
