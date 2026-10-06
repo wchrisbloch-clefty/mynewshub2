@@ -19,9 +19,21 @@
 
 import { MODELS, CASCADE_ORDER, CASCADE_TIMEOUTS, PROMPT_VERSION } from '../lib/ai-models.js';
 
-const MAX_INPUT       = 3000;
-const MAX_INPUT_LARGE = 5000; // briefing-gen mode
+// Input caps, per mode class. The EXTRACT modes are summarized from article body text
+// that api/extract.js returns (up to MAX_CHARS=8000); capping those at 3000 threw away
+// the back ~60% of any long piece before the model ever saw it. 7500 keeps headroom
+// under extract's 8000 while letting the model read the whole article. Non-extraction
+// modes (chat/briefing) and briefing-gen keep their own, smaller caps.
+const MAX_INPUT         = 3000; // chat, chat-open, briefing — content is already curated/short
+const MAX_INPUT_EXTRACT = 7500; // summary|takeaways|explain|bias|related|brief — full article body
+const MAX_INPUT_LARGE   = 5000; // briefing-gen mode
+const EXTRACT_MODES = new Set(['summary', 'takeaways', 'explain', 'bias', 'related', 'brief']);
 const TOKENS = { summary: 320, takeaways: 700, explain: 500, briefing: 400, 'briefing-gen': 700, chat: 300, 'chat-open': 300, bias: 400, related: 400, brief: 300 };
+
+// Appended to the system prompt ONLY when the client flags this as tier-(b) preview text
+// (extraction failed, we're summarizing a short RSS blurb). Without it the model is still
+// asked for a 3–4 sentence summary of 1–2 sentences of input, so it pads and restates.
+const SNIPPET_CONSTRAINT = '\n\nIMPORTANT: The source text below is a SHORT PREVIEW SNIPPET (an RSS blurb), not the full article. Be brief — at most 2 sentences (or at most 2 bullets). State ONLY what the snippet explicitly says; do not infer, extrapolate, or add any fact not present in it. If it supports only one line, write one. Never pad to reach a length.';
 
 // ── Body parser ──────────────────────────────────────────────────────────────
 async function readBody(req) {
@@ -232,14 +244,20 @@ export default async function handler(req, res) {
   const validModes = ['summary', 'takeaways', 'explain', 'briefing', 'briefing-gen', 'chat', 'chat-open', 'bias', 'related', 'brief'];
   const m = validModes.includes(mode) ? mode : 'summary';
   const maxTokens = TOKENS[m] || 250;
-  const maxInput = m === 'briefing-gen' ? MAX_INPUT_LARGE : MAX_INPUT;
+  const maxInput = m === 'briefing-gen' ? MAX_INPUT_LARGE : EXTRACT_MODES.has(m) ? MAX_INPUT_EXTRACT : MAX_INPUT;
   const t = String(title).slice(0, 500);
   const c = String(content).slice(0, maxInput);
 
+  // Tier-(b) preview: client sets `preview:true` when it's summarizing an RSS snippet
+  // because extraction failed. Tighten the prompt so the model doesn't pad a blurb.
+  const isPreview = !!body.preview && EXTRACT_MODES.has(m);
+  const system = buildSystem(type, m) + (isPreview ? SNIPPET_CONSTRAINT : '');
   const payload = {
-    system: buildSystem(type, m),
+    system,
     user:   buildUser(t, c, m),
-    prompt: buildPrompt(type, t, c, m),
+    // buildPrompt already composes system+user for the providers that take one blob
+    // (Gemini); keep the preview constraint in that path too.
+    prompt: m === 'briefing-gen' ? c : system + '\n\n' + buildUser(t, c, m),
     maxTokens,
   };
 

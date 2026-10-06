@@ -382,6 +382,26 @@ const TEAM_CHIPS = {
 };
 const teamSlug = (name) => name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
 
+// 4a: canonicalize a followed-teams list. The dedup invariant is teamSlug(name)+league,
+// computed from the NAME every time — never a stored route-param slug, which was the
+// second, divergent slug source. Also merges any duplicates already in storage/profile.
+// A genuinely distinct team that shares a name across leagues (e.g. Kentucky CFB vs CBB)
+// has a different league, so it is correctly kept as two entries.
+function normalizeMyTeams(arr) {
+  if (!Array.isArray(arr)) return [];
+  const seen = new Set(), out = [];
+  for (const t of arr) {
+    if (!t || !t.name) continue;
+    const slug = teamSlug(t.name);
+    const league = t.league || '';
+    const key = `${slug}|${league}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push({ ...t, slug });
+  }
+  return out;
+}
+
 // ── ESPN public team logos (no API key). Resolve a followed team's crest from the
 // ESPN teams endpoint (cached per league) and fall back to a clean initials tile if
 // the league is unknown, the team isn't found, or the image errors. Sports only. ──
@@ -766,19 +786,43 @@ function activeLeagues(scores) {
 // URL routing primitives (parseRoute / buildPath / ROUTE_CATS) now live in
 // ./modules/routing; App keeps only the stateful navigate/applyRoute orchestration.
 
+// Normalize any league identifier to the short scoreboard key. Team records are
+// inconsistent: SCORE_TEAMS uses ESPN paths ('college-football'), while myTeams/
+// TEAM_CHIPS use short keys ('cfb'). Game `_league` is always the short key.
+const LEAGUE_KEY = { nfl:'nfl', nba:'nba', mlb:'mlb', nhl:'nhl', 'college-football':'cfb', cfb:'cfb', 'mens-college-basketball':'cbb', cbb:'cbb', 'womens-college-basketball':'wcbb' };
+const normLeague = l => LEAGUE_KEY[(l||'').toLowerCase()] || (l||'').toLowerCase();
+// Whole-word match: a short token like "Houston" must not light up an unrelated
+// "Houston" team, and a term must match on a word boundary, not as a substring.
+function teamTermMatches(haystack, term) {
+  const t = (term||'').trim().toLowerCase();
+  if (!t) return false;
+  const esc = t.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  try { return new RegExp(`(?:^|\\W)${esc}(?:\\W|$)`).test(haystack); }
+  catch { return haystack.includes(t); }
+}
+
 function favoriteIn(game) {
   if (!game) return null;
   const txt=((game.homeName||'')+' '+(game.awayName||'')+' '+(game.short||'')+' '+(game.name||'')).toLowerCase();
-  return SCORE_TEAMS.find(t=>txt.includes(t.match.toLowerCase()))||null;
+  return SCORE_TEAMS.find(t=>teamTermMatches(txt, t.match))||null;
 }
 
 // v23: parameterized variant accepting any team list (typically the user's
 // customized `teams` state). Used by SportsScoreStrip + SportsPage for
 // favorite detection that respects the user's customization.
-function favoriteInList(game, list) {
+// 4d: whole-word matching + league scoping — when BOTH the game's league and the
+// team record's league are known (and mappable), they must agree, so following
+// "Kentucky" basketball never highlights a Kentucky *football* game.
+function favoriteInList(game, list, leagueKey) {
   if (!game || !Array.isArray(list)) return null;
   const txt=((game.homeName||'')+' '+(game.awayName||'')+' '+(game.short||'')+' '+(game.name||'')).toLowerCase();
-  return list.find(t=>txt.includes((t.match||'').toLowerCase()))||null;
+  const gLeague = normLeague(leagueKey || game._league || '');
+  return list.find(t => {
+    if (!teamTermMatches(txt, t.match || t.name)) return false;
+    const tLeague = normLeague(t.league || '');
+    if (gLeague && tLeague && gLeague !== tLeague) return false; // league scope
+    return true;
+  }) || null;
 }
 
 // ─── SOCIAL HELPERS ───────────────────────────────────────────────────────────
@@ -945,6 +989,12 @@ const EXTRACT_MODES = new Set(['summary','takeaways','explain','bias','related',
 // preview to summarize instead. Never summarize a blurb silently — always label it.
 export const PREVIEW_LABEL = 'Summary from preview text — full article unavailable';
 const PREVIEW_MIN = 120; // RSS preview must be at least this long to be worth summarizing
+// Stable small hash (djb2) → a per-STORY cache token on the summarize URL. The request
+// URL is the only thing a URL-keyed cache (CDN/proxy) can key on; `?pv=` alone is
+// identical for every story, so without a per-story token two different articles would
+// share one cache entry the moment this endpoint were ever GET/edge-cached. (See the
+// 1d note in /api/summarize.js — POST is what masks the collision today.)
+const hashKey = s => { let h = 5381; const str = String(s||''); for (let i=0;i<str.length;i++) h = ((h*33) ^ str.charCodeAt(i)) >>> 0; return h.toString(36); };
 async function fetchAISummary({type, title, content, mode='summary', url}) {
   // Extract-first, three honest tiers:
   //   (a) real extracted body        → normal summary
@@ -973,9 +1023,13 @@ async function fetchAISummary({type, title, content, mode='summary', url}) {
     // `pv` puts the prompt version in the request URL, so it is part of the cache key:
     // bumping PROMPT_VERSION after a buildSystem() change retires the old cached
     // summaries instead of letting them be served for the rest of the stale window.
-    const r = await fetch(`/api/summarize?pv=${encodeURIComponent(PROMPT_VERSION)}`, {
+    // `k` is a per-(story,mode) token so distinct stories can never collide on one
+    // cache entry (1d). It is derived from the extraction target url when present,
+    // else the title, so the same story+mode is stable across reloads.
+    const ck = hashKey(`${url || title || ''}|${mode}`);
+    const r = await fetch(`/api/summarize?pv=${encodeURIComponent(PROMPT_VERSION)}&k=${ck}`, {
       method:'POST', headers:{'Content-Type':'application/json'},
-      body: JSON.stringify({type,title,content:body,mode}),
+      body: JSON.stringify({type,title,content:body,mode,preview:fromPreview}),
       signal: AbortSignal.timeout(mode==='briefing-gen'?25000:mode==='takeaways'?18000:22000),
     });
     if (!r.ok) {
@@ -3118,6 +3172,15 @@ body:not(.dark) .pill-bar{
 .cp-team-row-body{
   display:flex;flex-direction:column;gap:3px;line-height:1.4;
 }
+/* 4c: reorder controls — 44x44 tap targets (the glyph is small, the hit area is not). */
+.cp-reorder-group{display:inline-flex;flex-shrink:0;}
+.cp-reorder{
+  min-width:44px;min-height:44px;display:inline-flex;align-items:center;justify-content:center;
+  background:none;border:1px solid var(--border);border-radius:8px;color:var(--text2);
+  font-size:15px;line-height:1;cursor:pointer;padding:0;margin-right:4px;
+}
+.cp-reorder:hover:not(:disabled){border-color:var(--accent);color:var(--accent);}
+.cp-reorder:disabled{opacity:0.3;cursor:default;}
 
 /* Mobile sports adjustments */
 @media (max-width:900px){
@@ -6261,13 +6324,17 @@ OUTPUT: 3-sentence paragraph followed by exactly 3 bullets (- markers). No heade
 }
 
 // ─── SCOREBOARD ───────────────────────────────────────────────────────────────
-function Scoreboard({scores, loading, compact=false}) {
+function Scoreboard({scores, loading, compact=false, favTeams}) {
   const [collapsed, setCollapsed] = useState(false);
   const [expanded, setExpanded] = useState(() => {
     const init={};
     LEAGUES.forEach(L=>{init[L.key]=['nfl','nba','mlb'].includes(L.key);});
     return init;
   });
+  // 4b: respect the user's customized teams. Fall back to the hardcoded SCORE_TEAMS
+  // (via favoriteIn) only when the reader has no custom teams at all.
+  const hasCustom = Array.isArray(favTeams) && favTeams.length > 0;
+  const favOf = (g, lk) => hasCustom ? favoriteInList(g, favTeams, lk) : favoriteIn(g);
 
   const renderGame = (g, isFav) => {
     const live=g.state==='in', final=g.state==='post';
@@ -6325,15 +6392,16 @@ function Scoreboard({scores, loading, compact=false}) {
       </button>
       {!collapsed && leaguesToShow.map(L => {
         const games = (scores[L.key]||[]).filter(isGameActive);
+        const isFavG = g => !!favOf(g, L.key);
         const sorted = [...games].sort((a,b)=>{
-          const fa=favoriteIn(a)?0:1, fb=favoriteIn(b)?0:1;
+          const fa=isFavG(a)?0:1, fb=isFavG(b)?0:1;
           return fa!==fb ? fa-fb : 0;
         });
-        const favCount = sorted.filter(g=>favoriteIn(g)).length;
+        const favCount = sorted.filter(isFavG).length;
         const liveCount = sorted.filter(g=>g.state==='in').length;
         const isOpen = expanded[L.key];
         const visible = compact
-          ? sorted.filter(g=>favoriteIn(g)).concat(sorted.filter(g=>!favoriteIn(g)).slice(0,2)).slice(0,4)
+          ? sorted.filter(isFavG).concat(sorted.filter(g=>!isFavG(g)).slice(0,2)).slice(0,4)
           : sorted;
         return (
           <div key={L.key} className="sb-league">
@@ -6348,7 +6416,7 @@ function Scoreboard({scores, loading, compact=false}) {
             </button>
             {isOpen&&sorted.length>0&&(
               <div className="sb-games">
-                {visible.map(g=>renderGame(g,favoriteIn(g)))}
+                {visible.map(g=>renderGame(g,isFavG(g)))}
                 {compact&&sorted.length>visible.length&&<div className="sb-more">+{sorted.length-visible.length} more games</div>}
               </div>
             )}
@@ -6460,7 +6528,7 @@ function SourceDirectory({ cat, feeds, onToggleFeed }) {
 
 // ─── GHOST SIDEBAR ────────────────────────────────────────────────────────────
 function Sidebar({cat, arts, kw, health, activeKw, setActiveKw, activeSource, setActiveSource, onRead, scores, scoresLoading, showScoreboard, recommended, showBriefing, onOpenBriefing, briefingExcludeCats, onTopicOpen, trendingItems, isTopicFollowed, toggleTopic, onTrendingOpen,
-  sopItems, sopGapItems, sopMeta, sopCollapsed, onToggleSop, formatDate, acrossSections, onAcrossSeeAll, followingModule, sopBreakingItems, feeds, onToggleFeed}) {
+  sopItems, sopGapItems, sopMeta, sopCollapsed, onToggleSop, formatDate, acrossSections, onAcrossSeeAll, followingModule, sopBreakingItems, feeds, onToggleFeed, favTeams}) {
   const cc = CATS[cat]||CATS.general;
   const catKws = kw[cat]||[];
   const catArts = arts[cat]||[];
@@ -6517,7 +6585,7 @@ function Sidebar({cat, arts, kw, health, activeKw, setActiveKw, activeSource, se
         </div>
       )}
 
-      {showScoreboard && <Scoreboard scores={scores} loading={scoresLoading}/>}
+      {showScoreboard && <Scoreboard scores={scores} loading={scoresLoading} favTeams={favTeams}/>}
 
       {/* The default "Trending in [cat]" list duplicated the main-column State of Play
           (same data), so it's removed. This section now renders ONLY when a keyword or
@@ -6961,6 +7029,12 @@ function CustomizePanel({feeds, kw, alerts, urgent, social, watchlist, teams, he
               {lt.map((t,i)=>(
                 <div key={i} className="cp-team-row">
                   <div className="cp-team-row-head">
+                    <span className="cp-reorder-group">
+                      <button className="cp-reorder" disabled={i===0} aria-label={`Move ${t.team} up`}
+                        onClick={()=>setLt(prev=>{ if(i===0) return prev; const n=[...prev]; [n[i-1],n[i]]=[n[i],n[i-1]]; return n; })}>↑</button>
+                      <button className="cp-reorder" disabled={i===lt.length-1} aria-label={`Move ${t.team} down`}
+                        onClick={()=>setLt(prev=>{ if(i===prev.length-1) return prev; const n=[...prev]; [n[i+1],n[i]]=[n[i],n[i+1]]; return n; })}>↓</button>
+                    </span>
                     <span style={{fontSize:'18px'}}>{t.emoji}</span>
                     <strong style={{fontSize:'12px',color:'var(--text)',flex:1}}>{t.team}</strong>
                     <span style={{fontSize:'10px',color:'var(--text3)'}}>{(t.sport||'').toUpperCase()} · {(t.league||'').toUpperCase()}</span>
@@ -8181,10 +8255,16 @@ export default function App() {
   const [tab, setTab]           = useState(()=>parseRoute().category);
   const [subcat, setSubcat]     = useState(()=>parseRoute().subcategory); // URL-driven subcategory
   const [tertiary, setTertiary] = useState(()=>parseRoute().tertiary);    // URL-driven team (Tier 3)
-  const [myTeams, setMyTeams]   = useState(()=>ld('myTeams', []));        // followed teams {name,league,slug}
+  const [myTeams, setMyTeams]   = useState(()=>normalizeMyTeams(ld('myTeams', [])));  // followed teams {name,league,slug}
+  // Persist the one-time normalization (migration) of any pre-existing duplicates.
+  useEffect(() => { sv('myTeams', normalizeMyTeams(ld('myTeams', []))); }, []); // eslint-disable-line react-hooks/exhaustive-deps
   const toggleMyTeam = (t) => setMyTeams(prev => {
-    const exists = prev.some(x => x.slug === t.slug && x.league === t.league);
-    const next = exists ? prev.filter(x => !(x.slug === t.slug && x.league === t.league)) : [...prev, t];
+    // Key on teamSlug(name)+league, recomputed from the name — never a passed-in slug.
+    const slug = teamSlug(t.name || ''); const league = t.league || '';
+    const exists = prev.some(x => x.slug === slug && x.league === league);
+    const next = exists
+      ? prev.filter(x => !(x.slug === slug && x.league === league))
+      : [...prev, { ...t, slug }];
     sv('myTeams', next); return next;
   });
   // My Topics — the same follow pattern generalized to ANY entity (ticker, company,
@@ -8613,7 +8693,7 @@ export default function App() {
     put('hiddenIndices', cfg.hiddenIndices, setHiddenIndices);
     put('briefingExclude', cfg.briefingExclude, setBriefingExclude);
     put('briefingSources', cfg.briefingSources, setBriefingSources);
-    put('myTeams', cfg.myTeams, setMyTeams);
+    put('myTeams', cfg.myTeams ? normalizeMyTeams(cfg.myTeams) : cfg.myTeams, setMyTeams);
     put('myTopics', cfg.myTopics, setMyTopics);
   }, []);
 
@@ -8769,7 +8849,7 @@ export default function App() {
       ? ((TEAM_CHIPS[sportTab] || []).find(n => teamSlug(n) === tertiary)
          || tertiary.replace(/-/g, ' ').replace(/\b\w/g, c => c.toUpperCase()))
       : null;
-    const teamFollowed = !!(tertiary && myTeams.some(x => x.slug === tertiary && x.league === sportTab));
+    const teamFollowed = !!(teamName && myTeams.some(x => x.slug === teamSlug(teamName) && x.league === sportTab));
     // activeTeam/setActiveTeam now live in App state (survives SportsPage remounts).
     const [teamMenuSym, setTeamMenuSym] = useState(null); // team with open popup menu
     // Collapsible State of Play — shared shell behavior, per-category memory ('sports').
@@ -8981,7 +9061,7 @@ export default function App() {
         )}
 
         {/* ── SCORES — live scoreboard, anchored at the very top of the ribbon ── */}
-        {!teamName && <SportsScoreStrip scores={visibleScores} teams={teams}/>}
+        {!teamName && <SportsScoreStrip scores={visibleScores} teams={[...teams, ...myTeams.map(t=>({match:t.name, league:t.league}))]}/>}
 
         {/* ── LEAGUES — ESPN pill-style tab row ── */}
         <div className="sport-tabs" ref={sportTabsRef}>
@@ -9041,7 +9121,7 @@ export default function App() {
                 </div>
               </div>
               <div style={{display:'flex',gap:'8px',alignItems:'center'}}>
-                <button className="sport-league-all-btn" onClick={()=>toggleMyTeam({name:teamName, league:sportTab, slug:tertiary})}>
+                <button className="sport-league-all-btn" onClick={()=>toggleMyTeam({name:teamName, league:sportTab})}>
                   {teamFollowed ? '★ Following' : '☆ Follow'}
                 </button>
                 <button className="sport-league-all-btn" onClick={()=>navigate('sports', sportTab)}>← All {SPORT_TABS.find(s=>s.key===sportTab)?.label}</button>
@@ -9887,6 +9967,7 @@ export default function App() {
             activeSource={activeSrc} setActiveSource={s=>{setActiveSrc(s);setActiveKw(null);}}
             onRead={onRead} scores={scores} scoresLoading={scoresLoading}
             showScoreboard={cat==='sports'} recommended={recommended}
+            favTeams={[...teams, ...myTeams.map(t=>({match:t.name, league:t.league}))]}
             onTopicOpen={label => navigate(cat, 'topic', teamSlug(label))}
             isTopicFollowed={isTopicFollowed} toggleTopic={toggleTopic}
             sopItems={!activeKw && !activeSrc && !search ? sopSourceItems : null}
@@ -10558,7 +10639,7 @@ export default function App() {
           searchHistory={searchHistory}
           trendingTopics={homeTrendingTopics}
           onAccount={()=>setShowAuth(true)} signedIn={!!userId}
-          scores={scores} favTeams={[...teams, ...myTeams.map(t=>({match:t.name}))]}
+          scores={scores} favTeams={[...teams, ...myTeams.map(t=>({match:t.name, league:t.league}))]}
           onGoToSports={() => handleTabChange('sports')}/>
 
         {/* Pull-to-refresh indicator (mobile, touch-only) */}
