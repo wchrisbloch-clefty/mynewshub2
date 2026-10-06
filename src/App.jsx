@@ -237,7 +237,7 @@ const DEFAULT_FEEDS = {
     { name:'MIT Tech Review',       url:'https://www.technologyreview.com/feed/',                                on:true },
     { name:'Canary Media',          url:'https://www.canarymedia.com/rss',                                       on:true },
     { name:'Rigzone',               url:'https://www.rigzone.com/news/rss/rigzone_latest.aspx',                   on:true },
-    { name:'Data Center Frontier',  url:'https://www.datacenterfrontier.com/rss',                                on:true,  tier:'reported' },
+    { name:'Data Center Frontier',  url:'https://www.datacenterfrontier.com/feed/',                                on:true,  tier:'reported' },
   ],
   popculture: [
     { name:'Variety',           url:'https://variety.com/feed/',                                  on:true },
@@ -266,12 +266,14 @@ const DEFAULT_FEEDS = {
     { name:'9to5Google',        url:'https://9to5google.com/feed/',                               on:false },
     { name:'9to5Mac',           url:'https://9to5mac.com/feed/',                                  on:false },
     // Analysis (reported) — opt-in; surfaced via the Source Directory (Pass L item 4).
-    { name:'Semafor Tech',      url:'https://www.semafor.com/rss/technology.xml',                 on:false, tier:'reported' },
+    // (Semafor Tech dropped: no RSS endpoint could be verified — their old
+    //  /rss/technology.xml 404s and egress is blocked here, so rather than ship another
+    //  guess it's omitted until a working URL is confirmed.)
     { name:'Platformer',        url:'https://www.platformer.news/feed',                           on:false, tier:'reported' },
     { name:'Stratechery',       url:'https://stratechery.com/feed/',                              on:false, tier:'reported' },
     // Primary-source model releases (verified) — same tier treatment as SEC/Reuters.
+    // (Anthropic dropped: it publishes no first-party RSS feed.)
     { name:'OpenAI',            url:'https://openai.com/news/rss.xml',                            on:true,  tier:'verified' },
-    { name:'Anthropic',         url:'https://www.anthropic.com/rss.xml',                          on:true,  tier:'verified' },
     { name:'Google DeepMind',   url:'https://deepmind.google/blog/rss.xml',                       on:true,  tier:'verified' },
   ],
   comedy: [
@@ -1276,7 +1278,7 @@ function suggestSourcesForQuery(query) {
     out.push({ name: 'ERCOT Insider', url: 'https://www.ercotinsider.com/feed', cat: 'business' });
   }
   if (/data center|hyperscale|ai infra/.test(q)) {
-    out.push({ name: 'Data Center Frontier', url: 'https://www.datacenterfrontier.com/rss', cat: 'business' });
+    out.push({ name: 'Data Center Frontier', url: 'https://www.datacenterfrontier.com/feed/', cat: 'business' });
   }
   if (/midstream|pipeline/.test(q)) {
     out.push({ name: 'Pipeline & Gas Journal', url: 'https://pgjonline.com/rss', cat: 'business' });
