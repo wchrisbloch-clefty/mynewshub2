@@ -1930,9 +1930,13 @@ body:not(.dark) .pill-bar{
 .takeaway-head{font-weight:700;color:var(--text);}
 .takeaway-body{font-weight:400;}
 
-/* Discussion panel */
-.fc-disc{margin-top:10px;background:var(--surface2);border-radius:8px;padding:10px 12px;}
-.fc-disc-lbl{font-size:9px;font-weight:700;color:#0284c7;text-transform:uppercase;letter-spacing:0.08em;margin-bottom:8px;}
+/* Discussion panel — a dashed left edge + muted inferred note keep it visually distinct
+   from the AI summary panel above (which is verified/reported reporting, not street talk). */
+.fc-disc{margin-top:10px;background:var(--surface2);border-radius:8px;padding:10px 12px;border-left:3px dashed var(--border);}
+.fc-disc-head{display:flex;align-items:baseline;gap:8px;flex-wrap:wrap;margin-bottom:8px;}
+.fc-disc-lbl{font-size:9px;font-weight:700;color:#0284c7;text-transform:uppercase;letter-spacing:0.08em;}
+.fc-disc-note{font-family:var(--font-publicsans);font-size:10px;color:var(--text4);font-style:italic;margin-left:auto;}
+@media(max-width:640px){ .fc-disc-note{width:100%;margin-left:0;} }
 .fc-disc-item{display:flex;align-items:center;gap:8px;padding:5px 0;text-decoration:none;color:var(--text);font-size:var(--fs-meta);transition:color 0.1s;}
 .fc-disc-item:hover{color:#0284c7;}
 .fc-disc-platform{font-size:8px;font-weight:800;border-radius:3px;padding:2px 5px;color:#fff;flex-shrink:0;text-transform:uppercase;}
@@ -1941,6 +1945,24 @@ body:not(.dark) .pill-bar{
 .fc-disc-sub{font-weight:600;color:var(--text2);flex-shrink:0;}
 .fc-disc-title{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:500;}
 .fc-disc-stats{margin-left:auto;font-size:10px;color:var(--text3);white-space:nowrap;flex-shrink:0;}
+/* GitHub signal (3c) — dashed edge like the discussions panel marks it inferred. */
+.ghs-trigger{display:flex;align-items:center;gap:10px;width:100%;background:var(--surface2);border:1px dashed var(--border);border-radius:10px;padding:10px 14px;cursor:pointer;font-family:inherit;text-align:left;margin:4px 0;}
+.ghs-trigger:hover{border-color:var(--accent);}
+.ghs-badge{font-size:10px;font-weight:800;letter-spacing:0.04em;color:var(--text2);background:var(--surface);border:1px solid var(--border);border-radius:5px;padding:2px 7px;flex-shrink:0;}
+.ghs-trigger-label{font-size:12px;color:var(--text3);}
+.ghs{background:var(--surface2);border-left:3px dashed var(--border);border-radius:10px;padding:10px 14px;margin:4px 0;}
+.ghs-head{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:8px;}
+.ghs-note{font-family:var(--font-publicsans);font-size:10px;color:var(--text4);font-style:italic;margin-left:auto;}
+.ghs-close{background:none;border:none;color:var(--text3);font-size:18px;line-height:1;cursor:pointer;}
+.ghs-loading,.ghs-empty{font-size:11px;color:var(--text3);font-style:italic;}
+.ghs-list{display:flex;flex-direction:column;}
+.ghs-item{display:flex;align-items:center;gap:8px;padding:6px 0;text-decoration:none;color:var(--text);font-size:var(--fs-meta);border-top:1px solid var(--border2);}
+.ghs-item:first-child{border-top:none;}
+.ghs-item:hover .ghs-name{color:var(--accent);}
+.ghs-name{font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0;}
+.ghs-lang{font-size:10px;color:var(--text3);flex-shrink:0;}
+.ghs-stars{margin-left:auto;font-size:10px;color:var(--text3);white-space:nowrap;flex-shrink:0;}
+@media(max-width:640px){ .ghs-note{width:100%;margin-left:0;} }
 
 /* Related sources */
 .fc-more{margin-top:8px;display:flex;align-items:center;gap:5px;flex-wrap:wrap;}
@@ -5752,30 +5774,15 @@ function FeedCard({a, cat, isSaved, onSave, onRead, relatedSources, isRead, user
     if (showDisc) { setShowDisc(false); return; }
     if (disc) { setShowDisc(true); return; }
     setShowDisc(true); setLoadingDisc(true);
-    const results = {reddit:[],hn:[]};
+    // Click-to-load only (never auto-fetched). Reddit + HN are fetched server-side via
+    // /api/discussions (item 3b) — the old direct browser call to reddit.com was blocked
+    // by CORS / no-User-Agent rate-limiting. Fail-soft: any error → empty, renders nothing.
+    let results = { reddit: [], hn: [] };
     try {
-      const q = encodeURIComponent(a.title.slice(0,80));
-      const r = await fetch(`https://www.reddit.com/search.json?q=${q}&sort=relevance&limit=3&t=week`,{signal:AbortSignal.timeout(6000)});
+      const r = await fetch(`/api/discussions?q=${encodeURIComponent(a.title.slice(0,80))}`, { signal: AbortSignal.timeout(8000) });
       if (r.ok) {
         const d = await r.json();
-        results.reddit = (d?.data?.children||[]).filter(c=>c.data?.num_comments>0).slice(0,3).map(c=>({
-          title:c.data.title, sub:c.data.subreddit_name_prefixed,
-          ups:c.data.ups, comments:c.data.num_comments,
-          url:`https://reddit.com${c.data.permalink}`,
-          platform:'reddit', source_class:'discussion', tier:'inferred', // 2b: street-signal provenance
-        }));
-      }
-    } catch {}
-    try {
-      const q = encodeURIComponent(a.title.slice(0,80));
-      const r = await fetch(`https://hn.algolia.com/api/v1/search?query=${q}&tags=story&hitsPerPage=3`,{signal:AbortSignal.timeout(6000)});
-      if (r.ok) {
-        const d = await r.json();
-        results.hn = (d?.hits||[]).filter(h=>h.num_comments>0).slice(0,3).map(h=>({
-          title:h.title, points:h.points, comments:h.num_comments,
-          url:`https://news.ycombinator.com/item?id=${h.objectID}`,
-          platform:'hn', source_class:'discussion', tier:'inferred', // 2b: street-signal provenance
-        }));
+        results = { reddit: Array.isArray(d?.reddit) ? d.reddit : [], hn: Array.isArray(d?.hn) ? d.hn : [] };
       }
     } catch {}
     setDisc(results); setLoadingDisc(false);
@@ -5847,7 +5854,12 @@ function FeedCard({a, cat, isSaved, onSave, onRead, relatedSources, isRead, user
       )}
       {showDisc && (
         <div className="fc-disc" onClick={e=>e.stopPropagation()}>
-          <div className="fc-disc-lbl">What People Are Saying</div>
+          <div className="fc-disc-head">
+            <span className="fc-disc-lbl">What People Are Saying</span>
+            {/* 3a: same governance stamp as X Pulse — these are inferred street signals,
+                NOT the verified/reported reporting summarized in the AI panel above. */}
+            <span className="fc-disc-note">alternative perspective · inferred, unverified street signal</span>
+          </div>
           {loadingDisc
             ? <div style={{fontSize:'11px',color:'var(--text3)',fontStyle:'italic'}}>Searching discussions...</div>
             : (!disc||(disc.reddit.length===0&&disc.hn.length===0))
@@ -6528,6 +6540,57 @@ function SourceDirectory({ cat, feeds, onToggleFeed }) {
           })}
         </div>
       )}
+    </div>
+  );
+}
+
+// ─── GITHUB SIGNAL (Batch B item 3c) ──────────────────────────────────────────
+// Click-to-load "Trending on GitHub" street signal, AI & Tech only. Mirrors XPulse:
+// nothing fetches until tapped; fail-soft (empty → renders nothing); governed as an
+// INFERRED signal, never mixed with the verified/reported feed. Server does the fetch
+// + caching (api/github-signal.js).
+function GithubSignal() {
+  const [open, setOpen] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [repos, setRepos] = useState(null);
+  const [done, setDone] = useState(false);
+  const load = async (e) => {
+    e && e.stopPropagation();
+    if (done) { setOpen(o => !o); return; }
+    setOpen(true); setLoading(true);
+    try {
+      const r = await fetch('/api/github-signal', { signal: AbortSignal.timeout(9000) });
+      if (r.ok) { const d = await r.json(); setRepos(Array.isArray(d?.repos) ? d.repos : []); }
+      else setRepos([]);
+    } catch { setRepos([]); }
+    finally { setLoading(false); setDone(true); }
+  };
+  if (!open) return (
+    <button className="ghs-trigger" onClick={load}>
+      <span className="ghs-badge">◆ GitHub</span>
+      <span className="ghs-trigger-label">See what’s trending on GitHub · alternative perspective</span>
+    </button>
+  );
+  return (
+    <div className="ghs" onClick={e => e.stopPropagation()}>
+      <div className="ghs-head">
+        <span className="ghs-badge">◆ GitHub</span>
+        <span className="ghs-note">alternative perspective · inferred, unverified street signal</span>
+        <button className="ghs-close" onClick={() => setOpen(false)} aria-label="Hide GitHub signal">×</button>
+      </div>
+      {loading && <div className="ghs-loading">Checking GitHub…</div>}
+      {!loading && repos && repos.length > 0 && (
+        <div className="ghs-list">
+          {repos.map((r, i) => (
+            <a key={i} className="ghs-item" href={r.url} target="_blank" rel="noreferrer" onClick={e => e.stopPropagation()}>
+              <span className="ghs-name">{r.name}</span>
+              {r.language && <span className="ghs-lang">{r.language}</span>}
+              <span className="ghs-stars">★ {typeof r.stars === 'number' ? r.stars.toLocaleString() : r.stars}</span>
+            </a>
+          ))}
+        </div>
+      )}
+      {!loading && repos && repos.length === 0 && <div className="ghs-empty">No trending repos right now.</div>}
     </div>
   );
 }
@@ -9852,6 +9915,8 @@ export default function App() {
               :feedItems.length===0
                 ?<div className="empty-state"><div className="empty-icon"></div><div className="empty-msg">{activeKw||activeSrc?'No articles match this filter':search?`No internal results for "${search}"`:'No articles loaded yet'}</div><button className="refresh-btn" onClick={refreshAll}>Refresh</button></div>
                 :<div className="snap-feed">
+                  {/* AI & Tech only: optional GitHub street signal, click-to-load (3c). */}
+                  {cat==='tech' && !activeKw && !activeSrc && !search && <GithubSignal/>}
                   {(activeKw||activeSrc||search ? feedItems.slice(0,20) : dedupedFeed.slice(0,20)).map((a,i)=>(
                     <Fragment key={a.link||i}>
                       <SnapshotCard a={a} meta={CATS[cat]||CATS.general} isSaved={isSavedFn(a)} onSave={onSave} onRead={onRead} onPerspectives={setPerspArticle} formatDate={fmtDate} hideImage={i>=3}/>
