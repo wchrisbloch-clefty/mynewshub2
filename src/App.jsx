@@ -372,6 +372,12 @@ const LEAGUES = [
   { key:'cbb', label:'College BB',sport:'basketball', league:'mens-college-basketball', emoji:'', accent:'var(--accent)' },
 ];
 
+// Normalize a league value to its short KEY (nfl/nba/mlb/cfb/cbb). SCORE_TEAMS store
+// the ESPN path ('college-football'); myTeams store the key ('cfb'). The unified
+// followed-teams list keys on the KEY so the two reconcile and dedup correctly.
+const _LEAGUE_KEY_BY_PATH = (() => { const m = {}; LEAGUES.forEach(l => { m[l.key] = l.key; m[l.league] = l.key; }); return m; })();
+const leagueKey = (lg) => _LEAGUE_KEY_BY_PATH[lg] || lg || '';
+
 // Tier 3 (Phase 5): ~20 major programs per league for the team-chip rail.
 // slug = name lowercased + hyphenated; query = name lowercased (substring match).
 const TEAM_CHIPS = {
@@ -8401,6 +8407,31 @@ export default function App() {
   const [watchlist, setWatchlist]= useState(()=>ld('watchlist',DEFAULT_WATCHLIST));
   // v23: customizable favorite teams. Defaults to SCORE_TEAMS; user can add/remove via Customize.
   const [teams, setTeams]       = useState(()=>ld('teams', SCORE_TEAMS));
+  // ONE source of truth for "followed teams" (the pill ribbon + Home Following row):
+  // union of the seeded favorites (teams) and explicit follows (myTeams), deduped on
+  // teamSlug(name)+leagueKey, seeded-defaults first then myTeams-only appended. The 7
+  // seeded defaults therefore read as "followed" and appear in the Following row.
+  const followedTeams = useMemo(() => {
+    const seen = new Set(), out = [];
+    const push = (name, lg, extra) => {
+      if (!name) return;
+      const lk = leagueKey(lg), slug = teamSlug(name), key = `${slug}|${lk}`;
+      if (seen.has(key)) return; seen.add(key);
+      out.push({ name, team: name, league: lk, slug, match: (extra && extra.match) || name, emoji: (extra && extra.emoji) || '', espnUrl: extra && extra.espnUrl, teamUrl: extra && extra.teamUrl });
+    };
+    (teams || []).forEach(t => push(t.team || t.name, t.league, t));
+    (myTeams || []).forEach(t => push(t.name, t.league));
+    return out;
+  }, [teams, myTeams]);
+  const isTeamFollowed = (name, lg) => { const lk = leagueKey(lg), s = teamSlug(name || ''); return followedTeams.some(t => t.slug === s && t.league === lk); };
+  // Follow adds to the explicit myTeams store; unfollow removes from BOTH stores so a
+  // seeded default can be removed too (otherwise it would re-appear from `teams`).
+  const followTeam = (name, lg) => toggleMyTeam({ name, league: leagueKey(lg) });
+  const unfollowTeam = (entry) => {
+    const lk = leagueKey(entry.league), slug = teamSlug(entry.name || entry.team || '');
+    setMyTeams(prev => { const n = prev.filter(x => !(teamSlug(x.name) === slug && leagueKey(x.league) === lk)); sv('myTeams', n); return n; });
+    setTeams(prev => { const n = prev.filter(x => !(teamSlug(x.team || x.name) === slug && leagueKey(x.league) === lk)); sv('teams', n); return n; });
+  };
   const [weatherCities, setWeatherCities] = useState(()=>ld('weatherCities', DEFAULT_WEATHER_CITIES));
   const [hiddenIndices, setHiddenIndices] = useState(()=>ld('hiddenIndices',[]));
   const [briefingExclude, setBriefingExclude] = useState(()=>ld('briefingExclude',['comedy']));
@@ -8921,7 +8952,7 @@ export default function App() {
       ? ((TEAM_CHIPS[sportTab] || []).find(n => teamSlug(n) === tertiary)
          || tertiary.replace(/-/g, ' ').replace(/\b\w/g, c => c.toUpperCase()))
       : null;
-    const teamFollowed = !!(teamName && myTeams.some(x => x.slug === teamSlug(teamName) && x.league === sportTab));
+    const teamFollowed = !!(teamName && isTeamFollowed(teamName, sportTab));
     // activeTeam/setActiveTeam now live in App state (survives SportsPage remounts).
     const [teamMenuSym, setTeamMenuSym] = useState(null); // team with open popup menu
     // Collapsible State of Play — shared shell behavior, per-category memory ('sports').
@@ -9150,10 +9181,10 @@ export default function App() {
         {/* ── MY TEAMS — followed teams as a pill ribbon (Yahoo Sports style). A pill
             click routes into the existing team-hub (setActiveTeam → filtered feed +
             ESPN/Team links). Order follows the user's My Teams (favorites) config. ── */}
-        {!teamName && !activeSrc && !search && teams.length > 0 && (
+        {!teamName && !activeSrc && !search && followedTeams.length > 0 && (
           <div className="sport-tabs my-teams-ribbon">
-            {teams.map((t, i) => (
-              <button key={(t.team||'')+i}
+            {followedTeams.map((t, i) => (
+              <button key={`${t.slug}-${t.league}-${i}`}
                 className={`sport-tab ${activeTeam && activeTeam.team===t.team && activeTeam.league===t.league ? 'active' : ''}`}
                 onClick={()=>{ setActiveTeam(activeTeam && activeTeam.team===t.team ? null : t); setTimeout(scrollToFeed,80); }}>
                 <TeamLogo name={t.team} league={t.league} size={16}/>
@@ -9193,7 +9224,7 @@ export default function App() {
                 </div>
               </div>
               <div style={{display:'flex',gap:'8px',alignItems:'center'}}>
-                <button className="sport-league-all-btn" onClick={()=>toggleMyTeam({name:teamName, league:sportTab})}>
+                <button className="sport-league-all-btn" onClick={()=> teamFollowed ? unfollowTeam({name:teamName, league:sportTab}) : followTeam(teamName, sportTab)}>
                   {teamFollowed ? '★ Following' : '☆ Follow'}
                 </button>
                 <button className="sport-league-all-btn" onClick={()=>navigate('sports', sportTab)}>← All {SPORT_TABS.find(s=>s.key===sportTab)?.label}</button>
@@ -9716,16 +9747,16 @@ export default function App() {
         <div className="following-chips">
           {(() => {
             const nameCounts = {};
-            myTeams.forEach(t => { const k = (t.name||'').toLowerCase(); nameCounts[k] = (nameCounts[k]||0) + 1; });
-            return myTeams.map((t, i) => {
+            followedTeams.forEach(t => { const k = (t.name||'').toLowerCase(); nameCounts[k] = (nameCounts[k]||0) + 1; });
+            return followedTeams.map((t, i) => {
               const dup = nameCounts[(t.name||'').toLowerCase()] > 1;
               return (
-                <span key={`tm-${i}`} className="following-chip following-chip-team">
+                <span key={`tm-${t.slug}-${t.league}-${i}`} className="following-chip following-chip-team">
                   <button type="button" className="following-chip-main" onClick={()=>navigate('sports', t.league, t.slug)}>
                     <TeamLogo name={t.name} league={t.league} size={18}/>
                     <span className="following-chip-name">{t.name}{dup ? ` · ${(t.league||'').toUpperCase()}` : ''}</span>
                   </button>
-                  <button type="button" className="following-chip-x" onClick={()=>toggleMyTeam(t)} aria-label={`Unfollow ${t.name}`}>×</button>
+                  <button type="button" className="following-chip-x" onClick={()=>unfollowTeam(t)} aria-label={`Unfollow ${t.name}`}>×</button>
                 </span>
               );
             });
@@ -9738,16 +9769,16 @@ export default function App() {
               <button type="button" className="following-chip-x" onClick={()=>toggleTopic(t)} aria-label={`Unfollow ${t}`}>×</button>
             </span>
           ))}
-          {myTeams.length === 0 && myTopics.length === 0 && (
+          {followedTeams.length === 0 && myTopics.length === 0 && (
             <span className="following-empty">Follow teams &amp; topics to build your row</span>
           )}
           <div className="follow-add-wrap">
             <button className="following-add-btn" onClick={()=>setShowFollowAdd(v=>!v)} aria-expanded={showFollowAdd}>+ Add</button>
             {showFollowAdd && (
               <FollowAdd
-                isFollowingTeam={t => myTeams.some(x => x.slug === teamSlug(t.name) && x.league === t.league)}
+                isFollowingTeam={t => isTeamFollowed(t.name, t.league)}
                 isTopicFollowed={isTopicFollowed}
-                onAddTeam={t => toggleMyTeam({ name: t.name, league: t.league, slug: teamSlug(t.name) })}
+                onAddTeam={t => followTeam(t.name, t.league)}
                 onAddTopic={topic => toggleTopic(topic)}
                 onClose={() => setShowFollowAdd(false)}/>
             )}
