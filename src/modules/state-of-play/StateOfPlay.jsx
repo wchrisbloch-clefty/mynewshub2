@@ -12,8 +12,12 @@
 //                        widely-covered stories none of the reader's own sources carried.
 //                        Folded into this same ranked list as extra rows, tagged
 //                        "Not in your sources" — no separate panel.
+//   breakingItems (array)  Urgent stories ({ title, link, pubDate, source }). Folded in at
+//                        the TOP of the list, tagged "Breaking" with a red pulse — so the
+//                        cramped status-strip marquee is retired and State of Play is the
+//                        single stop for "what's happening" (Pass L item 3).
 //
-// Renders nothing when fewer than 3 ranked items and no gap items. Styling:
+// Renders nothing when fewer than 3 ranked items AND no breaking items. Styling:
 // co-located StateOfPlay.css + design tokens (src/styles/tokens.css).
 
 import { useMemo } from 'react';
@@ -23,7 +27,7 @@ import './StateOfPlay.css';
 
 const defaultFormatDate = d => { try { return new Date(d).toLocaleString(); } catch { return ''; } };
 
-export function StateOfPlay({ items, meta = {}, onRead, formatDate = defaultFormatDate, collapsed = false, onToggleCollapse, gapItems = [], variant = 'strip' }) {
+export function StateOfPlay({ items, meta = {}, onRead, formatDate = defaultFormatDate, collapsed = false, onToggleCollapse, gapItems = [], breakingItems = [], variant = 'strip' }) {
   const color = meta.color;
   const label = meta.label || '';
   const sidebar = variant === 'sidebar';
@@ -31,10 +35,11 @@ export function StateOfPlay({ items, meta = {}, onRead, formatDate = defaultForm
   const top = useMemo(() => rankClusters(items, { max: 2, limit: 5 }), [items]);
   // Coverage-Gap rows fold into the same list (top 3), continuing the count.
   const gaps = (gapItems || []).slice(0, 3);
+  // Breaking rows fold in at the TOP (top 3), tagged with a red pulse.
+  const breaking = (breakingItems || []).slice(0, 3);
 
-  // Need a real ranked list to hang the module on; a couple of gap rows alone
-  // isn't a "State of Play".
-  if (top.length < 3) return null;
+  // Need a real ranked list OR something breaking to hang the module on.
+  if (top.length < 3 && !breaking.length) return null;
 
   return (
     <section className={`sop-strip${sidebar ? ' sop-sidebar' : ''}`}>
@@ -53,6 +58,16 @@ export function StateOfPlay({ items, meta = {}, onRead, formatDate = defaultForm
         )}
       </div>
       <div className="sop-list" style={collapsed ? { display: 'none' } : undefined}>
+        {breaking.map((b, i) => (
+          <button key={b.link || `brk-${i}`} className="sop-item sop-item-breaking" onClick={() => onRead(b)}>
+            <span className="sop-brk-dot" aria-hidden="true"/>
+            <span className="sop-item-title">{b.title}</span>
+            <span className="sop-item-meta">
+              <span className="sop-brk-tag">Breaking</span>
+              <span className="sop-item-time">{formatDate(b.pubDate)}</span>
+            </span>
+          </button>
+        ))}
         {top.map((a, i) => (
           <button key={a.link || i} className="sop-item" onClick={() => onRead(a)}>
             <span className="sop-num" style={{ color }}>{String(i + 1).padStart(2, '0')}</span>

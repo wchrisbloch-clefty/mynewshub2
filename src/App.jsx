@@ -237,6 +237,7 @@ const DEFAULT_FEEDS = {
     { name:'MIT Tech Review',       url:'https://www.technologyreview.com/feed/',                                on:true },
     { name:'Canary Media',          url:'https://www.canarymedia.com/rss',                                       on:true },
     { name:'Rigzone',               url:'https://www.rigzone.com/news/rss/rigzone_latest.aspx',                   on:true },
+    { name:'Data Center Frontier',  url:'https://www.datacenterfrontier.com/rss',                                on:true,  tier:'reported' },
   ],
   popculture: [
     { name:'Variety',           url:'https://variety.com/feed/',                                  on:true },
@@ -264,6 +265,14 @@ const DEFAULT_FEEDS = {
     { name:'IEEE Spectrum',     url:'https://spectrum.ieee.org/feeds/feed.rss',                   on:true },
     { name:'9to5Google',        url:'https://9to5google.com/feed/',                               on:false },
     { name:'9to5Mac',           url:'https://9to5mac.com/feed/',                                  on:false },
+    // Analysis (reported) — opt-in; surfaced via the Source Directory (Pass L item 4).
+    { name:'Semafor Tech',      url:'https://www.semafor.com/rss/technology.xml',                 on:false, tier:'reported' },
+    { name:'Platformer',        url:'https://www.platformer.news/feed',                           on:false, tier:'reported' },
+    { name:'Stratechery',       url:'https://stratechery.com/feed/',                              on:false, tier:'reported' },
+    // Primary-source model releases (verified) — same tier treatment as SEC/Reuters.
+    { name:'OpenAI',            url:'https://openai.com/news/rss.xml',                            on:true,  tier:'verified' },
+    { name:'Anthropic',         url:'https://www.anthropic.com/rss.xml',                          on:true,  tier:'verified' },
+    { name:'Google DeepMind',   url:'https://deepmind.google/blog/rss.xml',                       on:true,  tier:'verified' },
   ],
   comedy: [
     { name:'The Babylon Bee', url:'https://babylonbee.com/feed',  on:true },
@@ -852,7 +861,7 @@ function useSwipe(onSwipe, { threshold = 80, enabled = true } = {}) {
     if (!enabled) return;
     // Don't hijack gestures that begin inside a horizontally-scrollable rail —
     // let those scroll natively instead of triggering category navigation.
-    if (e.target?.closest?.('.sport-tabs, .pc-subtabs, .chip-bar, .mkt-rail-inner, .my-teams-scroll, .trending-section, .snap-feed, .ss-ticker-inner, .houston-scroll')) {
+    if (e.target?.closest?.('.sport-tabs, .pc-subtabs, .chip-bar, .mkt-rail-inner, .my-teams-scroll, .trending-section, .snap-feed, .ss-ticker-inner, .houston-scroll, .score-strip-scroll')) {
       state.current = { x: 0, y: 0, active: false, cancelled: true };
       return;
     }
@@ -1402,14 +1411,8 @@ body{
   border:none;background:none;font-family:inherit;padding:0;}
 .ss-flag-markets{color:var(--text3);cursor:default;}
 .ss-flag-breaking{color:var(--red);cursor:default;}
-/* The actual rotating breaking headline. Bounded width + ellipsis so it never crowds
-   the market ticker out (ticker keeps flex:1 = the remainder); tighter cap on mobile. */
-.ss-breaking-head{flex:0 1 auto;min-width:0;max-width:46%;text-align:left;
-  background:none;border:none;cursor:pointer;font-family:inherit;padding:0;
-  font-size:12px;font-weight:700;color:var(--text);line-height:1;
-  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
-.ss-breaking-head:hover{color:var(--red);text-decoration:underline;}
-@media(max-width:640px){ .ss-breaking-head{max-width:44%;font-size:11px;} }
+/* (.ss-breaking-head retired in Pass L item 3 — breaking headlines now fold into the
+   State of Play list; the strip keeps only the small pulsing signal flag.) */
 .ss-pulse{width:7px;height:7px;border-radius:50%;background:var(--red);
   animation:ss-pulse 1.8s ease-out infinite;}
 @keyframes ss-pulse{0%{box-shadow:0 0 0 0 rgba(200,16,46,0.5);}70%{box-shadow:0 0 0 6px rgba(200,16,46,0);}100%{box-shadow:0 0 0 0 rgba(200,16,46,0);}}
@@ -1919,6 +1922,20 @@ body:not(.dark) .pill-bar{
 }
 .gs-collapse-btn:hover{color:var(--text);}
 .gs-collapse-chevron{font-size:9px;color:var(--text4);}
+/* Source Directory (Pass L item 4) — tiered, toggleable list of configured feeds. */
+.sd-list{display:flex;flex-direction:column;gap:2px;}
+.sd-row{display:flex;align-items:center;gap:10px;padding:7px 0;border-top:1px solid var(--border2);}
+.sd-row:first-of-type{border-top:none;}
+.sd-name{flex:1;min-width:0;font-family:var(--font-publicsans);font-size:12px;font-weight:600;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.sd-tier{flex-shrink:0;font-family:var(--font-publicsans);font-size:9px;font-weight:800;text-transform:uppercase;letter-spacing:0.04em;border-radius:10px;padding:2px 7px;}
+.sd-tier-verified{color:#fff;background:var(--green);}
+.sd-tier-reported{color:var(--amber);background:rgba(154,98,7,0.12);}
+.sd-tier-inferred{color:var(--text3);background:var(--surface2);border:1px solid var(--border);}
+.sd-toggle{flex-shrink:0;width:30px;height:18px;border-radius:9px;border:none;background:var(--border);cursor:pointer;padding:0;position:relative;transition:background 0.15s;}
+.sd-toggle.on{background:var(--accent);}
+.sd-knob{position:absolute;top:2px;left:2px;width:14px;height:14px;border-radius:50%;background:#fff;transition:transform 0.15s;box-shadow:0 1px 2px rgba(0,0,0,0.3);}
+.sd-toggle.on .sd-knob{transform:translateX(12px);}
+.sd-toggle:focus-visible{outline:2px solid var(--accent);outline-offset:2px;}
 .gs-clear:hover{text-decoration:underline;}
 
 /* Filter active pill */
@@ -5112,18 +5129,20 @@ kbd{display:inline-block;padding:1px 5px;border:1px solid var(--border);border-r
   .toh-card-lead .toh-title{font-size:20px;}
   .toh-card:nth-child(n+4){display:none;}
 }
-/* Mobile: single column, stacking order preserved (lead first). */
+/* Mobile: single column, stacking order preserved (lead first). Buzzfeed-style pass
+   (Pass L item 5) — the hero image dominates (spans two rows ≈ 4:3 on a phone) with a
+   punchy one-wrap headline; desktop tokens are untouched. */
 @media(max-width:640px){
-  .toh-strip{margin-bottom:20px;}
+  .toh-strip{margin-bottom:22px;}
   .toh-grid{
     grid-template-columns:1fr;
-    grid-auto-rows:194px;
-    gap:12px;
+    grid-auto-rows:190px;
+    gap:14px;
   }
-  .toh-card-lead{grid-column:auto;grid-row:auto;}
+  .toh-card-lead{grid-column:auto;grid-row:span 2;}
   .toh-card-lead::before{content:none;}
   .toh-title{font-size:var(--fs-headline);}
-  .toh-card-lead .toh-title{font-size:19px;}
+  .toh-card-lead .toh-title{font-size:27px;font-weight:800;line-height:1.15;-webkit-line-clamp:3;}
 }
 
 /* ── BRIEFING TEASER — editorial dark card ─────────────────────── */
@@ -6387,9 +6406,59 @@ function PredictionMarkets({ keywords }) {
   );
 }
 
+// ─── SOURCE DIRECTORY (Pass L item 4) ─────────────────────────────────────────
+// A real directory of every CONFIGURED feed for a category (not just the ones that
+// currently returned articles): each row shows its tier (verified/reported/inferred)
+// and a switch to turn it on — so a reader can discover and enable a source without
+// already knowing it exists. Used on AI & Tech and Energy.
+const SD_TIER_RANK = { verified: 0, reported: 1, inferred: 2, unverified: 2 };
+const SD_TIER_BADGE = {
+  verified: { label: 'Verified', cls: 'sd-tier-verified' },
+  reported: { label: 'Reported', cls: 'sd-tier-reported' },
+  inferred: { label: 'Inferred', cls: 'sd-tier-inferred' },
+  unverified: { label: 'Unverified', cls: 'sd-tier-inferred' },
+};
+function SourceDirectory({ cat, feeds, onToggleFeed }) {
+  const [open, setOpen] = useState(false);
+  const list = (feeds[cat] || []).slice().sort((a, b) => {
+    const ta = SD_TIER_RANK[a.tier || 'reported'] ?? 1, tb = SD_TIER_RANK[b.tier || 'reported'] ?? 1;
+    if (ta !== tb) return ta - tb;
+    return (a.name || '').localeCompare(b.name || '');
+  });
+  if (!list.length) return null;
+  const onCount = list.filter(f => f.on).length;
+  return (
+    <div className="sidebar-section sd-section">
+      <div className="sidebar-sec-head">
+        <button className="sidebar-sec-collapse" onClick={() => setOpen(o => !o)} aria-expanded={open}>
+          <span className="sidebar-sec-label">Source Directory · {onCount}/{list.length}</span>
+          <span className="gs-collapse-chevron" style={{ fontSize: '10px', color: 'var(--text4)' }}>{open ? '▾' : '▸'}</span>
+        </button>
+      </div>
+      {open && (
+        <div className="sd-list">
+          {list.map((f, i) => {
+            const t = SD_TIER_BADGE[f.tier || 'reported'] || SD_TIER_BADGE.reported;
+            return (
+              <div key={(f.name || '') + i} className="sd-row">
+                <button className={`sd-toggle${f.on ? ' on' : ''}`} role="switch" aria-checked={f.on}
+                  aria-label={`${f.on ? 'Disable' : 'Enable'} ${f.name}`} onClick={() => onToggleFeed(cat, f.name)}>
+                  <span className="sd-knob"/>
+                </button>
+                <span className="sd-name">{f.name}</span>
+                <span className={`sd-tier ${t.cls}`}>{t.label}</span>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ─── GHOST SIDEBAR ────────────────────────────────────────────────────────────
 function Sidebar({cat, arts, kw, health, activeKw, setActiveKw, activeSource, setActiveSource, onRead, scores, scoresLoading, showScoreboard, recommended, showBriefing, onOpenBriefing, briefingExcludeCats, onTopicOpen, trendingItems, isTopicFollowed, toggleTopic, onTrendingOpen,
-  sopItems, sopGapItems, sopMeta, sopCollapsed, onToggleSop, formatDate, acrossSections, onAcrossSeeAll, followingModule}) {
+  sopItems, sopGapItems, sopMeta, sopCollapsed, onToggleSop, formatDate, acrossSections, onAcrossSeeAll, followingModule, sopBreakingItems, feeds, onToggleFeed}) {
   const cc = CATS[cat]||CATS.general;
   const catKws = kw[cat]||[];
   const catArts = arts[cat]||[];
@@ -6476,7 +6545,7 @@ function Sidebar({cat, arts, kw, health, activeKw, setActiveKw, activeSource, se
       {/* 1) STATE OF PLAY — moved into the sidebar (Pass J item 2), consistent
             sidebar-module styling, Coverage-Gap rows in a stacked (non-inline) layout. */}
       {sopItems && !activeKw && !activeSource && (
-        <StateOfPlay variant="sidebar" items={sopItems} gapItems={sopGapItems||[]}
+        <StateOfPlay variant="sidebar" items={sopItems} gapItems={sopGapItems||[]} breakingItems={sopBreakingItems||[]}
           meta={sopMeta||cc} onRead={onRead} formatDate={formatDate||fmtDate}
           collapsed={sopCollapsed} onToggleCollapse={onToggleSop}/>
       )}
@@ -6556,6 +6625,12 @@ function Sidebar({cat, arts, kw, health, activeKw, setActiveKw, activeSource, se
           separated from reported news; self-hides when the API returns nothing. */}
       {!activeKw && !activeSource && (
         <PredictionMarkets keywords={topicItems.map(t => t.label)}/>
+      )}
+
+      {/* SOURCE DIRECTORY (Pass L item 4) — AI & Tech and Energy get a real tiered,
+          toggleable directory so sources can be discovered, not just filtered. */}
+      {onToggleFeed && feeds && (cat === 'tech' || cat === 'bloom') && !activeKw && !activeSource && (
+        <SourceDirectory cat={cat} feeds={feeds} onToggleFeed={onToggleFeed}/>
       )}
 
       {/* 5) SOURCES — collapsed by default; kept so source filter/health stays reachable
@@ -7470,17 +7545,8 @@ function TopBar({tab, setTab, search, setSearch, dark, setDark,
   },[]);
 
   const hasBreaking = breakingItems&&breakingItems.length>0;
-  const tickerItems = hasBreaking?[...breakingItems,...breakingItems]:[];
-  // Rotate the actual breaking HEADLINE next to the flag (every 5s) so the strip shows
-  // a real story, not just a label. When nothing qualifies, hasBreaking is false and the
-  // left segment reads "Markets" instead — never a labeled-but-empty "Breaking".
-  const [breakingIdx, setBreakingIdx] = useState(0);
-  useEffect(() => {
-    if (!hasBreaking || breakingItems.length < 2) return;
-    const iv = setInterval(() => setBreakingIdx(i => (i + 1) % breakingItems.length), 5000);
-    return () => clearInterval(iv);
-  }, [hasBreaking, breakingItems.length]);
-  const curBreaking = hasBreaking ? breakingItems[breakingIdx % breakingItems.length] : null;
+  // Breaking headlines now live inside State of Play (Pass L item 3); the status strip
+  // keeps only the small pulsing "● Breaking" signal flag, not a cramped marquee.
 
   // v24a: Desktop nav per user: General · Business · Markets · Bloom · Sports · Pop Culture · Briefing · Podcasts · Saved
   const ALL_TABS = ['general','business','bloom','tech','sports','health','popculture','briefing','podcasts','sources','saved'];
@@ -7517,12 +7583,7 @@ function TopBar({tab, setTab, search, setSearch, dark, setDark,
       <div className="status-strip">
         <div className="status-strip-inner">
           {hasBreaking && showBreaking ? (
-            <>
-              <span className="ss-flag ss-flag-breaking"><span className="ss-pulse"/> Breaking</span>
-              <button className="ss-breaking-head" onClick={()=>curBreaking?.link&&window.open(curBreaking.link,'_blank')} title={curBreaking?.title||''}>
-                {curBreaking?.title}
-              </button>
-            </>
+            <span className="ss-flag ss-flag-breaking" title="Breaking — see State of Play"><span className="ss-pulse"/> Breaking</span>
           ) : (
             <span className="ss-flag ss-flag-markets">Markets</span>
           )}
@@ -8135,7 +8196,13 @@ export default function App() {
     sv('myTopics', next); return next;
   });
   const [search, setSearch]     = useState('');
-  const [dark, setDark]         = useState(()=>ld('dark',false));
+  const [dark, setDark]         = useState(()=>{
+    // Respect the OS preference on first load (no saved choice yet); once the user
+    // toggles, the saved value persists and overrides system (Pass L item 6).
+    const saved = ld('dark', null);
+    if (saved === true || saved === false) return saved;
+    try { return !!(window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches); } catch { return false; }
+  });
   const [saved, setSaved]       = useState(()=>ld('saved',[]));
   const [clicks, setClicks]     = useState(()=>ld('clicks',{}));
   const [readLinks, setReadLinks] = useState(()=>new Set(ld('readLinks',[])));
@@ -9318,6 +9385,30 @@ export default function App() {
       });
     }, [items, cat, enSubTab]);
 
+    // ── WIDE DISCOVERY (Pass L item 2) ──────────────────────────────────────────
+    // Every category/sub-category gets the SAME unrestricted "scan everything, ignore
+    // my followed sources" net that Sports already uses for teams (fetchDiscover feed
+    // mode). Results are merged into the feed by storyKey (same dedup as teams) and are
+    // capped at 'reported' tier (_tier:'reported', _wide:true) so breadth never borrows
+    // a verified source's authority — the tier-aware cluster rep keeps verified locals.
+    const [catWideItems, setCatWideItems] = useState([]);
+    useEffect(() => {
+      let alive = true;
+      const subKws = cat === 'bloom' && enSubTab !== 'all' ? (EN_KWS[enSubTab] || [])
+                   : cat === 'popculture' && pcSubTab !== 'all' ? (PC_KWS[pcSubTab] || [])
+                   : [];
+      const base = DEFAULT_KW[cat] || [];
+      const kws = (subKws.length ? [...subKws.slice(0, 3), base[0]] : base.slice(0, 4)).filter(Boolean);
+      if (!kws.length) { setCatWideItems([]); return () => { alive = false; }; }
+      fetchDiscover(cat, kws, [], 'feed').then(r => {
+        if (!alive) return;
+        const rows = ((r && r.items) || []).map(x => ({ ...x, cat, _tier: 'reported', _wide: true }));
+        setCatWideItems(rows);
+      });
+      return () => { alive = false; };
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [cat, enSubTab, pcSubTab]);
+
     // v36: Web results for pop culture sub-tab
     useEffect(() => {
       if (cat !== 'popculture' || pcSubTab === 'all') { setPcWebResults([]); return; }
@@ -9343,7 +9434,17 @@ export default function App() {
       fetchWebSearch(q).then(r => { setEnWebResults(r); setEnWebLoading(false); });
     }, [cat, enSubTab]);
 
-    const activeFilteredItems = cat === 'bloom' ? enFilteredItems : pcFilteredItems;
+    const baseFilteredItems = cat === 'bloom' ? enFilteredItems : pcFilteredItems;
+    // Fold the wide-discovery rows into the active feed (deduped by storyKey, then
+    // re-sorted by recency), so every category shows headlines from ANY outlet — not
+    // just the reader's toggled-on feeds (Pass L item 2).
+    const activeFilteredItems = useMemo(() => {
+      if (!catWideItems.length) return baseFilteredItems;
+      const have = new Set(baseFilteredItems.map(storyKey));
+      const extra = catWideItems.filter(a => a.title && !have.has(storyKey(a)));
+      if (!extra.length) return baseFilteredItems;
+      return [...baseFilteredItems, ...extra].sort((a, b) => new Date(b.pubDate || 0) - new Date(a.pubDate || 0));
+    }, [baseFilteredItems, catWideItems]);
     const heroItems=activeFilteredItems.filter(a=>a.img);
     const catLead=heroItems[0]||null;
     const feedItems=catLead?activeFilteredItems.filter(a=>a.link!==catLead.link):activeFilteredItems;
@@ -9383,6 +9484,15 @@ export default function App() {
       return [catLead, ...secondaries];
     }, [isHome, catLead, feedItems, arts]);
     const topStoryKeys = useMemo(() => new Set(topStoryItems.map(storyKey)), [topStoryItems]);
+    // Breaking stories for THIS category's State of Play (Pass L item 3) — the urgent
+    // items relevant to the page, deduped against what Top Stories already shows. Home
+    // sees cross-category breaking; a category page sees only its own.
+    const catBreaking = useMemo(() => {
+      if (!breakingItems || !breakingItems.length) return [];
+      const pool = isHome ? breakingItems
+        : breakingItems.filter(b => b.cat === cat || (isMergedBiz && (b.cat === 'business' || b.cat === 'finance')));
+      return pool.filter(b => !topStoryKeys.has(storyKey(b))).slice(0, 3);
+    }, [breakingItems, cat, isHome, isMergedBiz, topStoryKeys]);
     // State of Play ranks only from what Top Stories didn't already take.
     const sopSourceItems = useMemo(
       () => activeFilteredItems.filter(a => !topStoryKeys.has(storyKey(a))),
@@ -9561,7 +9671,7 @@ export default function App() {
             copy renders instead (see .sop-hoist CSS). */}
         {!activeKw && !activeSrc && !search && (
           <div className="sop-hoist">
-            <StateOfPlay variant="sidebar" items={sopSourceItems} gapItems={gapItems}
+            <StateOfPlay variant="sidebar" items={sopSourceItems} gapItems={gapItems} breakingItems={catBreaking}
               meta={CATS[cat]||CATS.general} onRead={onRead} formatDate={fmtDate}
               collapsed={sopCollapsed} onToggleCollapse={toggleSop}/>
           </div>
@@ -9778,11 +9888,12 @@ export default function App() {
             onTopicOpen={label => navigate(cat, 'topic', teamSlug(label))}
             isTopicFollowed={isTopicFollowed} toggleTopic={toggleTopic}
             sopItems={!activeKw && !activeSrc && !search ? sopSourceItems : null}
-            sopGapItems={gapItems} sopMeta={CATS[cat]||CATS.general}
+            sopGapItems={gapItems} sopBreakingItems={!activeKw && !activeSrc && !search ? catBreaking : []} sopMeta={CATS[cat]||CATS.general}
             sopCollapsed={sopCollapsed} onToggleSop={toggleSop} formatDate={fmtDate}
             acrossSections={isHome && !activeKw && !activeSrc && !search ? otherCatSections : null}
             onAcrossSeeAll={handleTabChange}
             followingModule={followingModule}
+            feeds={feeds} onToggleFeed={(c,name)=>setFeeds(prev=>{const next=JSON.parse(JSON.stringify(prev));const f=(next[c]||[]).find(x=>x.name===name);if(f){f.on=!f.on;sv('feeds',next);}return next;})}
             showBriefing={isHome} onOpenBriefing={() => handleTabChange('briefing')} briefingExcludeCats={briefingExclude}/>
         </div>{/* /page-grid */}
       </div>
