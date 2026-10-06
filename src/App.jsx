@@ -1443,6 +1443,10 @@ body{
    when you look, invisible when you don't
 ═══════════════════════════════════════════ */
 .topbar-wrap{position:sticky;top:0;z-index:300;}
+/* Mobile notch: fill the status-bar strip with the bar's own surface and push the
+   header below it (viewport-fit=cover lets content sit under the notch). 0 on
+   non-notched devices, and gated to mobile so desktop/iPad are untouched (Pass M 1b). */
+@media(max-width:640px){ .topbar-wrap{background:var(--surface);padding-top:env(safe-area-inset-top, 0);} }
 
 /* ═══════════════════════════════════════════
    UNIFIED STATUS STRIP — one slim row (was 3 stacked bars)
@@ -3873,7 +3877,7 @@ body{overscroll-behavior-y:contain;}
 
 /* ─── PULL-TO-REFRESH INDICATOR ─── */
 .ptr-indicator{
-  position:fixed;top:0;left:50%;transform:translateX(-50%);
+  position:fixed;top:env(safe-area-inset-top, 0);left:50%;transform:translateX(-50%);
   z-index:250;width:36px;height:36px;border-radius:50%;
   background:var(--surface);border:1px solid var(--border);
   box-shadow:var(--shadow-md);
@@ -4928,6 +4932,8 @@ kbd{display:inline-block;padding:1px 5px;border:1px solid var(--border);border-r
 @media(max-width:640px){
   .persp-overlay{justify-content:center;align-items:flex-end;}
   .persp-panel{width:100%;height:88vh;border-radius:16px 16px 0 0;animation:persp-slide-up 0.22s ease-out;}
+  /* bottom sheet: keep the last items clear of the home indicator (Pass M 1b) */
+  .persp-body{padding-bottom:calc(var(--s4) + env(safe-area-inset-bottom, 0));}
   @keyframes persp-slide-up{from{transform:translateY(100%);}to{transform:translateY(0);}}
 }
 .article-reader-overlay{
@@ -5139,14 +5145,29 @@ kbd{display:inline-block;padding:1px 5px;border:1px solid var(--border);border-r
 
 /* ── MOBILE TAP TARGETS ────────────────────────────────────────── */
 @media(max-width:640px){
-  .fc-act{padding:7px 12px;font-size:12px;min-height:36px;}
   .fc-read-link{padding:7px 0;font-size:var(--fs-meta);}
   .nav-btn,.nav-btn-blue{min-height:36px;}
-  .pc-subtab{min-height:40px;padding:8px 14px;}
   .fc-title{font-size:15px;line-height:1.35;}
   .fc-thumb,.fc-thumb-ph{width:96px;height:72px;border-radius:4px;float:right;margin-left:12px;margin-bottom:4px;}
   .fc-body{display:block;overflow:hidden;}
   .fc-body::after{content:'';display:table;clear:both;}
+
+  /* ── Pass M 1a — 44×44 minimum hit area. The hit box grows via min-size / padding /
+     a transparent ::after; visible icon size and horizontal density are unchanged.
+     Mobile only — desktop & iPad are untouched. ── */
+  /* text pills → 44 tall, content vertically centered (same horizontal padding) */
+  .chip,.ttp-chip,.pc-subtab,.en-subtab,.ms-trending-chip,.following-chip{min-height:44px;display:inline-flex;align-items:center;}
+  .sd-row{min-height:44px;}
+  /* transparent glyph/text buttons → grow the hit box; nothing visible enlarges */
+  .fc-act,.fc-ellipsis-btn,.sop-collapse,.my-teams-edit,.trending-follow,
+  .persp-close,.analyze-close,.snap-cov-close{min-width:44px;min-height:44px;display:inline-flex;align-items:center;justify-content:center;}
+  .fc-act{padding:7px 12px;font-size:12px;} /* keep label padding; min-size set above */
+  /* bordered / switch / crowded controls → keep the visible size, extend the hit area
+     with a centered transparent pseudo (avoids widening chips or enlarging the switch) */
+  .snap-save,.sd-toggle,.following-chip-x{position:relative;}
+  .snap-save::after,.sd-toggle::after,.following-chip-x::after{
+    content:'';position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:44px;height:44px;
+  }
 }
 
 /* ── TOP OF HOUR STRIP ─────────────────────────────────────────── */
@@ -5396,8 +5417,8 @@ kbd{display:inline-block;padding:1px 5px;border:1px solid var(--border);border-r
   .mobile-logo-sub{font-size:9px;}
   .mobile-actions{gap:4px;}
   .mobile-icon-btn{padding:7px;}
-  .chip-bar{height:40px;}
-  .chip{padding:6px 13px;min-height:30px;}
+  .chip-bar{height:44px;}
+  .chip{padding:6px 13px;min-height:44px;display:inline-flex;align-items:center;} /* Pass M 1a: 44 hit area */
   .bottom-tab-label{font-size:8.5px;}
   .bottom-tab-icon{width:19px;height:19px;}
   .sources-title{font-size:24px;}
@@ -5450,7 +5471,7 @@ kbd{display:inline-block;padding:1px 5px;border:1px solid var(--border);border-r
 /* ═══════════ v46 — STICKY SPORTS SCORE STRIP (mobile) ═══════════ */
 @media(max-width:640px){
   .sports-page .sports-score-strip{
-    position:sticky;top:0;z-index:110;
+    position:sticky;top:env(safe-area-inset-top, 0);z-index:110;
     box-shadow:0 3px 10px rgba(0,0,0,0.25);
   }
 }
