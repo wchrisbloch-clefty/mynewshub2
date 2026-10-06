@@ -337,10 +337,12 @@ const DEFAULT_SOCIAL = {
   },
 };
 
-// v23: Each team now has an espnUrl + teamUrl so the favorite-team pills can
-// expose external links. Users can edit/extend this list via the Customize
-// panel "Sports Teams" tab; the array below is the default seed.
-const SCORE_TEAMS = [
+// ── THE 7 DEFAULT TEAMS ──────────────────────────────────────────────────────
+// DEFAULT_TEAMS is the single source of the seeded follows: the `teams` state falls
+// back to it, and the followed-teams union starts from it. Each team carries an
+// espnUrl + teamUrl for the favorite-team pills. Users edit/extend/reorder via the
+// Customize "Sports Teams" tab; removals persist (stored `teams` overrides this seed).
+const DEFAULT_TEAMS = [
   { team:'Texans',        sport:'football',   league:'nfl',                       match:'Houston Texans',    emoji:'',
     espnUrl:'https://www.espn.com/nfl/team/_/name/hou/houston-texans',
     teamUrl:'https://www.houstontexans.com/' },
@@ -372,6 +374,12 @@ const LEAGUES = [
   { key:'cbb', label:'College BB',sport:'basketball', league:'mens-college-basketball', emoji:'', accent:'var(--accent)' },
 ];
 
+// Normalize a league value to its short KEY (nfl/nba/mlb/cfb/cbb). DEFAULT_TEAMS store
+// the ESPN path ('college-football'); myTeams store the key ('cfb'). The unified
+// followed-teams list keys on the KEY so the two reconcile and dedup correctly.
+const _LEAGUE_KEY_BY_PATH = (() => { const m = {}; LEAGUES.forEach(l => { m[l.key] = l.key; m[l.league] = l.key; }); return m; })();
+const leagueKey = (lg) => _LEAGUE_KEY_BY_PATH[lg] || lg || '';
+
 // Tier 3 (Phase 5): ~20 major programs per league for the team-chip rail.
 // slug = name lowercased + hyphenated; query = name lowercased (substring match).
 const TEAM_CHIPS = {
@@ -382,6 +390,9 @@ const TEAM_CHIPS = {
   cbb: ['UConn','Kansas','Duke','Kentucky','North Carolina','Purdue','Houston','Gonzaga','Arizona','Tennessee','Baylor','Michigan State','UCLA','Marquette','Auburn','Creighton','Illinois','Alabama','Indiana','Villanova'],
 };
 const teamSlug = (name) => name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+// Canonical identity key for a team (slug+normalized league). Used for dedup AND for
+// the removal tombstones that keep an unfollowed team removed across a cloud sync.
+const teamKeyOf = (name, lg) => `${teamSlug(name || '')}|${leagueKey(lg)}`;
 
 // 4a: canonicalize a followed-teams list. The dedup invariant is teamSlug(name)+league,
 // computed from the NAME every time — never a stored route-param slug, which was the
@@ -788,7 +799,7 @@ function activeLeagues(scores) {
 // ./modules/routing; App keeps only the stateful navigate/applyRoute orchestration.
 
 // Normalize any league identifier to the short scoreboard key. Team records are
-// inconsistent: SCORE_TEAMS uses ESPN paths ('college-football'), while myTeams/
+// inconsistent: DEFAULT_TEAMS uses ESPN paths ('college-football'), while myTeams/
 // TEAM_CHIPS use short keys ('cfb'). Game `_league` is always the short key.
 const LEAGUE_KEY = { nfl:'nfl', nba:'nba', mlb:'mlb', nhl:'nhl', 'college-football':'cfb', cfb:'cfb', 'mens-college-basketball':'cbb', cbb:'cbb', 'womens-college-basketball':'wcbb' };
 const normLeague = l => LEAGUE_KEY[(l||'').toLowerCase()] || (l||'').toLowerCase();
@@ -805,7 +816,7 @@ function teamTermMatches(haystack, term) {
 function favoriteIn(game) {
   if (!game) return null;
   const txt=((game.homeName||'')+' '+(game.awayName||'')+' '+(game.short||'')+' '+(game.name||'')).toLowerCase();
-  return SCORE_TEAMS.find(t=>teamTermMatches(txt, t.match))||null;
+  return DEFAULT_TEAMS.find(t=>teamTermMatches(txt, t.match))||null;
 }
 
 // v23: parameterized variant accepting any team list (typically the user's
@@ -6370,7 +6381,7 @@ function Scoreboard({scores, loading, compact=false, favTeams}) {
     LEAGUES.forEach(L=>{init[L.key]=['nfl','nba','mlb'].includes(L.key);});
     return init;
   });
-  // 4b: respect the user's customized teams. Fall back to the hardcoded SCORE_TEAMS
+  // 4b: respect the user's customized teams. Fall back to the hardcoded DEFAULT_TEAMS
   // (via favoriteIn) only when the reader has no custom teams at all.
   const hasCustom = Array.isArray(favTeams) && favTeams.length > 0;
   const favOf = (g, lk) => hasCustom ? favoriteInList(g, favTeams, lk) : favoriteIn(g);
@@ -8420,8 +8431,44 @@ export default function App() {
   }, [tab]);
   const [urgent, setUrgent]     = useState(()=>ld('urgent',DEFAULT_URGENT));
   const [watchlist, setWatchlist]= useState(()=>ld('watchlist',DEFAULT_WATCHLIST));
-  // v23: customizable favorite teams. Defaults to SCORE_TEAMS; user can add/remove via Customize.
-  const [teams, setTeams]       = useState(()=>ld('teams', SCORE_TEAMS));
+  // v23: customizable favorite teams. Defaults to DEFAULT_TEAMS; user can add/remove via Customize.
+  const [teams, setTeams]       = useState(()=>ld('teams', DEFAULT_TEAMS));
+  // Removal tombstones: canonical keys (slug|league) of teams the user explicitly
+  // unfollowed. They persist AND sync, and are subtracted from any pulled cloud
+  // profile, so an old cloud copy that still holds a removed default can never
+  // resurrect it on sign-in. Re-following a team clears its tombstone.
+  const [removedTeams, setRemovedTeams] = useState(()=>ld('removedTeams', []));
+  const tombstone = useMemo(() => new Set(removedTeams || []), [removedTeams]);
+  // ONE source of truth for "followed teams" (the pill ribbon + Home Following row):
+  // union of the seeded favorites (teams) and explicit follows (myTeams), deduped on
+  // teamSlug(name)+leagueKey, seeded-defaults first then myTeams-only appended, minus
+  // any tombstoned (removed) teams. The 7 seeded defaults read as "followed".
+  const followedTeams = useMemo(() => {
+    const seen = new Set(), out = [];
+    const push = (name, lg, extra) => {
+      if (!name) return;
+      const lk = leagueKey(lg), slug = teamSlug(name), key = `${slug}|${lk}`;
+      if (seen.has(key) || tombstone.has(key)) return; seen.add(key);
+      out.push({ name, team: name, league: lk, slug, match: (extra && extra.match) || name, emoji: (extra && extra.emoji) || '', espnUrl: extra && extra.espnUrl, teamUrl: extra && extra.teamUrl });
+    };
+    (teams || []).forEach(t => push(t.team || t.name, t.league, t));
+    (myTeams || []).forEach(t => push(t.name, t.league));
+    return out;
+  }, [teams, myTeams, tombstone]);
+  const isTeamFollowed = (name, lg) => { const lk = leagueKey(lg), s = teamSlug(name || ''); return followedTeams.some(t => t.slug === s && t.league === lk); };
+  // Follow adds to the explicit myTeams store and clears any tombstone; unfollow removes
+  // from BOTH stores and ADDS a tombstone so it cannot re-appear (local seed or cloud).
+  const followTeam = (name, lg) => {
+    const key = teamKeyOf(name, lg);
+    setRemovedTeams(prev => { const n = prev.filter(k => k !== key); sv('removedTeams', n); return n; });
+    toggleMyTeam({ name, league: leagueKey(lg) });
+  };
+  const unfollowTeam = (entry) => {
+    const lk = leagueKey(entry.league), slug = teamSlug(entry.name || entry.team || ''), key = `${slug}|${lk}`;
+    setRemovedTeams(prev => prev.includes(key) ? prev : (() => { const n = [...prev, key]; sv('removedTeams', n); return n; })());
+    setMyTeams(prev => { const n = prev.filter(x => !(teamSlug(x.name) === slug && leagueKey(x.league) === lk)); sv('myTeams', n); return n; });
+    setTeams(prev => { const n = prev.filter(x => !(teamSlug(x.team || x.name) === slug && leagueKey(x.league) === lk)); sv('teams', n); return n; });
+  };
   const [weatherCities, setWeatherCities] = useState(()=>ld('weatherCities', DEFAULT_WEATHER_CITIES));
   const [hiddenIndices, setHiddenIndices] = useState(()=>ld('hiddenIndices',[]));
   const [briefingExclude, setBriefingExclude] = useState(()=>ld('briefingExclude',['comedy']));
@@ -8767,16 +8814,23 @@ export default function App() {
   const cloudConfig = useMemo(() => ({
     kw, teams, feeds, alerts, urgent, social, watchlist,
     weatherCities, hiddenIndices, briefingExclude, briefingSources,
-    myTeams, myTopics,
+    myTeams, myTopics, removedTeams,
   }), [kw, teams, feeds, alerts, urgent, social, watchlist,
-       weatherCities, hiddenIndices, briefingExclude, briefingSources, myTeams, myTopics]);
+       weatherCities, hiddenIndices, briefingExclude, briefingSources, myTeams, myTopics, removedTeams]);
 
   // Apply a downloaded profile onto local state (+ localStorage), keying defensively.
   const applyCloudConfig = useCallback((cfg) => {
     if (!cfg || typeof cfg !== 'object') return;
     const put = (key, val, setter) => { if (val !== undefined && val !== null) { setter(val); sv(key, val); } };
+    // Removal tombstones are UNIONed (never clobbered) with the local set, then the
+    // pulled teams/myTeams are filtered through them. This is what stops an old cloud
+    // profile that still holds a removed default from resurrecting it on sign-in.
+    const mergedRemoved = Array.from(new Set([...(removedTeams || []), ...((Array.isArray(cfg.removedTeams) ? cfg.removedTeams : []))]));
+    put('removedTeams', mergedRemoved, setRemovedTeams);
+    const tomb = new Set(mergedRemoved);
+    const dropTomb = (list, nameOf) => (Array.isArray(list) ? list.filter(t => !tomb.has(teamKeyOf(nameOf(t), t.league))) : list);
     put('kw', cfg.kw, setKw);
-    put('teams', cfg.teams, setTeams);
+    put('teams', dropTomb(cfg.teams, t => t.team || t.name), setTeams);
     put('feeds', cfg.feeds, setFeeds);
     put('alerts', cfg.alerts, setAlerts);
     put('urgent', cfg.urgent, setUrgent);
@@ -8786,9 +8840,9 @@ export default function App() {
     put('hiddenIndices', cfg.hiddenIndices, setHiddenIndices);
     put('briefingExclude', cfg.briefingExclude, setBriefingExclude);
     put('briefingSources', cfg.briefingSources, setBriefingSources);
-    put('myTeams', cfg.myTeams ? normalizeMyTeams(cfg.myTeams) : cfg.myTeams, setMyTeams);
+    put('myTeams', cfg.myTeams ? dropTomb(normalizeMyTeams(cfg.myTeams), t => t.name) : cfg.myTeams, setMyTeams);
     put('myTopics', cfg.myTopics, setMyTopics);
-  }, []);
+  }, [removedTeams]);
 
   const pullCloudProfile = useCallback(async (uid) => {
     if (!uid) return;
@@ -8836,7 +8890,18 @@ export default function App() {
     if(nu){setUrgent(nu);sv('urgent',nu);}
     setSocial(ns);sv('social',ns);
     if(nw){setWatchlist(nw);sv('watchlist',nw);}
-    if(nt){setTeams(nt);sv('teams',nt);}
+    if(nt){
+      setTeams(nt);sv('teams',nt);
+      // Keep tombstones in sync with the Customize edit: un-tombstone every team kept
+      // in the saved list, and tombstone any seeded team the edit removed — so both
+      // Customize removes and the Following-row × stay removed across a cloud sync.
+      const keptKeys = new Set(nt.map(t => teamKeyOf(t.team || t.name, t.league)));
+      const removedByEdit = (teams || []).map(t => teamKeyOf(t.team || t.name, t.league)).filter(k => !keptKeys.has(k));
+      setRemovedTeams(prev => {
+        const next = Array.from(new Set([...prev.filter(k => !keptKeys.has(k)), ...removedByEdit]));
+        sv('removedTeams', next); return next;
+      });
+    }
     if(nwx){setWeatherCities(nwx);sv('weatherCities',nwx);}
     if(ni!=null){setHiddenIndices(ni);sv('hiddenIndices',ni);}
     if(nbe!=null){setBriefingExclude(nbe);sv('briefingExclude',nbe);}
@@ -8942,7 +9007,7 @@ export default function App() {
       ? ((TEAM_CHIPS[sportTab] || []).find(n => teamSlug(n) === tertiary)
          || tertiary.replace(/-/g, ' ').replace(/\b\w/g, c => c.toUpperCase()))
       : null;
-    const teamFollowed = !!(teamName && myTeams.some(x => x.slug === teamSlug(teamName) && x.league === sportTab));
+    const teamFollowed = !!(teamName && isTeamFollowed(teamName, sportTab));
     // activeTeam/setActiveTeam now live in App state (survives SportsPage remounts).
     const [teamMenuSym, setTeamMenuSym] = useState(null); // team with open popup menu
     // Collapsible State of Play — shared shell behavior, per-category memory ('sports').
@@ -9171,10 +9236,10 @@ export default function App() {
         {/* ── MY TEAMS — followed teams as a pill ribbon (Yahoo Sports style). A pill
             click routes into the existing team-hub (setActiveTeam → filtered feed +
             ESPN/Team links). Order follows the user's My Teams (favorites) config. ── */}
-        {!teamName && !activeSrc && !search && teams.length > 0 && (
+        {!teamName && !activeSrc && !search && followedTeams.length > 0 && (
           <div className="sport-tabs my-teams-ribbon">
-            {teams.map((t, i) => (
-              <button key={(t.team||'')+i}
+            {followedTeams.map((t, i) => (
+              <button key={`${t.slug}-${t.league}-${i}`}
                 className={`sport-tab ${activeTeam && activeTeam.team===t.team && activeTeam.league===t.league ? 'active' : ''}`}
                 onClick={()=>{ setActiveTeam(activeTeam && activeTeam.team===t.team ? null : t); setTimeout(scrollToFeed,80); }}>
                 <TeamLogo name={t.team} league={t.league} size={16}/>
@@ -9214,7 +9279,7 @@ export default function App() {
                 </div>
               </div>
               <div style={{display:'flex',gap:'8px',alignItems:'center'}}>
-                <button className="sport-league-all-btn" onClick={()=>toggleMyTeam({name:teamName, league:sportTab})}>
+                <button className="sport-league-all-btn" onClick={()=> teamFollowed ? unfollowTeam({name:teamName, league:sportTab}) : followTeam(teamName, sportTab)}>
                   {teamFollowed ? '★ Following' : '☆ Follow'}
                 </button>
                 <button className="sport-league-all-btn" onClick={()=>navigate('sports', sportTab)}>← All {SPORT_TABS.find(s=>s.key===sportTab)?.label}</button>
@@ -9737,16 +9802,16 @@ export default function App() {
         <div className="following-chips">
           {(() => {
             const nameCounts = {};
-            myTeams.forEach(t => { const k = (t.name||'').toLowerCase(); nameCounts[k] = (nameCounts[k]||0) + 1; });
-            return myTeams.map((t, i) => {
+            followedTeams.forEach(t => { const k = (t.name||'').toLowerCase(); nameCounts[k] = (nameCounts[k]||0) + 1; });
+            return followedTeams.map((t, i) => {
               const dup = nameCounts[(t.name||'').toLowerCase()] > 1;
               return (
-                <span key={`tm-${i}`} className="following-chip following-chip-team">
+                <span key={`tm-${t.slug}-${t.league}-${i}`} className="following-chip following-chip-team">
                   <button type="button" className="following-chip-main" onClick={()=>navigate('sports', t.league, t.slug)}>
                     <TeamLogo name={t.name} league={t.league} size={18}/>
                     <span className="following-chip-name">{t.name}{dup ? ` · ${(t.league||'').toUpperCase()}` : ''}</span>
                   </button>
-                  <button type="button" className="following-chip-x" onClick={()=>toggleMyTeam(t)} aria-label={`Unfollow ${t.name}`}>×</button>
+                  <button type="button" className="following-chip-x" onClick={()=>unfollowTeam(t)} aria-label={`Unfollow ${t.name}`}>×</button>
                 </span>
               );
             });
@@ -9759,16 +9824,16 @@ export default function App() {
               <button type="button" className="following-chip-x" onClick={()=>toggleTopic(t)} aria-label={`Unfollow ${t}`}>×</button>
             </span>
           ))}
-          {myTeams.length === 0 && myTopics.length === 0 && (
+          {followedTeams.length === 0 && myTopics.length === 0 && (
             <span className="following-empty">Follow teams &amp; topics to build your row</span>
           )}
           <div className="follow-add-wrap">
             <button className="following-add-btn" onClick={()=>setShowFollowAdd(v=>!v)} aria-expanded={showFollowAdd}>+ Add</button>
             {showFollowAdd && (
               <FollowAdd
-                isFollowingTeam={t => myTeams.some(x => x.slug === teamSlug(t.name) && x.league === t.league)}
+                isFollowingTeam={t => isTeamFollowed(t.name, t.league)}
                 isTopicFollowed={isTopicFollowed}
-                onAddTeam={t => toggleMyTeam({ name: t.name, league: t.league, slug: teamSlug(t.name) })}
+                onAddTeam={t => followTeam(t.name, t.league)}
                 onAddTopic={topic => toggleTopic(topic)}
                 onClose={() => setShowFollowAdd(false)}/>
             )}
