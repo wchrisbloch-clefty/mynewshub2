@@ -136,6 +136,10 @@ export function ChatBot({ arts, onNavigate, fetchSummary, fetchListen, fetchWebS
           <div className="chat-messages">
             {msgs.map((m, i) => (
               <div key={i} className={`chat-msg ${m.role}`}>
+                {/* These badges describe WHERE AN ANSWER CAME FROM (feed context / web /
+                    this article / general AI) — a different concept from the article trust
+                    tier in modules/provenance (verified/reported/inferred). Do NOT rename
+                    or unify them with the provenance TierBadge. */}
                 {m.tier && <span className={`chat-tier chat-tier-${m.tier}`}>{m.tier==='feed'?'● FEED':m.tier==='web'?'● WEB':m.tier==='open'?'● THIS':'● AI'}</span>}
                 <div className="chat-bubble">{m.text}</div>
                 {m.provenance && (

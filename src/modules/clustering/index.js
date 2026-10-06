@@ -15,6 +15,8 @@
 // Input article shape (only these fields are read): { title, source, pubDate }.
 // clusterStories preserves every other field via spread.
 
+import { tierRankOf } from '../../../lib/provenance.js';
+
 export const TREND_STOP = new Set([
   'the','and','for','that','with','this','from','have','will','are','was','were',
   'been','about','into','than','they','their','what','when','where','which','who',
@@ -31,10 +33,11 @@ export function heatScore(a) {
 
 // Tier trust ranking — higher wins. Used so a cluster's representative (which carries
 // the "_clusterSize / N sources" credibility signal) is always the HIGHEST-tier member,
-// never merely the first one seen. Prevents an unverified/inferred item from inheriting
-// a multi-source credibility badge from higher-tier coverage it was clustered with.
-const TIER_RANK = { verified: 3, reported: 2, unverified: 1, inferred: 0 };
-function tierRank(a) { const t = a && (a._tier || a.tier); return t in TIER_RANK ? TIER_RANK[t] : 2; }
+// never merely the first one seen. Prevents an inferred item from inheriting a
+// multi-source credibility badge from higher-tier coverage it was clustered with.
+// The rank table is the shared one in /lib/provenance.js (single source of truth); an
+// untagged article keeps its historical default of 2 ('reported').
+function tierRank(a) { return tierRankOf(a && (a._tier || a.tier), 2); }
 
 // Groups articles covering the same story. Bigram Jaccard on titles (>=0.28)
 // within a 6-hour window. Returns one representative per cluster — the highest-tier

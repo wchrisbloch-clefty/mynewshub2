@@ -48,6 +48,7 @@ async function fetchPolymarket() {
         question: String(m.question).trim(),
         probability: prob,
         source: 'Polymarket',
+        source_class: 'market', // provenance: market data, never news trust (2b)
         url: m.slug ? `https://polymarket.com/event/${m.slug}` : 'https://polymarket.com',
         volume: num(m.volumeNum || m.volume),
       });
@@ -73,6 +74,7 @@ async function fetchKalshi() {
       question: String(m.title || m.subtitle || '').trim(),
       probability: Math.round(num(m.yes_bid || m.last_price)),  // cents ≈ percent
       source: 'Kalshi',
+      source_class: 'market', // provenance: market data, never news trust (2b)
       url: m.ticker ? `https://kalshi.com/markets/${m.ticker}` : 'https://kalshi.com',
       volume: num(m.volume),
     })).filter(x => x.question && x.probability >= 0 && x.probability <= 100);

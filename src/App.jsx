@@ -48,6 +48,7 @@ import { FollowSourceContext, FollowSourceChip } from './modules/follow-source';
 import { MarketsSurface, useMarkets } from './modules/markets-surface';
 import { parseRoute, buildPath } from './modules/routing';
 import { PROMPT_VERSION } from '../lib/ai-models.js';
+import { TIER_LABEL, tagProvenance, TierBadge } from './modules/provenance';
 import { ChatBot } from './modules/concierge';
 // Icons: single set (lucide-react), fixed size per context — item 7.
 import { Settings, RefreshCw, Moon, Sun, User,
@@ -1082,7 +1083,8 @@ async function fetchContradictions(topic, items) {
 // "Sources disagree" panel — renders ONLY when a genuine factual conflict exists.
 // Positions arrive already ordered strongest-tier-first from the API, so a lone
 // verified source reads as authoritative rather than a false 50/50.
-const TIER_LABEL = { verified: 'Verified', reported: 'Reported', unverified: 'Unverified' };
+// TIER_LABEL now comes from the shared provenance module (./modules/provenance):
+// 'inferred' still displays as "Unverified", so this panel reads exactly as before.
 function SourcesDisagree({ topic, items }) {
   const [data, setData] = useState(null);
   const [expanded, setExpanded] = useState(false);
@@ -3033,7 +3035,8 @@ body:not(.dark) .pill-bar{
 .disagree-tier{flex-shrink:0;font-size:9px;font-weight:800;text-transform:uppercase;letter-spacing:0.05em;padding:1px 6px;border-radius:10px;}
 .disagree-pos.tier-verified .disagree-tier{background:#16a34a;color:#fff;}
 .disagree-pos.tier-reported .disagree-tier{background:#d97706;color:#fff;}
-.disagree-pos.tier-unverified .disagree-tier{background:var(--surface);color:var(--text3);border:1px solid var(--border);}
+.disagree-pos.tier-unverified .disagree-tier,
+.disagree-pos.tier-inferred .disagree-tier{background:var(--surface);color:var(--text3);border:1px solid var(--border);}
 .disagree-claim{color:var(--text);}
 .disagree-src{color:var(--text3);font-size:var(--fs-meta);}
 /* Coverage gap — "You may be missing this" panel (General, below Trending) */
@@ -5759,6 +5762,7 @@ function FeedCard({a, cat, isSaved, onSave, onRead, relatedSources, isRead, user
           title:c.data.title, sub:c.data.subreddit_name_prefixed,
           ups:c.data.ups, comments:c.data.num_comments,
           url:`https://reddit.com${c.data.permalink}`,
+          platform:'reddit', source_class:'discussion', tier:'inferred', // 2b: street-signal provenance
         }));
       }
     } catch {}
@@ -5770,6 +5774,7 @@ function FeedCard({a, cat, isSaved, onSave, onRead, relatedSources, isRead, user
         results.hn = (d?.hits||[]).filter(h=>h.num_comments>0).slice(0,3).map(h=>({
           title:h.title, points:h.points, comments:h.num_comments,
           url:`https://news.ycombinator.com/item?id=${h.objectID}`,
+          platform:'hn', source_class:'discussion', tier:'inferred', // 2b: street-signal provenance
         }));
       }
     } catch {}
@@ -5782,6 +5787,7 @@ function FeedCard({a, cat, isSaved, onSave, onRead, relatedSources, isRead, user
         <span className="fc-source" style={{color:cc.color}}>{a.source}</span>
         {paywall && <span className="fc-paywall-badge" title="Subscription may be required"></span>}
         {a.isAlert && <span className="fc-alert-badge">● BREAKING</span>}
+        <TierBadge item={a}/>
         {topKw && <span className="fc-topic" style={{background:cc.bg,color:cc.color}}>{topKw}</span>}
         {clusterCount > 1 && (
           <span className="fc-cluster-badge" title={`Also covered by: ${a._clusterSources?.join(', ')}`}>
@@ -8599,7 +8605,10 @@ export default function App() {
   };
   const onSave  = a=>{
     const wasSaved = saved.some(x=>x.link===a.link);
-    setSaved(s=>wasSaved?s.filter(x=>x.link!==a.link):[...s,{...a,savedAt:Date.now()}]);
+    // Stamp the trust tier + source_class on save (2b) so the saved record carries its
+    // provenance — this is the value the newshub_saved.tier column is meant to hold.
+    const prov = tagProvenance(a);
+    setSaved(s=>wasSaved?s.filter(x=>x.link!==a.link):[...s,{...a,tier:a._tier||a.tier||prov.tier,source_class:prov.source_class,savedAt:Date.now()}]);
   };
   const isSavedFn = a=>saved.some(s=>s.link===a.link);
   const isReadFn = a=>a.link&&readLinks.has(a.link);
