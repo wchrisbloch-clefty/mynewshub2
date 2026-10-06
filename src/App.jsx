@@ -390,6 +390,9 @@ const TEAM_CHIPS = {
   cbb: ['UConn','Kansas','Duke','Kentucky','North Carolina','Purdue','Houston','Gonzaga','Arizona','Tennessee','Baylor','Michigan State','UCLA','Marquette','Auburn','Creighton','Illinois','Alabama','Indiana','Villanova'],
 };
 const teamSlug = (name) => name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+// Canonical identity key for a team (slug+normalized league). Used for dedup AND for
+// the removal tombstones that keep an unfollowed team removed across a cloud sync.
+const teamKeyOf = (name, lg) => `${teamSlug(name || '')}|${leagueKey(lg)}`;
 
 // 4a: canonicalize a followed-teams list. The dedup invariant is teamSlug(name)+league,
 // computed from the NAME every time — never a stored route-param slug, which was the
@@ -8409,28 +8412,39 @@ export default function App() {
   const [watchlist, setWatchlist]= useState(()=>ld('watchlist',DEFAULT_WATCHLIST));
   // v23: customizable favorite teams. Defaults to DEFAULT_TEAMS; user can add/remove via Customize.
   const [teams, setTeams]       = useState(()=>ld('teams', DEFAULT_TEAMS));
+  // Removal tombstones: canonical keys (slug|league) of teams the user explicitly
+  // unfollowed. They persist AND sync, and are subtracted from any pulled cloud
+  // profile, so an old cloud copy that still holds a removed default can never
+  // resurrect it on sign-in. Re-following a team clears its tombstone.
+  const [removedTeams, setRemovedTeams] = useState(()=>ld('removedTeams', []));
+  const tombstone = useMemo(() => new Set(removedTeams || []), [removedTeams]);
   // ONE source of truth for "followed teams" (the pill ribbon + Home Following row):
   // union of the seeded favorites (teams) and explicit follows (myTeams), deduped on
-  // teamSlug(name)+leagueKey, seeded-defaults first then myTeams-only appended. The 7
-  // seeded defaults therefore read as "followed" and appear in the Following row.
+  // teamSlug(name)+leagueKey, seeded-defaults first then myTeams-only appended, minus
+  // any tombstoned (removed) teams. The 7 seeded defaults read as "followed".
   const followedTeams = useMemo(() => {
     const seen = new Set(), out = [];
     const push = (name, lg, extra) => {
       if (!name) return;
       const lk = leagueKey(lg), slug = teamSlug(name), key = `${slug}|${lk}`;
-      if (seen.has(key)) return; seen.add(key);
+      if (seen.has(key) || tombstone.has(key)) return; seen.add(key);
       out.push({ name, team: name, league: lk, slug, match: (extra && extra.match) || name, emoji: (extra && extra.emoji) || '', espnUrl: extra && extra.espnUrl, teamUrl: extra && extra.teamUrl });
     };
     (teams || []).forEach(t => push(t.team || t.name, t.league, t));
     (myTeams || []).forEach(t => push(t.name, t.league));
     return out;
-  }, [teams, myTeams]);
+  }, [teams, myTeams, tombstone]);
   const isTeamFollowed = (name, lg) => { const lk = leagueKey(lg), s = teamSlug(name || ''); return followedTeams.some(t => t.slug === s && t.league === lk); };
-  // Follow adds to the explicit myTeams store; unfollow removes from BOTH stores so a
-  // seeded default can be removed too (otherwise it would re-appear from `teams`).
-  const followTeam = (name, lg) => toggleMyTeam({ name, league: leagueKey(lg) });
+  // Follow adds to the explicit myTeams store and clears any tombstone; unfollow removes
+  // from BOTH stores and ADDS a tombstone so it cannot re-appear (local seed or cloud).
+  const followTeam = (name, lg) => {
+    const key = teamKeyOf(name, lg);
+    setRemovedTeams(prev => { const n = prev.filter(k => k !== key); sv('removedTeams', n); return n; });
+    toggleMyTeam({ name, league: leagueKey(lg) });
+  };
   const unfollowTeam = (entry) => {
-    const lk = leagueKey(entry.league), slug = teamSlug(entry.name || entry.team || '');
+    const lk = leagueKey(entry.league), slug = teamSlug(entry.name || entry.team || ''), key = `${slug}|${lk}`;
+    setRemovedTeams(prev => prev.includes(key) ? prev : (() => { const n = [...prev, key]; sv('removedTeams', n); return n; })());
     setMyTeams(prev => { const n = prev.filter(x => !(teamSlug(x.name) === slug && leagueKey(x.league) === lk)); sv('myTeams', n); return n; });
     setTeams(prev => { const n = prev.filter(x => !(teamSlug(x.team || x.name) === slug && leagueKey(x.league) === lk)); sv('teams', n); return n; });
   };
@@ -8779,16 +8793,23 @@ export default function App() {
   const cloudConfig = useMemo(() => ({
     kw, teams, feeds, alerts, urgent, social, watchlist,
     weatherCities, hiddenIndices, briefingExclude, briefingSources,
-    myTeams, myTopics,
+    myTeams, myTopics, removedTeams,
   }), [kw, teams, feeds, alerts, urgent, social, watchlist,
-       weatherCities, hiddenIndices, briefingExclude, briefingSources, myTeams, myTopics]);
+       weatherCities, hiddenIndices, briefingExclude, briefingSources, myTeams, myTopics, removedTeams]);
 
   // Apply a downloaded profile onto local state (+ localStorage), keying defensively.
   const applyCloudConfig = useCallback((cfg) => {
     if (!cfg || typeof cfg !== 'object') return;
     const put = (key, val, setter) => { if (val !== undefined && val !== null) { setter(val); sv(key, val); } };
+    // Removal tombstones are UNIONed (never clobbered) with the local set, then the
+    // pulled teams/myTeams are filtered through them. This is what stops an old cloud
+    // profile that still holds a removed default from resurrecting it on sign-in.
+    const mergedRemoved = Array.from(new Set([...(removedTeams || []), ...((Array.isArray(cfg.removedTeams) ? cfg.removedTeams : []))]));
+    put('removedTeams', mergedRemoved, setRemovedTeams);
+    const tomb = new Set(mergedRemoved);
+    const dropTomb = (list, nameOf) => (Array.isArray(list) ? list.filter(t => !tomb.has(teamKeyOf(nameOf(t), t.league))) : list);
     put('kw', cfg.kw, setKw);
-    put('teams', cfg.teams, setTeams);
+    put('teams', dropTomb(cfg.teams, t => t.team || t.name), setTeams);
     put('feeds', cfg.feeds, setFeeds);
     put('alerts', cfg.alerts, setAlerts);
     put('urgent', cfg.urgent, setUrgent);
@@ -8798,9 +8819,9 @@ export default function App() {
     put('hiddenIndices', cfg.hiddenIndices, setHiddenIndices);
     put('briefingExclude', cfg.briefingExclude, setBriefingExclude);
     put('briefingSources', cfg.briefingSources, setBriefingSources);
-    put('myTeams', cfg.myTeams ? normalizeMyTeams(cfg.myTeams) : cfg.myTeams, setMyTeams);
+    put('myTeams', cfg.myTeams ? dropTomb(normalizeMyTeams(cfg.myTeams), t => t.name) : cfg.myTeams, setMyTeams);
     put('myTopics', cfg.myTopics, setMyTopics);
-  }, []);
+  }, [removedTeams]);
 
   const pullCloudProfile = useCallback(async (uid) => {
     if (!uid) return;
@@ -8848,7 +8869,18 @@ export default function App() {
     if(nu){setUrgent(nu);sv('urgent',nu);}
     setSocial(ns);sv('social',ns);
     if(nw){setWatchlist(nw);sv('watchlist',nw);}
-    if(nt){setTeams(nt);sv('teams',nt);}
+    if(nt){
+      setTeams(nt);sv('teams',nt);
+      // Keep tombstones in sync with the Customize edit: un-tombstone every team kept
+      // in the saved list, and tombstone any seeded team the edit removed — so both
+      // Customize removes and the Following-row × stay removed across a cloud sync.
+      const keptKeys = new Set(nt.map(t => teamKeyOf(t.team || t.name, t.league)));
+      const removedByEdit = (teams || []).map(t => teamKeyOf(t.team || t.name, t.league)).filter(k => !keptKeys.has(k));
+      setRemovedTeams(prev => {
+        const next = Array.from(new Set([...prev.filter(k => !keptKeys.has(k)), ...removedByEdit]));
+        sv('removedTeams', next); return next;
+      });
+    }
     if(nwx){setWeatherCities(nwx);sv('weatherCities',nwx);}
     if(ni!=null){setHiddenIndices(ni);sv('hiddenIndices',ni);}
     if(nbe!=null){setBriefingExclude(nbe);sv('briefingExclude',nbe);}
