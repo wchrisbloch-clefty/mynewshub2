@@ -18,8 +18,7 @@
 // Model IDs come from the shared registry — see lib/ai-models.js before assuming a
 // provider failure is a bad key rather than a retired/renamed model.
 import { MODELS } from '../lib/ai-models.js';
-
-const TIER_RANK = { verified: 3, reported: 2, unverified: 1, '': 0 };
+import { normalizeTier, tierRankOf } from '../lib/provenance.js';
 
 async function readBody(req) {
   if (req.body && typeof req.body === 'object' && !req.body.on) return req.body;
@@ -121,8 +120,11 @@ function normalize(parsed) {
   const clean = conflicts.map(c => {
     const positions = Array.isArray(c?.positions) ? c.positions
       .filter(p => p && p.claim)
-      .map(p => ({ claim: String(p.claim).slice(0, 240), tier: TIER_RANK[p.tier] != null ? p.tier : 'unverified', sources: Array.isArray(p.sources) ? p.sources.slice(0, 4) : [] }))
-      .sort((x, y) => (TIER_RANK[y.tier] || 0) - (TIER_RANK[x.tier] || 0)) : [];
+      // Canonicalize the model's tier via the shared table (legacy 'unverified' → 'inferred');
+      // an unrecognized/absent tier falls back to 'inferred'. Ranking is unchanged — old
+      // unverified and new inferred both rank 1 — so position ordering is identical.
+      .map(p => ({ claim: String(p.claim).slice(0, 240), tier: normalizeTier(p.tier) || 'inferred', sources: Array.isArray(p.sources) ? p.sources.slice(0, 4) : [] }))
+      .sort((x, y) => tierRankOf(y.tier, 0) - tierRankOf(x.tier, 0)) : [];
     return { issue: String(c?.issue || 'Disputed detail').slice(0, 120), positions };
   }).filter(c => c.positions.length >= 2); // a real conflict needs ≥2 contradicting positions
   return { consensus, conflicts: clean };

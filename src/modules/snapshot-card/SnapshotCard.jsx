@@ -17,6 +17,7 @@
 
 import { useState } from 'react';
 import { FollowSourceChip } from '../follow-source';
+import { TierBadge } from '../provenance';
 import './SnapshotCard.css';
 
 const defaultFormatDate = d => { try { return new Date(d).toLocaleString(); } catch { return ''; } };
@@ -36,6 +37,7 @@ export function SnapshotCard({ a, meta = {}, isSaved, onSave, onRead, onPerspect
           <FollowSourceChip name={a.source} url={a.sourceUrl}/>
           {a.author && <span className="snap-byline">{a.author}</span>}
           {a.isAlert && <span className="snap-live">● LIVE</span>}
+          <TierBadge item={a}/>
           {topKw && <span className="snap-tag" style={{ background: bg, color }}>{topKw}</span>}
           <span className="snap-time">{formatDate(a.pubDate)}</span>
         </div>
