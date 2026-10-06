@@ -12,16 +12,16 @@
 // Props:
 //   topic     (string)  required — what to read the room on ("Kentucky", "Markets")
 //   variant   (string?) 'reader' tightens spacing for use inside a modal
-//   endpoint  (string?) serverless route; defaults to '/api/x-pulse'
+//   endpoint  (string?) serverless route; defaults to the unified '/api/signals?kind=xpulse'
 //
-// Server half: api/x-pulse.js (a single self-contained Vercel function; must live
-// under api/ for the platform to route it). Needs only XAI_API_KEY in the env.
-// Styling: co-located XPulse.css.
+// Server half: api/signals.js (kind=xpulse) — the street-signal endpoints were merged
+// into one Vercel function to stay under the Hobby plan's 12-function cap. Needs only
+// XAI_API_KEY in the env. Styling: co-located XPulse.css.
 
 import { useState, useEffect } from 'react';
 import './XPulse.css';
 
-export function XPulse({ topic, variant, endpoint = '/api/x-pulse' }) {
+export function XPulse({ topic, variant, endpoint = '/api/signals?kind=xpulse' }) {
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [data, setData] = useState(null);
@@ -40,7 +40,8 @@ export function XPulse({ topic, variant, endpoint = '/api/x-pulse' }) {
     const ctrl = new AbortController();
     const to = setTimeout(() => ctrl.abort(), 8000);
     try {
-      const r = await fetch(`${endpoint}?topic=${encodeURIComponent(topic)}`, { signal: ctrl.signal });
+      const sep = endpoint.includes('?') ? '&' : '?'; // endpoint may already carry ?kind=xpulse
+      const r = await fetch(`${endpoint}${sep}topic=${encodeURIComponent(topic)}`, { signal: ctrl.signal });
       if (r.ok) {
         const d = await r.json();
         if (d && Array.isArray(d.takes) && d.takes.length) setData(d);

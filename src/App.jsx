@@ -5775,11 +5775,11 @@ function FeedCard({a, cat, isSaved, onSave, onRead, relatedSources, isRead, user
     if (disc) { setShowDisc(true); return; }
     setShowDisc(true); setLoadingDisc(true);
     // Click-to-load only (never auto-fetched). Reddit + HN are fetched server-side via
-    // /api/discussions (item 3b) — the old direct browser call to reddit.com was blocked
+    // /api/signals?kind=discussions (item 3b) — the old direct browser call to reddit.com was blocked
     // by CORS / no-User-Agent rate-limiting. Fail-soft: any error → empty, renders nothing.
     let results = { reddit: [], hn: [] };
     try {
-      const r = await fetch(`/api/discussions?q=${encodeURIComponent(a.title.slice(0,80))}`, { signal: AbortSignal.timeout(8000) });
+      const r = await fetch(`/api/signals?kind=discussions&q=${encodeURIComponent(a.title.slice(0,80))}`, { signal: AbortSignal.timeout(8000) });
       if (r.ok) {
         const d = await r.json();
         results = { reddit: Array.isArray(d?.reddit) ? d.reddit : [], hn: Array.isArray(d?.hn) ? d.hn : [] };
@@ -6559,7 +6559,7 @@ function GithubSignal() {
     if (done) { setOpen(o => !o); return; }
     setOpen(true); setLoading(true);
     try {
-      const r = await fetch('/api/github-signal', { signal: AbortSignal.timeout(9000) });
+      const r = await fetch('/api/signals?kind=github', { signal: AbortSignal.timeout(9000) });
       if (r.ok) { const d = await r.json(); setRepos(Array.isArray(d?.repos) ? d.repos : []); }
       else setRepos([]);
     } catch { setRepos([]); }
