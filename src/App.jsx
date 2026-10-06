@@ -337,10 +337,12 @@ const DEFAULT_SOCIAL = {
   },
 };
 
-// v23: Each team now has an espnUrl + teamUrl so the favorite-team pills can
-// expose external links. Users can edit/extend this list via the Customize
-// panel "Sports Teams" tab; the array below is the default seed.
-const SCORE_TEAMS = [
+// ── THE 7 DEFAULT TEAMS ──────────────────────────────────────────────────────
+// DEFAULT_TEAMS is the single source of the seeded follows: the `teams` state falls
+// back to it, and the followed-teams union starts from it. Each team carries an
+// espnUrl + teamUrl for the favorite-team pills. Users edit/extend/reorder via the
+// Customize "Sports Teams" tab; removals persist (stored `teams` overrides this seed).
+const DEFAULT_TEAMS = [
   { team:'Texans',        sport:'football',   league:'nfl',                       match:'Houston Texans',    emoji:'',
     espnUrl:'https://www.espn.com/nfl/team/_/name/hou/houston-texans',
     teamUrl:'https://www.houstontexans.com/' },
@@ -372,7 +374,7 @@ const LEAGUES = [
   { key:'cbb', label:'College BB',sport:'basketball', league:'mens-college-basketball', emoji:'', accent:'var(--accent)' },
 ];
 
-// Normalize a league value to its short KEY (nfl/nba/mlb/cfb/cbb). SCORE_TEAMS store
+// Normalize a league value to its short KEY (nfl/nba/mlb/cfb/cbb). DEFAULT_TEAMS store
 // the ESPN path ('college-football'); myTeams store the key ('cfb'). The unified
 // followed-teams list keys on the KEY so the two reconcile and dedup correctly.
 const _LEAGUE_KEY_BY_PATH = (() => { const m = {}; LEAGUES.forEach(l => { m[l.key] = l.key; m[l.league] = l.key; }); return m; })();
@@ -794,7 +796,7 @@ function activeLeagues(scores) {
 // ./modules/routing; App keeps only the stateful navigate/applyRoute orchestration.
 
 // Normalize any league identifier to the short scoreboard key. Team records are
-// inconsistent: SCORE_TEAMS uses ESPN paths ('college-football'), while myTeams/
+// inconsistent: DEFAULT_TEAMS uses ESPN paths ('college-football'), while myTeams/
 // TEAM_CHIPS use short keys ('cfb'). Game `_league` is always the short key.
 const LEAGUE_KEY = { nfl:'nfl', nba:'nba', mlb:'mlb', nhl:'nhl', 'college-football':'cfb', cfb:'cfb', 'mens-college-basketball':'cbb', cbb:'cbb', 'womens-college-basketball':'wcbb' };
 const normLeague = l => LEAGUE_KEY[(l||'').toLowerCase()] || (l||'').toLowerCase();
@@ -811,7 +813,7 @@ function teamTermMatches(haystack, term) {
 function favoriteIn(game) {
   if (!game) return null;
   const txt=((game.homeName||'')+' '+(game.awayName||'')+' '+(game.short||'')+' '+(game.name||'')).toLowerCase();
-  return SCORE_TEAMS.find(t=>teamTermMatches(txt, t.match))||null;
+  return DEFAULT_TEAMS.find(t=>teamTermMatches(txt, t.match))||null;
 }
 
 // v23: parameterized variant accepting any team list (typically the user's
@@ -6355,7 +6357,7 @@ function Scoreboard({scores, loading, compact=false, favTeams}) {
     LEAGUES.forEach(L=>{init[L.key]=['nfl','nba','mlb'].includes(L.key);});
     return init;
   });
-  // 4b: respect the user's customized teams. Fall back to the hardcoded SCORE_TEAMS
+  // 4b: respect the user's customized teams. Fall back to the hardcoded DEFAULT_TEAMS
   // (via favoriteIn) only when the reader has no custom teams at all.
   const hasCustom = Array.isArray(favTeams) && favTeams.length > 0;
   const favOf = (g, lk) => hasCustom ? favoriteInList(g, favTeams, lk) : favoriteIn(g);
@@ -8405,8 +8407,8 @@ export default function App() {
   }, [tab]);
   const [urgent, setUrgent]     = useState(()=>ld('urgent',DEFAULT_URGENT));
   const [watchlist, setWatchlist]= useState(()=>ld('watchlist',DEFAULT_WATCHLIST));
-  // v23: customizable favorite teams. Defaults to SCORE_TEAMS; user can add/remove via Customize.
-  const [teams, setTeams]       = useState(()=>ld('teams', SCORE_TEAMS));
+  // v23: customizable favorite teams. Defaults to DEFAULT_TEAMS; user can add/remove via Customize.
+  const [teams, setTeams]       = useState(()=>ld('teams', DEFAULT_TEAMS));
   // ONE source of truth for "followed teams" (the pill ribbon + Home Following row):
   // union of the seeded favorites (teams) and explicit follows (myTeams), deduped on
   // teamSlug(name)+leagueKey, seeded-defaults first then myTeams-only appended. The 7
