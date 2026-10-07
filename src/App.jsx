@@ -1827,7 +1827,10 @@ body:not(.dark) .pill-bar{
 /* D5 fix 1: mobile State-of-Play slot sits inside the feed, directly under the lead.
    Desktop keeps the sidebar SoP; mobile hides the sidebar copy to avoid duplication. */
 .sop-mobile{display:none;}
-@media(max-width:640px){ .sop-mobile{display:block;margin:4px 0 8px;} .sop-hide-mobile{display:none;} }
+/* Review item 5: category header below the lead on mobile (desktop keeps it on top).
+   Two-class selectors so these beat the base .page-header-row{display:flex} rule. */
+.page-header-row.phr-mobile{display:none;}
+@media(max-width:640px){ .sop-mobile{display:block;margin:4px 0 8px;} .sop-hide-mobile{display:none;} .page-header-row.phr-desktop{display:none;} .page-header-row.phr-mobile{display:flex;} }
 /* State of Play lives in the sidebar on desktop; the main-column hoisted copy is
    hidden here and only shown ≤1100px (see the single-column media block). */
 .sop-hoist{display:none;}
@@ -10160,7 +10163,7 @@ export default function App() {
           <HoustonRow items={houstonItems} onRead={onRead} onAsk={setChatContext} formatDate={fmtDate}/>
         )}
 
-            <div className="page-header-row">
+            <div className="page-header-row phr-desktop">
               <span className="page-header" style={{fontFamily:'var(--font-sans)'}}>
                 {cc.label}{feedItems.length>0?` — ${feedItems.length} articles`:''}
                 {/* D6: per-page refresh — always present (shows "Refresh" before the first stamp). */}
@@ -10230,6 +10233,17 @@ export default function App() {
                   {(activeKw||activeSrc||search ? feedItems.slice(0,20) : dedupedFeed.slice(0,20)).map((a,i)=>(
                     <Fragment key={a.link||i}>
                       <SnapshotCard a={a} meta={CATS[cat]||CATS.general} isSaved={isSavedFn(a)} onSave={onSave} onRead={onRead} onPerspectives={setPerspArticle} onAsk={setChatContext} formatDate={fmtDate} hideImage={i>=3} lead={i===0 && !activeKw && !activeSrc && !search}/>
+                      {/* Review item 5: on mobile the category header moves BELOW the lead so
+                          the lead is the first element in the body (desktop copy is hidden). */}
+                      {i===0 && !activeKw && !activeSrc && !search && (
+                        <div className="page-header-row phr-mobile">
+                          <span className="page-header" style={{fontFamily:'var(--font-sans)'}}>
+                            {cc.label}{feedItems.length>0?` — ${feedItems.length} articles`:''}
+                            <span style={{marginLeft:'10px'}}><LastUpdated timestamp={lastUpdated[cat]} onRefresh={() => loadCat(cat)}/></span>
+                          </span>
+                          <button className="page-customize-btn" onClick={()=>openCustomize('sources',cat)}><IconGear/> Customize</button>
+                        </div>
+                      )}
                       {/* D5 fix 1: on mobile, State of Play sits directly under the lead (the
                           sidebar copy is hidden on mobile via hideSopMobile). Mobile-only. */}
                       {i===0 && !activeKw && !activeSrc && !search && (
