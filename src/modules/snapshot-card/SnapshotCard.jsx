@@ -22,14 +22,14 @@ import './SnapshotCard.css';
 
 const defaultFormatDate = d => { try { return new Date(d).toLocaleString(); } catch { return ''; } };
 
-export function SnapshotCard({ a, meta = {}, isSaved, onSave, onRead, onPerspectives, formatDate = defaultFormatDate, hideImage = false }) {
+export function SnapshotCard({ a, meta = {}, isSaved, onSave, onRead, onPerspectives, onAsk, formatDate = defaultFormatDate, hideImage = false, lead = false }) {
   const color = meta.color;
   const bg = meta.bg;
   const [imgErr, setImgErr] = useState(false);
   const topKw = a.matchedKw?.[0] || null;
   const multi = a._clusterSize > 1;
   return (
-    <article className={`snap-card ${a.isAlert ? 'snap-breaking' : ''}`} onClick={() => onRead(a)}>
+    <article className={`snap-card ${a.isAlert ? 'snap-breaking' : ''}${lead ? ' snap-lead' : ''}${lead && (!a.img || imgErr || hideImage) ? ' snap-lead-noimg' : ''}`} onClick={() => onRead(a)}>
       <span className="snap-accent" style={{ background: color }} />
       <div className="snap-main">
         <div className="snap-meta">
@@ -51,10 +51,20 @@ export function SnapshotCard({ a, meta = {}, isSaved, onSave, onRead, onPerspect
                 <svg className="snap-cov-caret" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
               </button>
             : <span className="snap-single">{a.source}</span>}
-          <button className={`snap-save ${isSaved ? 'saved' : ''}`}
-            onClick={e => { e.stopPropagation(); onSave(a); }} aria-label={isSaved ? 'Saved' : 'Save'}>
-            <svg width="14" height="14" viewBox="0 0 24 24" fill={isSaved ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth="2"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg>
-          </button>
+          <span className="snap-foot-actions">
+            {/* D7: Ask the assistant about this specific story. */}
+            {onAsk && (
+              <button className="snap-ask" onClick={e => { e.stopPropagation(); onAsk(a); }}
+                aria-label="Ask about this story" title="Ask the assistant about this story">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+                Ask
+              </button>
+            )}
+            <button className={`snap-save ${isSaved ? 'saved' : ''}`}
+              onClick={e => { e.stopPropagation(); onSave(a); }} aria-label={isSaved ? 'Saved' : 'Save'}>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill={isSaved ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth="2"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg>
+            </button>
+          </span>
         </div>
       </div>
       {a.img && !imgErr && !hideImage && <img className="snap-thumb" src={a.img} loading="lazy" alt="" onError={() => setImgErr(true)} />}

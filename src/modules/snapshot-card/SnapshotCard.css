@@ -49,6 +49,11 @@
 .snap-single{font-family:var(--font-publicsans);font-size:var(--fs-meta);color:var(--text3);}
 .snap-save{background:none;border:1px solid var(--border);border-radius:8px;padding:5px 8px;cursor:pointer;color:var(--text3);flex-shrink:0;display:flex;align-items:center;transition:color 0.12s,border-color 0.12s;}
 .snap-save:hover,.snap-save.saved{color:var(--accent);border-color:var(--accent);}
+/* D7: Ask-this-story action, grouped with Save. */
+.snap-foot-actions{display:inline-flex;align-items:center;gap:8px;flex-shrink:0;}
+.snap-ask{background:none;border:1px solid var(--border);border-radius:8px;padding:5px 10px;cursor:pointer;color:var(--text3);display:inline-flex;align-items:center;gap:5px;font-family:var(--font-publicsans);font-size:var(--fs-meta);font-weight:700;transition:color 0.12s,border-color 0.12s;}
+.snap-ask:hover{color:var(--accent);border-color:var(--accent);}
+@media(max-width:640px){ .snap-ask{min-height:44px;} .snap-save{min-height:44px;} }
 /* Thumbnail is a FIXED size, capped regardless of the column/main-column width, so
    standard feed cards stay headline-forward and balanced against the sidebar. Height
    is capped too so a tall card can't stretch the image into a large square. (The
@@ -63,15 +68,46 @@
 .snap-skel-thumb{width:150px;aspect-ratio:4/3;align-self:center;flex-shrink:0;background:var(--surface2);border-radius:6px;margin:0 12px;}
 .snap-skel-line{border-radius:5px;margin-bottom:8px;background:linear-gradient(90deg,var(--surface2) 25%,var(--border) 50%,var(--surface2) 75%);background-size:200% 100%;animation:shimmer 1.4s infinite;}
 @media(max-width:640px){
-  /* Buzzfeed-style mobile (Pass L item 5): cards flip to VERTICAL — a full-bleed 4:3
-     image reads as the primary element scrolling past, the headline is its caption.
-     More gap between cards so each reads as a distinct unit. Desktop is untouched. */
-  .snap-feed{gap:20px;}
-  .snap-card{flex-direction:column;}
-  .snap-accent{width:100%;height:4px;order:-2;}
-  .snap-thumb,.snap-skel-thumb{order:-1;width:100%;aspect-ratio:4/3;align-self:stretch;margin:0;border-radius:0;}
-  .snap-main,.snap-skel-main{padding:12px 14px 14px;}
-  .snap-title{font-size:19px;line-height:1.2;}
+  /* D5 — NYT/Bloomberg mobile: ONE dominant lead, then a DIVIDED LIST (no boxes).
+     Fewer boxes, more whitespace. Exactly one hero-weight element above the fold. */
+  .snap-feed{gap:0;}
+  /* Divided list rows: borderless, thin top rule, small 4:3 thumb RIGHT, headline LEFT. */
+  .snap-card{flex-direction:row;border:none;border-radius:0;border-top:1px solid var(--border2);background:none;box-shadow:none;}
+  .snap-card:first-child{border-top:none;}
+  .snap-card:hover{transform:none;box-shadow:none;}
+  .snap-accent{display:none;}
+  .snap-main,.snap-skel-main{order:0;padding:14px 0;}
+  .snap-thumb,.snap-skel-thumb{order:1;width:92px;height:69px;aspect-ratio:4/3;align-self:center;margin:0 0 0 12px;border-radius:6px;}
+  .snap-title{font-family:var(--font-archivo);font-size:16px;line-height:1.25;-webkit-line-clamp:3;}
+  .snap-snippet{display:none;} /* calmer list — headline + one meta line only */
+  .snap-meta{margin-bottom:4px;}
+  /* THE LEAD — full-bleed image, large serif headline, one meta line. */
+  .snap-lead{flex-direction:column;border-top:none;margin:0 0 6px;}
+  .snap-lead .snap-accent{display:none;}
+  .snap-lead .snap-thumb{order:-1;width:100vw;max-width:100%;height:auto;aspect-ratio:3/2;margin:0 -16px;border-radius:0;align-self:stretch;}
+  .snap-lead .snap-main{padding:14px 0 16px;}
+  .snap-lead .snap-title{font-family:var(--font-archivo);font-size:26px;line-height:1.12;letter-spacing:-0.3px;-webkit-line-clamp:4;}
+  .snap-lead .snap-snippet{display:-webkit-box;font-size:var(--fs-body);-webkit-line-clamp:2;margin-bottom:8px;}
+  /* D5 fix 2: typographic lead fallback — no image box. Small-caps kicker (the source)
+     + oversized serif headline + one meta line, filling a similar height budget. */
+  .snap-lead-noimg{min-height:220px;justify-content:center;padding:8px 0 16px;border-bottom:2px solid var(--border);}
+  .snap-lead-noimg .snap-source{font-size:11px;letter-spacing:0.1em;}
+  .snap-lead-noimg .snap-title{font-size:30px;line-height:1.08;-webkit-line-clamp:5;margin-top:4px;}
+}
+/* D5 — carry the DIVIDED-LIST treatment to DESKTOP SECONDARY lists only (not the main
+   grid): any .snap-feed inside .snap-feed-divided renders as calm rows. Desktop main
+   layout is unchanged. */
+.snap-feed-divided .snap-card{border:none;border-top:1px solid var(--border2);border-radius:0;background:none;box-shadow:none;}
+.snap-feed-divided .snap-card:first-child{border-top:none;}
+.snap-feed-divided .snap-card:hover{transform:none;box-shadow:none;}
+.snap-feed-divided .snap-accent{display:none;}
+.snap-feed-divided .snap-thumb{width:120px;height:80px;aspect-ratio:3/2;}
+.snap-feed-divided .snap-snippet{-webkit-line-clamp:1;}
+/* D5 fix 3: the LEAD stays a prominent card on desktop even inside a divided feed. */
+@media(min-width:641px){
+  .snap-feed-divided .snap-lead{border:1px solid var(--border);border-radius:10px;background:var(--surface);margin-bottom:14px;}
+  .snap-feed-divided .snap-lead .snap-accent{display:block;}
+  .snap-feed-divided .snap-lead .snap-snippet{-webkit-line-clamp:2;}
 }
 /* iPad (768–1279): the feed LIST is a 2-column card grid (the original responsive
    spec). Cards flip to VERTICAL (image on top, headline + body full-cell-width) so

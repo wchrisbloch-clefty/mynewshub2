@@ -14,6 +14,12 @@
 .sop-item-meta{display:flex;align-items:center;gap:8px;flex-shrink:0;}
 .sop-item-sources{font-family:var(--font-publicsans);font-size:10px;font-weight:700;color:var(--accent);background:var(--surface2);border-radius:10px;padding:2px 8px;white-space:nowrap;}
 .sop-item-time{font-family:var(--font-publicsans);font-size:var(--fs-meta);color:var(--text3);white-space:nowrap;}
+/* D7: per-row Ask button — quiet until hovered; always a >=44px target on mobile. */
+.sop-ask{background:none;border:1px solid var(--border);border-radius:12px;padding:2px 8px;cursor:pointer;
+  font-family:var(--font-publicsans);font-size:10px;font-weight:700;color:var(--text3);white-space:nowrap;
+  transition:color 0.12s,border-color 0.12s;}
+.sop-ask:hover{color:var(--accent);border-color:var(--accent);}
+@media(max-width:640px){ .sop-ask{min-height:44px;padding:2px 12px;} }
 /* Coverage-gap rows folded into the list: dimmer number + "Not in your sources" tag. */
 .sop-item-gap{text-decoration:none;}
 .sop-num-gap{opacity:0.5;}
@@ -37,8 +43,9 @@
 .sop-sidebar .sop-label{border-left:none;padding-left:0;font-family:var(--font-publicsans);font-size:10px;font-weight:800;color:var(--text3);letter-spacing:0.14em;}
 .sop-sidebar .sop-collapse{margin-left:auto;}
 .sop-sidebar .sop-item{flex-wrap:wrap;align-items:flex-start;padding:9px 0;gap:3px 8px;}
-.sop-sidebar .sop-num{font-size:13px;min-width:18px;}
-.sop-sidebar .sop-item-title{font-size:13px;line-height:1.32;}
+/* D4: tokenized (was 13px) — sidebar rows track the main body scale. */
+.sop-sidebar .sop-num{font-size:var(--fs-body);min-width:18px;}
+.sop-sidebar .sop-item-title{font-size:var(--fs-body);line-height:1.32;}
 .sop-sidebar .sop-item-meta{width:100%;padding-left:26px;justify-content:flex-start;gap:6px;flex-shrink:1;}
 .sop-sidebar .sop-item-time{font-size:10px;}
 .sop-sidebar .sop-item-sources{font-size:9px;padding:1px 6px;}

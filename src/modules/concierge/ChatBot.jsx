@@ -18,8 +18,12 @@ import { useState, useEffect, useRef } from 'react';
 import { retrieveFeedContext, buildFeedContextBlock } from '../retrieval';
 import './Concierge.css';
 
-export function ChatBot({ arts, onNavigate, fetchSummary, fetchListen, fetchWebSearch, resolveDeepLink, chatContext, onClearContext }) {
+export function ChatBot({ arts, onNavigate, fetchSummary, fetchListen, fetchWebSearch, resolveDeepLink, chatContext, onClearContext, pageContext }) {
   const [open, setOpen] = useState(false);
+  // D7: when the user clicks × on the page chip, widen to all topics for the session.
+  const [pageScopeOff, setPageScopeOff] = useState(false);
+  const pageScoped = !!pageContext && !pageScopeOff && !chatContext
+    && (pageContext.visibleHeadlines || []).length > 0;
   const [msgs, setMsgs] = useState([
     { role:'bot', text:"Hi! I'm your AI news assistant. Ask me anything about today's stories, markets, or sports.", time: new Date().toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'}) }
   ]);
@@ -80,6 +84,24 @@ export function ChatBot({ arts, onNavigate, fetchSummary, fetchListen, fetchWebS
       pushBot(summary, error, 'open'); setLoading(false); return;
     }
 
+    // D7 — Tier 0: THIS PAGE. If the user is on a page, answer from its own headlines
+    // first and tell the model which page it is, so "the biggest story here" means here.
+    // Caps (<=25 headlines, <=8 SoP) keep the per-turn prompt within budget. Falls
+    // through to the global feed/web tiers if the page can't answer.
+    if (pageScoped) {
+      // Cost guardrail (D7): the prompt sends only the top 10 headlines + top 5 SoP
+      // (the pageContext object carries more for display), keeping per-turn prompt
+      // growth within ~25% of the feed tier — see the measured delta in the PR.
+      const heads = (pageContext.visibleHeadlines || []).slice(0, 8)
+        .map(h => `- ${h.title}${h.source ? ` (${h.source})` : ''}`).join('\n');
+      const sop = (pageContext.stateOfPlay || []).slice(0, 4).map(t => `- ${t}`).join('\n');
+      const content = `User is viewing: ${pageContext.label}\n\nHEADLINES ON THIS PAGE:\n${heads}`
+        + (sop ? `\n\nSTATE OF PLAY:\n${sop}` : '')
+        + `\n\nQUESTION: ${q}\n\nAnswer from these headlines; if not covered, say so briefly.`;
+      const { summary, error } = await fetchSummary({ type:'article', title:'concierge-page', content, mode:'chat' });
+      if (summary && !/isn't in today's feed/i.test(summary)) { pushBot(summary, error, 'feed'); setLoading(false); return; }
+    }
+
     // Tier 1: FEED
     const ctx = retrieveFeedContext(q, arts, { resolveDeepLink });
     const feedBlock = buildFeedContextBlock(ctx);
@@ -133,6 +155,14 @@ export function ChatBot({ arts, onNavigate, fetchSummary, fetchListen, fetchWebS
               <button className="chat-context-clear" onClick={onClearContext} aria-label="Clear context">✕</button>
             </div>
           )}
+          {/* D7: page-scope chip when no specific article is attached. × widens to all topics. */}
+          {pageScoped && (
+            <div className="chat-context-chip">
+              <span className="chat-context-label">Asking about:</span>
+              <span className="chat-context-title">{pageContext.label}</span>
+              <button className="chat-context-clear" onClick={()=>setPageScopeOff(true)} aria-label="Widen to all topics" title="Ask about all topics">✕</button>
+            </div>
+          )}
           <div className="chat-messages">
             {msgs.map((m, i) => (
               <div key={i} className={`chat-msg ${m.role}`}>
@@ -175,6 +205,8 @@ export function ChatBot({ arts, onNavigate, fetchSummary, fetchListen, fetchWebS
           </div>
           {msgs.length <= 2 && (
             <div className="chat-quick-btns">
+              {/* D7: "Ask about this page" leads when the user is on a page. */}
+              {pageScoped && <button className="chat-quick-btn" onClick={() => send('What are the biggest stories on this page right now?')}>Ask about this page</button>}
               {QUICK.map(q => <button key={q} className="chat-quick-btn" onClick={() => send(q)}>{q}</button>)}
             </div>
           )}

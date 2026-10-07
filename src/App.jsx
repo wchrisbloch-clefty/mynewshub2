@@ -36,9 +36,11 @@
 //  • Storage v25a_ → v25b_, migration from v25a/v24/v23/v22
 // ─────────────────────────────────────────────────────────────────────────────
 
-import { useState, useEffect, useCallback, useMemo, useRef, Fragment } from 'react';
+import { useState, useEffect, useLayoutEffect, useCallback, useMemo, useRef, Fragment } from 'react';
 // Extracted, dependency-isolated capability modules (see src/modules/*/README.md)
 import { clusterStories, hotClusterTopics, rankClusters, TREND_STOP, decodeEntities, capByPublisher } from './modules/clustering';
+import { qualifyBreaking, isPromoItem } from './modules/breaking';
+import { DEBUG, dbgRender, dbgPoll, DebugOverlay } from './modules/debug';
 import { extractContent, extractionFallbackMessage } from './modules/extractor';
 import { retrieveFeedContext, buildFeedContextBlock } from './modules/retrieval';
 import { XPulse } from './modules/x-pulse';
@@ -127,13 +129,26 @@ const IconGear = ({size=ICON.meta}) => (
 // Matches the mobile chip bar order so swiping feels like advancing the chips.
 // v24a: Swipe order matches the mobile chip bar order. Today is removed;
 // General is the home position so swipes start from there.
-const SWIPE_ORDER = ['general','business','finance','bloom','tech','sports','popculture'];
+// D1: 'health' added in its chip-bar position (after Sports); the stray 'finance'
+// (which has no mobile chip — it is folded into Business) is dropped so every swipe
+// target is a reachable chip, keeping this list a true mirror of MOBILE_CHIPS.
+const SWIPE_ORDER = ['general','business','bloom','tech','sports','health','popculture'];
 
 const TICKERS = [
-  { sym:'BE',   label:'Bloom Energy', color:'#60a5fa' },
-  { sym:'CL=F', label:'Crude Oil',    color:'#4ade80' },
-  { sym:'BTC',  label:'Bitcoin',      color:'#fbbf24' },
+  { sym:'BE',      label:'Bloom Energy', color:'#60a5fa' },
+  { sym:'CL=F',    label:'Crude Oil',    color:'#4ade80' },
+  // D3: fetch 'BTC-USD' (actual Bitcoin). Plain 'BTC' on Yahoo is a ~$36 Grayscale
+  // fund, which is what produced the bogus "$36.86" tile. `short` keeps the label tidy.
+  { sym:'BTC-USD', label:'Bitcoin', short:'BTC', color:'#fbbf24' },
 ];
+
+// D3: price decimals by instrument. True indices (^GSPC/^DJI/^IXIC) show whole
+// numbers; everything else — gas (NG=F), oil (CL=F), crypto, equities — shows 2
+// decimals. Fixes natural gas rendering as "3" under the indices' 0-decimal format.
+const fmtQuotePrice = (sym, price) =>
+  Number(price).toLocaleString('en-US', /^\^/.test(sym)
+    ? { maximumFractionDigits: 0 }
+    : { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
 const PODCAST_FEEDS = [
   { name:'Joe Rogan Experience', host:'Joe Rogan',         url:'https://feeds.megaphone.fm/GLT1412515089',   emoji:'' },
@@ -1496,8 +1511,11 @@ body{
 .ss-ticker-inner::-webkit-scrollbar{display:none;}
 .ss-tk{display:inline-flex;align-items:baseline;gap:6px;flex-shrink:0;
   background:none;border:none;cursor:pointer;font-family:inherit;padding:0;white-space:nowrap;}
-.ss-tk-sym{font-size:10px;font-weight:700;letter-spacing:0.04em;color:var(--text3);text-transform:uppercase;}
-.ss-tk-val{font-size:12px;font-weight:600;color:var(--text);}
+/* D3: ticker + weather share one role scale.
+   label (symbol/city) = --fs-meta uppercase 700 · value (price/temp) = --fs-body 700 tnum
+   · change/desc = --fs-meta. */
+.ss-tk-sym{font-size:var(--fs-meta);font-weight:700;letter-spacing:0.04em;color:var(--text3);text-transform:uppercase;}
+.ss-tk-val{font-size:var(--fs-body);font-weight:700;color:var(--text);font-variant-numeric:tabular-nums;}
 .ss-tk-chg{font-size:var(--fs-meta);font-weight:700;}
 .ss-tk-chg.up{color:var(--pos);}
 .ss-tk-chg.down{color:var(--neg);}
@@ -1507,15 +1525,15 @@ body{
 .rnw-card{background:var(--surface);border:1px solid var(--border2);border-radius:var(--radius);margin-bottom:var(--s4);overflow:hidden;}
 .rnw-row{width:100%;display:flex;align-items:center;gap:var(--s3);padding:12px var(--s4);background:none;border:none;cursor:pointer;font-family:var(--font-publicsans);text-align:left;}
 .rnw-label{font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:0.08em;color:var(--accent);flex-shrink:0;}
-.rnw-city{font-size:var(--fs-body);font-weight:700;color:var(--text);}
-.rnw-temp{font-size:18px;font-weight:800;color:var(--text);}
-.rnw-desc{font-size:var(--fs-body);color:var(--text2);}
+.rnw-city{font-size:var(--fs-meta);font-weight:700;color:var(--text);text-transform:uppercase;letter-spacing:0.04em;}
+.rnw-temp{font-size:var(--fs-body);font-weight:700;color:var(--text);font-variant-numeric:tabular-nums;}
+.rnw-desc{font-size:var(--fs-meta);color:var(--text2);}
 .rnw-feels{font-size:var(--fs-meta);color:var(--text3);margin-left:auto;}
 .rnw-caret{color:var(--text3);flex-shrink:0;transition:transform 0.15s;margin-left:auto;}
 .rnw-caret.open{transform:rotate(180deg);}
 /* Multi-city: Houston + Louisville side by side in the one row. */
 .rnw-cities{display:flex;align-items:center;gap:var(--s4);flex:1;min-width:0;overflow:hidden;}
-.rnw-city-item{display:inline-flex;align-items:baseline;gap:7px;white-space:nowrap;}
+.rnw-city-item{display:inline-flex;align-items:baseline;gap:6px;white-space:nowrap;}
 .rnw-city-fc{padding-top:6px;}
 .rnw-city-fc + .rnw-city-fc{border-top:1px solid var(--border);margin-top:6px;}
 .rnw-city-fc-head{font-size:var(--fs-meta);font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:0.05em;padding:4px 0 2px;}
@@ -1571,7 +1589,7 @@ body{
 .entity-hub-btn:hover{border-color:var(--accent);color:var(--accent);}
 .entity-hub-btn.on{color:var(--amber);border-color:var(--amber);}
 .following-chip:hover{border-color:var(--accent);}
-.following-chip-name{font-size:12px;font-weight:600;color:var(--accent);}
+.following-chip-name{font-size:var(--fs-meta);font-weight:600;color:var(--accent);}/* D4: tokenized (was 12px) */
 .following-chip-x{background:none;border:none;color:var(--text3);cursor:pointer;font-size:15px;line-height:1;padding:0 2px;border-radius:50%;}
 .following-chip-x:hover{color:var(--neg);}
 .following-chip-x:focus-visible{outline:2px solid var(--accent);outline-offset:1px;}
@@ -1736,7 +1754,7 @@ body:not(.dark) .pill-bar{
 }
 /* BBC-clean section tabs: no box, strong underline on active */
 .nav-tabs{
-  display:flex;gap:0;flex:1;overflow-x:auto;scrollbar-width:none;
+  display:flex;gap:0;flex:1;min-width:0;overflow:hidden;position:relative;
   margin-left:0;padding-left:0;
 }
 .nav-tabs::-webkit-scrollbar{display:none;}
@@ -1752,6 +1770,20 @@ body:not(.dark) .pill-bar{
 .nav-tab.active{color:var(--accent);border-bottom-color:var(--accent);}
 .nav-tab:hover:not(.active){color:var(--text2);}
 .nav-right{display:flex;gap:8px;align-items:center;flex-shrink:0;padding-left:16px;border-left:1px solid var(--border);}
+/* D1: priority-overflow nav. The visible row is flex (no scroll); the hidden
+   measuring row holds the full set at natural width for the fit calculation. */
+.nav-measure{position:absolute;top:0;left:0;height:0;overflow:hidden;visibility:hidden;pointer-events:none;display:flex;white-space:nowrap;}
+.nav-more{position:relative;display:flex;align-items:stretch;}
+.nav-more-btn{display:inline-flex;align-items:center;gap:4px;}
+.nav-more-menu{position:absolute;top:100%;right:0;margin-top:2px;min-width:168px;z-index:450;
+  background:var(--surface);border:1px solid var(--border);border-radius:10px;
+  box-shadow:0 8px 28px rgba(0,0,0,0.14);padding:6px;display:flex;flex-direction:column;}
+.nav-more-item{background:none;border:none;text-align:left;cursor:pointer;white-space:nowrap;
+  padding:9px 12px;border-radius:7px;color:var(--text3);
+  font-family:var(--font-sans);font-size:12px;font-weight:700;letter-spacing:0.04em;text-transform:uppercase;
+  transition:background 0.12s,color 0.12s;}
+.nav-more-item:hover{background:var(--surface2);color:var(--text);}
+.nav-more-item.active{color:var(--accent);}
 .search-input{
   background:var(--surface2);border:1px solid var(--border);color:var(--text);
   border-radius:var(--radius-sm);padding:7px 13px;font-size:var(--fs-body);width:130px;
@@ -1784,7 +1816,21 @@ body:not(.dark) .pill-bar{
 ═══════════════════════════════════════════ */
 .page{max-width:1400px;margin:0 auto;padding:28px 24px;}
 .page-grid{display:grid;grid-template-columns:2.1fr 1fr;gap:28px;align-items:start;} /* main ~68% / sidebar ~32% (CNBC/NBC ratio) */
+/* D4: reclaim the wasted side gutters on large screens — the whole shell (header
+   bars + content) grows from 1400 to 1560 at >=1440px so the main column gets wider
+   instead of sitting small between big margins. The 2.1/1 grid keeps line length sane. */
+@media (min-width:1440px){
+  .status-strip-inner,.pill-bar-inner,.nav-bar-inner,.page,
+  .topbar-wx .rnw-card,.topbar-scores .home-scores{max-width:1560px;}
+}
 .feed-col{display:flex;flex-direction:column;gap:0;min-width:0;} /* min-width:0 so the column shrinks to its grid track instead of its content width */
+/* D5 fix 1: mobile State-of-Play slot sits inside the feed, directly under the lead.
+   Desktop keeps the sidebar SoP; mobile hides the sidebar copy to avoid duplication. */
+.sop-mobile{display:none;}
+/* Review item 5: category header below the lead on mobile (desktop keeps it on top).
+   Two-class selectors so these beat the base .page-header-row{display:flex} rule. */
+.page-header-row.phr-mobile{display:none;}
+@media(max-width:640px){ .sop-mobile{display:block;margin:4px 0 8px;} .sop-hide-mobile{display:none;} .page-header-row.phr-desktop{display:none;} .page-header-row.phr-mobile{display:flex;} }
 /* State of Play lives in the sidebar on desktop; the main-column hoisted copy is
    hidden here and only shown ≤1100px (see the single-column media block). */
 .sop-hoist{display:none;}
@@ -2060,6 +2106,13 @@ body:not(.dark) .pill-bar{
   font-size:10px;font-weight:800;color:var(--text3);
   text-transform:uppercase;letter-spacing:0.14em;
 }
+/* D5 fix 4: ONE canonical small-caps section label. .rail-label (previously undefined,
+   styled only by inline one-offs at each use) now shares it, as do the migrated inline
+   "From the Web" / section headers. */
+.section-label,.rail-label{
+  font-family:var(--font-sans);font-size:var(--fs-meta);font-weight:800;
+  color:var(--text3);text-transform:uppercase;letter-spacing:0.08em;
+}
 .sidebar-sec-action{
   background:none;border:none;color:var(--accent);cursor:pointer;
   font-size:10px;font-weight:600;font-family:inherit;padding:0;
@@ -2087,7 +2140,8 @@ body:not(.dark) .pill-bar{
 .pm-prob.pm-lo{color:var(--neg);}
 .pm-prob.pm-mid{color:var(--text2);}
 .pm-body{display:flex;flex-direction:column;gap:2px;min-width:0;}
-.pm-q{font-family:var(--font-publicsans);font-size:12px;font-weight:600;line-height:1.3;color:var(--text);display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;overflow-wrap:anywhere;}
+/* D4: tokenized (was 12px) — sidebar body tracks the main body scale. */
+.pm-q{font-family:var(--font-publicsans);font-size:var(--fs-body);font-weight:600;line-height:1.3;color:var(--text);display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;overflow-wrap:anywhere;}
 .pm-src{font-family:var(--font-publicsans);font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:0.03em;color:var(--text3);}
 .ttp-chips{display:flex;flex-wrap:wrap;gap:6px;}
 /* a11y (row 117): the pill is a non-interactive wrapper; the primary "filter by topic"
@@ -2121,7 +2175,7 @@ body:not(.dark) .pill-bar{
 .sb-across-clabel:hover{text-decoration:underline;}
 .sb-across-item{cursor:pointer;padding:5px 0;border-top:1px solid var(--border2);}
 .sb-across-cat .sb-across-item:first-of-type{border-top:none;}
-.sb-across-title{font-family:var(--font-archivo);font-weight:600;font-size:12px;line-height:1.3;color:var(--text);display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;}
+.sb-across-title{font-family:var(--font-archivo);font-weight:600;font-size:var(--fs-body);line-height:1.3;color:var(--text);display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;}/* D4: tokenized (was 12px) */
 .sb-across-item:hover .sb-across-title{color:var(--accent);}
 .sb-across-src{font-size:10px;color:var(--text3);margin-top:2px;}
 
@@ -3791,12 +3845,9 @@ body{overscroll-behavior-y:contain;}
   position:relative;
 }
 .chip-bar::-webkit-scrollbar{display:none;}
+/* D1: no edge-fade gradient — the partially-visible last chip + the "More" chip
+   are the overflow cue. */
 .chip-bar-wrap{position:relative;}
-.chip-bar-wrap::after{
-  content:'';position:absolute;right:0;top:0;bottom:0;width:40px;
-  background:linear-gradient(to left,var(--bg) 0%,transparent 100%);
-  pointer-events:none;z-index:2;
-}
 .chip{
   flex-shrink:0;scroll-snap-align:start;
   background:none;border:none;
@@ -3811,6 +3862,23 @@ body{overscroll-behavior-y:contain;}
 .chip:active{background:var(--surface2);}
 .chip.active{color:#fff;font-weight:700;background:#1a1a1a;}
 .dark .chip.active{background:rgba(255,255,255,0.15);}
+/* D1: "More ▾" chip opens the mobile overflow sheet (Briefing/Podcasts/Sources/Saved). */
+.chip-more{font-weight:700;color:var(--text2);}
+.chip-more.active{color:#fff;}
+.more-sheet-overlay{position:fixed;inset:0;background:rgba(0,0,0,0.45);z-index:650;display:flex;align-items:flex-end;}
+.more-sheet{background:var(--surface);width:100%;border-radius:16px 16px 0 0;
+  padding:8px 10px calc(14px + env(safe-area-inset-bottom,0));box-shadow:0 -8px 30px rgba(0,0,0,0.22);
+  animation:more-sheet-up 0.18s ease-out;}
+@keyframes more-sheet-up{from{transform:translateY(100%);}to{transform:translateY(0);}}
+.more-sheet-head{display:flex;align-items:center;justify-content:space-between;
+  padding:8px 8px 10px;font-family:var(--font-sans);font-weight:800;font-size:13px;
+  text-transform:uppercase;letter-spacing:0.08em;color:var(--text3);border-bottom:1px solid var(--border2);}
+.more-sheet-close{background:none;border:none;font-size:26px;line-height:1;color:var(--text3);cursor:pointer;padding:0 6px;}
+.more-sheet-item{display:flex;align-items:center;width:100%;min-height:52px;
+  background:none;border:none;border-bottom:1px solid var(--border2);cursor:pointer;
+  font-family:var(--font-sans);font-size:15px;font-weight:700;color:var(--text);text-align:left;padding:0 8px;}
+.more-sheet-item:last-child{border-bottom:none;}
+.more-sheet-item.active{color:var(--accent);}
 
 /* Mobile search slide-in */
 .mobile-search{display:none;padding:8px 12px;border-top:1px solid var(--border2);}
@@ -4015,12 +4083,20 @@ body{overscroll-behavior-y:contain;}
 .trending-card-src{font-size:10px;color:var(--text3);margin-top:auto;}
 
 /* ─── LAST UPDATED (per-feed timestamp) ─── */
+/* D6: now a real refresh button (was a span). Quiet in the header; not floating. */
 .last-updated{
-  font-size:10px;color:var(--text3);font-weight:500;
-  display:inline-flex;align-items:center;gap:4px;
+  font-size:var(--fs-meta);color:var(--text3);font-weight:600;
+  display:inline-flex;align-items:center;gap:5px;cursor:pointer;
+  background:none;border:1px solid var(--border);border-radius:16px;
+  padding:4px 10px;font-family:var(--font-sans);line-height:1;
+  transition:color 0.12s,border-color 0.12s;-webkit-tap-highlight-color:transparent;
 }
+.last-updated:hover:not(:disabled){color:var(--text);border-color:var(--text3);}
+.last-updated:disabled{cursor:default;opacity:0.7;}
+.last-updated-icon{flex-shrink:0;}
 .last-updated-dot{width:5px;height:5px;border-radius:50%;background:var(--green);}
 .last-updated-dot.stale{background:var(--amber);}
+@media(max-width:640px){ .last-updated{min-height:36px;padding:6px 12px;} }
 
 /* Swipe hint — brief toast when user changes category on mobile */
 .swipe-hint{
@@ -4063,7 +4139,9 @@ body{overscroll-behavior-y:contain;}
   /* Hoist State of Play into the main column near the top; hide the sidebar copy —
      but ONLY on grids that actually render a hoisted copy (General/category pages).
      Sports has no hoist, so its sidebar State of Play must stay visible here. */
-  .sop-hoist{display:block;margin-bottom:22px;}
+  /* D5 fix 1: the old TOP hoist is retired — State of Play now renders inside the feed
+     directly under the lead (.sop-mobile). Keep hiding the sidebar copy on these grids. */
+  .sop-hoist{display:none;}
   .has-sop-hoist .sidebar .sop-sidebar{display:none;}
 }
 @media (max-width:900px){
@@ -4468,24 +4546,8 @@ kbd{display:inline-block;padding:1px 5px;border:1px solid var(--border);border-r
 }
 .sb-box-sub{font-size:9px;color:rgba(255,255,255,0.5);text-transform:uppercase;letter-spacing:0.05em;}
 
-/* MOBILE CHIP BAR — editorial category pills */
-.chip-bar{
-  display:flex;gap:0;overflow-x:auto;scrollbar-width:none;
-  background:var(--navy);border-bottom:1px solid rgba(255,255,255,0.08);
-  padding:0;
-}
-.chip-bar::-webkit-scrollbar{display:none;}
-.chip{
-  flex-shrink:0;background:transparent;border:none;
-  color:rgba(255,255,255,0.6);
-  padding:10px 16px;font-size:var(--fs-meta);font-weight:700;cursor:pointer;
-  font-family:var(--font-sans);
-  text-transform:uppercase;letter-spacing:0.06em;
-  border-bottom:2px solid transparent;
-  transition:all 0.12s;white-space:nowrap;
-}
-.chip.active{color:#fff;border-bottom-color:#fff;}
-.chip:hover:not(.active){color:rgba(255,255,255,0.85);}
+/* D1: the second (legacy navy) .chip / .chip-bar block was removed here — the
+   single canonical definition now lives above (editorial category pills). */
 
 /* MOBILE HEADER — editorial masthead */
 .mobile-header{
@@ -5825,7 +5887,9 @@ function FeedCard({a, cat, isSaved, onSave, onRead, relatedSources, isRead, user
       <div className="fc-meta">
         <span className="fc-source" style={{color:cc.color}}>{a.source}</span>
         {paywall && <span className="fc-paywall-badge" title="Subscription may be required"></span>}
-        {a.isAlert && <span className="fc-alert-badge">● BREAKING</span>}
+        {/* D2: the per-card "● BREAKING" badge is removed — it came from the old broad
+            title+desc keyword match that mis-tagged previews/interviews. Breaking now
+            appears ONLY as tagged rows in State of Play. */}
         <TierBadge item={a}/>
         {topKw && <span className="fc-topic" style={{background:cc.bg,color:cc.color}}>{topKw}</span>}
         {clusterCount > 1 && (
@@ -5840,7 +5904,7 @@ function FeedCard({a, cat, isSaved, onSave, onRead, relatedSources, isRead, user
           ? <img className="fc-thumb" src={a.img} loading="lazy" onError={()=>setImgErr(true)} alt=""/>
           : <div className="fc-thumb-ph"><span className="ph-label">{a.source}</span></div>}
         <div className="fc-text">
-          <div className={`fc-title${a.isAlert?' fc-title-breaking':''}`}>{a.title}</div>
+          <div className="fc-title">{a.title}</div>
           {a.desc && <div className="fc-desc">{a.desc}</div>}
         </div>
       </div>
@@ -6139,9 +6203,7 @@ Output ONLY the paragraph followed by the bullets. No headers, no labels, no clo
         if (total > 10) generate();
       }
     };
-    checkStale(); // check immediately on mount/ts-change
-    const iv = setInterval(checkStale, 5 * 60 * 1000); // every 5 min
-    return () => clearInterval(iv);
+    checkStale(); // D6: generate on demand when stale on mount/ts-change; no 5-min poll.
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ts]);
 
@@ -6295,9 +6357,7 @@ OUTPUT: 3-sentence paragraph followed by exactly 3 bullets (- markers). No heade
         if (total > 10) generate();
       }
     };
-    checkStale();
-    const iv = setInterval(checkStale, 5 * 60 * 1000);
-    return () => clearInterval(iv);
+    checkStale(); // D6: generate on demand when stale; no 5-min poll.
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ts]);
 
@@ -6629,7 +6689,7 @@ function GithubSignal() {
 
 // ─── GHOST SIDEBAR ────────────────────────────────────────────────────────────
 function Sidebar({cat, arts, kw, health, activeKw, setActiveKw, activeSource, setActiveSource, onRead, scores, scoresLoading, showScoreboard, recommended, showBriefing, onOpenBriefing, briefingExcludeCats, onTopicOpen, trendingItems, isTopicFollowed, toggleTopic, onTrendingOpen,
-  sopItems, sopGapItems, sopMeta, sopCollapsed, onToggleSop, formatDate, acrossSections, onAcrossSeeAll, followingModule, sopBreakingItems, feeds, onToggleFeed, favTeams}) {
+  sopItems, sopGapItems, sopMeta, sopCollapsed, onToggleSop, formatDate, acrossSections, onAcrossSeeAll, followingModule, sopBreakingItems, feeds, onToggleFeed, favTeams, onAsk, hideSopMobile}) {
   const cc = CATS[cat]||CATS.general;
   const catKws = kw[cat]||[];
   const catArts = arts[cat]||[];
@@ -6716,9 +6776,11 @@ function Sidebar({cat, arts, kw, health, activeKw, setActiveKw, activeSource, se
       {/* 1) STATE OF PLAY — moved into the sidebar (Pass J item 2), consistent
             sidebar-module styling, Coverage-Gap rows in a stacked (non-inline) layout. */}
       {sopItems && !activeKw && !activeSource && (
-        <StateOfPlay variant="sidebar" items={sopItems} gapItems={sopGapItems||[]} breakingItems={sopBreakingItems||[]}
-          meta={sopMeta||cc} onRead={onRead} formatDate={formatDate||fmtDate}
-          collapsed={sopCollapsed} onToggleCollapse={onToggleSop}/>
+        <div className={hideSopMobile ? 'sidebar-sop sop-hide-mobile' : 'sidebar-sop'}>
+          <StateOfPlay variant="sidebar" items={sopItems} gapItems={sopGapItems||[]} breakingItems={sopBreakingItems||[]}
+            meta={sopMeta||cc} onRead={onRead} onAsk={onAsk} formatDate={formatDate||fmtDate}
+            collapsed={sopCollapsed} onToggleCollapse={onToggleSop}/>
+        </div>
       )}
 
       {/* TRENDING moved BELOW Across MyNewsHub (Pass L item 2) — see the block after
@@ -7677,22 +7739,118 @@ function HeroBand({ heroStories, heroIdx, setHeroIdx, paused, setPaused, onRead 
 }
 
 
-// Last-updated timestamp for feeds. Shows a green dot if refreshed
-// within the last 10 minutes, amber otherwise. Clickable could trigger
-// refresh (passed via onRefresh prop).
+// D6: per-page manual refresh control. A small "↻ Updated Nm ago" BUTTON in the
+// page header (never floating). Tapping calls onRefresh for that page only and the
+// stamp updates. Renders whenever onRefresh is given — even before the first stamp
+// (shows "Refresh") — so every page carries the control. Green dot ≤10m, amber after.
 function LastUpdated({ timestamp, onRefresh }) {
-  if (!timestamp) return null;
-  const ageMin = (Date.now() - timestamp) / 60000;
-  const stale = ageMin > 10;
-  let label;
-  if (ageMin < 1) label = 'Just now';
-  else if (ageMin < 60) label = `${Math.floor(ageMin)}m ago`;
-  else label = `${Math.floor(ageMin/60)}h ago`;
+  if (!timestamp && !onRefresh) return null;
+  const ageMin = timestamp ? (Date.now() - timestamp) / 60000 : null;
+  const stale = ageMin != null && ageMin > 10;
+  let label = 'Refresh';
+  if (ageMin != null) {
+    if (ageMin < 1) label = 'Updated just now';
+    else if (ageMin < 60) label = `Updated ${Math.floor(ageMin)}m ago`;
+    else label = `Updated ${Math.floor(ageMin/60)}h ago`;
+  }
   return (
-    <span className="last-updated" onClick={onRefresh} style={onRefresh?{cursor:'pointer'}:{}}>
-      <span className={`last-updated-dot ${stale?'stale':''}`}/>
-      Updated {label}
-    </span>
+    <button type="button" className="last-updated" onClick={onRefresh} disabled={!onRefresh}
+      title="Refresh this page" aria-label={`Refresh this page — ${label}`}>
+      <RefreshCw size={12} strokeWidth={2.4} className="last-updated-icon"/>
+      {timestamp && <span className={`last-updated-dot ${stale?'stale':''}`}/>}
+      {label}
+    </button>
+  );
+}
+
+// ─── PRIORITY-OVERFLOW NAV (D1) ───────────────────────────────────────────────
+// Desktop/iPad (>640px) primary nav. Every primary tab that fits at the current
+// width renders inline; the ones that don't collapse into a "More ▾" menu
+// (last-first, i.e. Podcasts overflows before Briefing, etc.). Sources and Saved
+// ALWAYS live in More. Fit is MEASURED with ResizeObserver against a hidden,
+// never-collapsed copy of the full row (so we always use natural widths), not CSS
+// overflow — guaranteeing every destination is reachable in ≤2 interactions at
+// any width. Keyboard: More opens/closes on Enter/click and Esc; items are buttons.
+const NAV_PRIMARY = ['general','business','bloom','tech','sports','health','popculture','briefing','podcasts'];
+const NAV_ALWAYS_MORE = ['sources','saved'];
+const NAV_MORE_RESERVE = 104; // px kept free for the More ▾ button when measuring
+
+function PriorityNav({ tab, onPick, labels, classes }) {
+  const wrapRef = useRef(null);
+  const measureRef = useRef(null);
+  const menuRef = useRef(null);
+  const moreBtnRef = useRef(null);
+  const [visibleCount, setVisibleCount] = useState(NAV_PRIMARY.length);
+  const [menuOpen, setMenuOpen] = useState(false);
+
+  const lbl = t => labels[t] || (t.charAt(0).toUpperCase() + t.slice(1));
+  const isActive = t => tab === t || (t === 'business' && tab === 'finance');
+
+  useLayoutEffect(() => {
+    const wrap = wrapRef.current, measure = measureRef.current;
+    if (!wrap || !measure) return;
+    const compute = () => {
+      const avail = wrap.clientWidth;
+      const btns = Array.from(measure.children);
+      let used = 0, fit = 0;
+      for (let i = 0; i < btns.length; i++) {
+        used += btns[i].offsetWidth;
+        // Always reserve room for More — Sources/Saved live there unconditionally.
+        if (used + NAV_MORE_RESERVE <= avail) fit = i + 1; else break;
+      }
+      setVisibleCount(fit);
+    };
+    compute();
+    const ro = new ResizeObserver(compute);
+    ro.observe(wrap);
+    return () => ro.disconnect();
+  }, [labels]);
+
+  useEffect(() => {
+    if (!menuOpen) return;
+    const onDown = e => {
+      if (menuRef.current && !menuRef.current.contains(e.target) &&
+          moreBtnRef.current && !moreBtnRef.current.contains(e.target)) setMenuOpen(false);
+    };
+    const onKey = e => { if (e.key === 'Escape') { setMenuOpen(false); moreBtnRef.current && moreBtnRef.current.focus(); } };
+    document.addEventListener('mousedown', onDown);
+    document.addEventListener('keydown', onKey);
+    return () => { document.removeEventListener('mousedown', onDown); document.removeEventListener('keydown', onKey); };
+  }, [menuOpen]);
+
+  const visible = NAV_PRIMARY.slice(0, visibleCount);
+  const moreItems = [...NAV_PRIMARY.slice(visibleCount), ...NAV_ALWAYS_MORE];
+  const activeInMore = moreItems.some(isActive);
+
+  return (
+    <div className="nav-tabs" ref={wrapRef}>
+      {/* Hidden full-width measuring row — natural widths, never collapsed. */}
+      <div className="nav-measure" ref={measureRef} aria-hidden="true">
+        {NAV_PRIMARY.map(t => <button key={t} className={`nav-tab ${classes[t]||''}`} tabIndex={-1}>{lbl(t)}</button>)}
+      </div>
+      {visible.map(t => (
+        <button key={t} className={`nav-tab ${classes[t]||''} ${isActive(t)?'active':''}`} onClick={()=>onPick(t)}>
+          {lbl(t)}
+        </button>
+      ))}
+      <div className="nav-more">
+        <button ref={moreBtnRef} className={`nav-tab nav-more-btn ${activeInMore?'active':''}`}
+          aria-haspopup="menu" aria-expanded={menuOpen}
+          onClick={()=>setMenuOpen(o=>!o)}>
+          More{moreItems.length?` (${moreItems.length})`:''} ▾
+        </button>
+        {menuOpen && (
+          <div className="nav-more-menu" role="menu" ref={menuRef}>
+            {moreItems.map(t => (
+              <button key={t} role="menuitem" className={`nav-more-item ${isActive(t)?'active':''}`}
+                onClick={()=>{ onPick(t); setMenuOpen(false); }}>
+                {lbl(t)}
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
   );
 }
 
@@ -7707,26 +7865,39 @@ function TopBar({tab, setTab, search, setSearch, dark, setDark,
                  scores, favTeams, onGoToSports}) {
   const [searchFocused, setSearchFocused] = useState(false);
   const [quotes, setQuotes] = useState({});
-  const [showBreaking, setShowBreaking] = useState(true);
+  // D1: desktop search collapses to an icon (reclaims width for the nav); mobile
+  // "More" chip opens a sheet holding Briefing/Podcasts/Sources/Saved.
+  const [searchOpenDesktop, setSearchOpenDesktop] = useState(false);
+  const [moreSheetOpen, setMoreSheetOpen] = useState(false);
+  const MORE_SHEET_TABS = ['briefing','podcasts','sources','saved'];
+  useEffect(() => {
+    if (!moreSheetOpen) return;
+    const onKey = e => { if (e.key === 'Escape') setMoreSheetOpen(false); };
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, [moreSheetOpen]);
   // Weather moved off the global strip → Home-only "Right Now" card (RightNowWeather).
 
   useEffect(()=>{
-    // v25: also fetch indices (S&P, DOW, Nasdaq) for the pill bar
+    // v25: also fetch indices (S&P, DOW, Nasdaq) for the pill bar.
+    // D6: fetch once on load (no 300s polling). D6: batch all symbols into ONE
+    // setState per refresh instead of one per symbol (avoids N re-renders of the
+    // whole app on every ticker tick).
     const allSyms = [...TICKERS.map(t=>t.sym), ...INDICES.map(i=>i.sym)];
-    const fetchAll = () => allSyms.forEach(sym =>
-      fetchQuote(sym).then(q=>q&&setQuotes(prev=>({...prev,[sym]:q})))
-    );
-    fetchAll();
-    const iv=setInterval(fetchAll, 300000);
-    return ()=>clearInterval(iv);
+    let live = true;
+    Promise.all(allSyms.map(sym => fetchQuote(sym).then(q => [sym, q]).catch(()=>[sym,null])))
+      .then(pairs => {
+        if (!live) return;
+        const next = {};
+        for (const [sym, q] of pairs) if (q) next[sym] = q;
+        if (Object.keys(next).length) setQuotes(prev => ({ ...prev, ...next }));
+      });
+    return () => { live = false; };
   },[]);
 
-  const hasBreaking = breakingItems&&breakingItems.length>0;
-  // Breaking headlines now live inside State of Play (Pass L item 3); the status strip
-  // keeps only the small pulsing "● Breaking" signal flag, not a cramped marquee.
 
-  // v24a: Desktop nav per user: General · Business · Markets · Bloom · Sports · Pop Culture · Briefing · Podcasts · Saved
-  const ALL_TABS = ['general','business','bloom','tech','sports','health','popculture','briefing','podcasts','sources','saved'];
+  // D1: desktop nav is now priority-overflow (PriorityNav). Primary order lives in
+  // NAV_PRIMARY; Sources/Saved always live in the More menu (NAV_ALWAYS_MORE).
   const TAB_LABELS = {business:'Business & Markets',bloom:'Energy',finance:'Markets',tech:'AI & Tech',health:'Health',popculture:'Pop Culture',podcasts:'Podcasts',sources:'Sources',saved:'Saved',briefing:'Briefing'};
   const TAB_CLASS  = {general:'t-general',sports:'t-sports',business:'t-business',finance:'t-finance',bloom:'t-bloom',tech:'t-tech',popculture:'t-popculture',podcasts:'t-podcasts'};
 
@@ -7759,11 +7930,9 @@ function TopBar({tab, setTab, search, setSearch, dark, setDark,
           compact weather chip RIGHT. Red is a signal here, never a texture. */}
       <div className="status-strip">
         <div className="status-strip-inner">
-          {hasBreaking && showBreaking ? (
-            <span className="ss-flag ss-flag-breaking" title="Breaking — see State of Play"><span className="ss-pulse"/> Breaking</span>
-          ) : (
-            <span className="ss-flag ss-flag-markets">Markets</span>
-          )}
+          {/* D2: the "● Breaking" status-strip flag is removed entirely — Breaking now
+              lives ONLY as tagged rows inside State of Play. The strip is markets-only. */}
+          <span className="ss-flag ss-flag-markets">Markets</span>
           <div className="ss-ticker">
             <div className="ss-ticker-inner">
               {INDICES.filter(idx=>!(hiddenIndices||[]).includes(idx.sym)).map(idx=>{
@@ -7771,7 +7940,7 @@ function TopBar({tab, setTab, search, setSearch, dark, setDark,
                 return (
                   <button key={idx.sym} className="ss-tk" onClick={()=>q&&window.open(`https://finance.yahoo.com/quote/${encodeURIComponent(idx.sym)}`,'_blank')}>
                     <span className="ss-tk-sym">{idx.short}</span>
-                    <span className="ss-tk-val tnum">{q?q.price.toLocaleString('en-US',{maximumFractionDigits:0}):'—'}</span>
+                    <span className="ss-tk-val tnum">{q?fmtQuotePrice(idx.sym,q.price):'—'}</span>
                     {q&&<span className={`ss-tk-chg tnum ${up?'up':'down'}`}>{up?'+':'−'}{Math.abs(q.pct).toFixed(2)}%</span>}
                   </button>
                 );
@@ -7780,8 +7949,8 @@ function TopBar({tab, setTab, search, setSearch, dark, setDark,
                 const q=quotes[t.sym]; const up=q?q.chg>=0:null;
                 return (
                   <button key={t.sym} className="ss-tk" onClick={()=>onTickerClick&&onTickerClick(t)}>
-                    <span className="ss-tk-sym">{t.sym}</span>
-                    <span className="ss-tk-val tnum">{q?`$${q.price.toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2})}`:'—'}</span>
+                    <span className="ss-tk-sym">{t.short||t.sym}</span>
+                    <span className="ss-tk-val tnum">{q?`$${fmtQuotePrice(t.sym,q.price)}`:'—'}</span>
                     {q&&<span className={`ss-tk-chg tnum ${up?'up':'down'}`}>{up?'+':'−'}{Math.abs(q.pct).toFixed(2)}%</span>}
                   </button>
                 );
@@ -7811,21 +7980,22 @@ function TopBar({tab, setTab, search, setSearch, dark, setDark,
             <div className="logo">My<span>News</span>Hub</div>
             <div className="logo-tag">Your daily briefing</div>
           </div>
-          <div className="nav-tabs">
-            {ALL_TABS.map(t=>(
-              <button key={t} className={`nav-tab ${TAB_CLASS[t]||''} ${(tab===t || (t==='business' && tab==='finance'))?'active':''}`}
-                onClick={()=>{setTab(t);setSearch('');}}>
-                {TAB_LABELS[t]||(t.charAt(0).toUpperCase()+t.slice(1))}
-              </button>
-            ))}
-          </div>
+          <PriorityNav tab={tab} onPick={t=>{setTab(t);setSearch('');}} labels={TAB_LABELS} classes={TAB_CLASS}/>
           <div className="nav-right">
-            <div className="search-wrap">
-              <input className="search-input" placeholder="Search…" value={search}
+            <div className={`search-wrap ${searchOpenDesktop?'open':''}`}>
+              {!searchOpenDesktop && (
+                <button className="nav-icon-btn" title="Search" aria-label="Open search"
+                  onClick={()=>{ setSearchOpenDesktop(true); setSearchFocused(true); }}>
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+                </button>
+              )}
+              {searchOpenDesktop && (
+              <input className="search-input" placeholder="Search…" value={search} autoFocus
                 onChange={e=>setSearch(e.target.value.toLowerCase())}
                 onFocus={()=>setSearchFocused(true)}
-                onBlur={()=>setTimeout(()=>setSearchFocused(false),160)}/>
-              {searchFocused && !search && ((searchHistory||[]).length>0||(trendingTopics||[]).length>0) && (
+                onBlur={()=>setTimeout(()=>{ setSearchFocused(false); if(!search) setSearchOpenDesktop(false); },160)}/>
+              )}
+              {searchOpenDesktop && searchFocused && !search && ((searchHistory||[]).length>0||(trendingTopics||[]).length>0) && (
                 <div className="search-dropdown">
                   {(searchHistory||[]).length>0 && (
                     <>
@@ -7922,8 +8092,32 @@ function TopBar({tab, setTab, search, setSearch, dark, setDark,
               </button>
             );
           })}
+          {/* D1: More chip → sheet with Briefing/Podcasts/Sources/Saved. */}
+          <button className={`chip chip-more ${MORE_SHEET_TABS.includes(tab)?'active':''}`}
+            style={MORE_SHEET_TABS.includes(tab)?{background:'#1a1a1a'}:{}}
+            aria-haspopup="menu" aria-expanded={moreSheetOpen}
+            onClick={()=>setMoreSheetOpen(true)}>
+            More ▾
+          </button>
         </div>
         </div>
+        {moreSheetOpen && (
+          <div className="more-sheet-overlay" onClick={()=>setMoreSheetOpen(false)}>
+            <div className="more-sheet" role="menu" onClick={e=>e.stopPropagation()}>
+              <div className="more-sheet-head">
+                <span>More</span>
+                <button className="more-sheet-close" aria-label="Close" onClick={()=>setMoreSheetOpen(false)}>×</button>
+              </div>
+              {MORE_SHEET_TABS.map(t=>(
+                <button key={t} role="menuitem"
+                  className={`more-sheet-item ${tab===t?'active':''}`}
+                  onClick={()=>{ setTab(t); setMoreSheetOpen(false); }}>
+                  {TAB_LABELS[t]||(t.charAt(0).toUpperCase()+t.slice(1))}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
@@ -8249,7 +8443,7 @@ function ArticleReader({ article, onClose, onAskInChat }) {
           {!aiLoading && aiResult && (
             <div className="article-reader-ai-result">
               {aiPreview && <div className="fc-preview-note" style={{marginBottom:'8px'}}>{PREVIEW_LABEL}</div>}
-              <div style={{fontWeight:700,fontSize:'11px',textTransform:'uppercase',letterSpacing:'0.08em',color:'var(--accent)',marginBottom:'8px'}}>
+              <div className="section-label" style={{color:'var(--accent)',marginBottom:'8px'}}>
                 {aiMode === 'summary' ? 'Summary' : aiMode === 'takeaways' ? 'Key Points' : 'Bias Check'}
               </div>
               {aiMode === 'takeaways' ? <TakeawaysContent text={aiResult}/> : aiResult}
@@ -8353,6 +8547,7 @@ function AuthModal({ onClose, onSend, status, email, setEmail, userId, onSignOut
 }
 
 export default function App() {
+  dbgRender('App'); // D8: ?debug=1 render counter (no-op when the flag is off)
   const [tab, setTab]           = useState(()=>parseRoute().category);
   const [subcat, setSubcat]     = useState(()=>parseRoute().subcategory); // URL-driven subcategory
   const [tertiary, setTertiary] = useState(()=>parseRoute().tertiary);    // URL-driven team (Tier 3)
@@ -8563,28 +8758,32 @@ export default function App() {
   // v20: whole-word urgent match + 6h recency window + cap 8.
   // Whole-word prevents "killed" matching "killed it" or "killing" substrings.
   // 6h window keeps breaking feeling live (was: any time).
-  const breakingItems = useMemo(()=>{
-    const sixHoursAgo = Date.now() - 6 * 60 * 60 * 1000;
-    const wordBoundary = urgent.map(u => new RegExp(`\\b${u.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')}\\b`, 'i'));
-    const seen = new Set();
-    return Object.values(arts).flat()
-      .filter(a => {
-        const pub = new Date(a.pubDate).getTime();
-        return pub > sixHoursAgo; // recency filter
-      })
-      .filter(a => {
-        const txt = a.title + ' ' + (a.desc || '');
-        return wordBoundary.some(rx => rx.test(txt));
-      })
-      .filter(a => {
-        const k = a.title.slice(0,60).toLowerCase().replace(/\s+/g,'');
-        if (seen.has(k)) return false;
-        seen.add(k);
-        return true;
-      })
-      .sort((a,b) => new Date(b.pubDate) - new Date(a.pubDate))
-      .slice(0, 8);
-  },[arts, urgent]);
+  // D2: Breaking is now a SIGNIFICANCE test, not a bare keyword match — a story
+  // qualifies only via >=3 distinct outlets within 2h (clusters) or a strong event
+  // term in the TITLE. Promos are excluded. This global pool is filtered to each
+  // page by relevance (see catBreaking) and capped at 3. Previews/interviews/promos
+  // never qualify because they are neither multi-outlet nor title-strong.
+  const breakingItems = useMemo(
+    () => qualifyBreaking(Object.values(arts).flat(), { now: Date.now() }),
+    [arts]
+  );
+
+  // D7: the page the chat is grounded on. ChatBot answers from THIS page's headlines
+  // first, names the page in the model prompt, and shows a context chip. Category-level
+  // headlines (<=25) + State of Play (<=8) — the sizes are capped to hold the
+  // per-turn prompt growth within budget.
+  const pageContext = useMemo(() => {
+    const category = tab;
+    const cc = CATS[category] || CATS.general;
+    const subcategory = activeKw || activeSrc || null;
+    const entity = (activeTeam && (activeTeam.team || activeTeam.match)) || null;
+    const pool = arts[category] || [];
+    const ageOf = d => { const m = d ? Math.round((Date.now() - new Date(d)) / 60000) : null; return m == null ? '' : m < 60 ? `${m}m` : `${Math.round(m / 60)}h`; };
+    const visibleHeadlines = pool.slice(0, 25).map(a => ({ title: a.title, source: a.source, age: ageOf(a.pubDate) }));
+    const stateOfPlay = rankClusters(pool, { max: 2, limit: 8 }).map(a => a.title);
+    const label = entity ? `${cc.label} › ${entity}` : subcategory ? `${cc.label} › ${subcategory}` : cc.label;
+    return { tab, category, subcategory, entity, label, visibleHeadlines, stateOfPlay };
+  }, [tab, activeKw, activeSrc, activeTeam, arts]);
 
   const kwMatch = useCallback(
     (a,cat)=>(kw[cat]||[]).filter(k=>(a.title+(a.desc||'')).toLowerCase().includes(k.toLowerCase())),
@@ -8614,8 +8813,10 @@ export default function App() {
       });
     }
     arr.sort((a,b)=>{const ka=kwMatch(a,cat).length,kb=kwMatch(b,cat).length;if(kb!==ka)return kb-ka;return new Date(b.pubDate)-new Date(a.pubDate);});
-    return arr.map(a=>({...a,matchedKw:kwMatch(a,cat),isAlert:urgent.some(u=>(a.title+(a.desc||'')).toLowerCase().includes(u.toLowerCase()))}));
-  },[arts,search,activeKw,activeSrc,kwMatch,urgent,specificCatKeys]);
+    return arr.map(a=>({...a,matchedKw:kwMatch(a,cat)}));
+  // D8: dropped the stale `urgent` dep — after D2 `sorted` no longer reads it, so
+  // keeping it only forced needless recomputes (new array identity) whenever urgent changed.
+  },[arts,search,activeKw,activeSrc,kwMatch,specificCatKeys]);
 
   const loadCat = useCallback(async (cat)=>{
     setLoading(l=>({...l,[cat]:true}));
@@ -8700,34 +8901,34 @@ export default function App() {
   }, [loadCat, loadPod, loadScores, loadMarketData]);
 
   useEffect(()=>{
+    // D6: fetch everything once on load. No 120s scores poll, no 3-min category
+    // poll — the only auto-refresh is the gated live-scores exception below, and
+    // every page has a manual "Updated Nm ago" refresh control.
     Object.keys(DEFAULT_FEEDS).forEach(c=>loadCat(c));
     PODCAST_FEEDS.forEach(p=>loadPod(p));
     loadScores();
     loadMarketData(); // preload so RightNowStrip + watchlist widgets have ticker data
-    const iv=setInterval(loadScores,120000);
-    return ()=>clearInterval(iv);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   },[]);
 
-  // v46: Background poll for the *current* news category — stages fresh articles
-  // into pendingNew (surfaced as a "N new stories" pill) instead of silently
-  // swapping the feed out from under the reader (Yahoo-style refresh affordance).
+  // D6: the ONE opt-in polling exception — live scores refresh every 120s, but
+  // ONLY while the user is on a Sports page AND at least one game is `live` AND
+  // the tab is visible. Pauses on document.hidden; stops the moment no game is
+  // live or the user leaves Sports. (The "N new stories" pill logic is retained in
+  // render but no longer runs on a background interval — only manual refresh.)
+  const hasLiveGame = useMemo(
+    () => Object.values(scores||{}).some(list => Array.isArray(list) && list.some(g => g && g.state === 'in')),
+    [scores]
+  );
   useEffect(()=>{
-    const NEWS=['general','sports','business','bloom','tech','popculture','comedy'];
-    if(!NEWS.includes(tab)) return;
-    const cat=tab;
-    const poll=async()=>{
-      if(typeof document!=='undefined'&&document.hidden) return;
-      if(!(artsRef.current[cat]||[]).length) return; // wait until first load done
-      const fresh=await fetchCatArticles(cat);
-      const existing=new Set((artsRef.current[cat]||[]).map(a=>a.link));
-      const newer=fresh.filter(a=>a.link&&!existing.has(a.link));
-      if(newer.length) setPendingNew(p=>({...p,[cat]:newer}));
-    };
-    const iv=setInterval(poll,180000); // 3 min
-    return ()=>clearInterval(iv);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  },[tab,fetchCatArticles]);
+    if (tab !== 'sports' || !hasLiveGame) return;
+    let stopped = false;
+    const tick = () => { if (typeof document!=='undefined' && document.hidden) return; dbgPoll('live-scores'); loadScores(); };
+    const iv = setInterval(tick, 120000);
+    const onVis = () => { if (!document.hidden && !stopped) loadScores(); };
+    document.addEventListener('visibilitychange', onVis);
+    return () => { stopped = true; clearInterval(iv); document.removeEventListener('visibilitychange', onVis); };
+  }, [tab, hasLiveGame, loadScores]);
 
   const onRead  = a=>{
     setClicks(c=>({...c,[a.source]:(c[a.source]||0)+1}));
@@ -8999,6 +9200,7 @@ export default function App() {
   // NBA/MLB/CFB/CBB), favorite team pills with external links, then prioritized
   // stories feed. Yahoo Sports' actual layout pattern.
   const SportsPage = () => {
+    dbgRender('SportsPage'); // D8: ?debug=1 render counter (no-op when off)
     // Phase 2: subcategory comes from the URL (never local state). Chips navigate.
     const sportTab = subcat || 'all'; // 'all' | 'nfl' | 'nba' | 'mlb' | 'cfb' | 'cbb' | 'cbase' | 'racing' | 'golf'
     const setSportTab = (key) => navigate('sports', key === 'all' ? null : key);
@@ -9077,7 +9279,12 @@ export default function App() {
     }, [sportTab]);
 
     const cc = CATS.sports;
-    const allItems = sorted('sports');
+    // D8: memoize — `sorted('sports')` returns a NEW array of NEW objects every call,
+    // so calling it raw gave `allItems` a fresh identity each render, which made the
+    // `sportItems` and `teamItems` memos (that depend on it) recompute on EVERY render
+    // and never cache. `sorted` is a stable useCallback, so this recomputes only when
+    // its inputs actually change.
+    const allItems = useMemo(() => sorted('sports'), [sorted]);
     const isLoading = loading.sports;
 
     // Filter scoreboard by sport tab
@@ -9289,8 +9496,10 @@ export default function App() {
               <div className="feed-col">
                 {/* Coverage Gap is folded into this list as "Not in your sources" rows
                     (Pass G item 9) — no standalone "You may be missing this" panel. */}
-                <StateOfPlay items={teamItems} meta={CATS.sports} onRead={onRead} formatDate={fmtDate}
-                  collapsed={sopCollapsed} onToggleCollapse={toggleSop} gapItems={teamGapItems}/>
+                {/* D2: wire Breaking into the Sports team/league page SoP (sports-relevant only). */}
+                <StateOfPlay items={teamItems} meta={CATS.sports} onRead={onRead} onAsk={setChatContext} formatDate={fmtDate}
+                  collapsed={sopCollapsed} onToggleCollapse={toggleSop} gapItems={teamGapItems}
+                  breakingItems={(breakingItems||[]).filter(b=>b.cat==='sports').slice(0,3)}/>
                 <TrendingPills label={`Trending · ${teamName}`} items={teamItems} onOpen={t=>setSearch(t.toLowerCase())} isTopicFollowed={isTopicFollowed} toggleTopic={toggleTopic}/>
                 <SourcesDisagree topic={teamName} items={teamItems}/>
                 {teamItems.length === 0
@@ -9298,13 +9507,13 @@ export default function App() {
                   : <div className="snap-feed">
                       {teamItems.slice(0,20).map((a,i)=>(
                         <Fragment key={a.link||i}>
-                          <SnapshotCard a={a} meta={CATS.sports} isSaved={isSavedFn(a)} onSave={onSave} onRead={onRead} onPerspectives={setPerspArticle} formatDate={fmtDate} hideImage={i>=3}/>
+                          <SnapshotCard a={a} meta={CATS.sports} isSaved={isSavedFn(a)} onSave={onSave} onRead={onRead} onPerspectives={setPerspArticle} onAsk={setChatContext} formatDate={fmtDate} hideImage={i>=3}/>
                           {i===2 && <XPulse topic={teamName} variant="feed"/>}
                         </Fragment>
                       ))}
                     </div>}
               </div>
-              <Sidebar cat="sports" arts={arts} kw={kw} health={health}
+              <Sidebar cat="sports" arts={arts} kw={kw} health={health} onAsk={setChatContext}
                 activeKw={activeKw} setActiveKw={k=>{setActiveKw(k);setActiveSrc(null);}}
                 activeSource={activeSrc} setActiveSource={s=>{setActiveSrc(s);setActiveKw(null);}}
                 onRead={onRead} scores={scores} scoresLoading={scoresLoading} showScoreboard={false}
@@ -9485,7 +9694,7 @@ export default function App() {
               • Team hub (activeTeam set) → SHOW, scoped to that team (sportItems is
                 already team-filtered). The Tier-3 team page renders its own in-column
                 StateOfPlay in the teamName block above. */}
-          <Sidebar cat="sports" arts={arts} kw={kw} health={health}
+          <Sidebar cat="sports" arts={arts} kw={kw} health={health} onAsk={setChatContext}
             activeKw={activeKw} setActiveKw={k=>{setActiveKw(k);setActiveSrc(null);}}
             activeSource={activeSrc} setActiveSource={s=>{setActiveSrc(s);setActiveKw(null);}}
             onRead={onRead} scores={scores} scoresLoading={scoresLoading}
@@ -9521,7 +9730,9 @@ export default function App() {
             <button className="entity-hub-btn" onClick={() => navigate(cat)}>← {cc.label}</button>
           </div>
         </div>
-        <StateOfPlay items={entityItems} meta={cc} onRead={onRead} formatDate={fmtDate}/>
+        {/* D2: wire Breaking into the entity hub SoP (this entity's category only). */}
+        <StateOfPlay items={entityItems} meta={cc} onRead={onRead} onAsk={setChatContext} formatDate={fmtDate}
+          breakingItems={(breakingItems||[]).filter(b=>b.cat===cat).slice(0,3)}/>
         <TrendingPills label={`Trending · ${entity}`} items={entityItems} onOpen={t => navigate(cat, 'topic', teamSlug(t))} isTopicFollowed={isTopicFollowed} toggleTopic={toggleTopic}/>
         <SourcesDisagree topic={entity} items={entityItems}/>
         {entityItems.length === 0
@@ -9529,7 +9740,7 @@ export default function App() {
           : <div className="snap-feed">
               {entityItems.slice(0, 20).map((a, i) => (
                 <Fragment key={a.link || i}>
-                  <SnapshotCard a={a} meta={cc} isSaved={isSavedFn(a)} onSave={onSave} onRead={onRead} onPerspectives={setPerspArticle} formatDate={fmtDate} hideImage={i>=3}/>
+                  <SnapshotCard a={a} meta={cc} isSaved={isSavedFn(a)} onSave={onSave} onRead={onRead} onPerspectives={setPerspArticle} onAsk={setChatContext} formatDate={fmtDate} hideImage={i>=3}/>
                   {i === 2 && <XPulse topic={entity} variant="feed"/>}
                 </Fragment>
               ))}
@@ -9727,15 +9938,28 @@ export default function App() {
     // Breaking stories for THIS category's State of Play (Pass L item 3) — the urgent
     // items relevant to the page, deduped against what Top Stories already shows. Home
     // sees cross-category breaking; a category page sees only its own.
+    // D2 relevance (gate a): a story shows on a page only if it belongs to that page.
+    // Category page = its own feed-category OR a DEFAULT_KW match for that category.
+    // General = general/world-US top-news OR a match on ANY category's keywords.
     const catBreaking = useMemo(() => {
       if (!breakingItems || !breakingItems.length) return [];
-      const pool = isHome ? breakingItems
-        : breakingItems.filter(b => b.cat === cat || (isMergedBiz && (b.cat === 'business' || b.cat === 'finance')));
-      return pool.filter(b => !topStoryKeys.has(storyKey(b))).slice(0, 3);
-    }, [breakingItems, cat, isHome, isMergedBiz, topStoryKeys]);
+      const anyKw = (b) => {
+        const txt = (b.title + ' ' + (b.desc || '')).toLowerCase();
+        return Object.keys(DEFAULT_KW).some(c =>
+          (kw[c] || DEFAULT_KW[c] || []).some(k => txt.includes(String(k).toLowerCase())));
+      };
+      const relevant = (b) => {
+        if (isHome) return b.cat === 'general' || anyKw(b);
+        if (b.cat === cat) return true;
+        if (isMergedBiz && (b.cat === 'business' || b.cat === 'finance')) return true;
+        return kwMatch(b, cat).length > 0;
+      };
+      return breakingItems.filter(relevant).filter(b => !topStoryKeys.has(storyKey(b))).slice(0, 3);
+    }, [breakingItems, cat, isHome, isMergedBiz, topStoryKeys, kw, kwMatch]);
     // State of Play ranks only from what Top Stories didn't already take.
+    // D2: promos/sportsbook content are excluded from SoP ranking too, not just Breaking.
     const sopSourceItems = useMemo(
-      () => activeFilteredItems.filter(a => !topStoryKeys.has(storyKey(a))),
+      () => activeFilteredItems.filter(a => !topStoryKeys.has(storyKey(a)) && !isPromoItem(a)),
       [activeFilteredItems, topStoryKeys]);
     const sopShownKeys = useMemo(() => {
       const ranked = rankClusters(sopSourceItems, { max: 2, limit: 5 });
@@ -9912,7 +10136,7 @@ export default function App() {
         {!activeKw && !activeSrc && !search && (
           <div className="sop-hoist">
             <StateOfPlay variant="sidebar" items={sopSourceItems} gapItems={gapItems} breakingItems={catBreaking}
-              meta={CATS[cat]||CATS.general} onRead={onRead} formatDate={fmtDate}
+              meta={CATS[cat]||CATS.general} onRead={onRead} onAsk={setChatContext} formatDate={fmtDate}
               collapsed={sopCollapsed} onToggleCollapse={toggleSop}/>
           </div>
         )}
@@ -9936,13 +10160,14 @@ export default function App() {
 
         {/* ── HOME: Houston local row ── */}
         {isHome && !activeKw && !activeSrc && !search && (
-          <HoustonRow items={houstonItems} onRead={onRead} formatDate={fmtDate}/>
+          <HoustonRow items={houstonItems} onRead={onRead} onAsk={setChatContext} formatDate={fmtDate}/>
         )}
 
-            <div className="page-header-row">
+            <div className="page-header-row phr-desktop">
               <span className="page-header" style={{fontFamily:'var(--font-sans)'}}>
                 {cc.label}{feedItems.length>0?` — ${feedItems.length} articles`:''}
-                {lastUpdated[cat] && <span style={{marginLeft:'10px'}}><LastUpdated timestamp={lastUpdated[cat]} onRefresh={() => loadCat(cat)}/></span>}
+                {/* D6: per-page refresh — always present (shows "Refresh" before the first stamp). */}
+                <span style={{marginLeft:'10px'}}><LastUpdated timestamp={lastUpdated[cat]} onRefresh={() => loadCat(cat)}/></span>
               </span>
               <div style={{display:'flex',alignItems:'center',gap:'10px'}}>
                 {(() => {
@@ -10000,12 +10225,34 @@ export default function App() {
                  </div>
               :feedItems.length===0
                 ?<div className="empty-state"><div className="empty-icon"></div><div className="empty-msg">{activeKw||activeSrc?'No articles match this filter':search?`No internal results for "${search}"`:'No articles loaded yet'}</div><button className="refresh-btn" onClick={refreshAll}>Refresh</button></div>
-                :<div className="snap-feed">
+                :<div className={`snap-feed${['business','bloom','tech','popculture'].includes(cat)?' snap-feed-divided':''}`}>
+                  {/* D5 fix 3: Business/Energy/AI&Tech/Pop Culture carry the divided-list
+                      treatment on desktop secondary rows; the lead stays a prominent card. */}
                   {/* AI & Tech only: optional GitHub street signal, click-to-load (3c). */}
                   {cat==='tech' && !activeKw && !activeSrc && !search && <GithubSignal/>}
                   {(activeKw||activeSrc||search ? feedItems.slice(0,20) : dedupedFeed.slice(0,20)).map((a,i)=>(
                     <Fragment key={a.link||i}>
-                      <SnapshotCard a={a} meta={CATS[cat]||CATS.general} isSaved={isSavedFn(a)} onSave={onSave} onRead={onRead} onPerspectives={setPerspArticle} formatDate={fmtDate} hideImage={i>=3}/>
+                      <SnapshotCard a={a} meta={CATS[cat]||CATS.general} isSaved={isSavedFn(a)} onSave={onSave} onRead={onRead} onPerspectives={setPerspArticle} onAsk={setChatContext} formatDate={fmtDate} hideImage={i>=3} lead={i===0 && !activeKw && !activeSrc && !search}/>
+                      {/* Review item 5: on mobile the category header moves BELOW the lead so
+                          the lead is the first element in the body (desktop copy is hidden). */}
+                      {i===0 && !activeKw && !activeSrc && !search && (
+                        <div className="page-header-row phr-mobile">
+                          <span className="page-header" style={{fontFamily:'var(--font-sans)'}}>
+                            {cc.label}{feedItems.length>0?` — ${feedItems.length} articles`:''}
+                            <span style={{marginLeft:'10px'}}><LastUpdated timestamp={lastUpdated[cat]} onRefresh={() => loadCat(cat)}/></span>
+                          </span>
+                          <button className="page-customize-btn" onClick={()=>openCustomize('sources',cat)}><IconGear/> Customize</button>
+                        </div>
+                      )}
+                      {/* D5 fix 1: on mobile, State of Play sits directly under the lead (the
+                          sidebar copy is hidden on mobile via hideSopMobile). Mobile-only. */}
+                      {i===0 && !activeKw && !activeSrc && !search && (
+                        <div className="sop-mobile">
+                          <StateOfPlay variant="sidebar" items={sopSourceItems} gapItems={gapItems} breakingItems={catBreaking}
+                            meta={CATS[cat]||CATS.general} onRead={onRead} onAsk={setChatContext} formatDate={fmtDate}
+                            collapsed={sopCollapsed} onToggleCollapse={toggleSop}/>
+                        </div>
+                      )}
                       {i===2 && <XPulse topic={cc?.label||cat} variant="feed"/>}
                     </Fragment>
                   ))}
@@ -10045,7 +10292,7 @@ export default function App() {
             {/* v26: Web search fallback when searching with thin internal results */}
             {search && (webResults.length > 0 || webLoading) && (
               <div className="web-fallback">
-                <div className="rail-label" style={{margin:'24px 0 12px',fontWeight:800,fontSize:'13px',letterSpacing:'0.04em',textTransform:'uppercase'}}>From the Web</div>
+                <div className="rail-label" style={{margin:'24px 0 12px'}}>From the Web</div>
                 {webLoading && <div style={{fontSize:'12px',color:'var(--text3)',fontStyle:'italic',padding:'10px 0'}}>Searching the web…</div>}
                 {webResults.map((r,i) => (
                   <a key={i} className="web-result" href={r.link} target="_blank" rel="noreferrer">
@@ -10122,7 +10369,7 @@ export default function App() {
             <SocialFollows cat={cat} social={social}/>
             <SourceFooter cat={cat} feeds={feeds} arts={arts}/>
           </div>{/* /feed-col */}
-          <Sidebar cat={cat} arts={arts} kw={kw} health={health}
+          <Sidebar cat={cat} hideSopMobile arts={arts} kw={kw} health={health} onAsk={setChatContext}
             activeKw={activeKw} setActiveKw={k=>{setActiveKw(k);setActiveSrc(null);}}
             activeSource={activeSrc} setActiveSource={s=>{setActiveSrc(s);setActiveKw(null);}}
             onRead={onRead} scores={scores} scoresLoading={scoresLoading}
@@ -10271,11 +10518,15 @@ export default function App() {
       <div className="page">
         <div className="today-flow" style={{maxWidth:'780px'}}>
           <header className="briefing-page-head">
-            <h1 className="briefing-page-title">The Briefing</h1>
+            <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:'10px',flexWrap:'wrap'}}>
+              <h1 className="briefing-page-title">The Briefing</h1>
+              {/* D6: manual refresh — reloads the feeds the briefing is built from. */}
+              <LastUpdated timestamp={lastUpdated.general} onRefresh={() => Object.keys(DEFAULT_FEEDS).forEach(c=>loadCat(c))}/>
+            </div>
             <p className="briefing-page-sub">
               A daily synthesis in the spirit of Morning Brew, Axios, and Bloomberg 5 Things —
               built from priority briefing sources plus the top headlines across every category.
-              Auto-refreshes every 90 minutes.
+              Regenerates when stale (90+ min) each time you open it.
             </p>
           </header>
 
@@ -10414,6 +10665,8 @@ export default function App() {
                 <div className="pod-header-name">{activePod?activePod.name:'All Podcasts'}</div>
                 <div className="pod-header-sub">{activePod?`Hosted by ${activePod.host}`:`${PODCAST_FEEDS.length} shows`}</div>
               </div>
+              {/* D6: per-page refresh — reloads podcast feeds. */}
+              <span style={{marginLeft:'auto'}}><LastUpdated onRefresh={() => PODCAST_FEEDS.forEach(p=>loadPod(p))}/></span>
             </div>
             {displayEps.length===0
               ?Array.from({length:5}).map((_,i)=>(
@@ -10441,7 +10694,7 @@ export default function App() {
           </div>
           <div className="sidebar">
             <div className="pod-shows">
-              <div style={{fontSize:'10px',fontWeight:'700',color:'var(--text3)',textTransform:'uppercase',letterSpacing:'0.08em',marginBottom:'8px',paddingBottom:'8px',borderBottom:'1px solid var(--border2)'}}>Shows</div>
+              <div className="section-label" style={{marginBottom:'8px',paddingBottom:'8px',borderBottom:'1px solid var(--border2)'}}>Shows</div>
               <div className="pod-show-item" onClick={()=>{setActivePod(null);setPodLimit(20);}}>
                 <div className="pod-show-emoji"></div>
                 <div><div className="pod-show-name" style={{color:!activePod?'var(--accent)':''}}>All Shows</div><div className="pod-show-ep">Latest from all {PODCAST_FEEDS.length} podcasts</div></div>
@@ -10651,8 +10904,10 @@ export default function App() {
         <MarketsSurface mkt={mkt} loading={mktLoading} error={mktErr}/>
 
         {/* ── STATE OF PLAY — collapsible top-stories block (shared shell) ── */}
-        <StateOfPlay items={newsItems} meta={CATS.finance} onRead={onRead} formatDate={fmtDate}
-          collapsed={sopCollapsed} onToggleCollapse={toggleSop}/>
+        {/* D2: wire Breaking into the Markets/finance SoP (finance + business relevant). */}
+        <StateOfPlay items={newsItems} meta={CATS.finance} onRead={onRead} onAsk={setChatContext} formatDate={fmtDate}
+          collapsed={sopCollapsed} onToggleCollapse={toggleSop}
+          breakingItems={(breakingItems||[]).filter(b=>b.cat==='finance'||b.cat==='business').slice(0,3)}/>
 
         <div className="fin-grid">
           <div className="fin-main">
@@ -10759,7 +11014,7 @@ export default function App() {
                 :<div className="snap-feed" style={{padding:'12px 0 0'}}>
                     {newsItems.slice(0, 15).map((a, i) => (
                       <Fragment key={a.link||i}>
-                        <SnapshotCard a={a} meta={CATS.finance} isSaved={isSavedFn(a)} onSave={onSave} onRead={onRead} onPerspectives={setPerspArticle} formatDate={fmtDate} hideImage={i>=3}/>
+                        <SnapshotCard a={a} meta={CATS.finance} isSaved={isSavedFn(a)} onSave={onSave} onRead={onRead} onPerspectives={setPerspArticle} onAsk={setChatContext} formatDate={fmtDate} hideImage={i>=3}/>
                         {i===2 && <XPulse topic="Markets" variant="feed"/>}
                       </Fragment>
                     ))}
@@ -10769,7 +11024,7 @@ export default function App() {
               <SourceFooter cat="finance" feeds={feeds} arts={arts}/>
             </section>
           </div>
-          <Sidebar cat="finance" arts={arts} kw={kw} health={health}
+          <Sidebar cat="finance" arts={arts} kw={kw} health={health} onAsk={setChatContext}
             activeKw={activeKw} setActiveKw={k=>{setActiveKw(k);setActiveSrc(null);}}
             activeSource={activeSrc} setActiveSource={s=>{setActiveSrc(s);setActiveKw(null);}}
             onTopicOpen={label => navigate('finance', 'topic', teamSlug(label))}
@@ -10866,7 +11121,10 @@ export default function App() {
         fetchWebSearch={fetchWebSearch}
         chatContext={chatContext}
         onClearContext={()=>setChatContext(null)}
+        pageContext={pageContext}
         resolveDeepLink={({entities})=>{ for(const [lg,names] of Object.entries(TEAM_CHIPS)){ const hit=names.find(n=>{const w=n.toLowerCase().split(' ');return w.some(x=>entities.includes(x))||entities.some(k=>k.length>3&&n.toLowerCase().includes(k));}); if(hit) return `/sports/${lg}/${teamSlug(hit)}`; } return null; }}/>
+      {/* D8: ?debug=1 scroll/render overlay (renders null unless the flag is on). */}
+      <DebugOverlay/>
       {/* Inline article reader overlay */}
       {readerArticle && <ArticleReader article={readerArticle} onClose={() => setReaderArticle(null)} onAskInChat={(a)=>setChatContext(a)}/>}
       {/* Perspectives panel (sources + X Pulse + AI key points) */}
