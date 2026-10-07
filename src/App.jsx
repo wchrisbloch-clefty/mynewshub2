@@ -4059,12 +4059,20 @@ body{overscroll-behavior-y:contain;}
 .trending-card-src{font-size:10px;color:var(--text3);margin-top:auto;}
 
 /* ─── LAST UPDATED (per-feed timestamp) ─── */
+/* D6: now a real refresh button (was a span). Quiet in the header; not floating. */
 .last-updated{
-  font-size:10px;color:var(--text3);font-weight:500;
-  display:inline-flex;align-items:center;gap:4px;
+  font-size:var(--fs-meta);color:var(--text3);font-weight:600;
+  display:inline-flex;align-items:center;gap:5px;cursor:pointer;
+  background:none;border:1px solid var(--border);border-radius:16px;
+  padding:4px 10px;font-family:var(--font-sans);line-height:1;
+  transition:color 0.12s,border-color 0.12s;-webkit-tap-highlight-color:transparent;
 }
+.last-updated:hover:not(:disabled){color:var(--text);border-color:var(--text3);}
+.last-updated:disabled{cursor:default;opacity:0.7;}
+.last-updated-icon{flex-shrink:0;}
 .last-updated-dot{width:5px;height:5px;border-radius:50%;background:var(--green);}
 .last-updated-dot.stale{background:var(--amber);}
+@media(max-width:640px){ .last-updated{min-height:36px;padding:6px 12px;} }
 
 /* Swipe hint — brief toast when user changes category on mobile */
 .swipe-hint{
@@ -6167,9 +6175,7 @@ Output ONLY the paragraph followed by the bullets. No headers, no labels, no clo
         if (total > 10) generate();
       }
     };
-    checkStale(); // check immediately on mount/ts-change
-    const iv = setInterval(checkStale, 5 * 60 * 1000); // every 5 min
-    return () => clearInterval(iv);
+    checkStale(); // D6: generate on demand when stale on mount/ts-change; no 5-min poll.
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ts]);
 
@@ -6323,9 +6329,7 @@ OUTPUT: 3-sentence paragraph followed by exactly 3 bullets (- markers). No heade
         if (total > 10) generate();
       }
     };
-    checkStale();
-    const iv = setInterval(checkStale, 5 * 60 * 1000);
-    return () => clearInterval(iv);
+    checkStale(); // D6: generate on demand when stale; no 5-min poll.
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ts]);
 
@@ -7705,22 +7709,27 @@ function HeroBand({ heroStories, heroIdx, setHeroIdx, paused, setPaused, onRead 
 }
 
 
-// Last-updated timestamp for feeds. Shows a green dot if refreshed
-// within the last 10 minutes, amber otherwise. Clickable could trigger
-// refresh (passed via onRefresh prop).
+// D6: per-page manual refresh control. A small "↻ Updated Nm ago" BUTTON in the
+// page header (never floating). Tapping calls onRefresh for that page only and the
+// stamp updates. Renders whenever onRefresh is given — even before the first stamp
+// (shows "Refresh") — so every page carries the control. Green dot ≤10m, amber after.
 function LastUpdated({ timestamp, onRefresh }) {
-  if (!timestamp) return null;
-  const ageMin = (Date.now() - timestamp) / 60000;
-  const stale = ageMin > 10;
-  let label;
-  if (ageMin < 1) label = 'Just now';
-  else if (ageMin < 60) label = `${Math.floor(ageMin)}m ago`;
-  else label = `${Math.floor(ageMin/60)}h ago`;
+  if (!timestamp && !onRefresh) return null;
+  const ageMin = timestamp ? (Date.now() - timestamp) / 60000 : null;
+  const stale = ageMin != null && ageMin > 10;
+  let label = 'Refresh';
+  if (ageMin != null) {
+    if (ageMin < 1) label = 'Updated just now';
+    else if (ageMin < 60) label = `Updated ${Math.floor(ageMin)}m ago`;
+    else label = `Updated ${Math.floor(ageMin/60)}h ago`;
+  }
   return (
-    <span className="last-updated" onClick={onRefresh} style={onRefresh?{cursor:'pointer'}:{}}>
-      <span className={`last-updated-dot ${stale?'stale':''}`}/>
-      Updated {label}
-    </span>
+    <button type="button" className="last-updated" onClick={onRefresh} disabled={!onRefresh}
+      title="Refresh this page" aria-label={`Refresh this page — ${label}`}>
+      <RefreshCw size={12} strokeWidth={2.4} className="last-updated-icon"/>
+      {timestamp && <span className={`last-updated-dot ${stale?'stale':''}`}/>}
+      {label}
+    </button>
   );
 }
 
@@ -7841,14 +7850,20 @@ function TopBar({tab, setTab, search, setSearch, dark, setDark,
   // Weather moved off the global strip → Home-only "Right Now" card (RightNowWeather).
 
   useEffect(()=>{
-    // v25: also fetch indices (S&P, DOW, Nasdaq) for the pill bar
+    // v25: also fetch indices (S&P, DOW, Nasdaq) for the pill bar.
+    // D6: fetch once on load (no 300s polling). D6: batch all symbols into ONE
+    // setState per refresh instead of one per symbol (avoids N re-renders of the
+    // whole app on every ticker tick).
     const allSyms = [...TICKERS.map(t=>t.sym), ...INDICES.map(i=>i.sym)];
-    const fetchAll = () => allSyms.forEach(sym =>
-      fetchQuote(sym).then(q=>q&&setQuotes(prev=>({...prev,[sym]:q})))
-    );
-    fetchAll();
-    const iv=setInterval(fetchAll, 300000);
-    return ()=>clearInterval(iv);
+    let live = true;
+    Promise.all(allSyms.map(sym => fetchQuote(sym).then(q => [sym, q]).catch(()=>[sym,null])))
+      .then(pairs => {
+        if (!live) return;
+        const next = {};
+        for (const [sym, q] of pairs) if (q) next[sym] = q;
+        if (Object.keys(next).length) setQuotes(prev => ({ ...prev, ...next }));
+      });
+    return () => { live = false; };
   },[]);
 
   const hasBreaking = breakingItems&&breakingItems.length>0;
@@ -8855,34 +8870,34 @@ export default function App() {
   }, [loadCat, loadPod, loadScores, loadMarketData]);
 
   useEffect(()=>{
+    // D6: fetch everything once on load. No 120s scores poll, no 3-min category
+    // poll — the only auto-refresh is the gated live-scores exception below, and
+    // every page has a manual "Updated Nm ago" refresh control.
     Object.keys(DEFAULT_FEEDS).forEach(c=>loadCat(c));
     PODCAST_FEEDS.forEach(p=>loadPod(p));
     loadScores();
     loadMarketData(); // preload so RightNowStrip + watchlist widgets have ticker data
-    const iv=setInterval(loadScores,120000);
-    return ()=>clearInterval(iv);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   },[]);
 
-  // v46: Background poll for the *current* news category — stages fresh articles
-  // into pendingNew (surfaced as a "N new stories" pill) instead of silently
-  // swapping the feed out from under the reader (Yahoo-style refresh affordance).
+  // D6: the ONE opt-in polling exception — live scores refresh every 120s, but
+  // ONLY while the user is on a Sports page AND at least one game is `live` AND
+  // the tab is visible. Pauses on document.hidden; stops the moment no game is
+  // live or the user leaves Sports. (The "N new stories" pill logic is retained in
+  // render but no longer runs on a background interval — only manual refresh.)
+  const hasLiveGame = useMemo(
+    () => Object.values(scores||{}).some(list => Array.isArray(list) && list.some(g => g && g.state === 'in')),
+    [scores]
+  );
   useEffect(()=>{
-    const NEWS=['general','sports','business','bloom','tech','popculture','comedy'];
-    if(!NEWS.includes(tab)) return;
-    const cat=tab;
-    const poll=async()=>{
-      if(typeof document!=='undefined'&&document.hidden) return;
-      if(!(artsRef.current[cat]||[]).length) return; // wait until first load done
-      const fresh=await fetchCatArticles(cat);
-      const existing=new Set((artsRef.current[cat]||[]).map(a=>a.link));
-      const newer=fresh.filter(a=>a.link&&!existing.has(a.link));
-      if(newer.length) setPendingNew(p=>({...p,[cat]:newer}));
-    };
-    const iv=setInterval(poll,180000); // 3 min
-    return ()=>clearInterval(iv);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  },[tab,fetchCatArticles]);
+    if (tab !== 'sports' || !hasLiveGame) return;
+    let stopped = false;
+    const tick = () => { if (typeof document!=='undefined' && document.hidden) return; loadScores(); };
+    const iv = setInterval(tick, 120000);
+    const onVis = () => { if (!document.hidden && !stopped) loadScores(); };
+    document.addEventListener('visibilitychange', onVis);
+    return () => { stopped = true; clearInterval(iv); document.removeEventListener('visibilitychange', onVis); };
+  }, [tab, hasLiveGame, loadScores]);
 
   const onRead  = a=>{
     setClicks(c=>({...c,[a.source]:(c[a.source]||0)+1}));
@@ -10097,7 +10112,8 @@ export default function App() {
             <div className="page-header-row">
               <span className="page-header" style={{fontFamily:'var(--font-sans)'}}>
                 {cc.label}{feedItems.length>0?` — ${feedItems.length} articles`:''}
-                {lastUpdated[cat] && <span style={{marginLeft:'10px'}}><LastUpdated timestamp={lastUpdated[cat]} onRefresh={() => loadCat(cat)}/></span>}
+                {/* D6: per-page refresh — always present (shows "Refresh" before the first stamp). */}
+                <span style={{marginLeft:'10px'}}><LastUpdated timestamp={lastUpdated[cat]} onRefresh={() => loadCat(cat)}/></span>
               </span>
               <div style={{display:'flex',alignItems:'center',gap:'10px'}}>
                 {(() => {
@@ -10426,11 +10442,15 @@ export default function App() {
       <div className="page">
         <div className="today-flow" style={{maxWidth:'780px'}}>
           <header className="briefing-page-head">
-            <h1 className="briefing-page-title">The Briefing</h1>
+            <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:'10px',flexWrap:'wrap'}}>
+              <h1 className="briefing-page-title">The Briefing</h1>
+              {/* D6: manual refresh — reloads the feeds the briefing is built from. */}
+              <LastUpdated timestamp={lastUpdated.general} onRefresh={() => Object.keys(DEFAULT_FEEDS).forEach(c=>loadCat(c))}/>
+            </div>
             <p className="briefing-page-sub">
               A daily synthesis in the spirit of Morning Brew, Axios, and Bloomberg 5 Things —
               built from priority briefing sources plus the top headlines across every category.
-              Auto-refreshes every 90 minutes.
+              Regenerates when stale (90+ min) each time you open it.
             </p>
           </header>
 
@@ -10569,6 +10589,8 @@ export default function App() {
                 <div className="pod-header-name">{activePod?activePod.name:'All Podcasts'}</div>
                 <div className="pod-header-sub">{activePod?`Hosted by ${activePod.host}`:`${PODCAST_FEEDS.length} shows`}</div>
               </div>
+              {/* D6: per-page refresh — reloads podcast feeds. */}
+              <span style={{marginLeft:'auto'}}><LastUpdated onRefresh={() => PODCAST_FEEDS.forEach(p=>loadPod(p))}/></span>
             </div>
             {displayEps.length===0
               ?Array.from({length:5}).map((_,i)=>(
