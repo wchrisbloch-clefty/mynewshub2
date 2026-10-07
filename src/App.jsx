@@ -40,6 +40,7 @@ import { useState, useEffect, useLayoutEffect, useCallback, useMemo, useRef, Fra
 // Extracted, dependency-isolated capability modules (see src/modules/*/README.md)
 import { clusterStories, hotClusterTopics, rankClusters, TREND_STOP, decodeEntities, capByPublisher } from './modules/clustering';
 import { qualifyBreaking, isPromoItem } from './modules/breaking';
+import { rankByVelocity, signalFor } from '../lib/voices/velocity';
 import { DEBUG, dbgRender, dbgPoll, DebugOverlay } from './modules/debug';
 import { makeVoice, upsertVoice, removeVoice as removeVoiceModel, mergeVoices, clearTombstone, voiceId, VOICE_PLATFORMS } from './modules/voices/model';
 import { SEED_VOICES } from './modules/voices/seeds';
@@ -7221,7 +7222,7 @@ function CustomizePanel({feeds, kw, alerts, urgent, social, watchlist, teams, he
           {secTab==='voices' && (
             <div className="cp-sec">
               <div className="cp-lbl">Voices</div>
-              <div className="cp-desc">People, businesses and teams whose posts across X, Instagram, LinkedIn, TikTok and YouTube get flagged in the matching category. Voices are always labeled <strong>inferred</strong>; clicking a tile opens the platform — nothing is read in-app.{!searchKeyPresent && <> <strong>Add a search key (SEARCH_API_KEY) to enable discovery</strong> — you can still add handles manually.</>}</div>
+              <div className="cp-desc">People, businesses and teams whose posts across X, Instagram, LinkedIn, TikTok and YouTube get flagged in the matching category. Voices are always labeled <strong>inferred</strong>; clicking a tile opens the platform — nothing is read in-app.{!searchKeyPresent && <> <strong>Add a search key (SEARCH_API_KEY) to enable discovery</strong> — you can still add handles manually.</>} <span style={{color:'var(--text4)'}}>Default provider: Serper (free tier). Brave is paid/metered.</span></div>
               {/* Add a voice */}
               <div className="cp-src-add">
                 <input className="cp-input" placeholder="Name (person, business or team)…" value={vName} onChange={e=>setVName(e.target.value)} onKeyDown={e=>{if(e.key==='Enter'&&vName.trim()){(onResolveVoice||onAddVoice)({name:vName.trim(),type:vType,category:voiceCat});setVName('');}}}/>
@@ -8868,17 +8869,48 @@ export default function App() {
   // E3: per-category Voices signals (tiles). Loads ONCE per category open (cached), and
   // only reloads when the page refresh runs (loadCat clears the cache entry). No polling.
   const [voiceSignals, setVoiceSignals] = useState({}); // { [cat]: {tiles,failures,loading,loaded} }
-  const loadVoiceSignals = useCallback(async (cat) => {
-    const relevant = (voices || []).filter(v => v.category === cat && v.status === 'confirmed' && v.handles && Object.keys(v.handles).length);
+  const loadVoiceSignals = useCallback(async (cat, opts = {}) => {
+    // Top-3 cap (E5 cost): only the first 3 confirmed voices per category (user's order)
+    // drive the lanes. E3/E6: server lanes (search/YouTube/RSSHub) + the EXISTING Reddit
+    // lane (/api/signals?kind=discussions) are auto; the EXISTING X lane (x-pulse) is
+    // click-to-load only (opts.includeX). All tiles are ranked together and promo-filtered
+    // (reusing isPromoItem from the breaking module). No AI, no polling.
+    const relevant = (voices || [])
+      .filter(v => v.category === cat && v.status === 'confirmed' && v.handles && Object.keys(v.handles).length)
+      .slice(0, 3);
     if (!relevant.length) { setVoiceSignals(s => ({ ...s, [cat]: { tiles: [], failures: [], loading: false, loaded: true } })); return; }
-    setVoiceSignals(s => ({ ...s, [cat]: { ...(s[cat] || {}), loading: true, loaded: true } }));
+    setVoiceSignals(s => ({ ...s, [cat]: { ...(s[cat] || {}), loading: true, loaded: true, xLoaded: opts.includeX || (s[cat] && s[cat].xLoaded) } }));
+    const failures = [];
+    const tiles = [];
+    // Server lanes (Lane 1 search + YouTube + RSSHub)
     try {
-      const r = await fetchWithTimeout('/api/voices-signals', 10000, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ voices: relevant, category: cat, limit: 4 }) });
+      const r = await fetchWithTimeout('/api/voices-signals', 10000, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ voices: relevant, category: cat, limit: 8 }) });
       const d = r.ok ? await r.json() : { tiles: [], failures: [{ source: 'voices', reason: `HTTP ${r.status}` }] };
-      setVoiceSignals(s => ({ ...s, [cat]: { tiles: d.tiles || [], failures: d.failures || [], loading: false, loaded: true } }));
-    } catch {
-      setVoiceSignals(s => ({ ...s, [cat]: { tiles: [], failures: [{ source: 'voices', reason: 'unreachable' }], loading: false, loaded: true } }));
+      (d.tiles || []).forEach(t => tiles.push(t));
+      (d.failures || []).forEach(f => failures.push(f));
+    } catch { failures.push({ source: 'voices', reason: 'unreachable' }); }
+    // E6 Reddit lane (auto, free) — the EXISTING /api/signals?kind=discussions endpoint.
+    await Promise.all(relevant.filter(v => v.handles.reddit || true).map(async v => {
+      try {
+        const r = await fetchWithTimeout(`/api/signals?kind=discussions&q=${encodeURIComponent(v.name)}`, 8000);
+        if (r.ok) { const d = await r.json(); (d.reddit || []).slice(0, 2).forEach(p => tiles.push({ platform: 'reddit', who: v.name, url: p.url || p.link, title: p.title, ageHours: p.ageHours ?? 18, tier: 'inferred', source_class: 'social' })); }
+        else failures.push({ source: `${v.name} · reddit`, reason: `HTTP ${r.status}` });
+      } catch { failures.push({ source: `${v.name} · reddit`, reason: 'unreachable' }); }
+    }));
+    // E6 X lane — click-to-load ONLY (x-pulse costs money). Fetched only when requested.
+    if (opts.includeX) {
+      await Promise.all(relevant.filter(v => v.handles.x).map(async v => {
+        try {
+          const r = await fetchWithTimeout(`/api/signals?kind=xpulse&topic=${encodeURIComponent(v.name)}`, 9000);
+          if (r.ok) { const d = await r.json(); const arr = Array.isArray(d) ? d : (d.posts || d.items || []); arr.slice(0, 2).forEach(p => tiles.push({ platform: 'x', who: v.name, url: p.url || p.link, title: p.text || p.title || '', ageHours: p.ageHours ?? 12, tier: 'inferred', source_class: 'social' })); }
+          else failures.push({ source: `${v.name} · x`, reason: `HTTP ${r.status}` });
+        } catch { failures.push({ source: `${v.name} · x`, reason: 'unreachable' }); }
+      }));
     }
+    // Item 8: strip promos/sportsbook; rank all lanes together; cap 4.
+    const clean = tiles.filter(t => t && t.title && !isPromoItem({ title: t.title, source: t.who, link: t.url }));
+    const ranked = rankByVelocity(clean.map(t => ({ ...t, signal: t.signal || signalFor(t) })), { limit: 4 });
+    setVoiceSignals(s => ({ ...s, [cat]: { tiles: ranked, failures, loading: false, loaded: true, xLoaded: opts.includeX || (s[cat] && s[cat].xLoaded), hasX: relevant.some(v => v.handles.x) } }));
   }, [voices]);
   // Load-once per category open (no polling). A ref guards against re-firing when the
   // voices list changes identity; the page refresh button clears the entry to reload.
@@ -8890,7 +8922,7 @@ export default function App() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tab]);
   const refreshVoiceSignals = useCallback((cat) => { voicesLoadedRef.current.delete(cat); loadVoiceSignals(cat); }, [loadVoiceSignals]);
-  const voicesStripFor = (cat) => { const s = voiceSignals[cat] || {}; return <VoicesStrip tiles={s.tiles || []} failures={s.failures || []} loading={!!s.loading}/>; };
+  const voicesStripFor = (cat) => { const s = voiceSignals[cat] || {}; return <VoicesStrip tiles={s.tiles || []} failures={s.failures || []} loading={!!s.loading} hasX={!!s.hasX} xLoaded={!!s.xLoaded} onLoadX={() => loadVoiceSignals(cat, { includeX: true })}/>; };
   // E4: migrate existing DEFAULT_SOCIAL handles into seed voices (status 'seed'), not
   // silently dropped — they surface in the seed review queue carrying their known handle.
   const SOCIAL_PLAT = { twitter: 'x', linkedin: 'linkedin', instagram: 'instagram', youtube: 'youtube' };

@@ -25,8 +25,9 @@ export default async function handler(req, res) {
 
   try {
     const result = await resolveVoice({ name, type });
-    // Discovery is a paid call; cache per name/type for 30 min at the CDN (E5 cost guard).
-    res.setHeader('Cache-Control', 's-maxage=1800, stale-while-revalidate=3600');
+    // item 7: discovery costs search queries; cache each voice's result 24h at the CDN
+    // (no KV). This GET route is cacheable per name/type, so repeat discovery is free.
+    res.setHeader('Cache-Control', 's-maxage=86400, stale-while-revalidate=86400');
     return res.status(200).json(result);
   } catch (err) {
     return res.status(200).json({ name, enabled: false, reason: 'resolve-error', note: String(err && err.message || err).slice(0, 160), platforms: {} });

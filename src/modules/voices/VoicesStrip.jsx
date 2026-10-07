@@ -10,9 +10,9 @@ import './VoicesStrip.css';
 const BADGE = { x: 'X', twitter: 'X', instagram: 'IG', linkedin: 'LI', tiktok: 'TT', youtube: 'YT', reddit: 'Reddit' };
 const age = h => h == null ? '' : h < 1 ? 'now' : h < 24 ? `${Math.round(h)}h` : `${Math.round(h / 24)}d`;
 
-export function VoicesStrip({ tiles = [], failures = [], loading = false, sidebar = true }) {
+export function VoicesStrip({ tiles = [], failures = [], loading = false, sidebar = true, hasX = false, xLoaded = false, onLoadX }) {
   const [showFail, setShowFail] = useState(false);
-  if (!loading && !tiles.length && !failures.length) return null;
+  if (!loading && !tiles.length && !failures.length && !hasX) return null;
   return (
     <section className={`voices-strip${sidebar ? ' voices-sidebar' : ''}`}>
       <div className="voices-head">
@@ -31,6 +31,10 @@ export function VoicesStrip({ tiles = [], failures = [], loading = false, sideba
           </a>
         ))}
       </div>
+      {/* E6: X stays click-to-load (it costs money) — never auto-fetched. */}
+      {hasX && !xLoaded && onLoadX && (
+        <button className="voices-loadx" onClick={onLoadX}>＋ Load X posts</button>
+      )}
       {failures.length > 0 && (
         <button className="voices-fail" onClick={() => setShowFail(s => !s)}>
           {failures.length} source{failures.length === 1 ? '' : 's'} unavailable

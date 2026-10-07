@@ -69,7 +69,14 @@ async function youtubeTiles(voice, failures) {
 // ~2,000/mo free tier (>50%). So Lane 1 runs only when VOICES_LANE1=1 (and a key exists),
 // and even then at most ONE search per voice (name-based), not per handle. Default tiles
 // come from the free Lane 2 (YouTube quota-guarded + RSSHub). One search per voice, capped.
-const LANE1_ON = () => process.env.VOICES_LANE1 === '1';
+// E5/item7: Lane 1 defaults ON when a search key exists, OFF without it; VOICES_LANE1
+// is the explicit override ('0' forces off, '1' forces on even if the default would differ).
+const LANE1_ON = () => {
+  const sw = process.env.VOICES_LANE1;
+  if (sw === '0') return false;
+  if (sw === '1') return true;
+  return !!process.env.SEARCH_API_KEY;
+};
 async function lane1Tiles(voice, failures) {
   if (!LANE1_ON()) return [];
   try {
@@ -88,7 +95,9 @@ export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'POST only' });
 
   const body = req.body || {};
-  const voices = Array.isArray(body.voices) ? body.voices.filter(v => v && v.status === 'confirmed' && v.handles && Object.keys(v.handles).length) : [];
+  // item 7: hard top-3 cap per category (defensive — the client already sends the user's
+  // first 3), so Lane 1 search never runs for more than 3 voices per category open.
+  const voices = (Array.isArray(body.voices) ? body.voices.filter(v => v && v.status === 'confirmed' && v.handles && Object.keys(v.handles).length) : []).slice(0, 3);
   const limit = Math.min(Number(body.limit) || 4, 8);
   const failures = [];
 
@@ -105,6 +114,9 @@ export default async function handler(req, res) {
   const tiles = rankByVelocity(all.map(t => ({ ...t, signal: t.signal || signalFor(t) })), { limit })
     .map(t => ({ platform: t.platform, who: t.who, handle: t.handle, url: t.url, title: t.title, ageHours: Math.round(t.ageHours), tier: 'inferred', source_class: 'social' }));
 
-  res.setHeader('Cache-Control', 's-maxage=1800, stale-while-revalidate=3600');
-  return res.status(200).json({ tiles, failures, searchEnabled: searchProvider().enabled });
+  // item 7: 24h CDN cache + SWR (no KV). Note: this route is POST, which most CDNs do not
+  // cache; the durable 24h caching is on the GET /api/voices-resolve (per voice name). The
+  // client also loads signals once per category open (no polling), so repeat cost is low.
+  res.setHeader('Cache-Control', 's-maxage=86400, stale-while-revalidate=86400');
+  return res.status(200).json({ tiles, failures, searchEnabled: searchProvider().enabled, lane1: LANE1_ON() });
 }
