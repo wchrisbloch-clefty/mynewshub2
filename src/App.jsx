@@ -2700,6 +2700,14 @@ body:not(.dark) .pill-bar{
 .cp-voice-btn:hover:not(:disabled){border-color:var(--accent);color:var(--accent);}
 .cp-voice-btn:disabled{opacity:0.4;cursor:default;}
 .cp-voice-rm:hover{border-color:var(--red);color:var(--red);}
+/* E4: seed review queue */
+.cp-seed-wrap{margin:4px 0 12px;border:1px solid var(--border2);border-radius:8px;padding:6px 10px;background:var(--surface2);}
+.cp-seed-toggle{background:none;border:none;cursor:pointer;font-family:var(--font-sans);font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:0.06em;color:var(--text3);padding:4px 0;}
+.cp-seed-list{display:flex;flex-direction:column;}
+.cp-seed-row{display:flex;flex-wrap:wrap;align-items:center;gap:8px;padding:7px 0;border-top:1px solid var(--border2);}
+.cp-seed-name{font-family:var(--font-sans);font-weight:700;font-size:var(--fs-body);color:var(--text);}
+.cp-seed-cat{font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:0.04em;}
+.cp-seed-actions{margin-left:auto;display:inline-flex;gap:6px;}
 .cp-voice-edit{width:100%;display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:6px;padding:8px 0 2px;}
 .cp-voice-hl{display:flex;flex-direction:column;gap:2px;font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:0.04em;}
 @media(max-width:640px){ .cp-voice-btn{min-width:44px;min-height:44px;} }
@@ -7008,7 +7016,8 @@ const CAT_LABELS = {general:'News',sports:'Sports',business:'Business',finance:'
 const PLAT_LABELS = {twitter:'𝕏',linkedin:'in',instagram:'IG',youtube:'▶'};
 
 function CustomizePanel({feeds, kw, alerts, urgent, social, watchlist, teams, health, arts, weatherCities, hiddenIndices, briefingExclude, briefingSources, initialTab, initialCat, onClose, onSave,
-  voices, onAddVoice, removeVoiceById, reorderVoice, onResolveVoice, onTestVoices, voicesTestSummary, searchKeyPresent}) {
+  voices, onAddVoice, removeVoiceById, reorderVoice, onResolveVoice, onTestVoices, voicesTestSummary, searchKeyPresent,
+  seedQueue, onAcceptSeed, onSkipSeed}) {
   const [lf, setLf] = useState(JSON.parse(JSON.stringify(feeds)));
   const [lk, setLk] = useState(JSON.parse(JSON.stringify(kw)));
   const [la, setLa] = useState([...alerts]);
@@ -7043,6 +7052,7 @@ function CustomizePanel({feeds, kw, alerts, urgent, social, watchlist, teams, he
   const [vName, setVName] = useState('');
   const [vType, setVType] = useState('person');
   const [editVoiceId, setEditVoiceId] = useState(null);
+  const [showSeeds, setShowSeeds] = useState(false);
   const VOICE_CATS = ['general','business','bloom','tech','sports','health','popculture'];
 
   const testFeed = async (url, key) => {
@@ -7218,6 +7228,33 @@ function CustomizePanel({feeds, kw, alerts, urgent, social, watchlist, teams, he
                 <div style={{display:'flex',gap:'8px',margin:'4px 0 10px'}}>
                   <button className="cp-btn-sec" onClick={onTestVoices}>Test voices</button>
                   {typeof voicesTestSummary==='string' && voicesTestSummary && <span className="cp-desc" style={{margin:0}}>{voicesTestSummary}</span>}
+                </div>
+              )}
+              {/* E4: seed review queue — suggestions + migrated DEFAULT_SOCIAL, Accept/Skip.
+                  Accept runs the E2 confirm flow (no handle saved until confirmed); Skip
+                  tombstones it so it won't re-suggest. */}
+              {seedQueue && seedQueue.length > 0 && (
+                <div className="cp-seed-wrap">
+                  <button className="cp-seed-toggle" onClick={()=>setShowSeeds(s=>!s)}>
+                    {showSeeds?'▾':'▸'} Suggested voices ({seedQueue.length})
+                  </button>
+                  {showSeeds && (
+                    <div className="cp-seed-list">
+                      {seedQueue.map(s => (
+                        <div key={s.id} className="cp-seed-row">
+                          <span className="cp-seed-name">{s.name}</span>
+                          <span className="cp-voice-type">{s.type}</span>
+                          <span className="cp-seed-cat">{(CATS[s.category]||{}).label||s.category}</span>
+                          {s._parkedFrom && <span className="cp-voice-flag" title="Parked here pending your category decision">parked: {s._parkedFrom}</span>}
+                          {s.handles && Object.keys(s.handles).length>0 && <span className="cp-voice-handles">{VOICE_PLATFORMS.filter(p=>s.handles[p]).join(' · ')}</span>}
+                          <span className="cp-seed-actions">
+                            <button className="cp-btn" onClick={()=>onAcceptSeed&&onAcceptSeed(s)}>Accept</button>
+                            <button className="cp-btn-sec" onClick={()=>onSkipSeed&&onSkipSeed(s.id)}>Skip</button>
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
               )}
               {/* Grouped by category */}
@@ -8831,6 +8868,36 @@ export default function App() {
   }, [tab]);
   const refreshVoiceSignals = useCallback((cat) => { voicesLoadedRef.current.delete(cat); loadVoiceSignals(cat); }, [loadVoiceSignals]);
   const voicesStripFor = (cat) => { const s = voiceSignals[cat] || {}; return <VoicesStrip tiles={s.tiles || []} failures={s.failures || []} loading={!!s.loading}/>; };
+  // E4: migrate existing DEFAULT_SOCIAL handles into seed voices (status 'seed'), not
+  // silently dropped — they surface in the seed review queue carrying their known handle.
+  const SOCIAL_PLAT = { twitter: 'x', linkedin: 'linkedin', instagram: 'instagram', youtube: 'youtube' };
+  const migratedSocialSeeds = useMemo(() => {
+    const out = [], byId = new Map();
+    for (const [cat, plats] of Object.entries(DEFAULT_SOCIAL || {})) {
+      for (const [plat, list] of Object.entries(plats || {})) {
+        const pk = SOCIAL_PLAT[plat]; if (!pk) continue;
+        for (const h of (list || [])) {
+          const v = makeVoice({ type: 'org', name: String(h).replace(/^@/, ''), category: cat, handles: { [pk]: h }, status: 'seed' });
+          if (byId.has(v.id)) { byId.get(v.id).handles[pk] = h; continue; }
+          byId.set(v.id, v); out.push(v);
+        }
+      }
+    }
+    return out;
+  }, []);
+  // The review queue: name-only suggestions (E4 list) + migrated social, minus anything
+  // already added or tombstoned (Skip tombstones so it won't re-suggest).
+  const seedQueue = useMemo(() => {
+    const added = new Set((voices || []).map(v => v.id));
+    const tomb = new Set(voiceTombstones || []);
+    const all = [...SEED_VOICES.map(s => ({ ...makeVoice(s), _parkedFrom: s._parkedFrom })), ...migratedSocialSeeds];
+    const seen = new Set(), out = [];
+    for (const v of all) { if (seen.has(v.id) || added.has(v.id) || tomb.has(v.id)) continue; seen.add(v.id); out.push(v); }
+    return out;
+  }, [voices, voiceTombstones, migratedSocialSeeds]);
+  const skipSeed = useCallback((id) => {
+    setVoiceTombstones(prev => prev.includes(id) ? prev : (() => { const n = [...prev, id]; sv('voiceTombstones', n); return n; })());
+  }, []);
   const acceptCandidate = useCallback((pk, cand) => {
     setVoiceResolve(cur => {
       if (!cur) return cur;
@@ -11298,7 +11365,8 @@ export default function App() {
           briefingSources={briefingSources}
           initialTab={panelInitial.tab} initialCat={panelInitial.cat}
           voices={voices} onAddVoice={addOrUpdateVoice} removeVoiceById={removeVoiceById} reorderVoice={reorderVoice}
-          onResolveVoice={resolveVoiceFlow} onTestVoices={undefined} voicesTestSummary={''} searchKeyPresent={false}
+          onResolveVoice={resolveVoiceFlow} seedQueue={seedQueue} onAcceptSeed={resolveVoiceFlow} onSkipSeed={skipSeed}
+          onTestVoices={undefined} voicesTestSummary={''} searchKeyPresent={false}
           onClose={()=>setShowPanel(false)} onSave={handleCustomizeSave}/>}
         {/* E2: Voices add+confirm discovery modal. */}
         {voiceResolve && <ResolveModal voice={voiceResolve.voice} state={voiceResolve} onAccept={acceptCandidate} onClose={()=>setVoiceResolve(null)}/>}
