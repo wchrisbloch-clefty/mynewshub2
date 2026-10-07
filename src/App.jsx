@@ -133,10 +133,20 @@ const IconGear = ({size=ICON.meta}) => (
 const SWIPE_ORDER = ['general','business','bloom','tech','sports','health','popculture'];
 
 const TICKERS = [
-  { sym:'BE',   label:'Bloom Energy', color:'#60a5fa' },
-  { sym:'CL=F', label:'Crude Oil',    color:'#4ade80' },
-  { sym:'BTC',  label:'Bitcoin',      color:'#fbbf24' },
+  { sym:'BE',      label:'Bloom Energy', color:'#60a5fa' },
+  { sym:'CL=F',    label:'Crude Oil',    color:'#4ade80' },
+  // D3: fetch 'BTC-USD' (actual Bitcoin). Plain 'BTC' on Yahoo is a ~$36 Grayscale
+  // fund, which is what produced the bogus "$36.86" tile. `short` keeps the label tidy.
+  { sym:'BTC-USD', label:'Bitcoin', short:'BTC', color:'#fbbf24' },
 ];
+
+// D3: price decimals by instrument. True indices (^GSPC/^DJI/^IXIC) show whole
+// numbers; everything else — gas (NG=F), oil (CL=F), crypto, equities — shows 2
+// decimals. Fixes natural gas rendering as "3" under the indices' 0-decimal format.
+const fmtQuotePrice = (sym, price) =>
+  Number(price).toLocaleString('en-US', /^\^/.test(sym)
+    ? { maximumFractionDigits: 0 }
+    : { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
 const PODCAST_FEEDS = [
   { name:'Joe Rogan Experience', host:'Joe Rogan',         url:'https://feeds.megaphone.fm/GLT1412515089',   emoji:'' },
@@ -1499,8 +1509,11 @@ body{
 .ss-ticker-inner::-webkit-scrollbar{display:none;}
 .ss-tk{display:inline-flex;align-items:baseline;gap:6px;flex-shrink:0;
   background:none;border:none;cursor:pointer;font-family:inherit;padding:0;white-space:nowrap;}
-.ss-tk-sym{font-size:10px;font-weight:700;letter-spacing:0.04em;color:var(--text3);text-transform:uppercase;}
-.ss-tk-val{font-size:12px;font-weight:600;color:var(--text);}
+/* D3: ticker + weather share one role scale.
+   label (symbol/city) = --fs-meta uppercase 700 · value (price/temp) = --fs-body 700 tnum
+   · change/desc = --fs-meta. */
+.ss-tk-sym{font-size:var(--fs-meta);font-weight:700;letter-spacing:0.04em;color:var(--text3);text-transform:uppercase;}
+.ss-tk-val{font-size:var(--fs-body);font-weight:700;color:var(--text);font-variant-numeric:tabular-nums;}
 .ss-tk-chg{font-size:var(--fs-meta);font-weight:700;}
 .ss-tk-chg.up{color:var(--pos);}
 .ss-tk-chg.down{color:var(--neg);}
@@ -1510,15 +1523,15 @@ body{
 .rnw-card{background:var(--surface);border:1px solid var(--border2);border-radius:var(--radius);margin-bottom:var(--s4);overflow:hidden;}
 .rnw-row{width:100%;display:flex;align-items:center;gap:var(--s3);padding:12px var(--s4);background:none;border:none;cursor:pointer;font-family:var(--font-publicsans);text-align:left;}
 .rnw-label{font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:0.08em;color:var(--accent);flex-shrink:0;}
-.rnw-city{font-size:var(--fs-body);font-weight:700;color:var(--text);}
-.rnw-temp{font-size:18px;font-weight:800;color:var(--text);}
-.rnw-desc{font-size:var(--fs-body);color:var(--text2);}
+.rnw-city{font-size:var(--fs-meta);font-weight:700;color:var(--text);text-transform:uppercase;letter-spacing:0.04em;}
+.rnw-temp{font-size:var(--fs-body);font-weight:700;color:var(--text);font-variant-numeric:tabular-nums;}
+.rnw-desc{font-size:var(--fs-meta);color:var(--text2);}
 .rnw-feels{font-size:var(--fs-meta);color:var(--text3);margin-left:auto;}
 .rnw-caret{color:var(--text3);flex-shrink:0;transition:transform 0.15s;margin-left:auto;}
 .rnw-caret.open{transform:rotate(180deg);}
 /* Multi-city: Houston + Louisville side by side in the one row. */
 .rnw-cities{display:flex;align-items:center;gap:var(--s4);flex:1;min-width:0;overflow:hidden;}
-.rnw-city-item{display:inline-flex;align-items:baseline;gap:7px;white-space:nowrap;}
+.rnw-city-item{display:inline-flex;align-items:baseline;gap:6px;white-space:nowrap;}
 .rnw-city-fc{padding-top:6px;}
 .rnw-city-fc + .rnw-city-fc{border-top:1px solid var(--border);margin-top:6px;}
 .rnw-city-fc-head{font-size:var(--fs-meta);font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:0.05em;padding:4px 0 2px;}
@@ -7888,7 +7901,7 @@ function TopBar({tab, setTab, search, setSearch, dark, setDark,
                 return (
                   <button key={idx.sym} className="ss-tk" onClick={()=>q&&window.open(`https://finance.yahoo.com/quote/${encodeURIComponent(idx.sym)}`,'_blank')}>
                     <span className="ss-tk-sym">{idx.short}</span>
-                    <span className="ss-tk-val tnum">{q?q.price.toLocaleString('en-US',{maximumFractionDigits:0}):'—'}</span>
+                    <span className="ss-tk-val tnum">{q?fmtQuotePrice(idx.sym,q.price):'—'}</span>
                     {q&&<span className={`ss-tk-chg tnum ${up?'up':'down'}`}>{up?'+':'−'}{Math.abs(q.pct).toFixed(2)}%</span>}
                   </button>
                 );
@@ -7897,8 +7910,8 @@ function TopBar({tab, setTab, search, setSearch, dark, setDark,
                 const q=quotes[t.sym]; const up=q?q.chg>=0:null;
                 return (
                   <button key={t.sym} className="ss-tk" onClick={()=>onTickerClick&&onTickerClick(t)}>
-                    <span className="ss-tk-sym">{t.sym}</span>
-                    <span className="ss-tk-val tnum">{q?`$${q.price.toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2})}`:'—'}</span>
+                    <span className="ss-tk-sym">{t.short||t.sym}</span>
+                    <span className="ss-tk-val tnum">{q?`$${fmtQuotePrice(t.sym,q.price)}`:'—'}</span>
                     {q&&<span className={`ss-tk-chg tnum ${up?'up':'down'}`}>{up?'+':'−'}{Math.abs(q.pct).toFixed(2)}%</span>}
                   </button>
                 );
