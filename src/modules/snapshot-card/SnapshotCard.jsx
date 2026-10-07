@@ -22,14 +22,14 @@ import './SnapshotCard.css';
 
 const defaultFormatDate = d => { try { return new Date(d).toLocaleString(); } catch { return ''; } };
 
-export function SnapshotCard({ a, meta = {}, isSaved, onSave, onRead, onPerspectives, onAsk, formatDate = defaultFormatDate, hideImage = false }) {
+export function SnapshotCard({ a, meta = {}, isSaved, onSave, onRead, onPerspectives, onAsk, formatDate = defaultFormatDate, hideImage = false, lead = false }) {
   const color = meta.color;
   const bg = meta.bg;
   const [imgErr, setImgErr] = useState(false);
   const topKw = a.matchedKw?.[0] || null;
   const multi = a._clusterSize > 1;
   return (
-    <article className={`snap-card ${a.isAlert ? 'snap-breaking' : ''}`} onClick={() => onRead(a)}>
+    <article className={`snap-card ${a.isAlert ? 'snap-breaking' : ''}${lead ? ' snap-lead' : ''}`} onClick={() => onRead(a)}>
       <span className="snap-accent" style={{ background: color }} />
       <div className="snap-main">
         <div className="snap-meta">

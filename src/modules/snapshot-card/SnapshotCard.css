@@ -68,16 +68,36 @@
 .snap-skel-thumb{width:150px;aspect-ratio:4/3;align-self:center;flex-shrink:0;background:var(--surface2);border-radius:6px;margin:0 12px;}
 .snap-skel-line{border-radius:5px;margin-bottom:8px;background:linear-gradient(90deg,var(--surface2) 25%,var(--border) 50%,var(--surface2) 75%);background-size:200% 100%;animation:shimmer 1.4s infinite;}
 @media(max-width:640px){
-  /* Buzzfeed-style mobile (Pass L item 5): cards flip to VERTICAL — a full-bleed 4:3
-     image reads as the primary element scrolling past, the headline is its caption.
-     More gap between cards so each reads as a distinct unit. Desktop is untouched. */
-  .snap-feed{gap:20px;}
-  .snap-card{flex-direction:column;}
-  .snap-accent{width:100%;height:4px;order:-2;}
-  .snap-thumb,.snap-skel-thumb{order:-1;width:100%;aspect-ratio:4/3;align-self:stretch;margin:0;border-radius:0;}
-  .snap-main,.snap-skel-main{padding:12px 14px 14px;}
-  .snap-title{font-size:19px;line-height:1.2;}
+  /* D5 — NYT/Bloomberg mobile: ONE dominant lead, then a DIVIDED LIST (no boxes).
+     Fewer boxes, more whitespace. Exactly one hero-weight element above the fold. */
+  .snap-feed{gap:0;}
+  /* Divided list rows: borderless, thin top rule, small 4:3 thumb RIGHT, headline LEFT. */
+  .snap-card{flex-direction:row;border:none;border-radius:0;border-top:1px solid var(--border2);background:none;box-shadow:none;}
+  .snap-card:first-child{border-top:none;}
+  .snap-card:hover{transform:none;box-shadow:none;}
+  .snap-accent{display:none;}
+  .snap-main,.snap-skel-main{order:0;padding:14px 0;}
+  .snap-thumb,.snap-skel-thumb{order:1;width:92px;height:69px;aspect-ratio:4/3;align-self:center;margin:0 0 0 12px;border-radius:6px;}
+  .snap-title{font-family:var(--font-archivo);font-size:16px;line-height:1.25;-webkit-line-clamp:3;}
+  .snap-snippet{display:none;} /* calmer list — headline + one meta line only */
+  .snap-meta{margin-bottom:4px;}
+  /* THE LEAD — full-bleed image, large serif headline, one meta line. */
+  .snap-lead{flex-direction:column;border-top:none;margin:0 0 6px;}
+  .snap-lead .snap-accent{display:none;}
+  .snap-lead .snap-thumb{order:-1;width:100vw;max-width:100%;height:auto;aspect-ratio:3/2;margin:0 -16px;border-radius:0;align-self:stretch;}
+  .snap-lead .snap-main{padding:14px 0 16px;}
+  .snap-lead .snap-title{font-family:var(--font-archivo);font-size:26px;line-height:1.12;letter-spacing:-0.3px;-webkit-line-clamp:4;}
+  .snap-lead .snap-snippet{display:-webkit-box;font-size:var(--fs-body);-webkit-line-clamp:2;margin-bottom:8px;}
 }
+/* D5 — carry the DIVIDED-LIST treatment to DESKTOP SECONDARY lists only (not the main
+   grid): any .snap-feed inside .snap-feed-divided renders as calm rows. Desktop main
+   layout is unchanged. */
+.snap-feed-divided .snap-card{border:none;border-top:1px solid var(--border2);border-radius:0;background:none;box-shadow:none;}
+.snap-feed-divided .snap-card:first-child{border-top:none;}
+.snap-feed-divided .snap-card:hover{transform:none;box-shadow:none;}
+.snap-feed-divided .snap-accent{display:none;}
+.snap-feed-divided .snap-thumb{width:120px;height:80px;aspect-ratio:3/2;}
+.snap-feed-divided .snap-snippet{-webkit-line-clamp:1;}
 /* iPad (768–1279): the feed LIST is a 2-column card grid (the original responsive
    spec). Cards flip to VERTICAL (image on top, headline + body full-cell-width) so
    the body copy gets a comfortable measure (~65 chars) instead of the crushed
