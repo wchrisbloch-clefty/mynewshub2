@@ -59,12 +59,14 @@ export function StateOfPlay({ items, meta = {}, onRead, formatDate = defaultForm
       </div>
       <div className="sop-list" style={collapsed ? { display: 'none' } : undefined}>
         {breaking.map((b, i) => (
-          <button key={b.link || `brk-${i}`} className="sop-item sop-item-breaking" onClick={() => onRead(b)}>
+          <button key={b.link || `brk-${i}`} className="sop-item sop-item-breaking"
+            onClick={() => onRead(b)} title={b._breakingWhy ? `Breaking — ${b._breakingWhy}` : 'Breaking'}>
             <span className="sop-brk-dot" aria-hidden="true"/>
             <span className="sop-item-title">{b.title}</span>
             <span className="sop-item-meta">
+              {/* D2: "why it's breaking" — e.g. "4 outlets · 38m" — in place of the bare time. */}
               <span className="sop-brk-tag">Breaking</span>
-              <span className="sop-item-time">{formatDate(b.pubDate)}</span>
+              <span className="sop-item-time">{b._breakingWhy || formatDate(b.pubDate)}</span>
             </span>
           </button>
         ))}

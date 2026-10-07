@@ -39,6 +39,7 @@
 import { useState, useEffect, useLayoutEffect, useCallback, useMemo, useRef, Fragment } from 'react';
 // Extracted, dependency-isolated capability modules (see src/modules/*/README.md)
 import { clusterStories, hotClusterTopics, rankClusters, TREND_STOP, decodeEntities, capByPublisher } from './modules/clustering';
+import { qualifyBreaking, isPromoItem } from './modules/breaking';
 import { extractContent, extractionFallbackMessage } from './modules/extractor';
 import { retrieveFeedContext, buildFeedContextBlock } from './modules/retrieval';
 import { XPulse } from './modules/x-pulse';
@@ -5861,7 +5862,9 @@ function FeedCard({a, cat, isSaved, onSave, onRead, relatedSources, isRead, user
       <div className="fc-meta">
         <span className="fc-source" style={{color:cc.color}}>{a.source}</span>
         {paywall && <span className="fc-paywall-badge" title="Subscription may be required"></span>}
-        {a.isAlert && <span className="fc-alert-badge">● BREAKING</span>}
+        {/* D2: the per-card "● BREAKING" badge is removed — it came from the old broad
+            title+desc keyword match that mis-tagged previews/interviews. Breaking now
+            appears ONLY as tagged rows in State of Play. */}
         <TierBadge item={a}/>
         {topKw && <span className="fc-topic" style={{background:cc.bg,color:cc.color}}>{topKw}</span>}
         {clusterCount > 1 && (
@@ -5876,7 +5879,7 @@ function FeedCard({a, cat, isSaved, onSave, onRead, relatedSources, isRead, user
           ? <img className="fc-thumb" src={a.img} loading="lazy" onError={()=>setImgErr(true)} alt=""/>
           : <div className="fc-thumb-ph"><span className="ph-label">{a.source}</span></div>}
         <div className="fc-text">
-          <div className={`fc-title${a.isAlert?' fc-title-breaking':''}`}>{a.title}</div>
+          <div className="fc-title">{a.title}</div>
           {a.desc && <div className="fc-desc">{a.desc}</div>}
         </div>
       </div>
@@ -7835,7 +7838,6 @@ function TopBar({tab, setTab, search, setSearch, dark, setDark,
                  scores, favTeams, onGoToSports}) {
   const [searchFocused, setSearchFocused] = useState(false);
   const [quotes, setQuotes] = useState({});
-  const [showBreaking, setShowBreaking] = useState(true);
   // D1: desktop search collapses to an icon (reclaims width for the nav); mobile
   // "More" chip opens a sheet holding Briefing/Podcasts/Sources/Saved.
   const [searchOpenDesktop, setSearchOpenDesktop] = useState(false);
@@ -7866,9 +7868,6 @@ function TopBar({tab, setTab, search, setSearch, dark, setDark,
     return () => { live = false; };
   },[]);
 
-  const hasBreaking = breakingItems&&breakingItems.length>0;
-  // Breaking headlines now live inside State of Play (Pass L item 3); the status strip
-  // keeps only the small pulsing "● Breaking" signal flag, not a cramped marquee.
 
   // D1: desktop nav is now priority-overflow (PriorityNav). Primary order lives in
   // NAV_PRIMARY; Sources/Saved always live in the More menu (NAV_ALWAYS_MORE).
@@ -7904,11 +7903,9 @@ function TopBar({tab, setTab, search, setSearch, dark, setDark,
           compact weather chip RIGHT. Red is a signal here, never a texture. */}
       <div className="status-strip">
         <div className="status-strip-inner">
-          {hasBreaking && showBreaking ? (
-            <span className="ss-flag ss-flag-breaking" title="Breaking — see State of Play"><span className="ss-pulse"/> Breaking</span>
-          ) : (
-            <span className="ss-flag ss-flag-markets">Markets</span>
-          )}
+          {/* D2: the "● Breaking" status-strip flag is removed entirely — Breaking now
+              lives ONLY as tagged rows inside State of Play. The strip is markets-only. */}
+          <span className="ss-flag ss-flag-markets">Markets</span>
           <div className="ss-ticker">
             <div className="ss-ticker-inner">
               {INDICES.filter(idx=>!(hiddenIndices||[]).includes(idx.sym)).map(idx=>{
@@ -8733,28 +8730,15 @@ export default function App() {
   // v20: whole-word urgent match + 6h recency window + cap 8.
   // Whole-word prevents "killed" matching "killed it" or "killing" substrings.
   // 6h window keeps breaking feeling live (was: any time).
-  const breakingItems = useMemo(()=>{
-    const sixHoursAgo = Date.now() - 6 * 60 * 60 * 1000;
-    const wordBoundary = urgent.map(u => new RegExp(`\\b${u.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')}\\b`, 'i'));
-    const seen = new Set();
-    return Object.values(arts).flat()
-      .filter(a => {
-        const pub = new Date(a.pubDate).getTime();
-        return pub > sixHoursAgo; // recency filter
-      })
-      .filter(a => {
-        const txt = a.title + ' ' + (a.desc || '');
-        return wordBoundary.some(rx => rx.test(txt));
-      })
-      .filter(a => {
-        const k = a.title.slice(0,60).toLowerCase().replace(/\s+/g,'');
-        if (seen.has(k)) return false;
-        seen.add(k);
-        return true;
-      })
-      .sort((a,b) => new Date(b.pubDate) - new Date(a.pubDate))
-      .slice(0, 8);
-  },[arts, urgent]);
+  // D2: Breaking is now a SIGNIFICANCE test, not a bare keyword match — a story
+  // qualifies only via >=3 distinct outlets within 2h (clusters) or a strong event
+  // term in the TITLE. Promos are excluded. This global pool is filtered to each
+  // page by relevance (see catBreaking) and capped at 3. Previews/interviews/promos
+  // never qualify because they are neither multi-outlet nor title-strong.
+  const breakingItems = useMemo(
+    () => qualifyBreaking(Object.values(arts).flat(), { now: Date.now() }),
+    [arts]
+  );
 
   const kwMatch = useCallback(
     (a,cat)=>(kw[cat]||[]).filter(k=>(a.title+(a.desc||'')).toLowerCase().includes(k.toLowerCase())),
@@ -8784,7 +8768,7 @@ export default function App() {
       });
     }
     arr.sort((a,b)=>{const ka=kwMatch(a,cat).length,kb=kwMatch(b,cat).length;if(kb!==ka)return kb-ka;return new Date(b.pubDate)-new Date(a.pubDate);});
-    return arr.map(a=>({...a,matchedKw:kwMatch(a,cat),isAlert:urgent.some(u=>(a.title+(a.desc||'')).toLowerCase().includes(u.toLowerCase()))}));
+    return arr.map(a=>({...a,matchedKw:kwMatch(a,cat)}));
   },[arts,search,activeKw,activeSrc,kwMatch,urgent,specificCatKeys]);
 
   const loadCat = useCallback(async (cat)=>{
@@ -9459,8 +9443,10 @@ export default function App() {
               <div className="feed-col">
                 {/* Coverage Gap is folded into this list as "Not in your sources" rows
                     (Pass G item 9) — no standalone "You may be missing this" panel. */}
+                {/* D2: wire Breaking into the Sports team/league page SoP (sports-relevant only). */}
                 <StateOfPlay items={teamItems} meta={CATS.sports} onRead={onRead} formatDate={fmtDate}
-                  collapsed={sopCollapsed} onToggleCollapse={toggleSop} gapItems={teamGapItems}/>
+                  collapsed={sopCollapsed} onToggleCollapse={toggleSop} gapItems={teamGapItems}
+                  breakingItems={(breakingItems||[]).filter(b=>b.cat==='sports').slice(0,3)}/>
                 <TrendingPills label={`Trending · ${teamName}`} items={teamItems} onOpen={t=>setSearch(t.toLowerCase())} isTopicFollowed={isTopicFollowed} toggleTopic={toggleTopic}/>
                 <SourcesDisagree topic={teamName} items={teamItems}/>
                 {teamItems.length === 0
@@ -9691,7 +9677,9 @@ export default function App() {
             <button className="entity-hub-btn" onClick={() => navigate(cat)}>← {cc.label}</button>
           </div>
         </div>
-        <StateOfPlay items={entityItems} meta={cc} onRead={onRead} formatDate={fmtDate}/>
+        {/* D2: wire Breaking into the entity hub SoP (this entity's category only). */}
+        <StateOfPlay items={entityItems} meta={cc} onRead={onRead} formatDate={fmtDate}
+          breakingItems={(breakingItems||[]).filter(b=>b.cat===cat).slice(0,3)}/>
         <TrendingPills label={`Trending · ${entity}`} items={entityItems} onOpen={t => navigate(cat, 'topic', teamSlug(t))} isTopicFollowed={isTopicFollowed} toggleTopic={toggleTopic}/>
         <SourcesDisagree topic={entity} items={entityItems}/>
         {entityItems.length === 0
@@ -9897,15 +9885,28 @@ export default function App() {
     // Breaking stories for THIS category's State of Play (Pass L item 3) — the urgent
     // items relevant to the page, deduped against what Top Stories already shows. Home
     // sees cross-category breaking; a category page sees only its own.
+    // D2 relevance (gate a): a story shows on a page only if it belongs to that page.
+    // Category page = its own feed-category OR a DEFAULT_KW match for that category.
+    // General = general/world-US top-news OR a match on ANY category's keywords.
     const catBreaking = useMemo(() => {
       if (!breakingItems || !breakingItems.length) return [];
-      const pool = isHome ? breakingItems
-        : breakingItems.filter(b => b.cat === cat || (isMergedBiz && (b.cat === 'business' || b.cat === 'finance')));
-      return pool.filter(b => !topStoryKeys.has(storyKey(b))).slice(0, 3);
-    }, [breakingItems, cat, isHome, isMergedBiz, topStoryKeys]);
+      const anyKw = (b) => {
+        const txt = (b.title + ' ' + (b.desc || '')).toLowerCase();
+        return Object.keys(DEFAULT_KW).some(c =>
+          (kw[c] || DEFAULT_KW[c] || []).some(k => txt.includes(String(k).toLowerCase())));
+      };
+      const relevant = (b) => {
+        if (isHome) return b.cat === 'general' || anyKw(b);
+        if (b.cat === cat) return true;
+        if (isMergedBiz && (b.cat === 'business' || b.cat === 'finance')) return true;
+        return kwMatch(b, cat).length > 0;
+      };
+      return breakingItems.filter(relevant).filter(b => !topStoryKeys.has(storyKey(b))).slice(0, 3);
+    }, [breakingItems, cat, isHome, isMergedBiz, topStoryKeys, kw, kwMatch]);
     // State of Play ranks only from what Top Stories didn't already take.
+    // D2: promos/sportsbook content are excluded from SoP ranking too, not just Breaking.
     const sopSourceItems = useMemo(
-      () => activeFilteredItems.filter(a => !topStoryKeys.has(storyKey(a))),
+      () => activeFilteredItems.filter(a => !topStoryKeys.has(storyKey(a)) && !isPromoItem(a)),
       [activeFilteredItems, topStoryKeys]);
     const sopShownKeys = useMemo(() => {
       const ranked = rankClusters(sopSourceItems, { max: 2, limit: 5 });
@@ -10828,8 +10829,10 @@ export default function App() {
         <MarketsSurface mkt={mkt} loading={mktLoading} error={mktErr}/>
 
         {/* ── STATE OF PLAY — collapsible top-stories block (shared shell) ── */}
+        {/* D2: wire Breaking into the Markets/finance SoP (finance + business relevant). */}
         <StateOfPlay items={newsItems} meta={CATS.finance} onRead={onRead} formatDate={fmtDate}
-          collapsed={sopCollapsed} onToggleCollapse={toggleSop}/>
+          collapsed={sopCollapsed} onToggleCollapse={toggleSop}
+          breakingItems={(breakingItems||[]).filter(b=>b.cat==='finance'||b.cat==='business').slice(0,3)}/>
 
         <div className="fin-grid">
           <div className="fin-main">
