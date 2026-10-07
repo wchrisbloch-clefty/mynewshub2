@@ -6672,7 +6672,7 @@ function GithubSignal() {
 
 // ─── GHOST SIDEBAR ────────────────────────────────────────────────────────────
 function Sidebar({cat, arts, kw, health, activeKw, setActiveKw, activeSource, setActiveSource, onRead, scores, scoresLoading, showScoreboard, recommended, showBriefing, onOpenBriefing, briefingExcludeCats, onTopicOpen, trendingItems, isTopicFollowed, toggleTopic, onTrendingOpen,
-  sopItems, sopGapItems, sopMeta, sopCollapsed, onToggleSop, formatDate, acrossSections, onAcrossSeeAll, followingModule, sopBreakingItems, feeds, onToggleFeed, favTeams}) {
+  sopItems, sopGapItems, sopMeta, sopCollapsed, onToggleSop, formatDate, acrossSections, onAcrossSeeAll, followingModule, sopBreakingItems, feeds, onToggleFeed, favTeams, onAsk}) {
   const cc = CATS[cat]||CATS.general;
   const catKws = kw[cat]||[];
   const catArts = arts[cat]||[];
@@ -6760,7 +6760,7 @@ function Sidebar({cat, arts, kw, health, activeKw, setActiveKw, activeSource, se
             sidebar-module styling, Coverage-Gap rows in a stacked (non-inline) layout. */}
       {sopItems && !activeKw && !activeSource && (
         <StateOfPlay variant="sidebar" items={sopItems} gapItems={sopGapItems||[]} breakingItems={sopBreakingItems||[]}
-          meta={sopMeta||cc} onRead={onRead} formatDate={formatDate||fmtDate}
+          meta={sopMeta||cc} onRead={onRead} onAsk={onAsk} formatDate={formatDate||fmtDate}
           collapsed={sopCollapsed} onToggleCollapse={onToggleSop}/>
       )}
 
@@ -8748,6 +8748,23 @@ export default function App() {
     [arts]
   );
 
+  // D7: the page the chat is grounded on. ChatBot answers from THIS page's headlines
+  // first, names the page in the model prompt, and shows a context chip. Category-level
+  // headlines (<=25) + State of Play (<=8) — the sizes are capped to hold the
+  // per-turn prompt growth within budget.
+  const pageContext = useMemo(() => {
+    const category = tab;
+    const cc = CATS[category] || CATS.general;
+    const subcategory = activeKw || activeSrc || null;
+    const entity = (activeTeam && (activeTeam.team || activeTeam.match)) || null;
+    const pool = arts[category] || [];
+    const ageOf = d => { const m = d ? Math.round((Date.now() - new Date(d)) / 60000) : null; return m == null ? '' : m < 60 ? `${m}m` : `${Math.round(m / 60)}h`; };
+    const visibleHeadlines = pool.slice(0, 25).map(a => ({ title: a.title, source: a.source, age: ageOf(a.pubDate) }));
+    const stateOfPlay = rankClusters(pool, { max: 2, limit: 8 }).map(a => a.title);
+    const label = entity ? `${cc.label} › ${entity}` : subcategory ? `${cc.label} › ${subcategory}` : cc.label;
+    return { tab, category, subcategory, entity, label, visibleHeadlines, stateOfPlay };
+  }, [tab, activeKw, activeSrc, activeTeam, arts]);
+
   const kwMatch = useCallback(
     (a,cat)=>(kw[cat]||[]).filter(k=>(a.title+(a.desc||'')).toLowerCase().includes(k.toLowerCase())),
     [kw]
@@ -9452,7 +9469,7 @@ export default function App() {
                 {/* Coverage Gap is folded into this list as "Not in your sources" rows
                     (Pass G item 9) — no standalone "You may be missing this" panel. */}
                 {/* D2: wire Breaking into the Sports team/league page SoP (sports-relevant only). */}
-                <StateOfPlay items={teamItems} meta={CATS.sports} onRead={onRead} formatDate={fmtDate}
+                <StateOfPlay items={teamItems} meta={CATS.sports} onRead={onRead} onAsk={setChatContext} formatDate={fmtDate}
                   collapsed={sopCollapsed} onToggleCollapse={toggleSop} gapItems={teamGapItems}
                   breakingItems={(breakingItems||[]).filter(b=>b.cat==='sports').slice(0,3)}/>
                 <TrendingPills label={`Trending · ${teamName}`} items={teamItems} onOpen={t=>setSearch(t.toLowerCase())} isTopicFollowed={isTopicFollowed} toggleTopic={toggleTopic}/>
@@ -9462,13 +9479,13 @@ export default function App() {
                   : <div className="snap-feed">
                       {teamItems.slice(0,20).map((a,i)=>(
                         <Fragment key={a.link||i}>
-                          <SnapshotCard a={a} meta={CATS.sports} isSaved={isSavedFn(a)} onSave={onSave} onRead={onRead} onPerspectives={setPerspArticle} formatDate={fmtDate} hideImage={i>=3}/>
+                          <SnapshotCard a={a} meta={CATS.sports} isSaved={isSavedFn(a)} onSave={onSave} onRead={onRead} onPerspectives={setPerspArticle} onAsk={setChatContext} formatDate={fmtDate} hideImage={i>=3}/>
                           {i===2 && <XPulse topic={teamName} variant="feed"/>}
                         </Fragment>
                       ))}
                     </div>}
               </div>
-              <Sidebar cat="sports" arts={arts} kw={kw} health={health}
+              <Sidebar cat="sports" arts={arts} kw={kw} health={health} onAsk={setChatContext}
                 activeKw={activeKw} setActiveKw={k=>{setActiveKw(k);setActiveSrc(null);}}
                 activeSource={activeSrc} setActiveSource={s=>{setActiveSrc(s);setActiveKw(null);}}
                 onRead={onRead} scores={scores} scoresLoading={scoresLoading} showScoreboard={false}
@@ -9649,7 +9666,7 @@ export default function App() {
               • Team hub (activeTeam set) → SHOW, scoped to that team (sportItems is
                 already team-filtered). The Tier-3 team page renders its own in-column
                 StateOfPlay in the teamName block above. */}
-          <Sidebar cat="sports" arts={arts} kw={kw} health={health}
+          <Sidebar cat="sports" arts={arts} kw={kw} health={health} onAsk={setChatContext}
             activeKw={activeKw} setActiveKw={k=>{setActiveKw(k);setActiveSrc(null);}}
             activeSource={activeSrc} setActiveSource={s=>{setActiveSrc(s);setActiveKw(null);}}
             onRead={onRead} scores={scores} scoresLoading={scoresLoading}
@@ -9686,7 +9703,7 @@ export default function App() {
           </div>
         </div>
         {/* D2: wire Breaking into the entity hub SoP (this entity's category only). */}
-        <StateOfPlay items={entityItems} meta={cc} onRead={onRead} formatDate={fmtDate}
+        <StateOfPlay items={entityItems} meta={cc} onRead={onRead} onAsk={setChatContext} formatDate={fmtDate}
           breakingItems={(breakingItems||[]).filter(b=>b.cat===cat).slice(0,3)}/>
         <TrendingPills label={`Trending · ${entity}`} items={entityItems} onOpen={t => navigate(cat, 'topic', teamSlug(t))} isTopicFollowed={isTopicFollowed} toggleTopic={toggleTopic}/>
         <SourcesDisagree topic={entity} items={entityItems}/>
@@ -9695,7 +9712,7 @@ export default function App() {
           : <div className="snap-feed">
               {entityItems.slice(0, 20).map((a, i) => (
                 <Fragment key={a.link || i}>
-                  <SnapshotCard a={a} meta={cc} isSaved={isSavedFn(a)} onSave={onSave} onRead={onRead} onPerspectives={setPerspArticle} formatDate={fmtDate} hideImage={i>=3}/>
+                  <SnapshotCard a={a} meta={cc} isSaved={isSavedFn(a)} onSave={onSave} onRead={onRead} onPerspectives={setPerspArticle} onAsk={setChatContext} formatDate={fmtDate} hideImage={i>=3}/>
                   {i === 2 && <XPulse topic={entity} variant="feed"/>}
                 </Fragment>
               ))}
@@ -10091,7 +10108,7 @@ export default function App() {
         {!activeKw && !activeSrc && !search && (
           <div className="sop-hoist">
             <StateOfPlay variant="sidebar" items={sopSourceItems} gapItems={gapItems} breakingItems={catBreaking}
-              meta={CATS[cat]||CATS.general} onRead={onRead} formatDate={fmtDate}
+              meta={CATS[cat]||CATS.general} onRead={onRead} onAsk={setChatContext} formatDate={fmtDate}
               collapsed={sopCollapsed} onToggleCollapse={toggleSop}/>
           </div>
         )}
@@ -10115,7 +10132,7 @@ export default function App() {
 
         {/* ── HOME: Houston local row ── */}
         {isHome && !activeKw && !activeSrc && !search && (
-          <HoustonRow items={houstonItems} onRead={onRead} formatDate={fmtDate}/>
+          <HoustonRow items={houstonItems} onRead={onRead} onAsk={setChatContext} formatDate={fmtDate}/>
         )}
 
             <div className="page-header-row">
@@ -10185,7 +10202,7 @@ export default function App() {
                   {cat==='tech' && !activeKw && !activeSrc && !search && <GithubSignal/>}
                   {(activeKw||activeSrc||search ? feedItems.slice(0,20) : dedupedFeed.slice(0,20)).map((a,i)=>(
                     <Fragment key={a.link||i}>
-                      <SnapshotCard a={a} meta={CATS[cat]||CATS.general} isSaved={isSavedFn(a)} onSave={onSave} onRead={onRead} onPerspectives={setPerspArticle} formatDate={fmtDate} hideImage={i>=3}/>
+                      <SnapshotCard a={a} meta={CATS[cat]||CATS.general} isSaved={isSavedFn(a)} onSave={onSave} onRead={onRead} onPerspectives={setPerspArticle} onAsk={setChatContext} formatDate={fmtDate} hideImage={i>=3}/>
                       {i===2 && <XPulse topic={cc?.label||cat} variant="feed"/>}
                     </Fragment>
                   ))}
@@ -10302,7 +10319,7 @@ export default function App() {
             <SocialFollows cat={cat} social={social}/>
             <SourceFooter cat={cat} feeds={feeds} arts={arts}/>
           </div>{/* /feed-col */}
-          <Sidebar cat={cat} arts={arts} kw={kw} health={health}
+          <Sidebar cat={cat} arts={arts} kw={kw} health={health} onAsk={setChatContext}
             activeKw={activeKw} setActiveKw={k=>{setActiveKw(k);setActiveSrc(null);}}
             activeSource={activeSrc} setActiveSource={s=>{setActiveSrc(s);setActiveKw(null);}}
             onRead={onRead} scores={scores} scoresLoading={scoresLoading}
@@ -10838,7 +10855,7 @@ export default function App() {
 
         {/* ── STATE OF PLAY — collapsible top-stories block (shared shell) ── */}
         {/* D2: wire Breaking into the Markets/finance SoP (finance + business relevant). */}
-        <StateOfPlay items={newsItems} meta={CATS.finance} onRead={onRead} formatDate={fmtDate}
+        <StateOfPlay items={newsItems} meta={CATS.finance} onRead={onRead} onAsk={setChatContext} formatDate={fmtDate}
           collapsed={sopCollapsed} onToggleCollapse={toggleSop}
           breakingItems={(breakingItems||[]).filter(b=>b.cat==='finance'||b.cat==='business').slice(0,3)}/>
 
@@ -10947,7 +10964,7 @@ export default function App() {
                 :<div className="snap-feed" style={{padding:'12px 0 0'}}>
                     {newsItems.slice(0, 15).map((a, i) => (
                       <Fragment key={a.link||i}>
-                        <SnapshotCard a={a} meta={CATS.finance} isSaved={isSavedFn(a)} onSave={onSave} onRead={onRead} onPerspectives={setPerspArticle} formatDate={fmtDate} hideImage={i>=3}/>
+                        <SnapshotCard a={a} meta={CATS.finance} isSaved={isSavedFn(a)} onSave={onSave} onRead={onRead} onPerspectives={setPerspArticle} onAsk={setChatContext} formatDate={fmtDate} hideImage={i>=3}/>
                         {i===2 && <XPulse topic="Markets" variant="feed"/>}
                       </Fragment>
                     ))}
@@ -10957,7 +10974,7 @@ export default function App() {
               <SourceFooter cat="finance" feeds={feeds} arts={arts}/>
             </section>
           </div>
-          <Sidebar cat="finance" arts={arts} kw={kw} health={health}
+          <Sidebar cat="finance" arts={arts} kw={kw} health={health} onAsk={setChatContext}
             activeKw={activeKw} setActiveKw={k=>{setActiveKw(k);setActiveSrc(null);}}
             activeSource={activeSrc} setActiveSource={s=>{setActiveSrc(s);setActiveKw(null);}}
             onTopicOpen={label => navigate('finance', 'topic', teamSlug(label))}
@@ -11054,6 +11071,7 @@ export default function App() {
         fetchWebSearch={fetchWebSearch}
         chatContext={chatContext}
         onClearContext={()=>setChatContext(null)}
+        pageContext={pageContext}
         resolveDeepLink={({entities})=>{ for(const [lg,names] of Object.entries(TEAM_CHIPS)){ const hit=names.find(n=>{const w=n.toLowerCase().split(' ');return w.some(x=>entities.includes(x))||entities.some(k=>k.length>3&&n.toLowerCase().includes(k));}); if(hit) return `/sports/${lg}/${teamSlug(hit)}`; } return null; }}/>
       {/* Inline article reader overlay */}
       {readerArticle && <ArticleReader article={readerArticle} onClose={() => setReaderArticle(null)} onAskInChat={(a)=>setChatContext(a)}/>}

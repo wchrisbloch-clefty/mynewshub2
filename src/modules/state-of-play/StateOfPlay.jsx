@@ -27,7 +27,7 @@ import './StateOfPlay.css';
 
 const defaultFormatDate = d => { try { return new Date(d).toLocaleString(); } catch { return ''; } };
 
-export function StateOfPlay({ items, meta = {}, onRead, formatDate = defaultFormatDate, collapsed = false, onToggleCollapse, gapItems = [], breakingItems = [], variant = 'strip' }) {
+export function StateOfPlay({ items, meta = {}, onRead, onAsk, formatDate = defaultFormatDate, collapsed = false, onToggleCollapse, gapItems = [], breakingItems = [], variant = 'strip' }) {
   const color = meta.color;
   const label = meta.label || '';
   const sidebar = variant === 'sidebar';
@@ -59,26 +59,30 @@ export function StateOfPlay({ items, meta = {}, onRead, formatDate = defaultForm
       </div>
       <div className="sop-list" style={collapsed ? { display: 'none' } : undefined}>
         {breaking.map((b, i) => (
-          <button key={b.link || `brk-${i}`} className="sop-item sop-item-breaking"
-            onClick={() => onRead(b)} title={b._breakingWhy ? `Breaking — ${b._breakingWhy}` : 'Breaking'}>
+          <div key={b.link || `brk-${i}`} className="sop-item sop-item-breaking" role="button" tabIndex={0}
+            onClick={() => onRead(b)} onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onRead(b); } }}
+            title={b._breakingWhy ? `Breaking — ${b._breakingWhy}` : 'Breaking'}>
             <span className="sop-brk-dot" aria-hidden="true"/>
             <span className="sop-item-title">{b.title}</span>
             <span className="sop-item-meta">
               {/* D2: "why it's breaking" — e.g. "4 outlets · 38m" — in place of the bare time. */}
               <span className="sop-brk-tag">Breaking</span>
               <span className="sop-item-time">{b._breakingWhy || formatDate(b.pubDate)}</span>
+              {onAsk && <button className="sop-ask" onClick={e => { e.stopPropagation(); onAsk(b); }} aria-label="Ask about this story" title="Ask the assistant">Ask</button>}
             </span>
-          </button>
+          </div>
         ))}
         {top.map((a, i) => (
-          <button key={a.link || i} className="sop-item" onClick={() => onRead(a)}>
+          <div key={a.link || i} className="sop-item" role="button" tabIndex={0}
+            onClick={() => onRead(a)} onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onRead(a); } }}>
             <span className="sop-num" style={{ color }}>{String(i + 1).padStart(2, '0')}</span>
             <span className="sop-item-title">{a.title}</span>
             <span className="sop-item-meta">
               {a._clusterSize > 1 && <span className="sop-item-sources">{a._clusterSize} sources</span>}
               <span className="sop-item-time">{formatDate(a.pubDate)}</span>
+              {onAsk && <button className="sop-ask" onClick={e => { e.stopPropagation(); onAsk(a); }} aria-label="Ask about this story" title="Ask the assistant">Ask</button>}
             </span>
-          </button>
+          </div>
         ))}
         {gaps.map((g, i) => {
           const outlets = (g.outlets && g.outlets.length ? g.outlets : [g.source]).filter(Boolean);

@@ -49,6 +49,11 @@
 .snap-single{font-family:var(--font-publicsans);font-size:var(--fs-meta);color:var(--text3);}
 .snap-save{background:none;border:1px solid var(--border);border-radius:8px;padding:5px 8px;cursor:pointer;color:var(--text3);flex-shrink:0;display:flex;align-items:center;transition:color 0.12s,border-color 0.12s;}
 .snap-save:hover,.snap-save.saved{color:var(--accent);border-color:var(--accent);}
+/* D7: Ask-this-story action, grouped with Save. */
+.snap-foot-actions{display:inline-flex;align-items:center;gap:8px;flex-shrink:0;}
+.snap-ask{background:none;border:1px solid var(--border);border-radius:8px;padding:5px 10px;cursor:pointer;color:var(--text3);display:inline-flex;align-items:center;gap:5px;font-family:var(--font-publicsans);font-size:var(--fs-meta);font-weight:700;transition:color 0.12s,border-color 0.12s;}
+.snap-ask:hover{color:var(--accent);border-color:var(--accent);}
+@media(max-width:640px){ .snap-ask{min-height:44px;} .snap-save{min-height:44px;} }
 /* Thumbnail is a FIXED size, capped regardless of the column/main-column width, so
    standard feed cards stay headline-forward and balanced against the sidebar. Height
    is capped too so a tall card can't stretch the image into a large square. (The
