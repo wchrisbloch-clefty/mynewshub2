@@ -22,9 +22,12 @@ is no in-app reader and no AI summarisation anywhere in this feature.
 - **X:** the existing x-pulse lane — **click-to-load only** (it costs money); never auto-fetched.
 
 ## Caching (no new infrastructure)
-- `/api/voices-resolve` (GET) and `/api/voices-signals` set `s-maxage=86400,
-  stale-while-revalidate=86400` — 24h CDN cache, no KV. `voices-resolve` is a GET keyed by
-  name/type so repeat discovery is free; `voices-signals` is POST (CDNs generally don't cache
+- All Voices endpoints are folded into the existing `/api/signals` function as `kind=`
+  routes (`voice-resolve`, `voice-signals`, `voice-test`, `voice-search`) — Vercel's Hobby
+  plan caps a deployment at 12 Serverless Functions, so they add no new function.
+- `kind=voice-resolve` (GET) and `kind=voice-search` (GET) set `s-maxage=86400,
+  stale-while-revalidate=86400` — 24h CDN cache, no KV. They are GETs keyed by
+  name/type/handle so repeat discovery + Lane 1 are free; `kind=voice-signals` is POST (CDNs generally don't cache
   POST), so its repeat cost is bounded by the client's load-once-per-category behaviour.
 
 ## Cost projection (Serper, current free allowance)

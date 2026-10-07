@@ -8859,7 +8859,7 @@ export default function App() {
     addOrUpdateVoice(v);
     setVoiceResolve({ voice: v, loading: true, data: null });
     try {
-      const r = await fetchWithTimeout(`/api/voices-resolve?name=${encodeURIComponent(v.name)}&type=${encodeURIComponent(v.type)}`, 9000);
+      const r = await fetchWithTimeout(`/api/signals?kind=voice-resolve&name=${encodeURIComponent(v.name)}&type=${encodeURIComponent(v.type)}`, 9000);
       const data = r.ok ? await r.json() : { enabled: false, note: `Discovery unavailable (HTTP ${r.status}).`, platforms: {} };
       setVoiceResolve(cur => cur && cur.voice.id === v.id ? { ...cur, loading: false, data } : cur);
     } catch (e) {
@@ -8884,7 +8884,7 @@ export default function App() {
     const tiles = [];
     // Free server lanes (YouTube + RSSHub). Lane 1 search is a separate GET below.
     try {
-      const r = await fetchWithTimeout('/api/voices-signals', 10000, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ voices: relevant, category: cat, limit: 8 }) });
+      const r = await fetchWithTimeout('/api/signals?kind=voice-signals', 10000, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ voices: relevant, category: cat, limit: 8 }) });
       const d = r.ok ? await r.json() : { tiles: [], failures: [{ source: 'voices', reason: `HTTP ${r.status}` }] };
       (d.tiles || []).forEach(t => tiles.push(t));
       (d.failures || []).forEach(f => failures.push(f));
@@ -8897,7 +8897,7 @@ export default function App() {
       if (cached && cached.t && (Date.now() - cached.t) < 86400000) { if (cached.tile) tiles.push(cached.tile); return; }
       try {
         const pk = Object.keys(v.handles)[0] || 'x';
-        const r = await fetchWithTimeout(`/api/voice-search?q=${encodeURIComponent(v.name)}&handle=${encodeURIComponent(v.handles[pk] || '')}&platform=${encodeURIComponent(pk)}`, 9000);
+        const r = await fetchWithTimeout(`/api/signals?kind=voice-search&q=${encodeURIComponent(v.name)}&handle=${encodeURIComponent(v.handles[pk] || '')}&platform=${encodeURIComponent(pk)}`, 9000);
         if (r.ok) { const d = await r.json(); if (d.tile) tiles.push(d.tile); sv(ck, { t: Date.now(), tile: d.tile || null }); }
         else failures.push({ source: `${v.name} · search`, reason: `HTTP ${r.status}` });
       } catch { failures.push({ source: `${v.name} · search`, reason: 'unreachable' }); }
@@ -8973,7 +8973,7 @@ export default function App() {
     if (!confirmed.length) { setVoicesTest({ loading: false, summary: 'No confirmed voices to test.', results: [] }); return; }
     setVoicesTest({ loading: true, summary: 'Testing…', results: [] });
     try {
-      const r = await fetchWithTimeout('/api/voices-test', 20000, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ voices: confirmed }) });
+      const r = await fetchWithTimeout('/api/signals?kind=voice-test', 20000, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ voices: confirmed }) });
       const d = r.ok ? await r.json() : { results: [], summary: { total: 0, ok: 0, failed: 0 } };
       const s = d.summary || {};
       setVoicesTest({ loading: false, summary: `${s.ok || 0} ok · ${s.failed || 0} failed · ${s.unverifiable || 0} unverifiable`, results: d.results || [] });
