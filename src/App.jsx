@@ -40,6 +40,7 @@ import { useState, useEffect, useLayoutEffect, useCallback, useMemo, useRef, Fra
 // Extracted, dependency-isolated capability modules (see src/modules/*/README.md)
 import { clusterStories, hotClusterTopics, rankClusters, TREND_STOP, decodeEntities, capByPublisher } from './modules/clustering';
 import { qualifyBreaking, isPromoItem } from './modules/breaking';
+import { DEBUG, dbgRender, dbgPoll, DebugOverlay } from './modules/debug';
 import { extractContent, extractionFallbackMessage } from './modules/extractor';
 import { retrieveFeedContext, buildFeedContextBlock } from './modules/retrieval';
 import { XPulse } from './modules/x-pulse';
@@ -8528,6 +8529,7 @@ function AuthModal({ onClose, onSend, status, email, setEmail, userId, onSignOut
 }
 
 export default function App() {
+  dbgRender('App'); // D8: ?debug=1 render counter (no-op when the flag is off)
   const [tab, setTab]           = useState(()=>parseRoute().category);
   const [subcat, setSubcat]     = useState(()=>parseRoute().subcategory); // URL-driven subcategory
   const [tertiary, setTertiary] = useState(()=>parseRoute().tertiary);    // URL-driven team (Tier 3)
@@ -8794,7 +8796,9 @@ export default function App() {
     }
     arr.sort((a,b)=>{const ka=kwMatch(a,cat).length,kb=kwMatch(b,cat).length;if(kb!==ka)return kb-ka;return new Date(b.pubDate)-new Date(a.pubDate);});
     return arr.map(a=>({...a,matchedKw:kwMatch(a,cat)}));
-  },[arts,search,activeKw,activeSrc,kwMatch,urgent,specificCatKeys]);
+  // D8: dropped the stale `urgent` dep — after D2 `sorted` no longer reads it, so
+  // keeping it only forced needless recomputes (new array identity) whenever urgent changed.
+  },[arts,search,activeKw,activeSrc,kwMatch,specificCatKeys]);
 
   const loadCat = useCallback(async (cat)=>{
     setLoading(l=>({...l,[cat]:true}));
@@ -8901,7 +8905,7 @@ export default function App() {
   useEffect(()=>{
     if (tab !== 'sports' || !hasLiveGame) return;
     let stopped = false;
-    const tick = () => { if (typeof document!=='undefined' && document.hidden) return; loadScores(); };
+    const tick = () => { if (typeof document!=='undefined' && document.hidden) return; dbgPoll('live-scores'); loadScores(); };
     const iv = setInterval(tick, 120000);
     const onVis = () => { if (!document.hidden && !stopped) loadScores(); };
     document.addEventListener('visibilitychange', onVis);
@@ -9178,6 +9182,7 @@ export default function App() {
   // NBA/MLB/CFB/CBB), favorite team pills with external links, then prioritized
   // stories feed. Yahoo Sports' actual layout pattern.
   const SportsPage = () => {
+    dbgRender('SportsPage'); // D8: ?debug=1 render counter (no-op when off)
     // Phase 2: subcategory comes from the URL (never local state). Chips navigate.
     const sportTab = subcat || 'all'; // 'all' | 'nfl' | 'nba' | 'mlb' | 'cfb' | 'cbb' | 'cbase' | 'racing' | 'golf'
     const setSportTab = (key) => navigate('sports', key === 'all' ? null : key);
@@ -9256,7 +9261,12 @@ export default function App() {
     }, [sportTab]);
 
     const cc = CATS.sports;
-    const allItems = sorted('sports');
+    // D8: memoize — `sorted('sports')` returns a NEW array of NEW objects every call,
+    // so calling it raw gave `allItems` a fresh identity each render, which made the
+    // `sportItems` and `teamItems` memos (that depend on it) recompute on EVERY render
+    // and never cache. `sorted` is a stable useCallback, so this recomputes only when
+    // its inputs actually change.
+    const allItems = useMemo(() => sorted('sports'), [sorted]);
     const isLoading = loading.sports;
 
     // Filter scoreboard by sport tab
@@ -11073,6 +11083,8 @@ export default function App() {
         onClearContext={()=>setChatContext(null)}
         pageContext={pageContext}
         resolveDeepLink={({entities})=>{ for(const [lg,names] of Object.entries(TEAM_CHIPS)){ const hit=names.find(n=>{const w=n.toLowerCase().split(' ');return w.some(x=>entities.includes(x))||entities.some(k=>k.length>3&&n.toLowerCase().includes(k));}); if(hit) return `/sports/${lg}/${teamSlug(hit)}`; } return null; }}/>
+      {/* D8: ?debug=1 scroll/render overlay (renders null unless the flag is on). */}
+      <DebugOverlay/>
       {/* Inline article reader overlay */}
       {readerArticle && <ArticleReader article={readerArticle} onClose={() => setReaderArticle(null)} onAskInChat={(a)=>setChatContext(a)}/>}
       {/* Perspectives panel (sources + X Pulse + AI key points) */}
