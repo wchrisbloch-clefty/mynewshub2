@@ -1588,7 +1588,7 @@ body{
 .entity-hub-btn:hover{border-color:var(--accent);color:var(--accent);}
 .entity-hub-btn.on{color:var(--amber);border-color:var(--amber);}
 .following-chip:hover{border-color:var(--accent);}
-.following-chip-name{font-size:12px;font-weight:600;color:var(--accent);}
+.following-chip-name{font-size:var(--fs-meta);font-weight:600;color:var(--accent);}/* D4: tokenized (was 12px) */
 .following-chip-x{background:none;border:none;color:var(--text3);cursor:pointer;font-size:15px;line-height:1;padding:0 2px;border-radius:50%;}
 .following-chip-x:hover{color:var(--neg);}
 .following-chip-x:focus-visible{outline:2px solid var(--accent);outline-offset:1px;}
@@ -1815,6 +1815,13 @@ body:not(.dark) .pill-bar{
 ═══════════════════════════════════════════ */
 .page{max-width:1400px;margin:0 auto;padding:28px 24px;}
 .page-grid{display:grid;grid-template-columns:2.1fr 1fr;gap:28px;align-items:start;} /* main ~68% / sidebar ~32% (CNBC/NBC ratio) */
+/* D4: reclaim the wasted side gutters on large screens — the whole shell (header
+   bars + content) grows from 1400 to 1560 at >=1440px so the main column gets wider
+   instead of sitting small between big margins. The 2.1/1 grid keeps line length sane. */
+@media (min-width:1440px){
+  .status-strip-inner,.pill-bar-inner,.nav-bar-inner,.page,
+  .topbar-wx .rnw-card,.topbar-scores .home-scores{max-width:1560px;}
+}
 .feed-col{display:flex;flex-direction:column;gap:0;min-width:0;} /* min-width:0 so the column shrinks to its grid track instead of its content width */
 /* State of Play lives in the sidebar on desktop; the main-column hoisted copy is
    hidden here and only shown ≤1100px (see the single-column media block). */
@@ -2118,7 +2125,8 @@ body:not(.dark) .pill-bar{
 .pm-prob.pm-lo{color:var(--neg);}
 .pm-prob.pm-mid{color:var(--text2);}
 .pm-body{display:flex;flex-direction:column;gap:2px;min-width:0;}
-.pm-q{font-family:var(--font-publicsans);font-size:12px;font-weight:600;line-height:1.3;color:var(--text);display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;overflow-wrap:anywhere;}
+/* D4: tokenized (was 12px) — sidebar body tracks the main body scale. */
+.pm-q{font-family:var(--font-publicsans);font-size:var(--fs-body);font-weight:600;line-height:1.3;color:var(--text);display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;overflow-wrap:anywhere;}
 .pm-src{font-family:var(--font-publicsans);font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:0.03em;color:var(--text3);}
 .ttp-chips{display:flex;flex-wrap:wrap;gap:6px;}
 /* a11y (row 117): the pill is a non-interactive wrapper; the primary "filter by topic"
@@ -2152,7 +2160,7 @@ body:not(.dark) .pill-bar{
 .sb-across-clabel:hover{text-decoration:underline;}
 .sb-across-item{cursor:pointer;padding:5px 0;border-top:1px solid var(--border2);}
 .sb-across-cat .sb-across-item:first-of-type{border-top:none;}
-.sb-across-title{font-family:var(--font-archivo);font-weight:600;font-size:12px;line-height:1.3;color:var(--text);display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;}
+.sb-across-title{font-family:var(--font-archivo);font-weight:600;font-size:var(--fs-body);line-height:1.3;color:var(--text);display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;}/* D4: tokenized (was 12px) */
 .sb-across-item:hover .sb-across-title{color:var(--accent);}
 .sb-across-src{font-size:10px;color:var(--text3);margin-top:2px;}
 

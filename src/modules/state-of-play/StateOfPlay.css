@@ -37,8 +37,9 @@
 .sop-sidebar .sop-label{border-left:none;padding-left:0;font-family:var(--font-publicsans);font-size:10px;font-weight:800;color:var(--text3);letter-spacing:0.14em;}
 .sop-sidebar .sop-collapse{margin-left:auto;}
 .sop-sidebar .sop-item{flex-wrap:wrap;align-items:flex-start;padding:9px 0;gap:3px 8px;}
-.sop-sidebar .sop-num{font-size:13px;min-width:18px;}
-.sop-sidebar .sop-item-title{font-size:13px;line-height:1.32;}
+/* D4: tokenized (was 13px) — sidebar rows track the main body scale. */
+.sop-sidebar .sop-num{font-size:var(--fs-body);min-width:18px;}
+.sop-sidebar .sop-item-title{font-size:var(--fs-body);line-height:1.32;}
 .sop-sidebar .sop-item-meta{width:100%;padding-left:26px;justify-content:flex-start;gap:6px;flex-shrink:1;}
 .sop-sidebar .sop-item-time{font-size:10px;}
 .sop-sidebar .sop-item-sources{font-size:9px;padding:1px 6px;}
