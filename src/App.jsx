@@ -43,6 +43,7 @@ import { qualifyBreaking, isPromoItem } from './modules/breaking';
 import { DEBUG, dbgRender, dbgPoll, DebugOverlay } from './modules/debug';
 import { makeVoice, upsertVoice, removeVoice as removeVoiceModel, mergeVoices, clearTombstone, voiceId, VOICE_PLATFORMS } from './modules/voices/model';
 import { SEED_VOICES } from './modules/voices/seeds';
+import { ResolveModal } from './modules/voices/ResolveModal';
 import { extractContent, extractionFallbackMessage } from './modules/extractor';
 import { retrieveFeedContext, buildFeedContextBlock } from './modules/retrieval';
 import { XPulse } from './modules/x-pulse';
@@ -7200,14 +7201,14 @@ function CustomizePanel({feeds, kw, alerts, urgent, social, watchlist, teams, he
               <div className="cp-desc">People, businesses and teams whose posts across X, Instagram, LinkedIn, TikTok and YouTube get flagged in the matching category. Voices are always labeled <strong>inferred</strong>; clicking a tile opens the platform — nothing is read in-app.{!searchKeyPresent && <> <strong>Add a search key (SEARCH_API_KEY) to enable discovery</strong> — you can still add handles manually.</>}</div>
               {/* Add a voice */}
               <div className="cp-src-add">
-                <input className="cp-input" placeholder="Name (person, business or team)…" value={vName} onChange={e=>setVName(e.target.value)} onKeyDown={e=>{if(e.key==='Enter'&&vName.trim()){onAddVoice&&onAddVoice({name:vName.trim(),type:vType,category:voiceCat});setVName('');}}}/>
+                <input className="cp-input" placeholder="Name (person, business or team)…" value={vName} onChange={e=>setVName(e.target.value)} onKeyDown={e=>{if(e.key==='Enter'&&vName.trim()){(onResolveVoice||onAddVoice)({name:vName.trim(),type:vType,category:voiceCat});setVName('');}}}/>
                 <select className="cp-input" value={vType} onChange={e=>setVType(e.target.value)} aria-label="Type">
                   <option value="person">Person</option><option value="org">Business / Org</option><option value="team">Team</option>
                 </select>
                 <select className="cp-input" value={voiceCat} onChange={e=>setVoiceCat(e.target.value)} aria-label="Category">
                   {VOICE_CATS.map(c=><option key={c} value={c}>{(CATS[c]||{}).label||c}</option>)}
                 </select>
-                <button className="cp-btn" onClick={()=>{ if(vName.trim()){ onAddVoice&&onAddVoice({name:vName.trim(),type:vType,category:voiceCat}); setVName(''); } }}>Add</button>
+                <button className="cp-btn" onClick={()=>{ if(vName.trim()){ (onResolveVoice||onAddVoice)({name:vName.trim(),type:vType,category:voiceCat}); setVName(''); } }}>Add</button>
               </div>
               {onTestVoices && (
                 <div style={{display:'flex',gap:'8px',margin:'4px 0 10px'}}>
@@ -8784,6 +8785,32 @@ export default function App() {
       sv('voices', n); return n;
     });
   }, []);
+  // E2: add+confirm discovery. resolveVoice ensures the voice exists (as unconfirmed) and
+  // opens the modal; the server /api/voices-resolve returns per-platform candidates; the
+  // user accepts per platform — only then is a handle stored (never a guess).
+  const [voiceResolve, setVoiceResolve] = useState(null); // { voice, loading, data }
+  const resolveVoiceFlow = useCallback(async (partial) => {
+    const v = partial.id ? partial : makeVoice({ ...partial, status: partial.status || 'unconfirmed' });
+    addOrUpdateVoice(v);
+    setVoiceResolve({ voice: v, loading: true, data: null });
+    try {
+      const r = await fetchWithTimeout(`/api/voices-resolve?name=${encodeURIComponent(v.name)}&type=${encodeURIComponent(v.type)}`, 9000);
+      const data = r.ok ? await r.json() : { enabled: false, note: `Discovery unavailable (HTTP ${r.status}).`, platforms: {} };
+      setVoiceResolve(cur => cur && cur.voice.id === v.id ? { ...cur, loading: false, data } : cur);
+    } catch (e) {
+      setVoiceResolve(cur => cur && cur.voice.id === v.id ? { ...cur, loading: false, data: { enabled: false, note: 'Discovery unreachable — add handles manually.', platforms: {} } } : cur);
+    }
+  }, [addOrUpdateVoice]);
+  const acceptCandidate = useCallback((pk, cand) => {
+    setVoiceResolve(cur => {
+      if (!cur) return cur;
+      const v = cur.voice;
+      const handles = { ...(v.handles || {}), [pk]: cand.handle };
+      const updated = { ...v, handles, status: 'confirmed', confirmedAt: Date.now() };
+      addOrUpdateVoice(updated);
+      return { ...cur, voice: updated };
+    });
+  }, [addOrUpdateVoice]);
   const [weatherCities, setWeatherCities] = useState(()=>ld('weatherCities', DEFAULT_WEATHER_CITIES));
   const [hiddenIndices, setHiddenIndices] = useState(()=>ld('hiddenIndices',[]));
   const [briefingExclude, setBriefingExclude] = useState(()=>ld('briefingExclude',['comedy']));
@@ -11241,8 +11268,10 @@ export default function App() {
           briefingSources={briefingSources}
           initialTab={panelInitial.tab} initialCat={panelInitial.cat}
           voices={voices} onAddVoice={addOrUpdateVoice} removeVoiceById={removeVoiceById} reorderVoice={reorderVoice}
-          onResolveVoice={undefined} onTestVoices={undefined} voicesTestSummary={''} searchKeyPresent={false}
+          onResolveVoice={resolveVoiceFlow} onTestVoices={undefined} voicesTestSummary={''} searchKeyPresent={false}
           onClose={()=>setShowPanel(false)} onSave={handleCustomizeSave}/>}
+        {/* E2: Voices add+confirm discovery modal. */}
+        {voiceResolve && <ResolveModal voice={voiceResolve.voice} state={voiceResolve} onAccept={acceptCandidate} onClose={()=>setVoiceResolve(null)}/>}
       </div>
       {/* Floating AI chatbot — available on all pages */}
       <ChatBot arts={arts}
