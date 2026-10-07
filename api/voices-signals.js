@@ -63,17 +63,21 @@ async function youtubeTiles(voice, failures) {
   } catch (e) { failures.push({ source: `${voice.name} · YouTube`, reason: e.name === 'TimeoutError' ? 'timeout' : 'error' }); return []; }
 }
 
+// E5 COST GUARD: Lane 1 (search snippets) is OFF by default. At scale it blows the free
+// search tier — see the cost report in the PR: ~1 search per voice per category open; for
+// 40 voices across a few sessions/day that is thousands of queries/month, well over Brave's
+// ~2,000/mo free tier (>50%). So Lane 1 runs only when VOICES_LANE1=1 (and a key exists),
+// and even then at most ONE search per voice (name-based), not per handle. Default tiles
+// come from the free Lane 2 (YouTube quota-guarded + RSSHub). One search per voice, capped.
+const LANE1_ON = () => process.env.VOICES_LANE1 === '1';
 async function lane1Tiles(voice, failures) {
-  const out = [];
-  const platforms = Object.keys(voice.handles || {});
-  await Promise.all(platforms.map(async pk => {
-    try {
-      const res = await searchWeb(`${voice.name} ${voice.handles[pk]} latest`, { limit: 2 });
-      if (res == null) return; // search disabled
-      for (const r of res.slice(0, 1)) out.push({ platform: pk, who: voice.name, handle: voice.handles[pk], url: r.url, title: r.title, ageHours: 24, _lane: 1 });
-    } catch { failures.push({ source: `${voice.name} · ${pk}`, reason: 'search error' }); }
-  }));
-  return out;
+  if (!LANE1_ON()) return [];
+  try {
+    const res = await searchWeb(`${voice.name} latest post`, { limit: 2 });
+    if (res == null) return []; // search disabled (no key)
+    const pk = Object.keys(voice.handles || {})[0] || 'x';
+    return res.slice(0, 1).map(r => ({ platform: pk, who: voice.name, handle: voice.handles[pk], url: r.url, title: r.title, ageHours: 24, _lane: 1 }));
+  } catch { failures.push({ source: `${voice.name} · search`, reason: 'search error' }); return []; }
 }
 
 export default async function handler(req, res) {

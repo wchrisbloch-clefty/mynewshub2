@@ -2708,6 +2708,15 @@ body:not(.dark) .pill-bar{
 .cp-seed-name{font-family:var(--font-sans);font-weight:700;font-size:var(--fs-body);color:var(--text);}
 .cp-seed-cat{font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:0.04em;}
 .cp-seed-actions{margin-left:auto;display:inline-flex;gap:6px;}
+/* E5: Test voices results */
+.cp-vtest{margin-top:8px;display:flex;flex-direction:column;gap:3px;}
+.cp-vtest-row{display:flex;align-items:center;gap:8px;font-family:var(--font-publicsans);font-size:var(--fs-meta);}
+.cp-vtest-dot{width:7px;height:7px;border-radius:50%;flex-shrink:0;}
+.cp-vtest-dot.ok{background:var(--pos,#0f9d58);}
+.cp-vtest-dot.fail{background:var(--neg,#d02f2f);}
+.cp-vtest-dot.unk{background:var(--amber,#b45309);}
+.cp-vtest-name{font-weight:700;color:var(--text);}
+.cp-vtest-reason{color:var(--text3);margin-left:auto;}
 .cp-voice-edit{width:100%;display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:6px;padding:8px 0 2px;}
 .cp-voice-hl{display:flex;flex-direction:column;gap:2px;font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:0.04em;}
 @media(max-width:640px){ .cp-voice-btn{min-width:44px;min-height:44px;} }
@@ -7016,7 +7025,7 @@ const CAT_LABELS = {general:'News',sports:'Sports',business:'Business',finance:'
 const PLAT_LABELS = {twitter:'𝕏',linkedin:'in',instagram:'IG',youtube:'▶'};
 
 function CustomizePanel({feeds, kw, alerts, urgent, social, watchlist, teams, health, arts, weatherCities, hiddenIndices, briefingExclude, briefingSources, initialTab, initialCat, onClose, onSave,
-  voices, onAddVoice, removeVoiceById, reorderVoice, onResolveVoice, onTestVoices, voicesTestSummary, searchKeyPresent,
+  voices, onAddVoice, removeVoiceById, reorderVoice, onResolveVoice, onTestVoices, voicesTest, searchKeyPresent,
   seedQueue, onAcceptSeed, onSkipSeed}) {
   const [lf, setLf] = useState(JSON.parse(JSON.stringify(feeds)));
   const [lk, setLk] = useState(JSON.parse(JSON.stringify(kw)));
@@ -7225,9 +7234,23 @@ function CustomizePanel({feeds, kw, alerts, urgent, social, watchlist, teams, he
                 <button className="cp-btn" onClick={()=>{ if(vName.trim()){ (onResolveVoice||onAddVoice)({name:vName.trim(),type:vType,category:voiceCat}); setVName(''); } }}>Add</button>
               </div>
               {onTestVoices && (
-                <div style={{display:'flex',gap:'8px',margin:'4px 0 10px'}}>
-                  <button className="cp-btn-sec" onClick={onTestVoices}>Test voices</button>
-                  {typeof voicesTestSummary==='string' && voicesTestSummary && <span className="cp-desc" style={{margin:0}}>{voicesTestSummary}</span>}
+                <div style={{margin:'4px 0 10px'}}>
+                  <div style={{display:'flex',gap:'8px',alignItems:'center'}}>
+                    <button className="cp-btn-sec" onClick={onTestVoices} disabled={voicesTest&&voicesTest.loading}>Test voices</button>
+                    {voicesTest && <span className="cp-desc" style={{margin:0}}>{voicesTest.summary}</span>}
+                  </div>
+                  {voicesTest && voicesTest.results && voicesTest.results.length>0 && (
+                    <div className="cp-vtest">
+                      {voicesTest.results.map((r,i)=>(
+                        <div key={i} className="cp-vtest-row">
+                          <span className={`cp-vtest-dot ${r.ok===true?'ok':r.ok===false?'fail':'unk'}`}/>
+                          <span className="cp-vtest-name">{r.name}</span>
+                          <span className="cp-voice-type">{r.platform}</span>
+                          <span className="cp-vtest-reason">{r.ok===true?'ok':(r.reason||'failed')}</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
               )}
               {/* E4: seed review queue — suggestions + migrated DEFAULT_SOCIAL, Accept/Skip.
@@ -8898,6 +8921,21 @@ export default function App() {
   const skipSeed = useCallback((id) => {
     setVoiceTombstones(prev => prev.includes(id) ? prev : (() => { const n = [...prev, id]; sv('voiceTombstones', n); return n; })());
   }, []);
+  // E5: "Test voices" — per voice/platform reachability (makes NO search-API calls).
+  const [voicesTest, setVoicesTest] = useState(null); // { loading, summary, results }
+  const testVoices = useCallback(async () => {
+    const confirmed = (voices || []).filter(v => v.status === 'confirmed' && v.handles && Object.keys(v.handles).length);
+    if (!confirmed.length) { setVoicesTest({ loading: false, summary: 'No confirmed voices to test.', results: [] }); return; }
+    setVoicesTest({ loading: true, summary: 'Testing…', results: [] });
+    try {
+      const r = await fetchWithTimeout('/api/voices-test', 20000, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ voices: confirmed }) });
+      const d = r.ok ? await r.json() : { results: [], summary: { total: 0, ok: 0, failed: 0 } };
+      const s = d.summary || {};
+      setVoicesTest({ loading: false, summary: `${s.ok || 0} ok · ${s.failed || 0} failed · ${s.unverifiable || 0} unverifiable`, results: d.results || [] });
+    } catch {
+      setVoicesTest({ loading: false, summary: 'Test unreachable from here.', results: [] });
+    }
+  }, [voices]);
   const acceptCandidate = useCallback((pk, cand) => {
     setVoiceResolve(cur => {
       if (!cur) return cur;
@@ -11366,7 +11404,7 @@ export default function App() {
           initialTab={panelInitial.tab} initialCat={panelInitial.cat}
           voices={voices} onAddVoice={addOrUpdateVoice} removeVoiceById={removeVoiceById} reorderVoice={reorderVoice}
           onResolveVoice={resolveVoiceFlow} seedQueue={seedQueue} onAcceptSeed={resolveVoiceFlow} onSkipSeed={skipSeed}
-          onTestVoices={undefined} voicesTestSummary={''} searchKeyPresent={false}
+          onTestVoices={testVoices} voicesTest={voicesTest} searchKeyPresent={false}
           onClose={()=>setShowPanel(false)} onSave={handleCustomizeSave}/>}
         {/* E2: Voices add+confirm discovery modal. */}
         {voiceResolve && <ResolveModal voice={voiceResolve.voice} state={voiceResolve} onAccept={acceptCandidate} onClose={()=>setVoiceResolve(null)}/>}
