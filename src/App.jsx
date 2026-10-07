@@ -8882,13 +8882,26 @@ export default function App() {
     setVoiceSignals(s => ({ ...s, [cat]: { ...(s[cat] || {}), loading: true, loaded: true, xLoaded: opts.includeX || (s[cat] && s[cat].xLoaded) } }));
     const failures = [];
     const tiles = [];
-    // Server lanes (Lane 1 search + YouTube + RSSHub)
+    // Free server lanes (YouTube + RSSHub). Lane 1 search is a separate GET below.
     try {
       const r = await fetchWithTimeout('/api/voices-signals', 10000, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ voices: relevant, category: cat, limit: 8 }) });
       const d = r.ok ? await r.json() : { tiles: [], failures: [{ source: 'voices', reason: `HTTP ${r.status}` }] };
       (d.tiles || []).forEach(t => tiles.push(t));
       (d.failures || []).forEach(f => failures.push(f));
     } catch { failures.push({ source: 'voices', reason: 'unreachable' }); }
+    // item 1: Lane 1 (search) via the edge-cacheable GET /api/voice-search, with a 24h
+    // per-voice localStorage cache — a repeat load within 24h makes ZERO search calls.
+    await Promise.all(relevant.map(async v => {
+      const ck = `vsearch_${v.id}`;
+      const cached = ld(ck, null);
+      if (cached && cached.t && (Date.now() - cached.t) < 86400000) { if (cached.tile) tiles.push(cached.tile); return; }
+      try {
+        const pk = Object.keys(v.handles)[0] || 'x';
+        const r = await fetchWithTimeout(`/api/voice-search?q=${encodeURIComponent(v.name)}&handle=${encodeURIComponent(v.handles[pk] || '')}&platform=${encodeURIComponent(pk)}`, 9000);
+        if (r.ok) { const d = await r.json(); if (d.tile) tiles.push(d.tile); sv(ck, { t: Date.now(), tile: d.tile || null }); }
+        else failures.push({ source: `${v.name} · search`, reason: `HTTP ${r.status}` });
+      } catch { failures.push({ source: `${v.name} · search`, reason: 'unreachable' }); }
+    }));
     // E6 Reddit lane (auto, free) — the EXISTING /api/signals?kind=discussions endpoint.
     await Promise.all(relevant.filter(v => v.handles.reddit || true).map(async v => {
       try {

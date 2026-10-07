@@ -11,15 +11,17 @@
 process.noDeprecation = true;
 
 import { resolveVoice } from '../lib/voices/resolve.js';
+import { allowOrigin, guard } from '../lib/voices/guard.js';
 
 export default async function handler(req, res) {
-  res.setHeader('Access-Control-Allow-Origin', '*');
+  allowOrigin(req, res); // item 2: specific origin, never '*'
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
   if (req.method === 'OPTIONS') return res.status(200).end();
+  if (guard(req, res)) return; // item 2: 403 disallowed origin, 429 over rate limit
 
   const q = req.method === 'POST' ? (req.body || {}) : (req.query || {});
-  const name = (q.name || '').toString().trim();
+  const name = (q.name || '').toString().trim().slice(0, 120); // item 3: sane length
   const type = (q.type || 'person').toString();
   if (!name) return res.status(400).json({ error: 'Missing name' });
 

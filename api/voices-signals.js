@@ -14,10 +14,14 @@
 
 process.noDeprecation = true;
 
-import { searchWeb, searchProvider } from '../lib/voices/search-adapter.js';
+import { searchProvider } from '../lib/voices/search-adapter.js';
 import { rankByVelocity, signalFor } from '../lib/voices/velocity.js';
+import { allowOrigin, guard } from '../lib/voices/guard.js';
 
 const RSSHUB = () => (process.env.RSSHUB_BASE_URL || 'https://rsshub.app').replace(/\/$/, '');
+// item 4: every handle placed in a path is a SINGLE encoded segment — strips a leading @
+// and URL-encodes the rest so a value like "../admin?x=1" can't change the path.
+const seg = s => encodeURIComponent(String(s || '').replace(/^@/, ''));
 const ageHours = d => { const t = Date.parse(d); return isFinite(t) ? Math.max(0, (Date.now() - t) / 3.6e6) : 48; };
 const UA = 'Mozilla/5.0 (compatible; NewsHubBot/1.0)';
 
@@ -63,36 +67,18 @@ async function youtubeTiles(voice, failures) {
   } catch (e) { failures.push({ source: `${voice.name} · YouTube`, reason: e.name === 'TimeoutError' ? 'timeout' : 'error' }); return []; }
 }
 
-// E5 COST GUARD: Lane 1 (search snippets) is OFF by default. At scale it blows the free
-// search tier — see the cost report in the PR: ~1 search per voice per category open; for
-// 40 voices across a few sessions/day that is thousands of queries/month, well over Brave's
-// ~2,000/mo free tier (>50%). So Lane 1 runs only when VOICES_LANE1=1 (and a key exists),
-// and even then at most ONE search per voice (name-based), not per handle. Default tiles
-// come from the free Lane 2 (YouTube quota-guarded + RSSHub). One search per voice, capped.
-// E5/item7: Lane 1 defaults ON when a search key exists, OFF without it; VOICES_LANE1
-// is the explicit override ('0' forces off, '1' forces on even if the default would differ).
-const LANE1_ON = () => {
-  const sw = process.env.VOICES_LANE1;
-  if (sw === '0') return false;
-  if (sw === '1') return true;
-  return !!process.env.SEARCH_API_KEY;
-};
-async function lane1Tiles(voice, failures) {
-  if (!LANE1_ON()) return [];
-  try {
-    const res = await searchWeb(`${voice.name} latest post`, { limit: 2 });
-    if (res == null) return []; // search disabled (no key)
-    const pk = Object.keys(voice.handles || {})[0] || 'x';
-    return res.slice(0, 1).map(r => ({ platform: pk, who: voice.name, handle: voice.handles[pk], url: r.url, title: r.title, ageHours: 24, _lane: 1 }));
-  } catch { failures.push({ source: `${voice.name} · search`, reason: 'search error' }); return []; }
-}
+// item 1: Lane 1 (search snippets) is no longer here — it moved to the edge-cacheable GET
+// /api/voice-search (POST routes can't be CDN-cached). This route runs only the FREE Lane 2
+// (YouTube quota-guarded + RSSHub); the client merges Lane 1 (GET, 24h localStorage-cached),
+// Reddit and click-to-load X into the same ranking.
 
 export default async function handler(req, res) {
-  res.setHeader('Access-Control-Allow-Origin', '*');
+  allowOrigin(req, res); // item 2: specific origin, never '*'
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
   if (req.method === 'OPTIONS') return res.status(200).end();
   if (req.method !== 'POST') return res.status(405).json({ error: 'POST only' });
+  if (guard(req, res)) return; // item 2: 403 disallowed origin, 429 over rate limit
 
   const body = req.body || {};
   // item 7: hard top-3 cap per category (defensive — the client already sends the user's
@@ -103,12 +89,12 @@ export default async function handler(req, res) {
 
   const all = [];
   await Promise.all(voices.map(async v => {
-    const [l1, yt] = await Promise.all([lane1Tiles(v, failures), youtubeTiles(v, failures)]);
-    all.push(...l1, ...yt);
-    // RSSHub lanes (best-effort) — IG, LinkedIn company, TikTok.
-    if (v.handles.instagram) all.push(...await rsshubTiles(v, 'instagram', `/instagram/user/${v.handles.instagram.replace(/^@/, '')}`, failures));
-    if (v.handles.tiktok) all.push(...await rsshubTiles(v, 'tiktok', `/tiktok/user/${v.handles.tiktok.replace(/^@/, '')}`, failures));
-    if (v.handles.linkedin && /company/.test(v.handles.linkedin)) all.push(...await rsshubTiles(v, 'linkedin', `/linkedin/company/${v.handles.linkedin.replace(/^.*company\//, '')}`, failures));
+    all.push(...await youtubeTiles(v, failures));
+    // RSSHub lanes (best-effort) — IG, LinkedIn company, TikTok. Handles are encoded to a
+    // single path segment (item 4) so they can never alter the request path.
+    if (v.handles.instagram) all.push(...await rsshubTiles(v, 'instagram', `/instagram/user/${seg(v.handles.instagram)}`, failures));
+    if (v.handles.tiktok) all.push(...await rsshubTiles(v, 'tiktok', `/tiktok/user/${seg(v.handles.tiktok)}`, failures));
+    if (v.handles.linkedin && /company/.test(v.handles.linkedin)) all.push(...await rsshubTiles(v, 'linkedin', `/linkedin/company/${seg(String(v.handles.linkedin).replace(/^.*company\//, ''))}`, failures));
   }));
 
   const tiles = rankByVelocity(all.map(t => ({ ...t, signal: t.signal || signalFor(t) })), { limit })
@@ -118,5 +104,5 @@ export default async function handler(req, res) {
   // cache; the durable 24h caching is on the GET /api/voices-resolve (per voice name). The
   // client also loads signals once per category open (no polling), so repeat cost is low.
   res.setHeader('Cache-Control', 's-maxage=86400, stale-while-revalidate=86400');
-  return res.status(200).json({ tiles, failures, searchEnabled: searchProvider().enabled, lane1: LANE1_ON() });
+  return res.status(200).json({ tiles, failures, searchEnabled: searchProvider().enabled });
 }
