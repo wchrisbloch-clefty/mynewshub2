@@ -262,7 +262,7 @@ const DEFAULT_FEEDS = {
     { name:'Ars Technica',      url:'https://feeds.arstechnica.com/arstechnica/index',            on:true },
     { name:'VentureBeat',       url:'https://venturebeat.com/feed/',                              on:true },
     { name:'MIT Tech Review',   url:'https://www.technologyreview.com/feed/',                     on:true },
-    { name:'Hacker News',       url:'https://news.ycombinator.com/rss',                           on:true },
+    { name:'Hacker News',       url:'https://news.ycombinator.com/rss',                           on:true,  tier:'inferred' },
     { name:'IEEE Spectrum',     url:'https://spectrum.ieee.org/feeds/feed.rss',                   on:true },
     { name:'9to5Google',        url:'https://9to5google.com/feed/',                               on:false },
     { name:'9to5Mac',           url:'https://9to5mac.com/feed/',                                  on:false },
