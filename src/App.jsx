@@ -44,6 +44,7 @@ import { DEBUG, dbgRender, dbgPoll, DebugOverlay } from './modules/debug';
 import { makeVoice, upsertVoice, removeVoice as removeVoiceModel, mergeVoices, clearTombstone, voiceId, VOICE_PLATFORMS } from './modules/voices/model';
 import { SEED_VOICES } from './modules/voices/seeds';
 import { ResolveModal } from './modules/voices/ResolveModal';
+import { VoicesStrip } from './modules/voices/VoicesStrip';
 import { extractContent, extractionFallbackMessage } from './modules/extractor';
 import { retrieveFeedContext, buildFeedContextBlock } from './modules/retrieval';
 import { XPulse } from './modules/x-pulse';
@@ -665,10 +666,10 @@ function parseXML(txt) {
     };
   });
 }
-async function fetchWithTimeout(url, ms=8000) {
+async function fetchWithTimeout(url, ms=8000, opts={}) {
   const ctrl = new AbortController();
   const timer = setTimeout(() => ctrl.abort(), ms);
-  try { return await fetch(url, {signal:ctrl.signal}); } finally { clearTimeout(timer); }
+  try { return await fetch(url, {...opts, signal:ctrl.signal}); } finally { clearTimeout(timer); }
 }
 async function fetchRSS(url) {
   // ONE first-party fetch path: /api/feed (browser UA + retry, robust server-side
@@ -6715,7 +6716,7 @@ function GithubSignal() {
 
 // ─── GHOST SIDEBAR ────────────────────────────────────────────────────────────
 function Sidebar({cat, arts, kw, health, activeKw, setActiveKw, activeSource, setActiveSource, onRead, scores, scoresLoading, showScoreboard, recommended, showBriefing, onOpenBriefing, briefingExcludeCats, onTopicOpen, trendingItems, isTopicFollowed, toggleTopic, onTrendingOpen,
-  sopItems, sopGapItems, sopMeta, sopCollapsed, onToggleSop, formatDate, acrossSections, onAcrossSeeAll, followingModule, sopBreakingItems, feeds, onToggleFeed, favTeams, onAsk, hideSopMobile}) {
+  sopItems, sopGapItems, sopMeta, sopCollapsed, onToggleSop, formatDate, acrossSections, onAcrossSeeAll, followingModule, sopBreakingItems, feeds, onToggleFeed, favTeams, onAsk, hideSopMobile, voicesNode}) {
   const cc = CATS[cat]||CATS.general;
   const catKws = kw[cat]||[];
   const catArts = arts[cat]||[];
@@ -6808,6 +6809,9 @@ function Sidebar({cat, arts, kw, health, activeKw, setActiveKw, activeSource, se
             collapsed={sopCollapsed} onToggleCollapse={onToggleSop}/>
         </div>
       )}
+
+      {/* E3: Voices strip, below State of Play in the sidebar. */}
+      {voicesNode}
 
       {/* TRENDING moved BELOW Across MyNewsHub (Pass L item 2) — see the block after
           Following. New sidebar order: State of Play → Today's Briefing → Across
@@ -8801,6 +8805,32 @@ export default function App() {
       setVoiceResolve(cur => cur && cur.voice.id === v.id ? { ...cur, loading: false, data: { enabled: false, note: 'Discovery unreachable — add handles manually.', platforms: {} } } : cur);
     }
   }, [addOrUpdateVoice]);
+  // E3: per-category Voices signals (tiles). Loads ONCE per category open (cached), and
+  // only reloads when the page refresh runs (loadCat clears the cache entry). No polling.
+  const [voiceSignals, setVoiceSignals] = useState({}); // { [cat]: {tiles,failures,loading,loaded} }
+  const loadVoiceSignals = useCallback(async (cat) => {
+    const relevant = (voices || []).filter(v => v.category === cat && v.status === 'confirmed' && v.handles && Object.keys(v.handles).length);
+    if (!relevant.length) { setVoiceSignals(s => ({ ...s, [cat]: { tiles: [], failures: [], loading: false, loaded: true } })); return; }
+    setVoiceSignals(s => ({ ...s, [cat]: { ...(s[cat] || {}), loading: true, loaded: true } }));
+    try {
+      const r = await fetchWithTimeout('/api/voices-signals', 10000, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ voices: relevant, category: cat, limit: 4 }) });
+      const d = r.ok ? await r.json() : { tiles: [], failures: [{ source: 'voices', reason: `HTTP ${r.status}` }] };
+      setVoiceSignals(s => ({ ...s, [cat]: { tiles: d.tiles || [], failures: d.failures || [], loading: false, loaded: true } }));
+    } catch {
+      setVoiceSignals(s => ({ ...s, [cat]: { tiles: [], failures: [{ source: 'voices', reason: 'unreachable' }], loading: false, loaded: true } }));
+    }
+  }, [voices]);
+  // Load-once per category open (no polling). A ref guards against re-firing when the
+  // voices list changes identity; the page refresh button clears the entry to reload.
+  const voicesLoadedRef = useRef(new Set());
+  useEffect(() => {
+    if (voicesLoadedRef.current.has(tab)) return;
+    voicesLoadedRef.current.add(tab);
+    loadVoiceSignals(tab);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tab]);
+  const refreshVoiceSignals = useCallback((cat) => { voicesLoadedRef.current.delete(cat); loadVoiceSignals(cat); }, [loadVoiceSignals]);
+  const voicesStripFor = (cat) => { const s = voiceSignals[cat] || {}; return <VoicesStrip tiles={s.tiles || []} failures={s.failures || []} loading={!!s.loading}/>; };
   const acceptCandidate = useCallback((pk, cand) => {
     setVoiceResolve(cur => {
       if (!cur) return cur;
@@ -9669,7 +9699,7 @@ export default function App() {
                       ))}
                     </div>}
               </div>
-              <Sidebar cat="sports" arts={arts} kw={kw} health={health} onAsk={setChatContext}
+              <Sidebar cat="sports" voicesNode={voicesStripFor('sports')} arts={arts} kw={kw} health={health} onAsk={setChatContext}
                 activeKw={activeKw} setActiveKw={k=>{setActiveKw(k);setActiveSrc(null);}}
                 activeSource={activeSrc} setActiveSource={s=>{setActiveSrc(s);setActiveKw(null);}}
                 onRead={onRead} scores={scores} scoresLoading={scoresLoading} showScoreboard={false}
@@ -9850,7 +9880,7 @@ export default function App() {
               • Team hub (activeTeam set) → SHOW, scoped to that team (sportItems is
                 already team-filtered). The Tier-3 team page renders its own in-column
                 StateOfPlay in the teamName block above. */}
-          <Sidebar cat="sports" arts={arts} kw={kw} health={health} onAsk={setChatContext}
+          <Sidebar cat="sports" voicesNode={voicesStripFor('sports')} arts={arts} kw={kw} health={health} onAsk={setChatContext}
             activeKw={activeKw} setActiveKw={k=>{setActiveKw(k);setActiveSrc(null);}}
             activeSource={activeSrc} setActiveSource={s=>{setActiveSrc(s);setActiveKw(null);}}
             onRead={onRead} scores={scores} scoresLoading={scoresLoading}
@@ -10323,7 +10353,7 @@ export default function App() {
               <span className="page-header" style={{fontFamily:'var(--font-sans)'}}>
                 {cc.label}{feedItems.length>0?` — ${feedItems.length} articles`:''}
                 {/* D6: per-page refresh — always present (shows "Refresh" before the first stamp). */}
-                <span style={{marginLeft:'10px'}}><LastUpdated timestamp={lastUpdated[cat]} onRefresh={() => loadCat(cat)}/></span>
+                <span style={{marginLeft:'10px'}}><LastUpdated timestamp={lastUpdated[cat]} onRefresh={() => { loadCat(cat); refreshVoiceSignals(cat); }}/></span>
               </span>
               <div style={{display:'flex',alignItems:'center',gap:'10px'}}>
                 {(() => {
@@ -10525,7 +10555,7 @@ export default function App() {
             <SocialFollows cat={cat} social={social}/>
             <SourceFooter cat={cat} feeds={feeds} arts={arts}/>
           </div>{/* /feed-col */}
-          <Sidebar cat={cat} hideSopMobile arts={arts} kw={kw} health={health} onAsk={setChatContext}
+          <Sidebar cat={cat} hideSopMobile voicesNode={voicesStripFor(cat)} arts={arts} kw={kw} health={health} onAsk={setChatContext}
             activeKw={activeKw} setActiveKw={k=>{setActiveKw(k);setActiveSrc(null);}}
             activeSource={activeSrc} setActiveSource={s=>{setActiveSrc(s);setActiveKw(null);}}
             onRead={onRead} scores={scores} scoresLoading={scoresLoading}
@@ -11180,7 +11210,7 @@ export default function App() {
               <SourceFooter cat="finance" feeds={feeds} arts={arts}/>
             </section>
           </div>
-          <Sidebar cat="finance" arts={arts} kw={kw} health={health} onAsk={setChatContext}
+          <Sidebar cat="finance" voicesNode={voicesStripFor('finance')} arts={arts} kw={kw} health={health} onAsk={setChatContext}
             activeKw={activeKw} setActiveKw={k=>{setActiveKw(k);setActiveSrc(null);}}
             activeSource={activeSrc} setActiveSource={s=>{setActiveSrc(s);setActiveKw(null);}}
             onTopicOpen={label => navigate('finance', 'topic', teamSlug(label))}
