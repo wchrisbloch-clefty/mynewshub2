@@ -40,7 +40,12 @@ import { useState, useEffect, useLayoutEffect, useCallback, useMemo, useRef, Fra
 // Extracted, dependency-isolated capability modules (see src/modules/*/README.md)
 import { clusterStories, hotClusterTopics, rankClusters, TREND_STOP, decodeEntities, capByPublisher } from './modules/clustering';
 import { qualifyBreaking, isPromoItem } from './modules/breaking';
+import { rankByVelocity, signalFor } from '../lib/voices/velocity';
 import { DEBUG, dbgRender, dbgPoll, DebugOverlay } from './modules/debug';
+import { makeVoice, upsertVoice, removeVoice as removeVoiceModel, mergeVoices, clearTombstone, voiceId, VOICE_PLATFORMS } from './modules/voices/model';
+import { SEED_VOICES } from './modules/voices/seeds';
+import { ResolveModal } from './modules/voices/ResolveModal';
+import { VoicesStrip } from './modules/voices/VoicesStrip';
 import { extractContent, extractionFallbackMessage } from './modules/extractor';
 import { retrieveFeedContext, buildFeedContextBlock } from './modules/retrieval';
 import { XPulse } from './modules/x-pulse';
@@ -662,10 +667,10 @@ function parseXML(txt) {
     };
   });
 }
-async function fetchWithTimeout(url, ms=8000) {
+async function fetchWithTimeout(url, ms=8000, opts={}) {
   const ctrl = new AbortController();
   const timer = setTimeout(() => ctrl.abort(), ms);
-  try { return await fetch(url, {signal:ctrl.signal}); } finally { clearTimeout(timer); }
+  try { return await fetch(url, {...opts, signal:ctrl.signal}); } finally { clearTimeout(timer); }
 }
 async function fetchRSS(url) {
   // ONE first-party fetch path: /api/feed (browser UA + retry, robust server-side
@@ -2676,6 +2681,46 @@ body:not(.dark) .pill-bar{
 .cp-input:focus{outline:none;border-color:var(--accent);}
 .cp-btn{background:var(--accent);border:none;color:#fff;border-radius:6px;padding:6px 12px;font-size:var(--fs-meta);font-weight:600;cursor:pointer;font-family:inherit;white-space:nowrap;}
 .cp-btn-red{background:var(--red);}
+.cp-btn-sec{background:none;border:1px solid var(--border);color:var(--text2);border-radius:6px;padding:6px 12px;font-size:var(--fs-meta);font-weight:700;cursor:pointer;font-family:inherit;white-space:nowrap;}
+.cp-btn-sec:hover{border-color:var(--accent);color:var(--accent);}
+/* E1: Voices tab */
+.cp-voice-group{margin-bottom:12px;}
+.cp-voice-cat{font-family:var(--font-sans);font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:0.08em;color:var(--text3);padding:8px 0 4px;border-bottom:1px solid var(--border2);}
+.cp-voice-row{display:flex;flex-wrap:wrap;align-items:center;gap:8px;padding:8px 0;border-bottom:1px solid var(--border2);}
+.cp-voice-row:last-child{border-bottom:none;}
+.cp-voice-main{display:flex;align-items:center;gap:8px;flex:1;min-width:0;flex-wrap:wrap;}
+.cp-voice-name{font-family:var(--font-sans);font-weight:700;font-size:var(--fs-body);color:var(--text);}
+.cp-voice-type{font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:0.05em;color:var(--text3);border:1px solid var(--border);border-radius:8px;padding:1px 6px;}
+.cp-voice-status{font-size:9px;font-weight:800;text-transform:uppercase;letter-spacing:0.04em;border-radius:8px;padding:1px 6px;}
+.cp-vs-seed{color:#b45309;background:rgba(217,119,6,0.12);}
+.cp-vs-unconfirmed{color:var(--text3);background:var(--surface2);}
+.cp-voice-flag{font-size:9px;color:#b45309;font-weight:700;}
+.cp-voice-handles{font-size:var(--fs-meta);color:var(--text3);font-family:var(--font-publicsans);}
+.cp-voice-actions{display:inline-flex;align-items:center;gap:4px;flex-shrink:0;}
+.cp-voice-btn{background:none;border:1px solid var(--border);border-radius:6px;min-width:34px;min-height:34px;padding:0 8px;cursor:pointer;color:var(--text3);font-size:12px;font-weight:700;font-family:inherit;}
+.cp-voice-btn:hover:not(:disabled){border-color:var(--accent);color:var(--accent);}
+.cp-voice-btn:disabled{opacity:0.4;cursor:default;}
+.cp-voice-rm:hover{border-color:var(--red);color:var(--red);}
+/* E4: seed review queue */
+.cp-seed-wrap{margin:4px 0 12px;border:1px solid var(--border2);border-radius:8px;padding:6px 10px;background:var(--surface2);}
+.cp-seed-toggle{background:none;border:none;cursor:pointer;font-family:var(--font-sans);font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:0.06em;color:var(--text3);padding:4px 0;}
+.cp-seed-list{display:flex;flex-direction:column;}
+.cp-seed-row{display:flex;flex-wrap:wrap;align-items:center;gap:8px;padding:7px 0;border-top:1px solid var(--border2);}
+.cp-seed-name{font-family:var(--font-sans);font-weight:700;font-size:var(--fs-body);color:var(--text);}
+.cp-seed-cat{font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:0.04em;}
+.cp-seed-actions{margin-left:auto;display:inline-flex;gap:6px;}
+/* E5: Test voices results */
+.cp-vtest{margin-top:8px;display:flex;flex-direction:column;gap:3px;}
+.cp-vtest-row{display:flex;align-items:center;gap:8px;font-family:var(--font-publicsans);font-size:var(--fs-meta);}
+.cp-vtest-dot{width:7px;height:7px;border-radius:50%;flex-shrink:0;}
+.cp-vtest-dot.ok{background:var(--pos,#0f9d58);}
+.cp-vtest-dot.fail{background:var(--neg,#d02f2f);}
+.cp-vtest-dot.unk{background:var(--amber,#b45309);}
+.cp-vtest-name{font-weight:700;color:var(--text);}
+.cp-vtest-reason{color:var(--text3);margin-left:auto;}
+.cp-voice-edit{width:100%;display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:6px;padding:8px 0 2px;}
+.cp-voice-hl{display:flex;flex-direction:column;gap:2px;font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:0.04em;}
+@media(max-width:640px){ .cp-voice-btn{min-width:44px;min-height:44px;} }
 .cp-src-row{display:flex;align-items:center;gap:8px;padding:7px 0;border-bottom:1px solid var(--border2);}
 .cp-src-row:last-child{border-bottom:none;}
 .cp-health{width:6px;height:6px;border-radius:50%;flex-shrink:0;}
@@ -6689,7 +6734,7 @@ function GithubSignal() {
 
 // ─── GHOST SIDEBAR ────────────────────────────────────────────────────────────
 function Sidebar({cat, arts, kw, health, activeKw, setActiveKw, activeSource, setActiveSource, onRead, scores, scoresLoading, showScoreboard, recommended, showBriefing, onOpenBriefing, briefingExcludeCats, onTopicOpen, trendingItems, isTopicFollowed, toggleTopic, onTrendingOpen,
-  sopItems, sopGapItems, sopMeta, sopCollapsed, onToggleSop, formatDate, acrossSections, onAcrossSeeAll, followingModule, sopBreakingItems, feeds, onToggleFeed, favTeams, onAsk, hideSopMobile}) {
+  sopItems, sopGapItems, sopMeta, sopCollapsed, onToggleSop, formatDate, acrossSections, onAcrossSeeAll, followingModule, sopBreakingItems, feeds, onToggleFeed, favTeams, onAsk, hideSopMobile, voicesNode}) {
   const cc = CATS[cat]||CATS.general;
   const catKws = kw[cat]||[];
   const catArts = arts[cat]||[];
@@ -6782,6 +6827,9 @@ function Sidebar({cat, arts, kw, health, activeKw, setActiveKw, activeSource, se
             collapsed={sopCollapsed} onToggleCollapse={onToggleSop}/>
         </div>
       )}
+
+      {/* E3: Voices strip, below State of Play in the sidebar. */}
+      {voicesNode}
 
       {/* TRENDING moved BELOW Across MyNewsHub (Pass L item 2) — see the block after
           Following. New sidebar order: State of Play → Today's Briefing → Across
@@ -6977,7 +7025,9 @@ function SourceFooter({cat, feeds, arts}) {
 const CAT_LABELS = {general:'News',sports:'Sports',business:'Business',finance:'Markets',bloom:'Energy',tech:'AI & Tech',popculture:'Pop Culture',comedy:'Comedy'};
 const PLAT_LABELS = {twitter:'𝕏',linkedin:'in',instagram:'IG',youtube:'▶'};
 
-function CustomizePanel({feeds, kw, alerts, urgent, social, watchlist, teams, health, arts, weatherCities, hiddenIndices, briefingExclude, briefingSources, initialTab, initialCat, onClose, onSave}) {
+function CustomizePanel({feeds, kw, alerts, urgent, social, watchlist, teams, health, arts, weatherCities, hiddenIndices, briefingExclude, briefingSources, initialTab, initialCat, onClose, onSave,
+  voices, onAddVoice, removeVoiceById, reorderVoice, onResolveVoice, onTestVoices, voicesTest, searchKeyPresent,
+  seedQueue, onAcceptSeed, onSkipSeed}) {
   const [lf, setLf] = useState(JSON.parse(JSON.stringify(feeds)));
   const [lk, setLk] = useState(JSON.parse(JSON.stringify(kw)));
   const [la, setLa] = useState([...alerts]);
@@ -7007,6 +7057,13 @@ function CustomizePanel({feeds, kw, alerts, urgent, social, watchlist, teams, he
   const [newUrl, setNewUrl] = useState('');
   const [newHandle, setNewHandle] = useState('');
   const [testState, setTestState] = useState({});
+  // E1: Voices tab state
+  const [voiceCat, setVoiceCat] = useState(initialCat||'general');
+  const [vName, setVName] = useState('');
+  const [vType, setVType] = useState('person');
+  const [editVoiceId, setEditVoiceId] = useState(null);
+  const [showSeeds, setShowSeeds] = useState(false);
+  const VOICE_CATS = ['general','business','bloom','tech','sports','health','popculture'];
 
   const testFeed = async (url, key) => {
     setTestState(s=>({...s,[key]:'loading'}));
@@ -7048,9 +7105,9 @@ function CustomizePanel({feeds, kw, alerts, urgent, social, watchlist, teams, he
         <div className="cp-head"><span className="cp-title">Customize</span><button className="cp-x" onClick={onClose}>✕</button></div>
         <div className="cp-body">
           <div className="cp-sec-tabs">
-            {['keywords','alerts','sources','social','watchlist','teams','datastrip','briefing'].map(t=>(
+            {['keywords','alerts','sources','social','voices','watchlist','teams','datastrip','briefing'].map(t=>(
               <button key={t} className={`cp-sec-tab ${secTab===t?'active':''}`} onClick={()=>setSecTab(t)}>
-                {t==='keywords'?'Keywords':t==='alerts'?'Alerts':t==='sources'?'Sources':t==='social'?'Social':t==='watchlist'?'Watchlist':t==='teams'?'Teams':t==='briefing'?'Briefing':'Data Strip'}
+                {t==='keywords'?'Keywords':t==='alerts'?'Alerts':t==='sources'?'Sources':t==='social'?'Social':t==='voices'?'Voices':t==='watchlist'?'Watchlist':t==='teams'?'Teams':t==='briefing'?'Briefing':'Data Strip'}
               </button>
             ))}
           </div>
@@ -7159,6 +7216,112 @@ function CustomizePanel({feeds, kw, alerts, urgent, social, watchlist, teams, he
                   onChange={e=>setNewHandle(e.target.value)} onKeyDown={e=>{if(e.key==='Enter')addHandle();}}/>
                 <button className="cp-btn" onClick={addHandle}>Add</button>
               </div>
+            </div>
+          )}
+
+          {secTab==='voices' && (
+            <div className="cp-sec">
+              <div className="cp-lbl">Voices</div>
+              <div className="cp-desc">People, businesses and teams whose posts across X, Instagram, LinkedIn, TikTok and YouTube get flagged in the matching category. Voices are always labeled <strong>inferred</strong>; clicking a tile opens the platform — nothing is read in-app.{!searchKeyPresent && <> <strong>Add a search key (SEARCH_API_KEY) to enable discovery</strong> — you can still add handles manually.</>} <span style={{color:'var(--text4)'}}>Default provider: Serper (free tier). Brave is paid/metered.</span></div>
+              {/* Add a voice */}
+              <div className="cp-src-add">
+                <input className="cp-input" placeholder="Name (person, business or team)…" value={vName} onChange={e=>setVName(e.target.value)} onKeyDown={e=>{if(e.key==='Enter'&&vName.trim()){(onResolveVoice||onAddVoice)({name:vName.trim(),type:vType,category:voiceCat});setVName('');}}}/>
+                <select className="cp-input" value={vType} onChange={e=>setVType(e.target.value)} aria-label="Type">
+                  <option value="person">Person</option><option value="org">Business / Org</option><option value="team">Team</option>
+                </select>
+                <select className="cp-input" value={voiceCat} onChange={e=>setVoiceCat(e.target.value)} aria-label="Category">
+                  {VOICE_CATS.map(c=><option key={c} value={c}>{(CATS[c]||{}).label||c}</option>)}
+                </select>
+                <button className="cp-btn" onClick={()=>{ if(vName.trim()){ (onResolveVoice||onAddVoice)({name:vName.trim(),type:vType,category:voiceCat}); setVName(''); } }}>Add</button>
+              </div>
+              {onTestVoices && (
+                <div style={{margin:'4px 0 10px'}}>
+                  <div style={{display:'flex',gap:'8px',alignItems:'center'}}>
+                    <button className="cp-btn-sec" onClick={onTestVoices} disabled={voicesTest&&voicesTest.loading}>Test voices</button>
+                    {voicesTest && <span className="cp-desc" style={{margin:0}}>{voicesTest.summary}</span>}
+                  </div>
+                  {voicesTest && voicesTest.results && voicesTest.results.length>0 && (
+                    <div className="cp-vtest">
+                      {voicesTest.results.map((r,i)=>(
+                        <div key={i} className="cp-vtest-row">
+                          <span className={`cp-vtest-dot ${r.ok===true?'ok':r.ok===false?'fail':'unk'}`}/>
+                          <span className="cp-vtest-name">{r.name}</span>
+                          <span className="cp-voice-type">{r.platform}</span>
+                          <span className="cp-vtest-reason">{r.ok===true?'ok':(r.reason||'failed')}</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+              {/* E4: seed review queue — suggestions + migrated DEFAULT_SOCIAL, Accept/Skip.
+                  Accept runs the E2 confirm flow (no handle saved until confirmed); Skip
+                  tombstones it so it won't re-suggest. */}
+              {seedQueue && seedQueue.length > 0 && (
+                <div className="cp-seed-wrap">
+                  <button className="cp-seed-toggle" onClick={()=>setShowSeeds(s=>!s)}>
+                    {showSeeds?'▾':'▸'} Suggested voices ({seedQueue.length})
+                  </button>
+                  {showSeeds && (
+                    <div className="cp-seed-list">
+                      {seedQueue.map(s => (
+                        <div key={s.id} className="cp-seed-row">
+                          <span className="cp-seed-name">{s.name}</span>
+                          <span className="cp-voice-type">{s.type}</span>
+                          <span className="cp-seed-cat">{(CATS[s.category]||{}).label||s.category}</span>
+                          {s._parkedFrom && <span className="cp-voice-flag" title="Parked here pending your category decision">parked: {s._parkedFrom}</span>}
+                          {s.handles && Object.keys(s.handles).length>0 && <span className="cp-voice-handles">{VOICE_PLATFORMS.filter(p=>s.handles[p]).join(' · ')}</span>}
+                          <span className="cp-seed-actions">
+                            <button className="cp-btn" onClick={()=>onAcceptSeed&&onAcceptSeed(s)}>Accept</button>
+                            <button className="cp-btn-sec" onClick={()=>onSkipSeed&&onSkipSeed(s.id)}>Skip</button>
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+              {/* Grouped by category */}
+              {VOICE_CATS.map(cat => {
+                const inCat = (voices||[]).filter(v=>v.category===cat);
+                if(!inCat.length) return null;
+                return (
+                  <div key={cat} className="cp-voice-group">
+                    <div className="cp-voice-cat">{(CATS[cat]||{}).label||cat}</div>
+                    {inCat.map((v,i)=>(
+                      <div key={v.id} className="cp-voice-row">
+                        <div className="cp-voice-main">
+                          <span className="cp-voice-name">{v.name}</span>
+                          <span className="cp-voice-type">{v.type}</span>
+                          {v.status!=='confirmed' && <span className={`cp-voice-status cp-vs-${v.status}`}>{v.status}</span>}
+                          {v._parkedFrom && <span className="cp-voice-flag" title="Parked here pending your category decision">parked: {v._parkedFrom}</span>}
+                          <span className="cp-voice-handles">{VOICE_PLATFORMS.filter(p=>v.handles&&v.handles[p]).join(' · ')||'no handles yet'}</span>
+                        </div>
+                        <div className="cp-voice-actions">
+                          {onResolveVoice && <button className="cp-voice-btn" title="Find handles" onClick={()=>onResolveVoice(v)}>Find</button>}
+                          <button className="cp-voice-btn" title="Edit handles" onClick={()=>setEditVoiceId(editVoiceId===v.id?null:v.id)}>Edit</button>
+                          <button className="cp-voice-btn" aria-label="Move up" disabled={i===0} onClick={()=>reorderVoice(v.id,-1)}>↑</button>
+                          <button className="cp-voice-btn" aria-label="Move down" disabled={i===inCat.length-1} onClick={()=>reorderVoice(v.id,1)}>↓</button>
+                          <button className="cp-voice-btn cp-voice-rm" aria-label="Remove" onClick={()=>removeVoiceById(v.id)}>✕</button>
+                        </div>
+                        {editVoiceId===v.id && (
+                          <div className="cp-voice-edit">
+                            {VOICE_PLATFORMS.map(p=>(
+                              <label key={p} className="cp-voice-hl">
+                                <span>{p}</span>
+                                <input className="cp-input" defaultValue={(v.handles&&v.handles[p])||''} placeholder={p==='linkedin'?'company/… or in/…':'@handle'}
+                                  onBlur={e=>{ const val=e.target.value.trim(); const handles={...(v.handles||{})}; if(val) handles[p]=val; else delete handles[p]; onAddVoice&&onAddVoice({...v, handles, status: Object.keys(handles).length?'confirmed':v.status, confirmedAt: Object.keys(handles).length?Date.now():v.confirmedAt, _manual:true}); }}/>
+                              </label>
+                            ))}
+                            <div className="cp-desc" style={{margin:'2px 0 0'}}>Manual handles are saved on blur. Prefer “Find” to confirm from search.</div>
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                );
+              })}
+              {(!voices||!voices.length) && <div className="cp-desc">No voices yet. Add one above, or accept suggestions from the seed list.</div>}
             </div>
           )}
 
@@ -8664,6 +8827,170 @@ export default function App() {
     setMyTeams(prev => { const n = prev.filter(x => !(teamSlug(x.name) === slug && leagueKey(x.league) === lk)); sv('myTeams', n); return n; });
     setTeams(prev => { const n = prev.filter(x => !(teamSlug(x.team || x.name) === slug && leagueKey(x.league) === lk)); sv('teams', n); return n; });
   };
+  // E1: Voices — people/orgs/teams whose cross-platform posts we flag. Persisted +
+  // synced; voiceTombstones mirror removedTeams so a removed voice can't be resurrected
+  // by an older cloud profile. A voice of type 'team' LINKS to the followedTeams entity
+  // (by name/slug) — we never keep a second team list here.
+  const [voices, setVoices] = useState(() => ld('voices', []));
+  const [voiceTombstones, setVoiceTombstones] = useState(() => ld('voiceTombstones', []));
+  const addOrUpdateVoice = useCallback((partial) => {
+    const v = partial.id && partial.handles !== undefined && partial.name ? partial : makeVoice(partial);
+    setVoiceTombstones(prev => { const n = clearTombstone(prev, v.id); sv('voiceTombstones', n); return n; });
+    setVoices(prev => { const n = upsertVoice(prev, v); sv('voices', n); return n; });
+  }, []);
+  const removeVoiceById = useCallback((id) => {
+    setVoices(prev => { const n = prev.filter(v => v.id !== id); sv('voices', n); return n; });
+    setVoiceTombstones(prev => prev.includes(id) ? prev : (() => { const n = [...prev, id]; sv('voiceTombstones', n); return n; })());
+  }, []);
+  const reorderVoice = useCallback((id, dir) => {
+    setVoices(prev => {
+      const i = prev.findIndex(v => v.id === id); if (i < 0) return prev;
+      const j = i + dir; if (j < 0 || j >= prev.length) return prev;
+      const n = prev.slice(); const [m] = n.splice(i, 1); n.splice(j, 0, m);
+      sv('voices', n); return n;
+    });
+  }, []);
+  // E2: add+confirm discovery. resolveVoice ensures the voice exists (as unconfirmed) and
+  // opens the modal; the server /api/voices-resolve returns per-platform candidates; the
+  // user accepts per platform — only then is a handle stored (never a guess).
+  const [voiceResolve, setVoiceResolve] = useState(null); // { voice, loading, data }
+  const resolveVoiceFlow = useCallback(async (partial) => {
+    const v = partial.id ? partial : makeVoice({ ...partial, status: partial.status || 'unconfirmed' });
+    addOrUpdateVoice(v);
+    setVoiceResolve({ voice: v, loading: true, data: null });
+    try {
+      const r = await fetchWithTimeout(`/api/signals?kind=voice-resolve&name=${encodeURIComponent(v.name)}&type=${encodeURIComponent(v.type)}`, 9000);
+      const data = r.ok ? await r.json() : { enabled: false, note: `Discovery unavailable (HTTP ${r.status}).`, platforms: {} };
+      setVoiceResolve(cur => cur && cur.voice.id === v.id ? { ...cur, loading: false, data } : cur);
+    } catch (e) {
+      setVoiceResolve(cur => cur && cur.voice.id === v.id ? { ...cur, loading: false, data: { enabled: false, note: 'Discovery unreachable — add handles manually.', platforms: {} } } : cur);
+    }
+  }, [addOrUpdateVoice]);
+  // E3: per-category Voices signals (tiles). Loads ONCE per category open (cached), and
+  // only reloads when the page refresh runs (loadCat clears the cache entry). No polling.
+  const [voiceSignals, setVoiceSignals] = useState({}); // { [cat]: {tiles,failures,loading,loaded} }
+  const loadVoiceSignals = useCallback(async (cat, opts = {}) => {
+    // Top-3 cap (E5 cost): only the first 3 confirmed voices per category (user's order)
+    // drive the lanes. E3/E6: server lanes (search/YouTube/RSSHub) + the EXISTING Reddit
+    // lane (/api/signals?kind=discussions) are auto; the EXISTING X lane (x-pulse) is
+    // click-to-load only (opts.includeX). All tiles are ranked together and promo-filtered
+    // (reusing isPromoItem from the breaking module). No AI, no polling.
+    const relevant = (voices || [])
+      .filter(v => v.category === cat && v.status === 'confirmed' && v.handles && Object.keys(v.handles).length)
+      .slice(0, 3);
+    if (!relevant.length) { setVoiceSignals(s => ({ ...s, [cat]: { tiles: [], failures: [], loading: false, loaded: true } })); return; }
+    setVoiceSignals(s => ({ ...s, [cat]: { ...(s[cat] || {}), loading: true, loaded: true, xLoaded: opts.includeX || (s[cat] && s[cat].xLoaded) } }));
+    const failures = [];
+    const tiles = [];
+    // Free server lanes (YouTube + RSSHub). Lane 1 search is a separate GET below.
+    try {
+      const r = await fetchWithTimeout('/api/signals?kind=voice-signals', 10000, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ voices: relevant, category: cat, limit: 8 }) });
+      const d = r.ok ? await r.json() : { tiles: [], failures: [{ source: 'voices', reason: `HTTP ${r.status}` }] };
+      (d.tiles || []).forEach(t => tiles.push(t));
+      (d.failures || []).forEach(f => failures.push(f));
+    } catch { failures.push({ source: 'voices', reason: 'unreachable' }); }
+    // item 1: Lane 1 (search) via the edge-cacheable GET /api/voice-search, with a 24h
+    // per-voice localStorage cache — a repeat load within 24h makes ZERO search calls.
+    await Promise.all(relevant.map(async v => {
+      const ck = `vsearch_${v.id}`;
+      const cached = ld(ck, null);
+      if (cached && cached.t && (Date.now() - cached.t) < 86400000) { if (cached.tile) tiles.push(cached.tile); return; }
+      try {
+        const pk = Object.keys(v.handles)[0] || 'x';
+        const r = await fetchWithTimeout(`/api/signals?kind=voice-search&q=${encodeURIComponent(v.name)}&handle=${encodeURIComponent(v.handles[pk] || '')}&platform=${encodeURIComponent(pk)}`, 9000);
+        if (r.ok) { const d = await r.json(); if (d.tile) tiles.push(d.tile); sv(ck, { t: Date.now(), tile: d.tile || null }); }
+        else failures.push({ source: `${v.name} · search`, reason: `HTTP ${r.status}` });
+      } catch { failures.push({ source: `${v.name} · search`, reason: 'unreachable' }); }
+    }));
+    // E6 Reddit lane (auto, free) — the EXISTING /api/signals?kind=discussions endpoint.
+    await Promise.all(relevant.filter(v => v.handles.reddit || true).map(async v => {
+      try {
+        const r = await fetchWithTimeout(`/api/signals?kind=discussions&q=${encodeURIComponent(v.name)}`, 8000);
+        if (r.ok) { const d = await r.json(); (d.reddit || []).slice(0, 2).forEach(p => tiles.push({ platform: 'reddit', who: v.name, url: p.url || p.link, title: p.title, ageHours: p.ageHours ?? 18, tier: 'inferred', source_class: 'social' })); }
+        else failures.push({ source: `${v.name} · reddit`, reason: `HTTP ${r.status}` });
+      } catch { failures.push({ source: `${v.name} · reddit`, reason: 'unreachable' }); }
+    }));
+    // E6 X lane — click-to-load ONLY (x-pulse costs money). Fetched only when requested.
+    if (opts.includeX) {
+      await Promise.all(relevant.filter(v => v.handles.x).map(async v => {
+        try {
+          const r = await fetchWithTimeout(`/api/signals?kind=xpulse&topic=${encodeURIComponent(v.name)}`, 9000);
+          if (r.ok) { const d = await r.json(); const arr = Array.isArray(d) ? d : (d.posts || d.items || []); arr.slice(0, 2).forEach(p => tiles.push({ platform: 'x', who: v.name, url: p.url || p.link, title: p.text || p.title || '', ageHours: p.ageHours ?? 12, tier: 'inferred', source_class: 'social' })); }
+          else failures.push({ source: `${v.name} · x`, reason: `HTTP ${r.status}` });
+        } catch { failures.push({ source: `${v.name} · x`, reason: 'unreachable' }); }
+      }));
+    }
+    // Item 8: strip promos/sportsbook; rank all lanes together; cap 4.
+    const clean = tiles.filter(t => t && t.title && !isPromoItem({ title: t.title, source: t.who, link: t.url }));
+    const ranked = rankByVelocity(clean.map(t => ({ ...t, signal: t.signal || signalFor(t) })), { limit: 4 });
+    setVoiceSignals(s => ({ ...s, [cat]: { tiles: ranked, failures, loading: false, loaded: true, xLoaded: opts.includeX || (s[cat] && s[cat].xLoaded), hasX: relevant.some(v => v.handles.x) } }));
+  }, [voices]);
+  // Load-once per category open (no polling). A ref guards against re-firing when the
+  // voices list changes identity; the page refresh button clears the entry to reload.
+  const voicesLoadedRef = useRef(new Set());
+  useEffect(() => {
+    if (voicesLoadedRef.current.has(tab)) return;
+    voicesLoadedRef.current.add(tab);
+    loadVoiceSignals(tab);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tab]);
+  const refreshVoiceSignals = useCallback((cat) => { voicesLoadedRef.current.delete(cat); loadVoiceSignals(cat); }, [loadVoiceSignals]);
+  const voicesStripFor = (cat) => { const s = voiceSignals[cat] || {}; return <VoicesStrip tiles={s.tiles || []} failures={s.failures || []} loading={!!s.loading} hasX={!!s.hasX} xLoaded={!!s.xLoaded} onLoadX={() => loadVoiceSignals(cat, { includeX: true })}/>; };
+  // E4: migrate existing DEFAULT_SOCIAL handles into seed voices (status 'seed'), not
+  // silently dropped — they surface in the seed review queue carrying their known handle.
+  const SOCIAL_PLAT = { twitter: 'x', linkedin: 'linkedin', instagram: 'instagram', youtube: 'youtube' };
+  const migratedSocialSeeds = useMemo(() => {
+    const out = [], byId = new Map();
+    for (const [cat, plats] of Object.entries(DEFAULT_SOCIAL || {})) {
+      for (const [plat, list] of Object.entries(plats || {})) {
+        const pk = SOCIAL_PLAT[plat]; if (!pk) continue;
+        for (const h of (list || [])) {
+          const v = makeVoice({ type: 'org', name: String(h).replace(/^@/, ''), category: cat, handles: { [pk]: h }, status: 'seed' });
+          if (byId.has(v.id)) { byId.get(v.id).handles[pk] = h; continue; }
+          byId.set(v.id, v); out.push(v);
+        }
+      }
+    }
+    return out;
+  }, []);
+  // The review queue: name-only suggestions (E4 list) + migrated social, minus anything
+  // already added or tombstoned (Skip tombstones so it won't re-suggest).
+  const seedQueue = useMemo(() => {
+    const added = new Set((voices || []).map(v => v.id));
+    const tomb = new Set(voiceTombstones || []);
+    const all = [...SEED_VOICES.map(s => ({ ...makeVoice(s), _parkedFrom: s._parkedFrom })), ...migratedSocialSeeds];
+    const seen = new Set(), out = [];
+    for (const v of all) { if (seen.has(v.id) || added.has(v.id) || tomb.has(v.id)) continue; seen.add(v.id); out.push(v); }
+    return out;
+  }, [voices, voiceTombstones, migratedSocialSeeds]);
+  const skipSeed = useCallback((id) => {
+    setVoiceTombstones(prev => prev.includes(id) ? prev : (() => { const n = [...prev, id]; sv('voiceTombstones', n); return n; })());
+  }, []);
+  // E5: "Test voices" — per voice/platform reachability (makes NO search-API calls).
+  const [voicesTest, setVoicesTest] = useState(null); // { loading, summary, results }
+  const testVoices = useCallback(async () => {
+    const confirmed = (voices || []).filter(v => v.status === 'confirmed' && v.handles && Object.keys(v.handles).length);
+    if (!confirmed.length) { setVoicesTest({ loading: false, summary: 'No confirmed voices to test.', results: [] }); return; }
+    setVoicesTest({ loading: true, summary: 'Testing…', results: [] });
+    try {
+      const r = await fetchWithTimeout('/api/signals?kind=voice-test', 20000, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ voices: confirmed }) });
+      const d = r.ok ? await r.json() : { results: [], summary: { total: 0, ok: 0, failed: 0 } };
+      const s = d.summary || {};
+      setVoicesTest({ loading: false, summary: `${s.ok || 0} ok · ${s.failed || 0} failed · ${s.unverifiable || 0} unverifiable`, results: d.results || [] });
+    } catch {
+      setVoicesTest({ loading: false, summary: 'Test unreachable from here.', results: [] });
+    }
+  }, [voices]);
+  const acceptCandidate = useCallback((pk, cand) => {
+    setVoiceResolve(cur => {
+      if (!cur) return cur;
+      const v = cur.voice;
+      const handles = { ...(v.handles || {}), [pk]: cand.handle };
+      const updated = { ...v, handles, status: 'confirmed', confirmedAt: Date.now() };
+      addOrUpdateVoice(updated);
+      return { ...cur, voice: updated };
+    });
+  }, [addOrUpdateVoice]);
   const [weatherCities, setWeatherCities] = useState(()=>ld('weatherCities', DEFAULT_WEATHER_CITIES));
   const [hiddenIndices, setHiddenIndices] = useState(()=>ld('hiddenIndices',[]));
   const [briefingExclude, setBriefingExclude] = useState(()=>ld('briefingExclude',['comedy']));
@@ -9016,8 +9343,10 @@ export default function App() {
     kw, teams, feeds, alerts, urgent, social, watchlist,
     weatherCities, hiddenIndices, briefingExclude, briefingSources,
     myTeams, myTopics, removedTeams,
+    voices, voiceTombstones, // E1
   }), [kw, teams, feeds, alerts, urgent, social, watchlist,
-       weatherCities, hiddenIndices, briefingExclude, briefingSources, myTeams, myTopics, removedTeams]);
+       weatherCities, hiddenIndices, briefingExclude, briefingSources, myTeams, myTopics, removedTeams,
+       voices, voiceTombstones]);
 
   // Apply a downloaded profile onto local state (+ localStorage), keying defensively.
   const applyCloudConfig = useCallback((cfg) => {
@@ -9043,7 +9372,14 @@ export default function App() {
     put('briefingSources', cfg.briefingSources, setBriefingSources);
     put('myTeams', cfg.myTeams ? dropTomb(normalizeMyTeams(cfg.myTeams), t => t.name) : cfg.myTeams, setMyTeams);
     put('myTopics', cfg.myTopics, setMyTopics);
-  }, [removedTeams]);
+    // E1: voices — same union-merge + tombstone contract as teams, via the model.
+    const mergedVoiceTombs = Array.from(new Set([...(voiceTombstones || []), ...(Array.isArray(cfg.voiceTombstones) ? cfg.voiceTombstones : [])]));
+    put('voiceTombstones', mergedVoiceTombs, setVoiceTombstones);
+    if (cfg.voices !== undefined) {
+      const mergedVoices = mergeVoices(voices, Array.isArray(cfg.voices) ? cfg.voices : [], mergedVoiceTombs);
+      put('voices', mergedVoices, setVoices);
+    }
+  }, [removedTeams, voices, voiceTombstones]);
 
   const pullCloudProfile = useCallback(async (uid) => {
     if (!uid) return;
@@ -9513,7 +9849,7 @@ export default function App() {
                       ))}
                     </div>}
               </div>
-              <Sidebar cat="sports" arts={arts} kw={kw} health={health} onAsk={setChatContext}
+              <Sidebar cat="sports" voicesNode={voicesStripFor('sports')} arts={arts} kw={kw} health={health} onAsk={setChatContext}
                 activeKw={activeKw} setActiveKw={k=>{setActiveKw(k);setActiveSrc(null);}}
                 activeSource={activeSrc} setActiveSource={s=>{setActiveSrc(s);setActiveKw(null);}}
                 onRead={onRead} scores={scores} scoresLoading={scoresLoading} showScoreboard={false}
@@ -9694,7 +10030,7 @@ export default function App() {
               • Team hub (activeTeam set) → SHOW, scoped to that team (sportItems is
                 already team-filtered). The Tier-3 team page renders its own in-column
                 StateOfPlay in the teamName block above. */}
-          <Sidebar cat="sports" arts={arts} kw={kw} health={health} onAsk={setChatContext}
+          <Sidebar cat="sports" voicesNode={voicesStripFor('sports')} arts={arts} kw={kw} health={health} onAsk={setChatContext}
             activeKw={activeKw} setActiveKw={k=>{setActiveKw(k);setActiveSrc(null);}}
             activeSource={activeSrc} setActiveSource={s=>{setActiveSrc(s);setActiveKw(null);}}
             onRead={onRead} scores={scores} scoresLoading={scoresLoading}
@@ -10167,7 +10503,7 @@ export default function App() {
               <span className="page-header" style={{fontFamily:'var(--font-sans)'}}>
                 {cc.label}{feedItems.length>0?` — ${feedItems.length} articles`:''}
                 {/* D6: per-page refresh — always present (shows "Refresh" before the first stamp). */}
-                <span style={{marginLeft:'10px'}}><LastUpdated timestamp={lastUpdated[cat]} onRefresh={() => loadCat(cat)}/></span>
+                <span style={{marginLeft:'10px'}}><LastUpdated timestamp={lastUpdated[cat]} onRefresh={() => { loadCat(cat); refreshVoiceSignals(cat); }}/></span>
               </span>
               <div style={{display:'flex',alignItems:'center',gap:'10px'}}>
                 {(() => {
@@ -10369,7 +10705,7 @@ export default function App() {
             <SocialFollows cat={cat} social={social}/>
             <SourceFooter cat={cat} feeds={feeds} arts={arts}/>
           </div>{/* /feed-col */}
-          <Sidebar cat={cat} hideSopMobile arts={arts} kw={kw} health={health} onAsk={setChatContext}
+          <Sidebar cat={cat} hideSopMobile voicesNode={voicesStripFor(cat)} arts={arts} kw={kw} health={health} onAsk={setChatContext}
             activeKw={activeKw} setActiveKw={k=>{setActiveKw(k);setActiveSrc(null);}}
             activeSource={activeSrc} setActiveSource={s=>{setActiveSrc(s);setActiveKw(null);}}
             onRead={onRead} scores={scores} scoresLoading={scoresLoading}
@@ -11024,7 +11360,7 @@ export default function App() {
               <SourceFooter cat="finance" feeds={feeds} arts={arts}/>
             </section>
           </div>
-          <Sidebar cat="finance" arts={arts} kw={kw} health={health} onAsk={setChatContext}
+          <Sidebar cat="finance" voicesNode={voicesStripFor('finance')} arts={arts} kw={kw} health={health} onAsk={setChatContext}
             activeKw={activeKw} setActiveKw={k=>{setActiveKw(k);setActiveSrc(null);}}
             activeSource={activeSrc} setActiveSource={s=>{setActiveSrc(s);setActiveKw(null);}}
             onTopicOpen={label => navigate('finance', 'topic', teamSlug(label))}
@@ -11111,7 +11447,12 @@ export default function App() {
           briefingExclude={briefingExclude}
           briefingSources={briefingSources}
           initialTab={panelInitial.tab} initialCat={panelInitial.cat}
+          voices={voices} onAddVoice={addOrUpdateVoice} removeVoiceById={removeVoiceById} reorderVoice={reorderVoice}
+          onResolveVoice={resolveVoiceFlow} seedQueue={seedQueue} onAcceptSeed={resolveVoiceFlow} onSkipSeed={skipSeed}
+          onTestVoices={testVoices} voicesTest={voicesTest} searchKeyPresent={false}
           onClose={()=>setShowPanel(false)} onSave={handleCustomizeSave}/>}
+        {/* E2: Voices add+confirm discovery modal. */}
+        {voiceResolve && <ResolveModal voice={voiceResolve.voice} state={voiceResolve} onAccept={acceptCandidate} onClose={()=>setVoiceResolve(null)}/>}
       </div>
       {/* Floating AI chatbot — available on all pages */}
       <ChatBot arts={arts}

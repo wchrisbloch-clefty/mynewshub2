@@ -1,0 +1,19 @@
+/* VoicesStrip (E3) — consumes design tokens; reads as a calm sidebar module. */
+.voices-strip{margin-bottom:22px;}
+.voices-head{display:flex;align-items:baseline;gap:6px;padding-bottom:9px;border-bottom:2px solid var(--border);margin-bottom:10px;}
+.voices-label{font-family:var(--font-publicsans);font-size:10px;font-weight:800;color:var(--text3);letter-spacing:0.14em;text-transform:uppercase;}
+.voices-inferred{font-family:var(--font-publicsans);font-size:10px;font-weight:700;color:var(--text4);letter-spacing:0.04em;}
+.voices-empty{font-family:var(--font-publicsans);font-size:var(--fs-meta);color:var(--text3);padding:6px 0;}
+.voices-list{display:flex;flex-direction:column;}
+.voices-tile{display:flex;align-items:flex-start;gap:9px;padding:9px 0;border-top:1px solid var(--border2);text-decoration:none;transition:opacity 0.12s;}
+.voices-tile:first-child{border-top:none;}
+.voices-tile:hover{opacity:0.7;}
+.voices-badge{flex-shrink:0;font-family:var(--font-publicsans);font-size:9px;font-weight:800;letter-spacing:0.04em;color:var(--text3);border:1px solid var(--border);border-radius:6px;padding:2px 5px;min-width:26px;text-align:center;}
+.voices-tile-main{min-width:0;display:flex;flex-direction:column;gap:2px;}
+.voices-who{font-family:var(--font-publicsans);font-size:10px;font-weight:700;color:var(--accent);}
+.voices-age{color:var(--text3);font-weight:600;}
+.voices-tile-title{font-family:var(--font-archivo);font-size:var(--fs-body);font-weight:700;line-height:1.3;color:var(--text);display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;overflow-wrap:anywhere;}
+.voices-loadx{margin-top:8px;background:none;border:1px solid var(--border);border-radius:16px;cursor:pointer;padding:5px 12px;font-family:var(--font-publicsans);font-size:var(--fs-meta);font-weight:700;color:var(--text3);}
+.voices-loadx:hover{border-color:var(--accent);color:var(--accent);}
+.voices-fail{margin-top:8px;background:none;border:none;cursor:pointer;text-align:left;padding:4px 0;font-family:var(--font-publicsans);font-size:var(--fs-meta);color:var(--amber,#b45309);display:flex;flex-direction:column;gap:3px;}
+.voices-fail-detail{display:flex;flex-direction:column;gap:2px;color:var(--text3);font-size:10px;}

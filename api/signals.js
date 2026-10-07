@@ -14,6 +14,12 @@
 // keeps its click-to-load trigger.
 
 import { MODELS } from '../lib/ai-models.js';
+// Voices endpoints are folded in here as kinds (same Hobby 12-function reason as above):
+// their handlers live in lib/voices/ so they don't each count as a Vercel function.
+import voiceResolve from '../lib/voices/handler-resolve.js';
+import voiceSignals from '../lib/voices/handler-signals.js';
+import voiceTest from '../lib/voices/handler-test.js';
+import voiceSearch from '../lib/voices/handler-search.js';
 
 const UA = 'MyNewsHub/1.0 (+https://mynewshub2.vercel.app; street signals)';
 
@@ -150,8 +156,14 @@ async function handleGithub(req, res) {
 }
 
 export default async function handler(req, res) {
-  res.setHeader('Access-Control-Allow-Origin', '*');
   const kind = (req.query.kind || '').toString();
+  // Voices kinds manage their OWN CORS (an allow-list, not '*') and rate limiting, so they
+  // are dispatched before the legacy wildcard header below.
+  if (kind === 'voice-resolve') return voiceResolve(req, res);
+  if (kind === 'voice-signals') return voiceSignals(req, res);
+  if (kind === 'voice-test') return voiceTest(req, res);
+  if (kind === 'voice-search') return voiceSearch(req, res);
+  res.setHeader('Access-Control-Allow-Origin', '*');
   if (kind === 'discussions') return handleDiscussions(req, res);
   if (kind === 'github') return handleGithub(req, res);
   if (kind === 'xpulse') return handleXPulse(req, res);
