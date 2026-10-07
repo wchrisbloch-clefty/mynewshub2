@@ -29,7 +29,7 @@ export function SnapshotCard({ a, meta = {}, isSaved, onSave, onRead, onPerspect
   const topKw = a.matchedKw?.[0] || null;
   const multi = a._clusterSize > 1;
   return (
-    <article className={`snap-card ${a.isAlert ? 'snap-breaking' : ''}${lead ? ' snap-lead' : ''}`} onClick={() => onRead(a)}>
+    <article className={`snap-card ${a.isAlert ? 'snap-breaking' : ''}${lead ? ' snap-lead' : ''}${lead && (!a.img || imgErr || hideImage) ? ' snap-lead-noimg' : ''}`} onClick={() => onRead(a)}>
       <span className="snap-accent" style={{ background: color }} />
       <div className="snap-main">
         <div className="snap-meta">

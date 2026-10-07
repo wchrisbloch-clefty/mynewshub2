@@ -88,6 +88,11 @@
   .snap-lead .snap-main{padding:14px 0 16px;}
   .snap-lead .snap-title{font-family:var(--font-archivo);font-size:26px;line-height:1.12;letter-spacing:-0.3px;-webkit-line-clamp:4;}
   .snap-lead .snap-snippet{display:-webkit-box;font-size:var(--fs-body);-webkit-line-clamp:2;margin-bottom:8px;}
+  /* D5 fix 2: typographic lead fallback — no image box. Small-caps kicker (the source)
+     + oversized serif headline + one meta line, filling a similar height budget. */
+  .snap-lead-noimg{min-height:220px;justify-content:center;padding:8px 0 16px;border-bottom:2px solid var(--border);}
+  .snap-lead-noimg .snap-source{font-size:11px;letter-spacing:0.1em;}
+  .snap-lead-noimg .snap-title{font-size:30px;line-height:1.08;-webkit-line-clamp:5;margin-top:4px;}
 }
 /* D5 — carry the DIVIDED-LIST treatment to DESKTOP SECONDARY lists only (not the main
    grid): any .snap-feed inside .snap-feed-divided renders as calm rows. Desktop main
@@ -98,6 +103,12 @@
 .snap-feed-divided .snap-accent{display:none;}
 .snap-feed-divided .snap-thumb{width:120px;height:80px;aspect-ratio:3/2;}
 .snap-feed-divided .snap-snippet{-webkit-line-clamp:1;}
+/* D5 fix 3: the LEAD stays a prominent card on desktop even inside a divided feed. */
+@media(min-width:641px){
+  .snap-feed-divided .snap-lead{border:1px solid var(--border);border-radius:10px;background:var(--surface);margin-bottom:14px;}
+  .snap-feed-divided .snap-lead .snap-accent{display:block;}
+  .snap-feed-divided .snap-lead .snap-snippet{-webkit-line-clamp:2;}
+}
 /* iPad (768–1279): the feed LIST is a 2-column card grid (the original responsive
    spec). Cards flip to VERTICAL (image on top, headline + body full-cell-width) so
    the body copy gets a comfortable measure (~65 chars) instead of the crushed

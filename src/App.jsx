@@ -1824,6 +1824,10 @@ body:not(.dark) .pill-bar{
   .topbar-wx .rnw-card,.topbar-scores .home-scores{max-width:1560px;}
 }
 .feed-col{display:flex;flex-direction:column;gap:0;min-width:0;} /* min-width:0 so the column shrinks to its grid track instead of its content width */
+/* D5 fix 1: mobile State-of-Play slot sits inside the feed, directly under the lead.
+   Desktop keeps the sidebar SoP; mobile hides the sidebar copy to avoid duplication. */
+.sop-mobile{display:none;}
+@media(max-width:640px){ .sop-mobile{display:block;margin:4px 0 8px;} .sop-hide-mobile{display:none;} }
 /* State of Play lives in the sidebar on desktop; the main-column hoisted copy is
    hidden here and only shown ≤1100px (see the single-column media block). */
 .sop-hoist{display:none;}
@@ -2098,6 +2102,13 @@ body:not(.dark) .pill-bar{
 .sidebar-sec-label{
   font-size:10px;font-weight:800;color:var(--text3);
   text-transform:uppercase;letter-spacing:0.14em;
+}
+/* D5 fix 4: ONE canonical small-caps section label. .rail-label (previously undefined,
+   styled only by inline one-offs at each use) now shares it, as do the migrated inline
+   "From the Web" / section headers. */
+.section-label,.rail-label{
+  font-family:var(--font-sans);font-size:var(--fs-meta);font-weight:800;
+  color:var(--text3);text-transform:uppercase;letter-spacing:0.08em;
 }
 .sidebar-sec-action{
   background:none;border:none;color:var(--accent);cursor:pointer;
@@ -4125,7 +4136,9 @@ body{overscroll-behavior-y:contain;}
   /* Hoist State of Play into the main column near the top; hide the sidebar copy —
      but ONLY on grids that actually render a hoisted copy (General/category pages).
      Sports has no hoist, so its sidebar State of Play must stay visible here. */
-  .sop-hoist{display:block;margin-bottom:22px;}
+  /* D5 fix 1: the old TOP hoist is retired — State of Play now renders inside the feed
+     directly under the lead (.sop-mobile). Keep hiding the sidebar copy on these grids. */
+  .sop-hoist{display:none;}
   .has-sop-hoist .sidebar .sop-sidebar{display:none;}
 }
 @media (max-width:900px){
@@ -6673,7 +6686,7 @@ function GithubSignal() {
 
 // ─── GHOST SIDEBAR ────────────────────────────────────────────────────────────
 function Sidebar({cat, arts, kw, health, activeKw, setActiveKw, activeSource, setActiveSource, onRead, scores, scoresLoading, showScoreboard, recommended, showBriefing, onOpenBriefing, briefingExcludeCats, onTopicOpen, trendingItems, isTopicFollowed, toggleTopic, onTrendingOpen,
-  sopItems, sopGapItems, sopMeta, sopCollapsed, onToggleSop, formatDate, acrossSections, onAcrossSeeAll, followingModule, sopBreakingItems, feeds, onToggleFeed, favTeams, onAsk}) {
+  sopItems, sopGapItems, sopMeta, sopCollapsed, onToggleSop, formatDate, acrossSections, onAcrossSeeAll, followingModule, sopBreakingItems, feeds, onToggleFeed, favTeams, onAsk, hideSopMobile}) {
   const cc = CATS[cat]||CATS.general;
   const catKws = kw[cat]||[];
   const catArts = arts[cat]||[];
@@ -6760,9 +6773,11 @@ function Sidebar({cat, arts, kw, health, activeKw, setActiveKw, activeSource, se
       {/* 1) STATE OF PLAY — moved into the sidebar (Pass J item 2), consistent
             sidebar-module styling, Coverage-Gap rows in a stacked (non-inline) layout. */}
       {sopItems && !activeKw && !activeSource && (
-        <StateOfPlay variant="sidebar" items={sopItems} gapItems={sopGapItems||[]} breakingItems={sopBreakingItems||[]}
-          meta={sopMeta||cc} onRead={onRead} onAsk={onAsk} formatDate={formatDate||fmtDate}
-          collapsed={sopCollapsed} onToggleCollapse={onToggleSop}/>
+        <div className={hideSopMobile ? 'sidebar-sop sop-hide-mobile' : 'sidebar-sop'}>
+          <StateOfPlay variant="sidebar" items={sopItems} gapItems={sopGapItems||[]} breakingItems={sopBreakingItems||[]}
+            meta={sopMeta||cc} onRead={onRead} onAsk={onAsk} formatDate={formatDate||fmtDate}
+            collapsed={sopCollapsed} onToggleCollapse={onToggleSop}/>
+        </div>
       )}
 
       {/* TRENDING moved BELOW Across MyNewsHub (Pass L item 2) — see the block after
@@ -8425,7 +8440,7 @@ function ArticleReader({ article, onClose, onAskInChat }) {
           {!aiLoading && aiResult && (
             <div className="article-reader-ai-result">
               {aiPreview && <div className="fc-preview-note" style={{marginBottom:'8px'}}>{PREVIEW_LABEL}</div>}
-              <div style={{fontWeight:700,fontSize:'11px',textTransform:'uppercase',letterSpacing:'0.08em',color:'var(--accent)',marginBottom:'8px'}}>
+              <div className="section-label" style={{color:'var(--accent)',marginBottom:'8px'}}>
                 {aiMode === 'summary' ? 'Summary' : aiMode === 'takeaways' ? 'Key Points' : 'Bias Check'}
               </div>
               {aiMode === 'takeaways' ? <TakeawaysContent text={aiResult}/> : aiResult}
@@ -10207,12 +10222,23 @@ export default function App() {
                  </div>
               :feedItems.length===0
                 ?<div className="empty-state"><div className="empty-icon"></div><div className="empty-msg">{activeKw||activeSrc?'No articles match this filter':search?`No internal results for "${search}"`:'No articles loaded yet'}</div><button className="refresh-btn" onClick={refreshAll}>Refresh</button></div>
-                :<div className="snap-feed">
+                :<div className={`snap-feed${['business','bloom','tech','popculture'].includes(cat)?' snap-feed-divided':''}`}>
+                  {/* D5 fix 3: Business/Energy/AI&Tech/Pop Culture carry the divided-list
+                      treatment on desktop secondary rows; the lead stays a prominent card. */}
                   {/* AI & Tech only: optional GitHub street signal, click-to-load (3c). */}
                   {cat==='tech' && !activeKw && !activeSrc && !search && <GithubSignal/>}
                   {(activeKw||activeSrc||search ? feedItems.slice(0,20) : dedupedFeed.slice(0,20)).map((a,i)=>(
                     <Fragment key={a.link||i}>
                       <SnapshotCard a={a} meta={CATS[cat]||CATS.general} isSaved={isSavedFn(a)} onSave={onSave} onRead={onRead} onPerspectives={setPerspArticle} onAsk={setChatContext} formatDate={fmtDate} hideImage={i>=3} lead={i===0 && !activeKw && !activeSrc && !search}/>
+                      {/* D5 fix 1: on mobile, State of Play sits directly under the lead (the
+                          sidebar copy is hidden on mobile via hideSopMobile). Mobile-only. */}
+                      {i===0 && !activeKw && !activeSrc && !search && (
+                        <div className="sop-mobile">
+                          <StateOfPlay variant="sidebar" items={sopSourceItems} gapItems={gapItems} breakingItems={catBreaking}
+                            meta={CATS[cat]||CATS.general} onRead={onRead} onAsk={setChatContext} formatDate={fmtDate}
+                            collapsed={sopCollapsed} onToggleCollapse={toggleSop}/>
+                        </div>
+                      )}
                       {i===2 && <XPulse topic={cc?.label||cat} variant="feed"/>}
                     </Fragment>
                   ))}
@@ -10252,7 +10278,7 @@ export default function App() {
             {/* v26: Web search fallback when searching with thin internal results */}
             {search && (webResults.length > 0 || webLoading) && (
               <div className="web-fallback">
-                <div className="rail-label" style={{margin:'24px 0 12px',fontWeight:800,fontSize:'13px',letterSpacing:'0.04em',textTransform:'uppercase'}}>From the Web</div>
+                <div className="rail-label" style={{margin:'24px 0 12px'}}>From the Web</div>
                 {webLoading && <div style={{fontSize:'12px',color:'var(--text3)',fontStyle:'italic',padding:'10px 0'}}>Searching the web…</div>}
                 {webResults.map((r,i) => (
                   <a key={i} className="web-result" href={r.link} target="_blank" rel="noreferrer">
@@ -10329,7 +10355,7 @@ export default function App() {
             <SocialFollows cat={cat} social={social}/>
             <SourceFooter cat={cat} feeds={feeds} arts={arts}/>
           </div>{/* /feed-col */}
-          <Sidebar cat={cat} arts={arts} kw={kw} health={health} onAsk={setChatContext}
+          <Sidebar cat={cat} hideSopMobile arts={arts} kw={kw} health={health} onAsk={setChatContext}
             activeKw={activeKw} setActiveKw={k=>{setActiveKw(k);setActiveSrc(null);}}
             activeSource={activeSrc} setActiveSource={s=>{setActiveSrc(s);setActiveKw(null);}}
             onRead={onRead} scores={scores} scoresLoading={scoresLoading}
@@ -10654,7 +10680,7 @@ export default function App() {
           </div>
           <div className="sidebar">
             <div className="pod-shows">
-              <div style={{fontSize:'10px',fontWeight:'700',color:'var(--text3)',textTransform:'uppercase',letterSpacing:'0.08em',marginBottom:'8px',paddingBottom:'8px',borderBottom:'1px solid var(--border2)'}}>Shows</div>
+              <div className="section-label" style={{marginBottom:'8px',paddingBottom:'8px',borderBottom:'1px solid var(--border2)'}}>Shows</div>
               <div className="pod-show-item" onClick={()=>{setActivePod(null);setPodLimit(20);}}>
                 <div className="pod-show-emoji"></div>
                 <div><div className="pod-show-name" style={{color:!activePod?'var(--accent)':''}}>All Shows</div><div className="pod-show-ep">Latest from all {PODCAST_FEEDS.length} podcasts</div></div>
