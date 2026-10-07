@@ -36,7 +36,7 @@
 //  • Storage v25a_ → v25b_, migration from v25a/v24/v23/v22
 // ─────────────────────────────────────────────────────────────────────────────
 
-import { useState, useEffect, useCallback, useMemo, useRef, Fragment } from 'react';
+import { useState, useEffect, useLayoutEffect, useCallback, useMemo, useRef, Fragment } from 'react';
 // Extracted, dependency-isolated capability modules (see src/modules/*/README.md)
 import { clusterStories, hotClusterTopics, rankClusters, TREND_STOP, decodeEntities, capByPublisher } from './modules/clustering';
 import { extractContent, extractionFallbackMessage } from './modules/extractor';
@@ -127,7 +127,10 @@ const IconGear = ({size=ICON.meta}) => (
 // Matches the mobile chip bar order so swiping feels like advancing the chips.
 // v24a: Swipe order matches the mobile chip bar order. Today is removed;
 // General is the home position so swipes start from there.
-const SWIPE_ORDER = ['general','business','finance','bloom','tech','sports','popculture'];
+// D1: 'health' added in its chip-bar position (after Sports); the stray 'finance'
+// (which has no mobile chip — it is folded into Business) is dropped so every swipe
+// target is a reachable chip, keeping this list a true mirror of MOBILE_CHIPS.
+const SWIPE_ORDER = ['general','business','bloom','tech','sports','health','popculture'];
 
 const TICKERS = [
   { sym:'BE',   label:'Bloom Energy', color:'#60a5fa' },
@@ -1736,7 +1739,7 @@ body:not(.dark) .pill-bar{
 }
 /* BBC-clean section tabs: no box, strong underline on active */
 .nav-tabs{
-  display:flex;gap:0;flex:1;overflow-x:auto;scrollbar-width:none;
+  display:flex;gap:0;flex:1;min-width:0;overflow:hidden;position:relative;
   margin-left:0;padding-left:0;
 }
 .nav-tabs::-webkit-scrollbar{display:none;}
@@ -1752,6 +1755,20 @@ body:not(.dark) .pill-bar{
 .nav-tab.active{color:var(--accent);border-bottom-color:var(--accent);}
 .nav-tab:hover:not(.active){color:var(--text2);}
 .nav-right{display:flex;gap:8px;align-items:center;flex-shrink:0;padding-left:16px;border-left:1px solid var(--border);}
+/* D1: priority-overflow nav. The visible row is flex (no scroll); the hidden
+   measuring row holds the full set at natural width for the fit calculation. */
+.nav-measure{position:absolute;top:0;left:0;height:0;overflow:hidden;visibility:hidden;pointer-events:none;display:flex;white-space:nowrap;}
+.nav-more{position:relative;display:flex;align-items:stretch;}
+.nav-more-btn{display:inline-flex;align-items:center;gap:4px;}
+.nav-more-menu{position:absolute;top:100%;right:0;margin-top:2px;min-width:168px;z-index:450;
+  background:var(--surface);border:1px solid var(--border);border-radius:10px;
+  box-shadow:0 8px 28px rgba(0,0,0,0.14);padding:6px;display:flex;flex-direction:column;}
+.nav-more-item{background:none;border:none;text-align:left;cursor:pointer;white-space:nowrap;
+  padding:9px 12px;border-radius:7px;color:var(--text3);
+  font-family:var(--font-sans);font-size:12px;font-weight:700;letter-spacing:0.04em;text-transform:uppercase;
+  transition:background 0.12s,color 0.12s;}
+.nav-more-item:hover{background:var(--surface2);color:var(--text);}
+.nav-more-item.active{color:var(--accent);}
 .search-input{
   background:var(--surface2);border:1px solid var(--border);color:var(--text);
   border-radius:var(--radius-sm);padding:7px 13px;font-size:var(--fs-body);width:130px;
@@ -3791,12 +3808,9 @@ body{overscroll-behavior-y:contain;}
   position:relative;
 }
 .chip-bar::-webkit-scrollbar{display:none;}
+/* D1: no edge-fade gradient — the partially-visible last chip + the "More" chip
+   are the overflow cue. */
 .chip-bar-wrap{position:relative;}
-.chip-bar-wrap::after{
-  content:'';position:absolute;right:0;top:0;bottom:0;width:40px;
-  background:linear-gradient(to left,var(--bg) 0%,transparent 100%);
-  pointer-events:none;z-index:2;
-}
 .chip{
   flex-shrink:0;scroll-snap-align:start;
   background:none;border:none;
@@ -3811,6 +3825,23 @@ body{overscroll-behavior-y:contain;}
 .chip:active{background:var(--surface2);}
 .chip.active{color:#fff;font-weight:700;background:#1a1a1a;}
 .dark .chip.active{background:rgba(255,255,255,0.15);}
+/* D1: "More ▾" chip opens the mobile overflow sheet (Briefing/Podcasts/Sources/Saved). */
+.chip-more{font-weight:700;color:var(--text2);}
+.chip-more.active{color:#fff;}
+.more-sheet-overlay{position:fixed;inset:0;background:rgba(0,0,0,0.45);z-index:650;display:flex;align-items:flex-end;}
+.more-sheet{background:var(--surface);width:100%;border-radius:16px 16px 0 0;
+  padding:8px 10px calc(14px + env(safe-area-inset-bottom,0));box-shadow:0 -8px 30px rgba(0,0,0,0.22);
+  animation:more-sheet-up 0.18s ease-out;}
+@keyframes more-sheet-up{from{transform:translateY(100%);}to{transform:translateY(0);}}
+.more-sheet-head{display:flex;align-items:center;justify-content:space-between;
+  padding:8px 8px 10px;font-family:var(--font-sans);font-weight:800;font-size:13px;
+  text-transform:uppercase;letter-spacing:0.08em;color:var(--text3);border-bottom:1px solid var(--border2);}
+.more-sheet-close{background:none;border:none;font-size:26px;line-height:1;color:var(--text3);cursor:pointer;padding:0 6px;}
+.more-sheet-item{display:flex;align-items:center;width:100%;min-height:52px;
+  background:none;border:none;border-bottom:1px solid var(--border2);cursor:pointer;
+  font-family:var(--font-sans);font-size:15px;font-weight:700;color:var(--text);text-align:left;padding:0 8px;}
+.more-sheet-item:last-child{border-bottom:none;}
+.more-sheet-item.active{color:var(--accent);}
 
 /* Mobile search slide-in */
 .mobile-search{display:none;padding:8px 12px;border-top:1px solid var(--border2);}
@@ -4468,24 +4499,8 @@ kbd{display:inline-block;padding:1px 5px;border:1px solid var(--border);border-r
 }
 .sb-box-sub{font-size:9px;color:rgba(255,255,255,0.5);text-transform:uppercase;letter-spacing:0.05em;}
 
-/* MOBILE CHIP BAR — editorial category pills */
-.chip-bar{
-  display:flex;gap:0;overflow-x:auto;scrollbar-width:none;
-  background:var(--navy);border-bottom:1px solid rgba(255,255,255,0.08);
-  padding:0;
-}
-.chip-bar::-webkit-scrollbar{display:none;}
-.chip{
-  flex-shrink:0;background:transparent;border:none;
-  color:rgba(255,255,255,0.6);
-  padding:10px 16px;font-size:var(--fs-meta);font-weight:700;cursor:pointer;
-  font-family:var(--font-sans);
-  text-transform:uppercase;letter-spacing:0.06em;
-  border-bottom:2px solid transparent;
-  transition:all 0.12s;white-space:nowrap;
-}
-.chip.active{color:#fff;border-bottom-color:#fff;}
-.chip:hover:not(.active){color:rgba(255,255,255,0.85);}
+/* D1: the second (legacy navy) .chip / .chip-bar block was removed here — the
+   single canonical definition now lives above (editorial category pills). */
 
 /* MOBILE HEADER — editorial masthead */
 .mobile-header{
@@ -7696,6 +7711,97 @@ function LastUpdated({ timestamp, onRefresh }) {
   );
 }
 
+// ─── PRIORITY-OVERFLOW NAV (D1) ───────────────────────────────────────────────
+// Desktop/iPad (>640px) primary nav. Every primary tab that fits at the current
+// width renders inline; the ones that don't collapse into a "More ▾" menu
+// (last-first, i.e. Podcasts overflows before Briefing, etc.). Sources and Saved
+// ALWAYS live in More. Fit is MEASURED with ResizeObserver against a hidden,
+// never-collapsed copy of the full row (so we always use natural widths), not CSS
+// overflow — guaranteeing every destination is reachable in ≤2 interactions at
+// any width. Keyboard: More opens/closes on Enter/click and Esc; items are buttons.
+const NAV_PRIMARY = ['general','business','bloom','tech','sports','health','popculture','briefing','podcasts'];
+const NAV_ALWAYS_MORE = ['sources','saved'];
+const NAV_MORE_RESERVE = 104; // px kept free for the More ▾ button when measuring
+
+function PriorityNav({ tab, onPick, labels, classes }) {
+  const wrapRef = useRef(null);
+  const measureRef = useRef(null);
+  const menuRef = useRef(null);
+  const moreBtnRef = useRef(null);
+  const [visibleCount, setVisibleCount] = useState(NAV_PRIMARY.length);
+  const [menuOpen, setMenuOpen] = useState(false);
+
+  const lbl = t => labels[t] || (t.charAt(0).toUpperCase() + t.slice(1));
+  const isActive = t => tab === t || (t === 'business' && tab === 'finance');
+
+  useLayoutEffect(() => {
+    const wrap = wrapRef.current, measure = measureRef.current;
+    if (!wrap || !measure) return;
+    const compute = () => {
+      const avail = wrap.clientWidth;
+      const btns = Array.from(measure.children);
+      let used = 0, fit = 0;
+      for (let i = 0; i < btns.length; i++) {
+        used += btns[i].offsetWidth;
+        // Always reserve room for More — Sources/Saved live there unconditionally.
+        if (used + NAV_MORE_RESERVE <= avail) fit = i + 1; else break;
+      }
+      setVisibleCount(fit);
+    };
+    compute();
+    const ro = new ResizeObserver(compute);
+    ro.observe(wrap);
+    return () => ro.disconnect();
+  }, [labels]);
+
+  useEffect(() => {
+    if (!menuOpen) return;
+    const onDown = e => {
+      if (menuRef.current && !menuRef.current.contains(e.target) &&
+          moreBtnRef.current && !moreBtnRef.current.contains(e.target)) setMenuOpen(false);
+    };
+    const onKey = e => { if (e.key === 'Escape') { setMenuOpen(false); moreBtnRef.current && moreBtnRef.current.focus(); } };
+    document.addEventListener('mousedown', onDown);
+    document.addEventListener('keydown', onKey);
+    return () => { document.removeEventListener('mousedown', onDown); document.removeEventListener('keydown', onKey); };
+  }, [menuOpen]);
+
+  const visible = NAV_PRIMARY.slice(0, visibleCount);
+  const moreItems = [...NAV_PRIMARY.slice(visibleCount), ...NAV_ALWAYS_MORE];
+  const activeInMore = moreItems.some(isActive);
+
+  return (
+    <div className="nav-tabs" ref={wrapRef}>
+      {/* Hidden full-width measuring row — natural widths, never collapsed. */}
+      <div className="nav-measure" ref={measureRef} aria-hidden="true">
+        {NAV_PRIMARY.map(t => <button key={t} className={`nav-tab ${classes[t]||''}`} tabIndex={-1}>{lbl(t)}</button>)}
+      </div>
+      {visible.map(t => (
+        <button key={t} className={`nav-tab ${classes[t]||''} ${isActive(t)?'active':''}`} onClick={()=>onPick(t)}>
+          {lbl(t)}
+        </button>
+      ))}
+      <div className="nav-more">
+        <button ref={moreBtnRef} className={`nav-tab nav-more-btn ${activeInMore?'active':''}`}
+          aria-haspopup="menu" aria-expanded={menuOpen}
+          onClick={()=>setMenuOpen(o=>!o)}>
+          More{moreItems.length?` (${moreItems.length})`:''} ▾
+        </button>
+        {menuOpen && (
+          <div className="nav-more-menu" role="menu" ref={menuRef}>
+            {moreItems.map(t => (
+              <button key={t} role="menuitem" className={`nav-more-item ${isActive(t)?'active':''}`}
+                onClick={()=>{ onPick(t); setMenuOpen(false); }}>
+                {lbl(t)}
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 // ─── TOP BAR ──────────────────────────────────────────────────────────────────
 // Renders BOTH desktop (whisper + nav) AND mobile (compact header + chip bar)
 // in DOM. CSS media queries decide which is visible. `hidden` prop drives
@@ -7708,6 +7814,17 @@ function TopBar({tab, setTab, search, setSearch, dark, setDark,
   const [searchFocused, setSearchFocused] = useState(false);
   const [quotes, setQuotes] = useState({});
   const [showBreaking, setShowBreaking] = useState(true);
+  // D1: desktop search collapses to an icon (reclaims width for the nav); mobile
+  // "More" chip opens a sheet holding Briefing/Podcasts/Sources/Saved.
+  const [searchOpenDesktop, setSearchOpenDesktop] = useState(false);
+  const [moreSheetOpen, setMoreSheetOpen] = useState(false);
+  const MORE_SHEET_TABS = ['briefing','podcasts','sources','saved'];
+  useEffect(() => {
+    if (!moreSheetOpen) return;
+    const onKey = e => { if (e.key === 'Escape') setMoreSheetOpen(false); };
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, [moreSheetOpen]);
   // Weather moved off the global strip → Home-only "Right Now" card (RightNowWeather).
 
   useEffect(()=>{
@@ -7725,8 +7842,8 @@ function TopBar({tab, setTab, search, setSearch, dark, setDark,
   // Breaking headlines now live inside State of Play (Pass L item 3); the status strip
   // keeps only the small pulsing "● Breaking" signal flag, not a cramped marquee.
 
-  // v24a: Desktop nav per user: General · Business · Markets · Bloom · Sports · Pop Culture · Briefing · Podcasts · Saved
-  const ALL_TABS = ['general','business','bloom','tech','sports','health','popculture','briefing','podcasts','sources','saved'];
+  // D1: desktop nav is now priority-overflow (PriorityNav). Primary order lives in
+  // NAV_PRIMARY; Sources/Saved always live in the More menu (NAV_ALWAYS_MORE).
   const TAB_LABELS = {business:'Business & Markets',bloom:'Energy',finance:'Markets',tech:'AI & Tech',health:'Health',popculture:'Pop Culture',podcasts:'Podcasts',sources:'Sources',saved:'Saved',briefing:'Briefing'};
   const TAB_CLASS  = {general:'t-general',sports:'t-sports',business:'t-business',finance:'t-finance',bloom:'t-bloom',tech:'t-tech',popculture:'t-popculture',podcasts:'t-podcasts'};
 
@@ -7811,21 +7928,22 @@ function TopBar({tab, setTab, search, setSearch, dark, setDark,
             <div className="logo">My<span>News</span>Hub</div>
             <div className="logo-tag">Your daily briefing</div>
           </div>
-          <div className="nav-tabs">
-            {ALL_TABS.map(t=>(
-              <button key={t} className={`nav-tab ${TAB_CLASS[t]||''} ${(tab===t || (t==='business' && tab==='finance'))?'active':''}`}
-                onClick={()=>{setTab(t);setSearch('');}}>
-                {TAB_LABELS[t]||(t.charAt(0).toUpperCase()+t.slice(1))}
-              </button>
-            ))}
-          </div>
+          <PriorityNav tab={tab} onPick={t=>{setTab(t);setSearch('');}} labels={TAB_LABELS} classes={TAB_CLASS}/>
           <div className="nav-right">
-            <div className="search-wrap">
-              <input className="search-input" placeholder="Search…" value={search}
+            <div className={`search-wrap ${searchOpenDesktop?'open':''}`}>
+              {!searchOpenDesktop && (
+                <button className="nav-icon-btn" title="Search" aria-label="Open search"
+                  onClick={()=>{ setSearchOpenDesktop(true); setSearchFocused(true); }}>
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+                </button>
+              )}
+              {searchOpenDesktop && (
+              <input className="search-input" placeholder="Search…" value={search} autoFocus
                 onChange={e=>setSearch(e.target.value.toLowerCase())}
                 onFocus={()=>setSearchFocused(true)}
-                onBlur={()=>setTimeout(()=>setSearchFocused(false),160)}/>
-              {searchFocused && !search && ((searchHistory||[]).length>0||(trendingTopics||[]).length>0) && (
+                onBlur={()=>setTimeout(()=>{ setSearchFocused(false); if(!search) setSearchOpenDesktop(false); },160)}/>
+              )}
+              {searchOpenDesktop && searchFocused && !search && ((searchHistory||[]).length>0||(trendingTopics||[]).length>0) && (
                 <div className="search-dropdown">
                   {(searchHistory||[]).length>0 && (
                     <>
@@ -7922,8 +8040,32 @@ function TopBar({tab, setTab, search, setSearch, dark, setDark,
               </button>
             );
           })}
+          {/* D1: More chip → sheet with Briefing/Podcasts/Sources/Saved. */}
+          <button className={`chip chip-more ${MORE_SHEET_TABS.includes(tab)?'active':''}`}
+            style={MORE_SHEET_TABS.includes(tab)?{background:'#1a1a1a'}:{}}
+            aria-haspopup="menu" aria-expanded={moreSheetOpen}
+            onClick={()=>setMoreSheetOpen(true)}>
+            More ▾
+          </button>
         </div>
         </div>
+        {moreSheetOpen && (
+          <div className="more-sheet-overlay" onClick={()=>setMoreSheetOpen(false)}>
+            <div className="more-sheet" role="menu" onClick={e=>e.stopPropagation()}>
+              <div className="more-sheet-head">
+                <span>More</span>
+                <button className="more-sheet-close" aria-label="Close" onClick={()=>setMoreSheetOpen(false)}>×</button>
+              </div>
+              {MORE_SHEET_TABS.map(t=>(
+                <button key={t} role="menuitem"
+                  className={`more-sheet-item ${tab===t?'active':''}`}
+                  onClick={()=>{ setTab(t); setMoreSheetOpen(false); }}>
+                  {TAB_LABELS[t]||(t.charAt(0).toUpperCase()+t.slice(1))}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
