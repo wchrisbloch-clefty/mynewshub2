@@ -41,6 +41,8 @@ import { useState, useEffect, useLayoutEffect, useCallback, useMemo, useRef, Fra
 import { clusterStories, hotClusterTopics, rankClusters, TREND_STOP, decodeEntities, capByPublisher } from './modules/clustering';
 import { qualifyBreaking, isPromoItem } from './modules/breaking';
 import { DEBUG, dbgRender, dbgPoll, DebugOverlay } from './modules/debug';
+import { makeVoice, upsertVoice, removeVoice as removeVoiceModel, mergeVoices, clearTombstone, voiceId, VOICE_PLATFORMS } from './modules/voices/model';
+import { SEED_VOICES } from './modules/voices/seeds';
 import { extractContent, extractionFallbackMessage } from './modules/extractor';
 import { retrieveFeedContext, buildFeedContextBlock } from './modules/retrieval';
 import { XPulse } from './modules/x-pulse';
@@ -2676,6 +2678,29 @@ body:not(.dark) .pill-bar{
 .cp-input:focus{outline:none;border-color:var(--accent);}
 .cp-btn{background:var(--accent);border:none;color:#fff;border-radius:6px;padding:6px 12px;font-size:var(--fs-meta);font-weight:600;cursor:pointer;font-family:inherit;white-space:nowrap;}
 .cp-btn-red{background:var(--red);}
+.cp-btn-sec{background:none;border:1px solid var(--border);color:var(--text2);border-radius:6px;padding:6px 12px;font-size:var(--fs-meta);font-weight:700;cursor:pointer;font-family:inherit;white-space:nowrap;}
+.cp-btn-sec:hover{border-color:var(--accent);color:var(--accent);}
+/* E1: Voices tab */
+.cp-voice-group{margin-bottom:12px;}
+.cp-voice-cat{font-family:var(--font-sans);font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:0.08em;color:var(--text3);padding:8px 0 4px;border-bottom:1px solid var(--border2);}
+.cp-voice-row{display:flex;flex-wrap:wrap;align-items:center;gap:8px;padding:8px 0;border-bottom:1px solid var(--border2);}
+.cp-voice-row:last-child{border-bottom:none;}
+.cp-voice-main{display:flex;align-items:center;gap:8px;flex:1;min-width:0;flex-wrap:wrap;}
+.cp-voice-name{font-family:var(--font-sans);font-weight:700;font-size:var(--fs-body);color:var(--text);}
+.cp-voice-type{font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:0.05em;color:var(--text3);border:1px solid var(--border);border-radius:8px;padding:1px 6px;}
+.cp-voice-status{font-size:9px;font-weight:800;text-transform:uppercase;letter-spacing:0.04em;border-radius:8px;padding:1px 6px;}
+.cp-vs-seed{color:#b45309;background:rgba(217,119,6,0.12);}
+.cp-vs-unconfirmed{color:var(--text3);background:var(--surface2);}
+.cp-voice-flag{font-size:9px;color:#b45309;font-weight:700;}
+.cp-voice-handles{font-size:var(--fs-meta);color:var(--text3);font-family:var(--font-publicsans);}
+.cp-voice-actions{display:inline-flex;align-items:center;gap:4px;flex-shrink:0;}
+.cp-voice-btn{background:none;border:1px solid var(--border);border-radius:6px;min-width:34px;min-height:34px;padding:0 8px;cursor:pointer;color:var(--text3);font-size:12px;font-weight:700;font-family:inherit;}
+.cp-voice-btn:hover:not(:disabled){border-color:var(--accent);color:var(--accent);}
+.cp-voice-btn:disabled{opacity:0.4;cursor:default;}
+.cp-voice-rm:hover{border-color:var(--red);color:var(--red);}
+.cp-voice-edit{width:100%;display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:6px;padding:8px 0 2px;}
+.cp-voice-hl{display:flex;flex-direction:column;gap:2px;font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:0.04em;}
+@media(max-width:640px){ .cp-voice-btn{min-width:44px;min-height:44px;} }
 .cp-src-row{display:flex;align-items:center;gap:8px;padding:7px 0;border-bottom:1px solid var(--border2);}
 .cp-src-row:last-child{border-bottom:none;}
 .cp-health{width:6px;height:6px;border-radius:50%;flex-shrink:0;}
@@ -6977,7 +7002,8 @@ function SourceFooter({cat, feeds, arts}) {
 const CAT_LABELS = {general:'News',sports:'Sports',business:'Business',finance:'Markets',bloom:'Energy',tech:'AI & Tech',popculture:'Pop Culture',comedy:'Comedy'};
 const PLAT_LABELS = {twitter:'𝕏',linkedin:'in',instagram:'IG',youtube:'▶'};
 
-function CustomizePanel({feeds, kw, alerts, urgent, social, watchlist, teams, health, arts, weatherCities, hiddenIndices, briefingExclude, briefingSources, initialTab, initialCat, onClose, onSave}) {
+function CustomizePanel({feeds, kw, alerts, urgent, social, watchlist, teams, health, arts, weatherCities, hiddenIndices, briefingExclude, briefingSources, initialTab, initialCat, onClose, onSave,
+  voices, onAddVoice, removeVoiceById, reorderVoice, onResolveVoice, onTestVoices, voicesTestSummary, searchKeyPresent}) {
   const [lf, setLf] = useState(JSON.parse(JSON.stringify(feeds)));
   const [lk, setLk] = useState(JSON.parse(JSON.stringify(kw)));
   const [la, setLa] = useState([...alerts]);
@@ -7007,6 +7033,12 @@ function CustomizePanel({feeds, kw, alerts, urgent, social, watchlist, teams, he
   const [newUrl, setNewUrl] = useState('');
   const [newHandle, setNewHandle] = useState('');
   const [testState, setTestState] = useState({});
+  // E1: Voices tab state
+  const [voiceCat, setVoiceCat] = useState(initialCat||'general');
+  const [vName, setVName] = useState('');
+  const [vType, setVType] = useState('person');
+  const [editVoiceId, setEditVoiceId] = useState(null);
+  const VOICE_CATS = ['general','business','bloom','tech','sports','health','popculture'];
 
   const testFeed = async (url, key) => {
     setTestState(s=>({...s,[key]:'loading'}));
@@ -7048,9 +7080,9 @@ function CustomizePanel({feeds, kw, alerts, urgent, social, watchlist, teams, he
         <div className="cp-head"><span className="cp-title">Customize</span><button className="cp-x" onClick={onClose}>✕</button></div>
         <div className="cp-body">
           <div className="cp-sec-tabs">
-            {['keywords','alerts','sources','social','watchlist','teams','datastrip','briefing'].map(t=>(
+            {['keywords','alerts','sources','social','voices','watchlist','teams','datastrip','briefing'].map(t=>(
               <button key={t} className={`cp-sec-tab ${secTab===t?'active':''}`} onClick={()=>setSecTab(t)}>
-                {t==='keywords'?'Keywords':t==='alerts'?'Alerts':t==='sources'?'Sources':t==='social'?'Social':t==='watchlist'?'Watchlist':t==='teams'?'Teams':t==='briefing'?'Briefing':'Data Strip'}
+                {t==='keywords'?'Keywords':t==='alerts'?'Alerts':t==='sources'?'Sources':t==='social'?'Social':t==='voices'?'Voices':t==='watchlist'?'Watchlist':t==='teams'?'Teams':t==='briefing'?'Briefing':'Data Strip'}
               </button>
             ))}
           </div>
@@ -7159,6 +7191,71 @@ function CustomizePanel({feeds, kw, alerts, urgent, social, watchlist, teams, he
                   onChange={e=>setNewHandle(e.target.value)} onKeyDown={e=>{if(e.key==='Enter')addHandle();}}/>
                 <button className="cp-btn" onClick={addHandle}>Add</button>
               </div>
+            </div>
+          )}
+
+          {secTab==='voices' && (
+            <div className="cp-sec">
+              <div className="cp-lbl">Voices</div>
+              <div className="cp-desc">People, businesses and teams whose posts across X, Instagram, LinkedIn, TikTok and YouTube get flagged in the matching category. Voices are always labeled <strong>inferred</strong>; clicking a tile opens the platform — nothing is read in-app.{!searchKeyPresent && <> <strong>Add a search key (SEARCH_API_KEY) to enable discovery</strong> — you can still add handles manually.</>}</div>
+              {/* Add a voice */}
+              <div className="cp-src-add">
+                <input className="cp-input" placeholder="Name (person, business or team)…" value={vName} onChange={e=>setVName(e.target.value)} onKeyDown={e=>{if(e.key==='Enter'&&vName.trim()){onAddVoice&&onAddVoice({name:vName.trim(),type:vType,category:voiceCat});setVName('');}}}/>
+                <select className="cp-input" value={vType} onChange={e=>setVType(e.target.value)} aria-label="Type">
+                  <option value="person">Person</option><option value="org">Business / Org</option><option value="team">Team</option>
+                </select>
+                <select className="cp-input" value={voiceCat} onChange={e=>setVoiceCat(e.target.value)} aria-label="Category">
+                  {VOICE_CATS.map(c=><option key={c} value={c}>{(CATS[c]||{}).label||c}</option>)}
+                </select>
+                <button className="cp-btn" onClick={()=>{ if(vName.trim()){ onAddVoice&&onAddVoice({name:vName.trim(),type:vType,category:voiceCat}); setVName(''); } }}>Add</button>
+              </div>
+              {onTestVoices && (
+                <div style={{display:'flex',gap:'8px',margin:'4px 0 10px'}}>
+                  <button className="cp-btn-sec" onClick={onTestVoices}>Test voices</button>
+                  {typeof voicesTestSummary==='string' && voicesTestSummary && <span className="cp-desc" style={{margin:0}}>{voicesTestSummary}</span>}
+                </div>
+              )}
+              {/* Grouped by category */}
+              {VOICE_CATS.map(cat => {
+                const inCat = (voices||[]).filter(v=>v.category===cat);
+                if(!inCat.length) return null;
+                return (
+                  <div key={cat} className="cp-voice-group">
+                    <div className="cp-voice-cat">{(CATS[cat]||{}).label||cat}</div>
+                    {inCat.map((v,i)=>(
+                      <div key={v.id} className="cp-voice-row">
+                        <div className="cp-voice-main">
+                          <span className="cp-voice-name">{v.name}</span>
+                          <span className="cp-voice-type">{v.type}</span>
+                          {v.status!=='confirmed' && <span className={`cp-voice-status cp-vs-${v.status}`}>{v.status}</span>}
+                          {v._parkedFrom && <span className="cp-voice-flag" title="Parked here pending your category decision">parked: {v._parkedFrom}</span>}
+                          <span className="cp-voice-handles">{VOICE_PLATFORMS.filter(p=>v.handles&&v.handles[p]).join(' · ')||'no handles yet'}</span>
+                        </div>
+                        <div className="cp-voice-actions">
+                          {onResolveVoice && <button className="cp-voice-btn" title="Find handles" onClick={()=>onResolveVoice(v)}>Find</button>}
+                          <button className="cp-voice-btn" title="Edit handles" onClick={()=>setEditVoiceId(editVoiceId===v.id?null:v.id)}>Edit</button>
+                          <button className="cp-voice-btn" aria-label="Move up" disabled={i===0} onClick={()=>reorderVoice(v.id,-1)}>↑</button>
+                          <button className="cp-voice-btn" aria-label="Move down" disabled={i===inCat.length-1} onClick={()=>reorderVoice(v.id,1)}>↓</button>
+                          <button className="cp-voice-btn cp-voice-rm" aria-label="Remove" onClick={()=>removeVoiceById(v.id)}>✕</button>
+                        </div>
+                        {editVoiceId===v.id && (
+                          <div className="cp-voice-edit">
+                            {VOICE_PLATFORMS.map(p=>(
+                              <label key={p} className="cp-voice-hl">
+                                <span>{p}</span>
+                                <input className="cp-input" defaultValue={(v.handles&&v.handles[p])||''} placeholder={p==='linkedin'?'company/… or in/…':'@handle'}
+                                  onBlur={e=>{ const val=e.target.value.trim(); const handles={...(v.handles||{})}; if(val) handles[p]=val; else delete handles[p]; onAddVoice&&onAddVoice({...v, handles, status: Object.keys(handles).length?'confirmed':v.status, confirmedAt: Object.keys(handles).length?Date.now():v.confirmedAt, _manual:true}); }}/>
+                              </label>
+                            ))}
+                            <div className="cp-desc" style={{margin:'2px 0 0'}}>Manual handles are saved on blur. Prefer “Find” to confirm from search.</div>
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                );
+              })}
+              {(!voices||!voices.length) && <div className="cp-desc">No voices yet. Add one above, or accept suggestions from the seed list.</div>}
             </div>
           )}
 
@@ -8664,6 +8761,29 @@ export default function App() {
     setMyTeams(prev => { const n = prev.filter(x => !(teamSlug(x.name) === slug && leagueKey(x.league) === lk)); sv('myTeams', n); return n; });
     setTeams(prev => { const n = prev.filter(x => !(teamSlug(x.team || x.name) === slug && leagueKey(x.league) === lk)); sv('teams', n); return n; });
   };
+  // E1: Voices — people/orgs/teams whose cross-platform posts we flag. Persisted +
+  // synced; voiceTombstones mirror removedTeams so a removed voice can't be resurrected
+  // by an older cloud profile. A voice of type 'team' LINKS to the followedTeams entity
+  // (by name/slug) — we never keep a second team list here.
+  const [voices, setVoices] = useState(() => ld('voices', []));
+  const [voiceTombstones, setVoiceTombstones] = useState(() => ld('voiceTombstones', []));
+  const addOrUpdateVoice = useCallback((partial) => {
+    const v = partial.id && partial.handles !== undefined && partial.name ? partial : makeVoice(partial);
+    setVoiceTombstones(prev => { const n = clearTombstone(prev, v.id); sv('voiceTombstones', n); return n; });
+    setVoices(prev => { const n = upsertVoice(prev, v); sv('voices', n); return n; });
+  }, []);
+  const removeVoiceById = useCallback((id) => {
+    setVoices(prev => { const n = prev.filter(v => v.id !== id); sv('voices', n); return n; });
+    setVoiceTombstones(prev => prev.includes(id) ? prev : (() => { const n = [...prev, id]; sv('voiceTombstones', n); return n; })());
+  }, []);
+  const reorderVoice = useCallback((id, dir) => {
+    setVoices(prev => {
+      const i = prev.findIndex(v => v.id === id); if (i < 0) return prev;
+      const j = i + dir; if (j < 0 || j >= prev.length) return prev;
+      const n = prev.slice(); const [m] = n.splice(i, 1); n.splice(j, 0, m);
+      sv('voices', n); return n;
+    });
+  }, []);
   const [weatherCities, setWeatherCities] = useState(()=>ld('weatherCities', DEFAULT_WEATHER_CITIES));
   const [hiddenIndices, setHiddenIndices] = useState(()=>ld('hiddenIndices',[]));
   const [briefingExclude, setBriefingExclude] = useState(()=>ld('briefingExclude',['comedy']));
@@ -9016,8 +9136,10 @@ export default function App() {
     kw, teams, feeds, alerts, urgent, social, watchlist,
     weatherCities, hiddenIndices, briefingExclude, briefingSources,
     myTeams, myTopics, removedTeams,
+    voices, voiceTombstones, // E1
   }), [kw, teams, feeds, alerts, urgent, social, watchlist,
-       weatherCities, hiddenIndices, briefingExclude, briefingSources, myTeams, myTopics, removedTeams]);
+       weatherCities, hiddenIndices, briefingExclude, briefingSources, myTeams, myTopics, removedTeams,
+       voices, voiceTombstones]);
 
   // Apply a downloaded profile onto local state (+ localStorage), keying defensively.
   const applyCloudConfig = useCallback((cfg) => {
@@ -9043,7 +9165,14 @@ export default function App() {
     put('briefingSources', cfg.briefingSources, setBriefingSources);
     put('myTeams', cfg.myTeams ? dropTomb(normalizeMyTeams(cfg.myTeams), t => t.name) : cfg.myTeams, setMyTeams);
     put('myTopics', cfg.myTopics, setMyTopics);
-  }, [removedTeams]);
+    // E1: voices — same union-merge + tombstone contract as teams, via the model.
+    const mergedVoiceTombs = Array.from(new Set([...(voiceTombstones || []), ...(Array.isArray(cfg.voiceTombstones) ? cfg.voiceTombstones : [])]));
+    put('voiceTombstones', mergedVoiceTombs, setVoiceTombstones);
+    if (cfg.voices !== undefined) {
+      const mergedVoices = mergeVoices(voices, Array.isArray(cfg.voices) ? cfg.voices : [], mergedVoiceTombs);
+      put('voices', mergedVoices, setVoices);
+    }
+  }, [removedTeams, voices, voiceTombstones]);
 
   const pullCloudProfile = useCallback(async (uid) => {
     if (!uid) return;
@@ -11111,6 +11240,8 @@ export default function App() {
           briefingExclude={briefingExclude}
           briefingSources={briefingSources}
           initialTab={panelInitial.tab} initialCat={panelInitial.cat}
+          voices={voices} onAddVoice={addOrUpdateVoice} removeVoiceById={removeVoiceById} reorderVoice={reorderVoice}
+          onResolveVoice={undefined} onTestVoices={undefined} voicesTestSummary={''} searchKeyPresent={false}
           onClose={()=>setShowPanel(false)} onSave={handleCustomizeSave}/>}
       </div>
       {/* Floating AI chatbot — available on all pages */}
