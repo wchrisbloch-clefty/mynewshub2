@@ -58,19 +58,22 @@ export function SnapshotCard({ a, meta = {}, isSaved, onSave, onRead, onPerspect
           {a.isAlert && <span className="snap-live">● LIVE</span>}
           <TierBadge item={a}/>
           {topKw && <span className="snap-tag" style={{ background: bg, color }}>{topKw}</span>}
-          <span className="snap-time">{formatDate(a.pubDate)}</span>
         </div>
         <h3 className="snap-title">{a.title}</h3>
         </>)}
         {a.desc && <p className="snap-snippet">{a.desc}</p>}
+        {/* F3: ONE meta row — timestamp (+ sources) left, Ask/save right. The hero shows
+            its time in the overlay, so the foot omits it there to avoid duplication. */}
         <div className="snap-foot">
-          {multi
-            ? <button className="snap-sources snap-sources-btn"
+          <span className="snap-foot-left">
+            {!heroImg && <span className="snap-time">{formatDate(a.pubDate)}</span>}
+            {multi &&
+              <button className="snap-sources snap-sources-btn"
                 onClick={e => { e.stopPropagation(); onPerspectives?.(a); }}>
                 <strong>{a._clusterSize} sources</strong> · Perspectives
                 <svg className="snap-cov-caret" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
-              </button>
-            : <span className="snap-single">{a.source}</span>}
+              </button>}
+          </span>
           <span className="snap-foot-actions">
             {/* D7: Ask the assistant about this specific story. */}
             {onAsk && (
