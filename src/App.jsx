@@ -1771,14 +1771,16 @@ body:not(.dark) .pill-bar{
 .nav-tabs::-webkit-scrollbar{display:none;}
 .nav-tab{
   background:transparent;border:none;color:var(--text3);
-  padding:0 14px;height:54px;cursor:pointer;
+  padding:0 11px;height:54px;cursor:pointer; /* F7: tighter tab spacing (was 0 14px) */
   font-family:var(--font-sans);font-size:12px;font-weight:700;
   white-space:nowrap;border-bottom:3px solid transparent;
-  transition:color 0.12s,border-color 0.12s;letter-spacing:0.04em;
+  transition:color 0.12s,border-color 0.12s;letter-spacing:0.03em;
   text-transform:uppercase;
 }
-/* One accent for the active section — identity is the label, not a colour per tab */
-.nav-tab.active{color:var(--accent);border-bottom-color:var(--accent);}
+/* F7: ONE accent for the active section, made decisive — accent ink, heavier weight and
+   a full-weight 3px underline. Identity is the label + the single accent, never a colour
+   per tab. */
+.nav-tab.active{color:var(--accent);border-bottom-color:var(--accent);font-weight:800;}
 .nav-tab:hover:not(.active){color:var(--text2);}
 .nav-right{display:flex;gap:8px;align-items:center;flex-shrink:0;padding-left:16px;border-left:1px solid var(--border);}
 /* D1: priority-overflow nav. The visible row is flex (no scroll); the hidden
@@ -4225,6 +4227,20 @@ body{overscroll-behavior-y:contain;}
   .pill-label{font-size:8px;}
   .pill-value{font-size:var(--fs-body);}
   .pill-chg{font-size:9px;padding:1px 5px;}
+
+  /* F7: default-collapsed market ticker — the header toggle reclaims the ~34px strip. */
+  .topbar-wrap.ticker-collapsed .status-strip{display:none;}
+  .mobile-ticker-toggle.on{color:var(--accent);border-color:var(--accent);}
+  /* F7: when the header auto-hides on scroll-down, the wrap no longer slides fully away.
+     The logo row + ticker + weather + scores hide, but the category CHIPS stay pinned at
+     the top (under env(safe-area-inset-top), already on .topbar-wrap) so switching
+     sections stays one tap while reading — no overlap, no dead zone. */
+  .topbar-wrap.hidden{transform:none;}
+  .topbar-wrap.hidden .status-strip,
+  .topbar-wrap.hidden .topbar-wx,
+  .topbar-wrap.hidden .topbar-scores,
+  .topbar-wrap.hidden .mobile-header,
+  .topbar-wrap.hidden .mobile-search{display:none;}
 
   body{padding-bottom:calc(58px + env(safe-area-inset-bottom, 0));}
   .page{padding:14px 14px 24px;}
@@ -8000,6 +8016,10 @@ function TopBar({tab, setTab, search, setSearch, dark, setDark,
                  scores, favTeams, onGoToSports}) {
   const [searchFocused, setSearchFocused] = useState(false);
   const [quotes, setQuotes] = useState({});
+  // F7: mobile market ticker is collapsible and DEFAULT-COLLAPSED (reclaims the ~34px
+  // strip at the top of a phone screen). Persisted; desktop always shows the ticker.
+  const [tickerOpen, setTickerOpen] = useState(() => ld('tickerOpen', false));
+  useEffect(() => { sv('tickerOpen', tickerOpen); }, [tickerOpen]);
   // D1: desktop search collapses to an icon (reclaims width for the nav); mobile
   // "More" chip opens a sheet holding Briefing/Podcasts/Sources/Saved.
   const [searchOpenDesktop, setSearchOpenDesktop] = useState(false);
@@ -8059,7 +8079,7 @@ function TopBar({tab, setTab, search, setSearch, dark, setDark,
   }, [tab]);
 
   return (
-    <div className={`topbar-wrap ${hidden?'hidden':''} ${shrunk?'shrunk':''}`}>
+    <div className={`topbar-wrap ${hidden?'hidden':''} ${shrunk?'shrunk':''} ${tickerOpen?'':'ticker-collapsed'}`}>
       {/* Unified status strip — collapses the old weather + ticker + breaking bars
           into one slim row: live/breaking signal LEFT, market ticker CENTER,
           compact weather chip RIGHT. Red is a signal here, never a texture. */}
@@ -8187,6 +8207,11 @@ function TopBar({tab, setTab, search, setSearch, dark, setDark,
             <div className="mobile-logo-sub">Daily briefing</div>
           </div>
           <div className="mobile-actions">
+            {/* F7: toggles the default-collapsed market ticker (mobile only). */}
+            <button className={`mobile-icon-btn mobile-ticker-toggle${tickerOpen?' on':''}`} onClick={()=>setTickerOpen(o=>!o)}
+              title={tickerOpen?'Hide markets':'Show markets'} aria-label={tickerOpen?'Hide market ticker':'Show market ticker'} aria-pressed={tickerOpen}>
+              <TrendingUp size={18} strokeWidth={2}/>
+            </button>
             <button className="mobile-icon-btn" onClick={onAnalyze} title="Analyze">
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><rect x="8" y="2" width="8" height="4" rx="1"/><line x1="9" y1="12" x2="15" y2="12"/><line x1="9" y1="16" x2="13" y2="16"/></svg>
             </button>
