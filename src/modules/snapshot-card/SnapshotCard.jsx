@@ -28,10 +28,29 @@ export function SnapshotCard({ a, meta = {}, isSaved, onSave, onRead, onPerspect
   const [imgErr, setImgErr] = useState(false);
   const topKw = a.matchedKw?.[0] || null;
   const multi = a._clusterSize > 1;
+  // F2: a lead WITH an image renders as a hero — 16:9 cover image, a bottom-up dark
+  // gradient, and the source + headline overlaid in white (meta in one fixed position).
+  // The no-image lead keeps the D5 typographic treatment. Regular cards are unchanged.
+  const hasImg = a.img && !imgErr && !hideImage;
+  const heroImg = lead && hasImg;
   return (
-    <article className={`snap-card ${a.isAlert ? 'snap-breaking' : ''}${lead ? ' snap-lead' : ''}${lead && (!a.img || imgErr || hideImage) ? ' snap-lead-noimg' : ''}`} onClick={() => onRead(a)}>
+    <article className={`snap-card ${a.isAlert ? 'snap-breaking' : ''}${lead ? ' snap-lead' : ''}${lead && !hasImg ? ' snap-lead-noimg' : ''}${heroImg ? ' snap-lead-hero' : ''}`} onClick={() => onRead(a)}>
       <span className="snap-accent" style={{ background: color }} />
+      {heroImg && (
+        <div className="snap-hero-media">
+          <img className="snap-hero-img" src={a.img} loading="lazy" alt="" onError={() => setImgErr(true)} />
+          <div className="snap-hero-overlay">
+            <div className="snap-meta snap-hero-meta">
+              <span className="snap-hero-source">{a.source}</span>
+              {a.isAlert && <span className="snap-live">● LIVE</span>}
+              <span className="snap-hero-time">{formatDate(a.pubDate)}</span>
+            </div>
+            <h3 className="snap-title snap-hero-title">{a.title}</h3>
+          </div>
+        </div>
+      )}
       <div className="snap-main">
+        {!heroImg && (<>
         <div className="snap-meta">
           <span className="snap-source" style={{ color }}>{a.source}</span>
           <FollowSourceChip name={a.source} url={a.sourceUrl}/>
@@ -42,6 +61,7 @@ export function SnapshotCard({ a, meta = {}, isSaved, onSave, onRead, onPerspect
           <span className="snap-time">{formatDate(a.pubDate)}</span>
         </div>
         <h3 className="snap-title">{a.title}</h3>
+        </>)}
         {a.desc && <p className="snap-snippet">{a.desc}</p>}
         <div className="snap-foot">
           {multi
@@ -67,7 +87,7 @@ export function SnapshotCard({ a, meta = {}, isSaved, onSave, onRead, onPerspect
           </span>
         </div>
       </div>
-      {a.img && !imgErr && !hideImage && <img className="snap-thumb" src={a.img} loading="lazy" alt="" onError={() => setImgErr(true)} />}
+      {!heroImg && hasImg && <img className="snap-thumb" src={a.img} loading="lazy" alt="" onError={() => setImgErr(true)} />}
     </article>
   );
 }
