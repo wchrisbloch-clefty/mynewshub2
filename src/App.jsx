@@ -6223,38 +6223,25 @@ Output ONLY the paragraph followed by the bullets. No headers, no labels, no clo
     });
     if (summary) {
       const { body: b, bullets: bs } = parseBriefing(summary.trim());
+      const now = Date.now();
       setBody(b);
       setBullets(bs);
-      setTs(Date.now());
+      setTs(now);
+      // F4: persist today's briefing so a remount shows it without re-spending, and
+      // "Refresh" vs "Generate" reflects whether today's briefing already exists.
+      try { sv('briefingCache', { date: new Date().toDateString(), body: b, bullets: bs, ts: now }); } catch {}
     } else {
       setError(err||'Could not generate briefing');
     }
     setLoading(false);
   }, [arts, dateStr]);
 
-  // Initial generation when feeds load (>10 articles total)
+  // F4: NO automatic generation (cost guardrail). On mount, load today's cached
+  // briefing if one exists; generation happens ONLY on the button press below.
   useEffect(() => {
-    const total = Object.values(arts).reduce((n,l)=>n+(l?.length||0),0);
-    if (total > 10 && !body && !loading) generate();
+    try { const c = ld('briefingCache', null); if (c && c.date === new Date().toDateString()) { setBody(c.body || ''); setBullets(c.bullets || []); setTs(c.ts || null); } } catch {}
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [arts]);
-
-  // ── TIER 3: time-aware auto-refresh ──
-  // If briefing exists but is older than BRIEFING_STALE_MS (90min), regenerate.
-  // Re-checks every 5 minutes so a user who leaves the tab open mid-morning
-  // gets a fresh briefing by midday without manual refresh.
-  useEffect(() => {
-    if (!ts || loading) return;
-    const checkStale = () => {
-      const age = Date.now() - ts;
-      if (age > BRIEFING_STALE_MS) {
-        const total = Object.values(arts).reduce((n,l)=>n+(l?.length||0),0);
-        if (total > 10) generate();
-      }
-    };
-    checkStale(); // D6: generate on demand when stale on mount/ts-change; no 5-min poll.
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [ts]);
+  }, []);
 
   // Freshness indicator: green <30min, amber older
   const tsLabel = useMemo(() => {
@@ -6278,8 +6265,10 @@ Output ONLY the paragraph followed by the bullets. No headers, no labels, no clo
             </span>
           )}
         </div>
+        {/* F4: ONE button — Generate when no briefing exists for today, Refresh otherwise.
+            Disabled while running (debounces double taps); one press = one generation. */}
         <button className="briefing-inline-refresh-btn" onClick={generate} disabled={loading}>
-          {loading ? 'Generating…' : '↻ Refresh'}
+          {loading ? 'Generating…' : body ? '↻ Refresh briefing' : "Generate today's briefing"}
         </button>
       </div>
       <div className="briefing-inline-sources">
@@ -6289,8 +6278,10 @@ Output ONLY the paragraph followed by the bullets. No headers, no labels, no clo
       {body
         ? <p className="briefing-inline-body" dangerouslySetInnerHTML={{__html: body.replace(/\*\*([^*]+)\*\*/g,'<strong>$1</strong>')}}/>
         : error
-          ? <p className="briefing-inline-empty">{error}</p>
-          : <p className="briefing-inline-empty">{loading?'Synthesizing today\'s headlines…':'Loading briefing…'}</p>}
+          ? <p className="briefing-inline-empty">Generation failed: {error}. Press “Generate today's briefing” to try again.</p>
+          : loading
+            ? <p className="briefing-inline-empty">Synthesizing today's headlines…</p>
+            : <p className="briefing-inline-empty">No briefing yet today — press “Generate today's briefing”.</p>}
       {bullets.length > 0 && (
         <ul className="briefing-inline-bullets">
           {bullets.map((b, i) => (
@@ -6321,94 +6312,15 @@ function BriefingTeaser({arts, excludeCats, onOpenFull, compact}) {
   const [error, setError]     = useState('');
   const dateStr = new Date().toLocaleDateString('en-US',{weekday:'long',month:'long',day:'numeric'});
 
-  const parseBriefing = (text) => {
-    const lines = text.split('\n').map(l => l.trim()).filter(Boolean);
-    const paragraphs = [];
-    const bulletLines = [];
-    for (const line of lines) {
-      const m = line.match(/^(?:[-•*]|\d+[.)])\s+(.+)$/);
-      if (m) bulletLines.push(m[1].trim());
-      else paragraphs.push(line);
-    }
-    return { body: paragraphs.join(' '), bullets: bulletLines.slice(0, 3) };
-  };
-
-  const generate = useCallback(async () => {
-    setLoading(true); setError('');
-    const allArts = Object.values(arts).flat();
-    const tier1 = [];
-    const tier1Keys = new Set();
-    briefingSourceList().forEach(srcName => {
-      allArts
-        .filter(a => a.source === srcName)
-        .sort((a,b) => new Date(b.pubDate) - new Date(a.pubDate))
-        .slice(0, 2)
-        .forEach(a => {
-          tier1.push(a);
-          tier1Keys.add(a.title.slice(0,60).toLowerCase().replace(/\s+/g,''));
-        });
-    });
-    const tier2 = {};
-    Object.entries(arts).forEach(([cat, list]) => {
-      if (effectiveExclude.includes(cat)) return;
-      const headlines = (list||[])
-        .filter(a => !tier1Keys.has(a.title.slice(0,60).toLowerCase().replace(/\s+/g,'')))
-        .sort((a,b) => new Date(b.pubDate) - new Date(a.pubDate))
-        .slice(0, 5)
-        .map(a => a.title);
-      if (headlines.length > 0) tier2[cat] = headlines;
-    });
-    const tier1Block = tier1.length > 0
-      ? `PRIORITY BRIEFINGS:\n${tier1.map(a => `• [${a.source}] ${a.title}`).join('\n')}`
-      : '';
-    const tier2Block = Object.entries(tier2).map(([cat, hl]) =>
-      `${CATS[cat]?.label || cat.toUpperCase()}:\n${hl.map(t => `• ${t}`).join('\n')}`
-    ).join('\n\n');
-
-    const prompt = `Synthesize a punchy 3-sentence opening + 3 specific bullet takeaways for a busy executive's morning briefing. Style: Morning Brew + Axios + Bloomberg 5 Things. Be specific and name actual stories.
-
-${tier1Block}
-
-FRESH HEADLINES BY CATEGORY:
-${tier2Block}
-
-OUTPUT: 3-sentence paragraph followed by exactly 3 bullets (- markers). No headers.`;
-
-    const {summary, error:err} = await fetchAISummary({
-      type:'article',
-      title:`Briefing Teaser — ${dateStr}`,
-      content: prompt,
-      mode:'briefing-gen',
-    });
-    if (summary) {
-      const { body: b, bullets: bs } = parseBriefing(summary.trim());
-      setBody(b);
-      setBullets(bs);
-      setTs(Date.now());
-    } else {
-      setError(err || 'Could not generate briefing');
-    }
-    setLoading(false);
-  }, [arts, dateStr]);
-
+  // F4: the Home teaser NEVER generates — it reflects the SAME cached briefing the
+  // Briefing page produces on its button press (no auto-generation, no double-spend).
+  // It re-reads on focus so a briefing generated in the Briefing tab shows up here.
   useEffect(() => {
-    const total = Object.values(arts).reduce((n,l)=>n+(l?.length||0),0);
-    if (total > 10 && !body && !loading) generate();
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [arts]);
-
-  // Time-aware refresh
-  useEffect(() => {
-    if (!ts || loading) return;
-    const checkStale = () => {
-      if (Date.now() - ts > BRIEFING_STALE_MS) {
-        const total = Object.values(arts).reduce((n,l)=>n+(l?.length||0),0);
-        if (total > 10) generate();
-      }
-    };
-    checkStale(); // D6: generate on demand when stale; no 5-min poll.
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [ts]);
+    const load = () => { try { const c = ld('briefingCache', null); if (c && c.date === new Date().toDateString()) { setBody(c.body || ''); setBullets(c.bullets || []); setTs(c.ts || null); } else { setBody(''); setBullets([]); setTs(null); } } catch {} };
+    load();
+    window.addEventListener('focus', load);
+    return () => window.removeEventListener('focus', load);
+  }, []);
 
   const tsLabel = useMemo(() => {
     if (!ts) return null;
@@ -6442,7 +6354,7 @@ OUTPUT: 3-sentence paragraph followed by exactly 3 bullets (- markers). No heade
             )
         }
         {!loading && !body && !error && bullets.length === 0 && (
-          <button className="briefing-sb-gen" onClick={onOpenFull}>Generate today's briefing →</button>
+          <button className="briefing-sb-gen" onClick={onOpenFull}>No briefing yet — open to generate →</button>
         )}
       </div>
     );
