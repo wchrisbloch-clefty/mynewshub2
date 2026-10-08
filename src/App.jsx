@@ -5140,10 +5140,28 @@ kbd{display:inline-block;padding:1px 5px;border:1px solid var(--border);border-r
   z-index:1;transition:background 0.15s;
 }
 .article-reader-close:hover{background:rgba(0,0,0,0.7);}
+/* F9: header Ask — compact, sits after source · time. */
+.article-reader-ask{
+  display:inline-flex;align-items:center;gap:4px;margin-left:auto;
+  font-family:var(--font-publicsans);font-size:11px;font-weight:700;letter-spacing:0;text-transform:none;
+  color:var(--accent);background:var(--accent-bg);border:1px solid transparent;border-radius:14px;
+  padding:3px 10px;cursor:pointer;transition:background 0.12s;
+}
+.article-reader-ask:hover{background:var(--surface2);border-color:var(--accent);}
+/* F9: Related — compact text rows from existing category/cluster data (no new fetch). */
+.article-reader-related{margin-top:22px;border-top:1px solid var(--border);padding-top:16px;}
+.article-reader-related-row{display:flex;flex-direction:column;gap:2px;width:100%;text-align:left;
+  background:none;border:none;border-top:1px solid var(--border2);padding:9px 0;cursor:pointer;font-family:inherit;}
+.article-reader-related-row:first-of-type{border-top:none;}
+.arr-title{font-family:var(--font-archivo);font-weight:600;font-size:var(--fs-body);line-height:1.3;color:var(--text);}
+.article-reader-related-row:hover .arr-title{color:var(--accent);}
+.arr-src{font-family:var(--font-publicsans);font-size:var(--fs-meta);color:var(--text3);}
 @media(max-width:640px){
   .article-reader-overlay{padding:0;}
   .article-reader{border-radius:0;min-height:100dvh;}
-  .article-reader-body{padding:18px 18px 32px;}
+  .article-reader-body{padding:16px 16px 32px;} /* F9: full-width, 16px pad */
+  /* F9: >=44px close target on touch. */
+  .article-reader-close{width:44px;height:44px;font-size:22px;top:10px;right:10px;}
 }
 
 /* ── PASTE & BRIEF PANEL ───────────────────────────────────────── */
@@ -8566,12 +8584,36 @@ function AnalyzePanel({ onClose }) {
 // ─── ARTICLE READER ───────────────────────────────────────────────────────────
 // XPulse component now lives in ./modules/x-pulse
 
-function ArticleReader({ article, onClose, onAskInChat }) {
+function ArticleReader({ article, onClose, onAskInChat, related = [], onOpen }) {
   const [aiResult, setAiResult] = useState('');
   const [aiErr, setAiErr] = useState('');
   const [aiLoading, setAiLoading] = useState(false);
   const [aiMode, setAiMode] = useState(null);
   const [aiPreview, setAiPreview] = useState(false);
+  const dialogRef = useRef(null);
+  const closeRef = useRef(null);
+
+  // F9: focus trap + RETURN focus. Remember whatever was focused when the reader
+  // opened (the card/link), move focus into the dialog, keep Tab/Shift+Tab inside it,
+  // and restore focus to the opener on close. (Esc-to-close is wired globally.)
+  useEffect(() => {
+    const opener = document.activeElement;
+    const node = dialogRef.current;
+    closeRef.current?.focus();
+    const onKey = (e) => {
+      if (e.key !== 'Tab' || !node) return;
+      const f = node.querySelectorAll('a[href],button:not([disabled]),input,[tabindex]:not([tabindex="-1"])');
+      if (!f.length) return;
+      const first = f[0], last = f[f.length - 1];
+      if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
+      else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
+    };
+    node?.addEventListener('keydown', onKey);
+    return () => {
+      node?.removeEventListener('keydown', onKey);
+      if (opener && opener.focus) { try { opener.focus(); } catch {} }
+    };
+  }, []);
 
   // Fix: pass the real mode (summary/takeaways/bias) and read the {summary,error}
   // object fetchAISummary returns — previously it sent mode:'groq' (invalid) and
@@ -8588,13 +8630,21 @@ function ArticleReader({ article, onClose, onAskInChat }) {
 
   return (
     <div className="article-reader-overlay" onClick={e => { if (e.target === e.currentTarget) onClose(); }}>
-      <div className="article-reader">
-        <button className="article-reader-close" onClick={onClose} aria-label="Close">×</button>
+      <div className="article-reader" ref={dialogRef} role="dialog" aria-modal="true" aria-label={article.title}>
+        <button className="article-reader-close" ref={closeRef} onClick={onClose} aria-label="Close reader">×</button>
         {article.img && <img className="article-reader-img" src={article.img} alt="" loading="lazy"/>}
         <div className="article-reader-body">
+          {/* F9: header — source · time · Ask. Close is the top-right control (>=44px on mobile). */}
           <div className="article-reader-source">
-            {article.source}
+            <span>{article.source}</span>
             {article.pubDate && <span className="article-reader-date">· {fmtDate(article.pubDate)}</span>}
+            {onAskInChat && (
+              <button className="article-reader-ask" onClick={() => { onAskInChat(article); onClose(); }}
+                aria-label="Ask the assistant about this story">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+                Ask
+              </button>
+            )}
           </div>
           <h2 className="article-reader-title">{article.title}</h2>
           {article.desc && <p className="article-reader-desc">{article.desc}</p>}
@@ -8624,6 +8674,19 @@ function ArticleReader({ article, onClose, onAskInChat }) {
           )}
           {/* Phase 4: inline X Pulse under the summary (fails silently) */}
           <XPulse topic={article.title} variant="reader"/>
+          {/* F9: Related — 3–4 stories from EXISTING category/cluster data via the host's
+              getRelated() (keyword match over arts[cat]); NO new network fetch. */}
+          {related && related.length > 0 && (
+            <div className="article-reader-related">
+              <div className="section-label" style={{ color: 'var(--text3)', marginBottom: '8px' }}>Related</div>
+              {related.slice(0, 4).map((r, i) => (
+                <button key={r.link || i} className="article-reader-related-row" onClick={() => onOpen?.(r)}>
+                  <span className="arr-title">{r.title}</span>
+                  <span className="arr-src">{r.source}{r.pubDate ? ` · ${fmtDate(r.pubDate)}` : ''}</span>
+                </button>
+              ))}
+            </div>
+          )}
         </div>
       </div>
     </div>
@@ -9519,6 +9582,24 @@ export default function App() {
   const getRelated = (a,cat)=>{
     const matched=kwMatch(a,cat);if(!matched.length)return[];
     return(arts[cat]||[]).filter(x=>x.link!==a.link&&matched.some(k=>(x.title+(x.desc||'')).toLowerCase().includes(k.toLowerCase()))).slice(0,4);
+  };
+  // F9: related stories for the reader — EXISTING data only, no network fetch.
+  // (1) the story's own cluster members (from clusterStories' _clusterMembers), then
+  // (2) same-category siblings that share significant title words. Dedup, cap at 4.
+  const getReaderRelated = (a)=>{
+    if(!a) return [];
+    const self=a.link;
+    const members=(a._clusterMembers||[]).filter(x=>x&&x.link&&x.link!==self);
+    const cat=a.cat||tab||'general';
+    const pool=arts[cat]||[];
+    const words=(a.title||'').toLowerCase().split(/\W+/).filter(w=>w.length>4);
+    const sibs=pool
+      .filter(x=>x.link&&x.link!==self&&!members.some(m=>m.link===x.link))
+      .map(x=>{const t=(x.title+' '+(x.desc||'')).toLowerCase();return{x,n:words.reduce((s,w)=>s+(t.includes(w)?1:0),0)};})
+      .filter(o=>o.n>0).sort((p,q)=>q.n-p.n).map(o=>o.x);
+    const seen=new Set();const out=[];
+    for(const x of [...members,...sibs]){ if(!seen.has(x.link)){seen.add(x.link);out.push(x);} if(out.length>=4)break; }
+    return out;
   };
 
   // Reading stats derived from clicks + readLinks
@@ -11477,7 +11558,8 @@ export default function App() {
       {/* D8: ?debug=1 scroll/render overlay (renders null unless the flag is on). */}
       <DebugOverlay/>
       {/* Inline article reader overlay */}
-      {readerArticle && <ArticleReader article={readerArticle} onClose={() => setReaderArticle(null)} onAskInChat={(a)=>setChatContext(a)}/>}
+      {readerArticle && <ArticleReader article={readerArticle} onClose={() => setReaderArticle(null)} onAskInChat={(a)=>setChatContext(a)}
+        related={getReaderRelated(readerArticle)} onOpen={(a)=>setReaderArticle(a)}/>}
       {/* Perspectives panel (sources + X Pulse + AI key points) */}
       {perspArticle && <PerspectivesPanel article={perspArticle} onClose={() => setPerspArticle(null)}/>}
       {/* Paste & Brief panel */}
