@@ -2051,7 +2051,7 @@ body:not(.dark) .pill-bar{
    Scoreboard keeps its box (it's a widget).
 ═══════════════════════════════════════════ */
 .sidebar{
-  display:flex;flex-direction:column;gap:24px;min-width:0;
+  display:flex;flex-direction:column;gap:18px;min-width:0; /* F6: tighter secondary rhythm (was 24px) */
   border-left:1px solid var(--border2);padding-left:28px;
   /* Flows in normal document scroll along with the main column — no sticky/fixed
      positioning and no internal scroll container. */
@@ -2111,7 +2111,7 @@ body:not(.dark) .pill-bar{
 .sidebar-section{display:flex;flex-direction:column;gap:0;}
 .sidebar-sec-head{
   display:flex;align-items:center;justify-content:space-between;
-  padding-bottom:9px;border-bottom:2px solid var(--border);margin-bottom:12px;
+  padding-bottom:7px;border-bottom:2px solid var(--border);margin-bottom:9px; /* F6: tightened (was 9/12) */
 }
 .sidebar-sec-label{
   font-size:10px;font-weight:800;color:var(--text3);
@@ -2142,6 +2142,9 @@ body:not(.dark) .pill-bar{
    matches the Sports/Energy/Pop-Culture filter pills. */
 /* Prediction Markets sidebar module (Pass: item 4) — market sentiment, not news. */
 .pm-tag{font-family:var(--font-publicsans);font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:0.04em;color:var(--text4);}
+/* F6: tagline shown once under the collapsible header; muted, out of the way. */
+.pm-tagline{font-family:var(--font-publicsans);font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:0.04em;color:var(--text4);margin:-2px 0 8px;}
+.pm-empty{font-family:var(--font-publicsans);font-size:var(--fs-meta);color:var(--text3);padding:4px 0 2px;}
 .pm-list{display:flex;flex-direction:column;}
 .pm-row{display:flex;align-items:flex-start;gap:10px;padding:9px 0;border-top:1px solid var(--border2);text-decoration:none;}
 .pm-row:first-of-type{border-top:none;}
@@ -6517,34 +6520,77 @@ async function fetchPredictionMarkets(keywords) {
   } catch { return { markets: [] }; }
 }
 
+// F6: module-level cache + in-flight dedupe keyed by the keyword set. The sidebar can
+// remount PredictionMarkets several times while the feed loads; without this, each remount
+// would re-POST. The cache collapses concurrent/rapid remounts (same keywords) to ONE
+// network call, while a different category's keywords still miss and fetch fresh.
+let _pmCache = { key: null, markets: null, ts: 0 };
+let _pmInflight = {};
+const PM_TTL = 5 * 60 * 1000;
+function loadPredictionMarkets(kwKey) {
+  if (_pmCache.key === kwKey && Date.now() - _pmCache.ts < PM_TTL) return Promise.resolve(_pmCache.markets);
+  if (!_pmInflight[kwKey]) {
+    _pmInflight[kwKey] = fetchPredictionMarkets(kwKey.split('|')).then(r => {
+      const m = (r && r.markets) || [];
+      _pmCache = { key: kwKey, markets: m, ts: Date.now() };
+      delete _pmInflight[kwKey];
+      return m;
+    }).catch(() => { delete _pmInflight[kwKey]; return []; });
+  }
+  return _pmInflight[kwKey];
+}
+
 function PredictionMarkets({ keywords }) {
-  const [markets, setMarkets] = useState([]);
+  // F6: collapsed by default and persisted; the network request fires ONLY after the
+  // reader expands it (fetch-on-expand), so an idle load makes ZERO prediction-market
+  // requests. markets===null means "not loaded yet".
+  const [open, setOpen] = useState(() => ld('pmOpen', false));
+  const [markets, setMarkets] = useState(null);
+  const [loading, setLoading] = useState(false);
   const kwKey = (keywords || []).slice(0, 20).join('|');
+  useEffect(() => { sv('pmOpen', open); }, [open]);
   useEffect(() => {
+    if (!open) return;   // no fetch until expanded
+    if (!kwKey) return;  // wait for the feed to derive at least one keyword
     let alive = true;
-    fetchPredictionMarkets((kwKey ? kwKey.split('|') : [])).then(r => { if (alive) setMarkets((r && r.markets) || []); });
+    setLoading(true);
+    loadPredictionMarkets(kwKey).then(m => {
+      if (!alive) return;
+      setMarkets(m || []);
+      setLoading(false);
+    });
     return () => { alive = false; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [kwKey]);
-  if (!markets.length) return null;
+  }, [open, kwKey]);
   const probClass = p => p >= 60 ? 'pm-hi' : p <= 40 ? 'pm-lo' : 'pm-mid';
   return (
     <div className="sidebar-section pm-section">
       <div className="sidebar-sec-head">
-        <span className="sidebar-sec-label">Prediction Markets</span>
-        <span className="pm-tag">market sentiment · not news</span>
+        <button className="sidebar-sec-collapse" onClick={() => setOpen(o => !o)} aria-expanded={open}>
+          <span className="sidebar-sec-label">Prediction Markets</span>
+          <span className="gs-collapse-chevron" style={{ fontSize: '10px', color: 'var(--text4)' }}>{open ? '▾' : '▸'}</span>
+        </button>
       </div>
-      <div className="pm-list">
-        {markets.slice(0, 6).map((m, i) => (
-          <a key={i} className="pm-row" href={m.url} target="_blank" rel="noreferrer">
-            <span className={`pm-prob ${probClass(m.probability)}`}>{m.probability}%</span>
-            <span className="pm-body">
-              <span className="pm-q">{m.question}</span>
-              <span className="pm-src">{m.source}{m.matched ? '' : ' · trending'}</span>
-            </span>
-          </a>
-        ))}
-      </div>
+      {open && (
+        <>
+          <div className="pm-tagline">market sentiment · not news</div>
+          {loading && <div className="pm-empty">Loading markets…</div>}
+          {!loading && markets && markets.length === 0 && <div className="pm-empty">No active markets right now.</div>}
+          {!loading && markets && markets.length > 0 && (
+            <div className="pm-list">
+              {markets.slice(0, 6).map((m, i) => (
+                <a key={i} className="pm-row" href={m.url} target="_blank" rel="noreferrer">
+                  <span className={`pm-prob ${probClass(m.probability)}`}>{m.probability}%</span>
+                  <span className="pm-body">
+                    <span className="pm-q">{m.question}</span>
+                    <span className="pm-src">{m.source}{m.matched ? '' : ' · trending'}</span>
+                  </span>
+                </a>
+              ))}
+            </div>
+          )}
+        </>
+      )}
     </div>
   );
 }
@@ -6663,6 +6709,9 @@ function Sidebar({cat, arts, kw, health, activeKw, setActiveKw, activeSource, se
   const [showSources, setShowSources] = useState(false);
   const [showAllSrcs, setShowAllSrcs] = useState(false);
   useEffect(() => { if (activeSource) setShowSources(true); }, [activeSource]);
+  // F6: Trending is a secondary module — collapsed by default, state persisted.
+  const [trendOpen, setTrendOpen] = useState(() => ld('trendOpen', false));
+  useEffect(() => { sv('trendOpen', trendOpen); }, [trendOpen]);
 
   // Trending list respects active filters
   const sbItems = useMemo(() => {
@@ -6791,9 +6840,13 @@ function Sidebar({cat, arts, kw, health, activeKw, setActiveKw, activeSource, se
       {topicItems.length > 0 && (
         <div className="sidebar-section">
           <div className="sidebar-sec-head">
-            <span className="sidebar-sec-label">Trending</span>
-            {activeKw && <button className="sidebar-sec-action" onClick={()=>setActiveKw(null)}>Clear</button>}
+            <button className="sidebar-sec-collapse" onClick={()=>setTrendOpen(o=>!o)} aria-expanded={trendOpen}>
+              <span className="sidebar-sec-label">Trending · {topicItems.length}</span>
+              <span className="gs-collapse-chevron" style={{fontSize:'10px',color:'var(--text4)'}}>{trendOpen?'▾':'▸'}</span>
+            </button>
+            {activeKw && trendOpen && <button className="sidebar-sec-action" onClick={()=>setActiveKw(null)}>Clear</button>}
           </div>
+          {trendOpen && (
           <div className="ttp-chips">
             {topicItems.map((t, i) => {
               const followed = isTopicFollowed?.(t.label);
@@ -6816,6 +6869,7 @@ function Sidebar({cat, arts, kw, health, activeKw, setActiveKw, activeSource, se
               );
             })}
           </div>
+          )}
         </div>
       )}
 
