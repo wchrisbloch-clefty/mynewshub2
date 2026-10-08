@@ -1569,7 +1569,11 @@ body{
 .houston-card-title{font-family:var(--font-publicsans);font-size:var(--fs-body);font-weight:600;line-height:1.35;color:var(--text);padding:0 10px;margin-bottom:6px;overflow-wrap:anywhere;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden;}
 .houston-card-meta{font-family:var(--font-publicsans);font-size:10px;color:var(--text3);padding:0 10px;display:flex;gap:5px;flex-wrap:wrap;font-variant-numeric:tabular-nums;}
 @media(max-width:640px){
-  .houston-scroll{scroll-snap-type:x mandatory;}
+  /* F1 bug fix: the flex row defaulted to align-items:stretch, so a short-title card
+     stretched to the tallest card and showed a large empty tail of white card background
+     below its meta (the reported "empty white space"). Top-align so each card is sized to
+     its own content — no blank tail, still a horizontal swipe row. Desktop is untouched. */
+  .houston-scroll{scroll-snap-type:x mandatory;align-items:flex-start;}
   .houston-card{flex-basis:82%;}
 }
 /* Following row (My Topics + My Teams) */
