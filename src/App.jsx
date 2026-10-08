@@ -39,6 +39,7 @@
 import { useState, useEffect, useLayoutEffect, useCallback, useMemo, useRef, Fragment } from 'react';
 // Extracted, dependency-isolated capability modules (see src/modules/*/README.md)
 import { clusterStories, hotClusterTopics, rankClusters, TREND_STOP, decodeEntities, capByPublisher } from './modules/clustering';
+import { opinionLabel } from './modules/opinion';
 import { qualifyBreaking, isPromoItem } from './modules/breaking';
 import { rankByVelocity, signalFor } from '../lib/voices/velocity';
 import { DEBUG, dbgRender, dbgPoll, DebugOverlay } from './modules/debug';
@@ -1432,6 +1433,9 @@ function whyItMatters(article, userKw, userTeams) {
 // `_clusterSize` and `_clusterSources` so the card can show "3 sources covering this".
 // clusterStories now lives in ./modules/clustering
 
+// F8: Opinion/Analysis label — rules-only, in its own module (one editable constant
+// OPINION_SOURCES). Imported at the top of the file; never read by tiering/ranking.
+
 // StateOfPlay + SnapshotCard components now live in ./modules/state-of-play and ./modules/snapshot-card
 
 // ─── GLOBAL CSS ───────────────────────────────────────────────────────────────
@@ -1913,6 +1917,12 @@ body:not(.dark) .pill-bar{
 .fc-topic{
   font-size:10px;font-weight:700;border-radius:20px;padding:2px 9px;
   letter-spacing:0.03em;text-transform:uppercase;font-family:var(--font-sans);
+}
+/* F8: Opinion/Analysis — rules-only neutral OUTLINE tag (never a tier/category). */
+.fc-opinion{
+  font-size:9px;font-weight:800;text-transform:uppercase;letter-spacing:0.06em;
+  color:var(--text3);border:1px solid var(--border);border-radius:4px;padding:1px 6px;
+  font-family:var(--font-publicsans);white-space:nowrap;
 }
 .fc-alert-badge{
   font-size:9px;font-weight:900;background:var(--accent);color:#fff;
@@ -4393,12 +4403,14 @@ body{overscroll-behavior-y:contain;}
 /* Paywall badge */
 .fc-paywall-badge{font-size:var(--fs-meta);cursor:default;flex-shrink:0;}
 
-/* Cluster badge — "N sources" indicator */
-.fc-cluster-badge{
-  font-size:9px;font-weight:700;color:var(--accent);background:var(--accent-bg);
-  border-radius:4px;padding:2px 7px;letter-spacing:0.04em;cursor:default;
+/* F8: ONE canonical "N sources" indicator, reused everywhere a cluster shows its
+   coverage count (State of Play, SnapshotCard, FeedCard). Matches the State of Play
+   pill — accent ink on a neutral surface, no decorative colour (the old dark-mode
+   purple #2d1f5a/#a78bfa is removed). */
+.sources-tag{
+  font-family:var(--font-publicsans);font-size:10px;font-weight:700;color:var(--accent);
+  background:var(--surface2);border-radius:10px;padding:2px 8px;white-space:nowrap;letter-spacing:0;
 }
-.dark .fc-cluster-badge{background:#2d1f5a;color:#a78bfa;}
 
 /* Category placeholder image with gradient */
 .gn-card-img-ph{
@@ -5961,9 +5973,10 @@ function FeedCard({a, cat, isSaved, onSave, onRead, relatedSources, isRead, user
             title+desc keyword match that mis-tagged previews/interviews. Breaking now
             appears ONLY as tagged rows in State of Play. */}
         <TierBadge item={a}/>
+        {opinionLabel(a) && <span className="fc-opinion">{opinionLabel(a)}</span>}
         {topKw && <span className="fc-topic" style={{background:cc.bg,color:cc.color}}>{topKw}</span>}
         {clusterCount > 1 && (
-          <span className="fc-cluster-badge" title={`Also covered by: ${a._clusterSources?.join(', ')}`}>
+          <span className="sources-tag" title={`Also covered by: ${a._clusterSources?.join(', ')}`}>
             {clusterCount} sources
           </span>
         )}
@@ -9840,7 +9853,7 @@ export default function App() {
                   : <div className="snap-feed">
                       {teamItems.slice(0,20).map((a,i)=>(
                         <Fragment key={a.link||i}>
-                          <SnapshotCard a={a} meta={CATS.sports} isSaved={isSavedFn(a)} onSave={onSave} onRead={onRead} onPerspectives={setPerspArticle} onAsk={setChatContext} formatDate={fmtDate} hideImage={i>=3}/>
+                          <SnapshotCard a={a} meta={CATS.sports} isSaved={isSavedFn(a)} onSave={onSave} onRead={onRead} onPerspectives={setPerspArticle} onAsk={setChatContext} formatDate={fmtDate} opinionLabel={opinionLabel(a)} hideImage={i>=3}/>
                           {i===2 && <XPulse topic={teamName} variant="feed"/>}
                         </Fragment>
                       ))}
@@ -10073,7 +10086,7 @@ export default function App() {
           : <div className="snap-feed">
               {entityItems.slice(0, 20).map((a, i) => (
                 <Fragment key={a.link || i}>
-                  <SnapshotCard a={a} meta={cc} isSaved={isSavedFn(a)} onSave={onSave} onRead={onRead} onPerspectives={setPerspArticle} onAsk={setChatContext} formatDate={fmtDate} hideImage={i>=3}/>
+                  <SnapshotCard a={a} meta={cc} isSaved={isSavedFn(a)} onSave={onSave} onRead={onRead} onPerspectives={setPerspArticle} onAsk={setChatContext} formatDate={fmtDate} opinionLabel={opinionLabel(a)} hideImage={i>=3}/>
                   {i === 2 && <XPulse topic={entity} variant="feed"/>}
                 </Fragment>
               ))}
@@ -10565,7 +10578,7 @@ export default function App() {
                   {cat==='tech' && !activeKw && !activeSrc && !search && <GithubSignal/>}
                   {(activeKw||activeSrc||search ? feedItems.slice(0,20) : dedupedFeed.slice(0,20)).map((a,i)=>(
                     <Fragment key={a.link||i}>
-                      <SnapshotCard a={a} meta={CATS[cat]||CATS.general} isSaved={isSavedFn(a)} onSave={onSave} onRead={onRead} onPerspectives={setPerspArticle} onAsk={setChatContext} formatDate={fmtDate} hideImage={i>=3} lead={i===0 && !activeKw && !activeSrc && !search}/>
+                      <SnapshotCard a={a} meta={CATS[cat]||CATS.general} isSaved={isSavedFn(a)} onSave={onSave} onRead={onRead} onPerspectives={setPerspArticle} onAsk={setChatContext} formatDate={fmtDate} opinionLabel={opinionLabel(a)} hideImage={i>=3} lead={i===0 && !activeKw && !activeSrc && !search}/>
                       {/* Review item 5: on mobile the category header moves BELOW the lead so
                           the lead is the first element in the body (desktop copy is hidden). */}
                       {i===0 && !activeKw && !activeSrc && !search && (
@@ -11347,7 +11360,7 @@ export default function App() {
                 :<div className="snap-feed" style={{padding:'12px 0 0'}}>
                     {newsItems.slice(0, 15).map((a, i) => (
                       <Fragment key={a.link||i}>
-                        <SnapshotCard a={a} meta={CATS.finance} isSaved={isSavedFn(a)} onSave={onSave} onRead={onRead} onPerspectives={setPerspArticle} onAsk={setChatContext} formatDate={fmtDate} hideImage={i>=3}/>
+                        <SnapshotCard a={a} meta={CATS.finance} isSaved={isSavedFn(a)} onSave={onSave} onRead={onRead} onPerspectives={setPerspArticle} onAsk={setChatContext} formatDate={fmtDate} opinionLabel={opinionLabel(a)} hideImage={i>=3}/>
                         {i===2 && <XPulse topic="Markets" variant="feed"/>}
                       </Fragment>
                     ))}

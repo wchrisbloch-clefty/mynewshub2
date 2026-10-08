@@ -37,6 +37,10 @@
 .snap-source{font-family:var(--font-publicsans);font-size:var(--fs-meta);font-weight:700;text-transform:uppercase;letter-spacing:0.05em;}
 .snap-live{font-family:var(--font-publicsans);font-size:9px;font-weight:800;color:#fff;background:var(--red);border-radius:4px;padding:2px 6px;letter-spacing:0.06em;}
 .snap-tag{font-family:var(--font-publicsans);font-size:10px;font-weight:700;border-radius:20px;padding:2px 9px;text-transform:uppercase;letter-spacing:0.03em;}
+/* F8: Opinion/Analysis label — rules-only metadata, styled as a neutral OUTLINE tag so it
+   never reads as a trust tier/category (no fill, no accent). */
+.snap-opinion{font-family:var(--font-publicsans);font-size:9px;font-weight:800;text-transform:uppercase;letter-spacing:0.06em;color:var(--text3);border:1px solid var(--border);border-radius:4px;padding:1px 6px;white-space:nowrap;}
+.snap-hero-overlay .snap-opinion{color:#fff;border-color:rgba(255,255,255,0.55);}
 .snap-time{font-family:var(--font-publicsans);font-size:var(--fs-meta);color:var(--text3);}
 /* F3: single meta row — time (+ sources) left, actions right. */
 .snap-foot-left{display:inline-flex;align-items:center;gap:10px;min-width:0;flex-wrap:wrap;}
@@ -49,8 +53,9 @@
 .snap-foot{display:flex;align-items:center;justify-content:space-between;gap:10px;}
 /* Full Coverage — "N sources" is a tappable disclosure that lists every article in
    the cluster (publisher · byline · relative time), max 2 per publisher then Show all. */
-.snap-sources-btn{background:none;border:none;cursor:pointer;font-family:inherit;display:inline-flex;align-items:center;gap:4px;padding:2px 0;}
-.snap-sources-btn:hover{color:var(--accent);}
+.snap-sources-btn{background:none;border:none;cursor:pointer;font-family:inherit;display:inline-flex;align-items:center;gap:6px;padding:2px 0;}
+.snap-sources-cta{font-family:var(--font-publicsans);font-size:var(--fs-meta);color:var(--text3);}
+.snap-sources-btn:hover .snap-sources-cta{color:var(--accent);}
 .snap-cov-caret{transition:transform 0.15s;}
 .snap-cov-caret.open{transform:rotate(180deg);}
 .snap-coverage{margin-top:10px;border-top:1px solid var(--border2);padding-top:10px;animation:fade-in 0.15s ease-out;}

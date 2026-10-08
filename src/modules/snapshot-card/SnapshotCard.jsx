@@ -22,7 +22,7 @@ import './SnapshotCard.css';
 
 const defaultFormatDate = d => { try { return new Date(d).toLocaleString(); } catch { return ''; } };
 
-export function SnapshotCard({ a, meta = {}, isSaved, onSave, onRead, onPerspectives, onAsk, formatDate = defaultFormatDate, hideImage = false, lead = false }) {
+export function SnapshotCard({ a, meta = {}, isSaved, onSave, onRead, onPerspectives, onAsk, formatDate = defaultFormatDate, hideImage = false, lead = false, opinionLabel = null }) {
   const color = meta.color;
   const bg = meta.bg;
   const [imgErr, setImgErr] = useState(false);
@@ -42,6 +42,7 @@ export function SnapshotCard({ a, meta = {}, isSaved, onSave, onRead, onPerspect
           <div className="snap-hero-overlay">
             <div className="snap-meta snap-hero-meta">
               <span className="snap-hero-source">{a.source}</span>
+              {opinionLabel && <span className="snap-opinion">{opinionLabel}</span>}
               {a.isAlert && <span className="snap-live">● LIVE</span>}
               <span className="snap-hero-time">{formatDate(a.pubDate)}</span>
             </div>
@@ -57,6 +58,7 @@ export function SnapshotCard({ a, meta = {}, isSaved, onSave, onRead, onPerspect
           {a.author && <span className="snap-byline">{a.author}</span>}
           {a.isAlert && <span className="snap-live">● LIVE</span>}
           <TierBadge item={a}/>
+          {opinionLabel && <span className="snap-opinion">{opinionLabel}</span>}
           {topKw && <span className="snap-tag" style={{ background: bg, color }}>{topKw}</span>}
         </div>
         <h3 className="snap-title">{a.title}</h3>
@@ -70,7 +72,10 @@ export function SnapshotCard({ a, meta = {}, isSaved, onSave, onRead, onPerspect
             {multi &&
               <button className="snap-sources snap-sources-btn"
                 onClick={e => { e.stopPropagation(); onPerspectives?.(a); }}>
-                <strong>{a._clusterSize} sources</strong> · Perspectives
+                {/* F8: the "N sources" count reuses the shared .sources-tag pill (State of
+                    Play style); the button still opens Perspectives. */}
+                <span className="sources-tag">{a._clusterSize} sources</span>
+                <span className="snap-sources-cta">Perspectives</span>
                 <svg className="snap-cov-caret" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
               </button>}
           </span>
