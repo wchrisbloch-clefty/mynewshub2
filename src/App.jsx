@@ -1757,9 +1757,11 @@ body:not(.dark) .pill-bar{
   color:var(--text);letter-spacing:-0.5px;line-height:1;
 }
 .logo span{color:var(--accent);}
+/* F5: lighter wordmark tagline (weight 500, muted) — integrated under the name; still
+   hidden when the header shrinks on scroll, and the header height is unchanged. */
 .logo-tag{
-  font-family:var(--font-sans);font-size:7px;color:var(--text3);
-  letter-spacing:0.18em;text-transform:uppercase;font-weight:600;margin-top:2px;
+  font-family:var(--font-sans);font-size:7px;color:var(--text4);
+  letter-spacing:0.16em;text-transform:uppercase;font-weight:500;margin-top:2px;
 }
 /* BBC-clean section tabs: no box, strong underline on active */
 .nav-tabs{
@@ -3909,8 +3911,8 @@ body{overscroll-behavior-y:contain;}
   -webkit-tap-highlight-color:transparent;
 }
 .chip:active{background:var(--surface2);}
-.chip.active{color:#fff;font-weight:700;background:#1a1a1a;}
-.dark .chip.active{background:rgba(255,255,255,0.15);}
+/* F5: active chip uses the single accent token (was #1a1a1a / per-category color). */
+.chip.active{color:#fff;font-weight:700;background:var(--accent);}
 /* D1: "More ▾" chip opens the mobile overflow sheet (Briefing/Podcasts/Sources/Saved). */
 .chip-more{font-weight:700;color:var(--text2);}
 .chip-more.active{color:#fff;}
@@ -8165,7 +8167,8 @@ function TopBar({tab, setTab, search, setSearch, dark, setDark,
             return (
               <button key={c.key}
                 className={`chip ${isActive?'active':''}`}
-                style={isActive ? { background:c.color } : {}}
+                /* F5: the active chip uses the single accent, not each category's color
+                   (decorative rainbow removed). Styling lives in the .chip.active token rule. */
                 onClick={()=>{ setTab(c.key); }}>
                 {c.label}
               </button>
@@ -8173,7 +8176,6 @@ function TopBar({tab, setTab, search, setSearch, dark, setDark,
           })}
           {/* D1: More chip → sheet with Briefing/Podcasts/Sources/Saved. */}
           <button className={`chip chip-more ${MORE_SHEET_TABS.includes(tab)?'active':''}`}
-            style={MORE_SHEET_TABS.includes(tab)?{background:'#1a1a1a'}:{}}
             aria-haspopup="menu" aria-expanded={moreSheetOpen}
             onClick={()=>setMoreSheetOpen(true)}>
             More ▾
