@@ -3055,7 +3055,7 @@ body:not(.dark) .pill-bar{
 /* SCOREBOARD STRIP — light band that blends with the page (Pass H item 2). */
 .sports-score-strip{
   background:var(--surface2);
-  margin:-28px -24px 18px;
+  margin:0 -24px 18px; /* I0.3: was -28px top — it pulled the strip UP under the sticky nav */
   padding:9px 24px;
   border-top:1px solid var(--border2);
   border-bottom:1px solid var(--border2);
@@ -3378,7 +3378,7 @@ body:not(.dark) .pill-bar{
   .team-pills-row{gap:8px;}
 }
 @media (max-width:640px){
-  .sports-score-strip{margin:-12px -12px 14px;padding:12px;}
+  .sports-score-strip{margin:0 -12px 14px;padding:12px;} /* I0.3: no negative top under sticky nav */
   .score-tile{min-width:120px;padding:9px 11px;}
   .sport-tab{padding:10px 12px;font-size:12px;min-height:44px;}
   .team-pill-group{border-radius:18px;}
@@ -8171,6 +8171,7 @@ function TopBar({tab, setTab, search, setSearch, dark, setDark,
   }, [tab]);
 
   return (
+    <>
     <div className={`topbar-wrap ${hidden?'hidden':''} ${shrunk?'shrunk':''} ${tickerOpen?'':'ticker-collapsed'}`}>
       {/* Unified status strip — collapses the old weather + ticker + breaking bars
           into one slim row: live/breaking signal LEFT, market ticker CENTER,
@@ -8211,19 +8212,6 @@ function TopBar({tab, setTab, search, setSearch, dark, setDark,
           )}
         </div>
       </div>
-
-      {/* Home-only weather band, stacked under the ticker — shown only <1100px (H1). */}
-      {tab==='general' && (
-        <div className="topbar-wx"><RightNowWeather data={weatherData}/></div>
-      )}
-
-      {/* Scoreboard sits below weather and above the category nav (Pass G item 3).
-          Self-hides when nothing is live; collapses when the header shrinks on scroll. */}
-      {tab==='general' && (
-        <div className="topbar-scores">
-          <ActiveScoresBar scores={scores} favTeams={favTeams} onGoToSports={onGoToSports}/>
-        </div>
-      )}
 
       {/* ━━━ DESKTOP: nav bar ━━━ */}
       <div className="nav-bar">
@@ -8377,6 +8365,18 @@ function TopBar({tab, setTab, search, setSearch, dark, setDark,
         )}
       </div>
     </div>
+    {/* I0.3: Home weather + scores moved OUT of the sticky masthead so the sticky header
+        (ticker + nav) is a constant height on every page — no content jump Home<->Sports,
+        and nothing can sit under the nav. They scroll as the first page content on Home. */}
+    {tab==='general' && (
+      <div className="home-subbands">
+        <div className="topbar-wx"><RightNowWeather data={weatherData}/></div>
+        <div className="topbar-scores">
+          <ActiveScoresBar scores={scores} favTeams={favTeams} onGoToSports={onGoToSports}/>
+        </div>
+      </div>
+    )}
+    </>
   );
 }
 
