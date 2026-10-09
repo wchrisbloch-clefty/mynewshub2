@@ -1,6 +1,6 @@
 /* "+ Follow" chip — sits next to a source name; consumes design tokens. */
 .follow-src-chip{
-  font-family:var(--font-publicsans);
+  font-family:var(--font-sans);
   font-size:9px;font-weight:800;text-transform:uppercase;letter-spacing:0.04em;
   color:var(--accent);background:var(--accent-bg);
   border:1px solid var(--accent);border-radius:10px;

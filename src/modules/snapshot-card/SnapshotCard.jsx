@@ -1,6 +1,6 @@
 // ─── SNAPSHOT CARD ────────────────────────────────────────────────────────────
-// A deduped story card: category accent bar, source/badge meta row, Archivo
-// headline, Public Sans snippet, "N sources" row, and a Save button. Clicking the
+// A deduped story card: category accent bar, source/badge meta row, Source Serif 4
+// headline, Inter snippet, "N sources" row, and a Save button. Clicking the
 // card calls onRead (host decides what "read" means). App-agnostic: category
 // theming and date formatting are INJECTED.
 //

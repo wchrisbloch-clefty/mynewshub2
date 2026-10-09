@@ -1,7 +1,7 @@
 /* TierBadge — mirrors the Perspectives panel's tier palette (green verified / muted
    unverified), kept intentionally small so it rides inside a card meta row. */
 .prov-badge{
-  font-family:var(--font-publicsans);font-size:9px;font-weight:800;letter-spacing:0.04em;
+  font-family:var(--font-sans);font-size:9px;font-weight:800;letter-spacing:0.04em;
   text-transform:uppercase;border-radius:4px;padding:1px 6px;line-height:1.5;
   display:inline-flex;align-items:center;gap:3px;white-space:nowrap;flex-shrink:0;
 }

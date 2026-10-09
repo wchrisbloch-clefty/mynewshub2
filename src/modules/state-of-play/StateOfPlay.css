@@ -3,35 +3,39 @@
 .sop-head{display:flex;align-items:baseline;gap:10px;margin-bottom:8px;flex-wrap:wrap;}
 .sop-collapse{margin-left:auto;background:none;border:none;cursor:pointer;color:var(--text3);padding:2px 2px 0;display:flex;align-items:center;align-self:center;}
 .sop-collapse:hover{color:var(--text);}
-.sop-label{font-family:var(--font-archivo);font-weight:800;font-size:12px;text-transform:uppercase;letter-spacing:0.08em;border-left:3px solid;padding-left:8px;}
-.sop-sub{font-family:var(--font-publicsans);font-size:12px;color:var(--text3);}
+.sop-label{font-family:var(--font-serif);font-weight:800;font-size:12px;text-transform:uppercase;letter-spacing:0.08em;border-left:3px solid;padding-left:8px;}
+.sop-sub{font-family:var(--font-sans);font-size:12px;color:var(--text3);}
 .sop-list{display:flex;flex-direction:column;}
 .sop-item{display:flex;align-items:center;gap:12px;padding:9px 0;border:none;border-top:1px solid var(--border2);background:none;cursor:pointer;text-align:left;font-family:inherit;width:100%;transition:opacity 0.12s;}
 .sop-item:first-of-type{border-top:none;}
 .sop-item:hover{opacity:0.68;}
-.sop-num{font-family:var(--font-archivo);font-weight:800;font-size:15px;min-width:24px;font-variant-numeric:tabular-nums;flex-shrink:0;}
-.sop-item-title{font-family:var(--font-archivo);font-weight:700;font-size:var(--fs-subhead);line-height:1.3;color:var(--text);flex:1;min-width:0;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;overflow-wrap:anywhere;word-break:break-word;}
+.sop-num{font-family:var(--font-serif);font-weight:800;font-size:15px;min-width:24px;font-variant-numeric:tabular-nums;flex-shrink:0;}
+.sop-item-title{font-family:var(--font-serif);font-weight:700;font-size:var(--fs-subhead);line-height:1.3;color:var(--text);flex:1;min-width:0;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;overflow-wrap:anywhere;word-break:break-word;}
 .sop-item-meta{display:flex;align-items:center;gap:8px;flex-shrink:0;}
-.sop-item-sources{font-family:var(--font-publicsans);font-size:10px;font-weight:700;color:var(--accent);background:var(--surface2);border-radius:10px;padding:2px 8px;white-space:nowrap;}
-.sop-item-time{font-family:var(--font-publicsans);font-size:var(--fs-meta);color:var(--text3);white-space:nowrap;}
-/* D7: per-row Ask button — quiet until hovered; always a >=44px target on mobile. */
-.sop-ask{background:none;border:1px solid var(--border);border-radius:12px;padding:2px 8px;cursor:pointer;
-  font-family:var(--font-publicsans);font-size:10px;font-weight:700;color:var(--text3);white-space:nowrap;
-  transition:color 0.12s,border-color 0.12s;}
-.sop-ask:hover{color:var(--accent);border-color:var(--accent);}
-@media(max-width:640px){ .sop-ask{min-height:44px;padding:2px 12px;} }
+.sop-item-sources{font-family:var(--font-sans);font-size:10px;font-weight:700;color:var(--accent);background:var(--surface2);border-radius:10px;padding:2px 8px;white-space:nowrap;}
+.sop-item-time{font-family:var(--font-sans);font-size:var(--fs-meta);color:var(--text3);white-space:nowrap;}
+/* G7f item 4: quiet icon-only Ask — the "Ask" word appears only on hover/focus. */
+.sop-ask{background:none;border:none;border-radius:var(--radius);padding:3px;cursor:pointer;
+  display:inline-flex;align-items:center;gap:4px;color:var(--text3);
+  transition:color 0.12s;}
+.sop-ask:hover,.sop-ask:focus-visible{color:var(--accent);}
+.sop-ask-label{display:none;font-family:var(--font-sans);font-size:var(--fs-eyebrow);font-weight:700;text-transform:uppercase;letter-spacing:0.06em;}
+.sop-ask:hover .sop-ask-label,.sop-ask:focus-visible .sop-ask-label{display:inline;}
+.sop-ask:focus-visible{outline:2px solid var(--accent);outline-offset:2px;}
+@media(max-width:640px){ .sop-ask{min-width:44px;min-height:44px;justify-content:center;} }
 /* Coverage-gap rows folded into the list: dimmer number + "Not in your sources" tag. */
 .sop-item-gap{text-decoration:none;}
 .sop-num-gap{opacity:0.5;}
 .sop-item-gap .sop-item-title{font-weight:600;}
-.sop-gap-tag{font-family:var(--font-publicsans);font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.03em;border:1px solid;border-radius:10px;padding:2px 8px;white-space:nowrap;opacity:0.9;}
+.sop-gap-tag{font-family:var(--font-sans);font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.03em;border:1px solid;border-radius:10px;padding:2px 8px;white-space:nowrap;opacity:0.9;}
 /* Breaking rows folded in at the top (Pass L item 3): red pulse dot in place of the
    number + a "Breaking" tag, replacing the cramped status-strip marquee. */
 .sop-item-breaking .sop-item-title{font-weight:800;}
 /* F6: stronger live indicator — larger dot, a solid red core and a wider pulse ring. */
 .sop-brk-dot{width:10px;height:10px;min-width:10px;border-radius:50%;background:var(--red);align-self:center;margin:0 8px 0 8px;box-shadow:0 0 0 2px rgba(200,16,46,0.25);animation:sop-brk-pulse 1.6s ease-out infinite;}
 @keyframes sop-brk-pulse{0%{box-shadow:0 0 0 0 rgba(200,16,46,0.6);}70%{box-shadow:0 0 0 8px rgba(200,16,46,0);}100%{box-shadow:0 0 0 0 rgba(200,16,46,0);}}
-.sop-brk-tag{font-family:var(--font-publicsans);font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:0.05em;color:#fff;background:var(--red);border-radius:10px;padding:2px 8px;white-space:nowrap;}
+/* G7f item 3: plain red "BREAKING" eyebrow — no filled pill (the red dot carries colour). */
+.sop-brk-tag{font-family:var(--font-sans);font-size:var(--fs-eyebrow);font-weight:700;text-transform:uppercase;letter-spacing:0.08em;color:var(--red);background:none;padding:0;white-space:nowrap;}
 .sop-sidebar .sop-brk-dot{margin-left:0;}
 @media(prefers-reduced-motion:reduce){ .sop-brk-dot{animation:none;} }
 @media(max-width:640px){ .sop-strip{padding:12px 14px;} .sop-strip:not(.sop-sidebar) .sop-gap-tag{display:none;} }
@@ -43,7 +47,7 @@
 /* F6: SoP anchors the top of the rail — tighter header, a touch more label weight/ink
    (text3 -> text2) and a thin accent rule so it reads as the lead module, not a peer. */
 .sop-sidebar .sop-head{padding-bottom:7px;border-bottom:2px solid var(--border);margin-bottom:9px;gap:8px;align-items:center;}
-.sop-sidebar .sop-label{border-left:none;padding-left:0;font-family:var(--font-publicsans);font-size:10px;font-weight:800;color:var(--text2);letter-spacing:0.14em;}
+.sop-sidebar .sop-label{border-left:none;padding-left:0;font-family:var(--font-sans);font-size:10px;font-weight:800;color:var(--text2);letter-spacing:0.14em;}
 .sop-sidebar .sop-collapse{margin-left:auto;}
 .sop-sidebar .sop-item{flex-wrap:wrap;align-items:flex-start;padding:7px 0;gap:3px 8px;}
 /* D4: tokenized (was 13px) — sidebar rows track the main body scale. */
