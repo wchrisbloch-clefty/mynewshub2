@@ -62,11 +62,14 @@ import { parseRoute, buildPath } from './modules/routing';
 import { PROMPT_VERSION } from '../lib/ai-models.js';
 import { TIER_LABEL, tagProvenance, TierBadge } from './modules/provenance';
 const ChatBot = lazy(() => import('./modules/concierge').then(m => ({ default: m.ChatBot })));
-const prefetchLazy = () => { import('./modules/concierge'); import('./modules/voices/ResolveModal'); };
+const AnalyzePanel = lazy(() => import('./modules/analyze/AnalyzePanel').then(m => ({ default: m.AnalyzePanel })));
+const ArticleReader = lazy(() => import('./modules/reader/ArticleReader').then(m => ({ default: m.ArticleReader })));
+const prefetchLazy = () => { import('./modules/concierge'); import('./modules/voices/ResolveModal'); import('./modules/analyze/AnalyzePanel'); import('./modules/reader/ArticleReader'); };
 // Icons: single set (lucide-react), fixed size per context — item 7.
 import { Settings, RefreshCw, Moon, Sun, User,
-  Zap, Droplet, Leaf, TrendingUp, Scale, LayoutGrid, Film, Music, BookOpen, Laugh, Trophy } from 'lucide-react';
-import { isCloudSyncEnabled, getUserId, signInWithEmail, signOut, onAuthStateChange, loadProfileFromCloud, saveProfileToCloud, emitEvent } from './lib/cloudSync';
+  Zap, Droplet, Leaf, TrendingUp, Scale, LayoutGrid, Film, Music, BookOpen, Laugh, Trophy,
+  ChevronDown, X as XIcon, ExternalLink, Sparkles, Star, Check, ArrowRight } from 'lucide-react';
+import { isCloudSyncEnabled, hasCloudSession, getUserId, signInWithEmail, signOut, onAuthStateChange, loadProfileFromCloud, saveProfileToCloud, emitEvent } from './lib/cloudSync';
 
 // ─── CATEGORIES ───────────────────────────────────────────────────────────────
 // One brand accent across all sections — hierarchy comes from type, not colour-coded
@@ -540,12 +543,12 @@ function FollowAdd({ isFollowingTeam, isTopicFollowed, onAddTeam, onAddTopic, on
               <TeamLogo name={t.name} league={t.league} size={20}/>
               <span className="follow-add-name">{t.name}</span>
               <span className="follow-add-league">{t.league.toUpperCase()}</span>
-              <span className="follow-add-star">{isFollowingTeam(t) ? '★' : '☆'}</span>
+              <span className="follow-add-star"><Star size={12} aria-hidden="true" fill={isFollowingTeam(t)?'currentColor':'none'}/></span>
             </button>
           ))}
           <button className="follow-add-item follow-add-topic" onClick={() => { onAddTopic(q.trim()); setQ(''); }}>
             <span className="follow-add-name">Follow topic “{q.trim()}”</span>
-            <span className="follow-add-star">{isTopicFollowed(q.trim()) ? '★' : '☆'}</span>
+            <span className="follow-add-star"><Star size={12} aria-hidden="true" fill={isTopicFollowed(q.trim())?'currentColor':'none'}/></span>
           </button>
         </div>
       )}
@@ -1508,6 +1511,23 @@ body{
 }
 .topbar-wx .rnw-row{padding:5px 0;} /* G7f item 7: trimmed weather band padding */
 .topbar-wx .rnw-forecast{padding-left:var(--s4);padding-right:var(--s4);}
+
+/* ── H1: weather ON the ticker line at >=1100px ───────────────────────────────
+   Inline weather is hidden by default (stacked band shows); at >=1100px the band
+   hides and the inline weather appears right-aligned on the ticker line, divided by
+   a hairline. D3 token roles (label/value/change) are unchanged. The forecast opens
+   as an absolute dropdown so the 30px strip never grows. */
+.ss-weather{display:none;}
+@media(min-width:1100px){
+  .topbar-wx{display:none;}                 /* band off — merged onto the ticker line */
+  .ss-weather{display:flex;align-items:center;flex-shrink:0;padding-left:14px;border-left:1px solid var(--border);height:100%;}
+  .ss-weather .rnw-card{background:none;border:none;border-radius:0;margin:0;overflow:visible;position:relative;}
+  .ss-weather .rnw-row{width:auto;padding:0;gap:10px;}
+  .ss-weather .rnw-cities{gap:var(--s3);flex:0 0 auto;overflow:visible;}
+  .ss-weather .rnw-forecast{position:absolute;top:calc(100% + 8px);right:0;width:min(380px,80vw);
+    background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);
+    box-shadow:var(--shadow-lg);padding:10px 14px;z-index:400;}
+}
 .ss-flag{display:inline-flex;align-items:center;gap:6px;flex-shrink:0;
   font-family:var(--font-sans);font-size:var(--fs-eyebrow);font-weight:700;text-transform:uppercase;letter-spacing:0.08em;
   border:none;background:none;padding:0;}
@@ -3065,50 +3085,51 @@ body:not(.dark) .pill-bar{
 .score-strip-scroll::-webkit-scrollbar{display:none;}
 /* Light, compact tile: white/surface card, dark text for names + scores; colour
    is reserved for status accents (live/final/winner), not the whole tile. */
+/* H2: neutral hairline card — no coloured boxes. Leader = heavier weight (not colour);
+   live = a small red dot + period/clock; scheduled/final in quiet meta text; a favourite
+   keeps a quiet accent star only. Tighter height than before. */
 .score-tile{
   position:relative;
   flex-shrink:0;scroll-snap-align:start;
   background:var(--surface);border:1px solid var(--border);
-  border-radius:7px;padding:5px 9px;
+  border-radius:var(--radius);padding:4px 9px 3px;
   min-width:112px;max-width:132px;cursor:pointer;
   transition:border-color 0.15s, transform 0.1s;
 }
-.score-tile:hover{border-color:var(--accent);transform:translateY(-1px);}
-.score-tile.live{border-color:var(--border);} /* G7f item 6: neutral hairline, not red box */
-.score-tile.fav{border-color:var(--accent);}
-.score-tile.fav.live{border-color:var(--accent);}
+.score-tile:hover{border-color:var(--text3);transform:translateY(-1px);}
+.score-tile.live,.score-tile.fav,.score-tile.fav.live{border-color:var(--border);}
 .score-tile-star{
-  position:absolute;top:5px;right:8px;
-  color:var(--amber);font-size:10px;
+  position:absolute;top:4px;right:8px;
+  color:var(--accent);font-size:9px;
 }
-.score-tile-league{
-  font-size:8px;font-weight:800;color:var(--text3);
-  text-transform:uppercase;letter-spacing:0.08em;margin-bottom:3px;
-}
+/* H2: league moved INTO the status row (saves a line, hides no info). */
+.score-tile-lg{font-weight:800;color:var(--text3);}
+.score-tile-when{opacity:0.95;}
+.score-tile-status .score-tile-lg + .score-tile-when::before{content:'·';margin:0 3px;opacity:0.6;}
 .score-tile-row{
   display:flex;justify-content:space-between;align-items:center;
   font-size:12px;color:var(--text);
-  font-variant-numeric:tabular-nums;padding:1px 0;gap:8px;
+  font-variant-numeric:tabular-nums;padding:0;gap:8px;line-height:1.35;
 }
 .score-tile-side{display:flex;align-items:center;gap:5px;min-width:0;}
-.score-tile-logo{width:14px;height:14px;object-fit:contain;flex-shrink:0;}
-.score-tile-team{font-weight:600;letter-spacing:-0.2px;color:var(--text2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
-.score-tile-team.win{color:var(--text);font-weight:800;}
-.score-tile-team.loss{color:var(--text3);}
-.score-tile-score{font-weight:900;font-size:var(--fs-body);color:var(--text);min-width:22px;text-align:right;}
-.score-tile-score.win{color:var(--green);}
-.score-tile-score.loss{color:var(--text3);}
+.score-tile-logo{width:16px;height:16px;object-fit:contain;flex-shrink:0;}
+.score-tile-logo-ph{display:inline-flex;align-items:center;justify-content:center;
+  border-radius:50%;background:var(--surface2);color:var(--text2);
+  font-family:var(--font-sans);font-size:7px;font-weight:800;letter-spacing:0;}
+.score-tile-team{font-weight:500;letter-spacing:-0.2px;color:var(--text2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.score-tile-team.win{color:var(--text);font-weight:700;}
+.score-tile-score{font-weight:600;font-size:var(--fs-body);color:var(--text2);min-width:22px;text-align:right;font-variant-numeric:tabular-nums;}
+.score-tile-score.win{color:var(--text);font-weight:900;} /* leader: WEIGHT, not colour */
 .score-tile-status{
-  font-size:9px;color:var(--text3);
+  font-family:var(--font-sans);font-size:9px;color:var(--text3);
   text-transform:uppercase;letter-spacing:0.05em;
-  margin-top:3px;display:flex;align-items:center;gap:4px;
-  border-top:1px solid var(--border2);padding-top:3px;
+  margin-top:2px;display:flex;align-items:center;gap:4px;
+  border-top:1px solid var(--border2);padding-top:2px;
 }
 .score-tile-status.live{color:var(--red);font-weight:700;}
-.score-tile-status.final{color:var(--text3);}
-.score-tile-status.pre{color:#3b82f6;}
+.score-tile-status.final,.score-tile-status.pre{color:var(--text3);}
 .score-tile-dot{
-  width:5px;height:5px;border-radius:50%;background:var(--red);
+  width:5px;height:5px;border-radius:50%;background:var(--red);flex-shrink:0;
   animation:pulse-badge 1.4s ease-in-out infinite;
 }
 
@@ -5771,7 +5792,7 @@ function AudioListen({ text, title }) {
       {listening ? (
         <><span className="listen-wave"><span className="listen-bar"/><span className="listen-bar"/><span className="listen-bar"/><span className="listen-bar"/><span className="listen-bar"/></span> Stop</>
       ) : (
-        <><span>♪</span> Listen</>
+        <><Music size={13} aria-hidden="true"/> Listen</>
       )}
     </button>
   );
@@ -5785,36 +5806,42 @@ function AudioListen({ text, title }) {
 // scoreboard looks like one component everywhere (Pass G item 6). Each strip
 // prepares `_leagueLabel` + `_fav` on the game before handing it here.
 const SCORE_LEAGUE_LABEL = { nfl:'NFL', nba:'NBA', mlb:'MLB', cfb:'CFB', cbb:'CBB' };
+// H2: consistent circular abbreviation fallback when a team logo image fails/blocks.
+function ScoreLogo({ url, abbr }) {
+  const [err, setErr] = useState(false);
+  if (!url || err) return <span className="score-tile-logo score-tile-logo-ph" aria-hidden="true">{(abbr || '').replace(/[^A-Za-z]/g, '').slice(0, 2).toUpperCase()}</span>;
+  return <img className="score-tile-logo" src={url} alt="" loading="lazy" onError={() => setErr(true)}/>;
+}
 function ScoreTile({ g }) {
   const live = g.state === 'in';
   const final = g.state === 'post';
   const home = g.homeAbbr || g.homeName || 'HOME';
   const away = g.awayAbbr || g.awayName || 'AWAY';
   const h = parseInt(g.homeScore) || 0, a = parseInt(g.awayScore) || 0;
-  const homeWin = final && h > a, awayWin = final && a > h;
-  const hideLogo = e => { e.currentTarget.style.visibility = 'hidden'; };
+  // H2: "leading/winning" gets a heavier WEIGHT, never colour — for live and final.
+  const homeLead = (final || live) && h > a, awayLead = (final || live) && a > h;
   return (
     <div className={`score-tile ${live ? 'live' : ''} ${g._fav ? 'fav' : ''}`}
       onClick={() => g.link && window.open(g.link, '_blank')}>
-      {g._fav && <span className="score-tile-star">★</span>}
-      {g._leagueLabel && <div className="score-tile-league">{g._leagueLabel}</div>}
+      {g._fav && <Star className="score-tile-star" size={9} fill="currentColor" aria-hidden="true"/>}
       <div className="score-tile-row">
         <span className="score-tile-side">
-          {g.awayLogo && <img className="score-tile-logo" src={g.awayLogo} alt="" loading="lazy" onError={hideLogo}/>}
-          <span className={`score-tile-team ${awayWin ? 'win' : final ? 'loss' : ''}`}>{away}</span>
+          <ScoreLogo url={g.awayLogo} abbr={away}/>
+          <span className={`score-tile-team ${awayLead ? 'win' : ''}`}>{away}</span>
         </span>
-        <span className={`score-tile-score ${awayWin ? 'win' : final ? 'loss' : ''}`}>{g.awayScore || '—'}</span>
+        <span className={`score-tile-score ${awayLead ? 'win' : ''}`}>{g.awayScore || '—'}</span>
       </div>
       <div className="score-tile-row">
         <span className="score-tile-side">
-          {g.homeLogo && <img className="score-tile-logo" src={g.homeLogo} alt="" loading="lazy" onError={hideLogo}/>}
-          <span className={`score-tile-team ${homeWin ? 'win' : final ? 'loss' : ''}`}>{home}</span>
+          <ScoreLogo url={g.homeLogo} abbr={home}/>
+          <span className={`score-tile-team ${homeLead ? 'win' : ''}`}>{home}</span>
         </span>
-        <span className={`score-tile-score ${homeWin ? 'win' : final ? 'loss' : ''}`}>{g.homeScore || '—'}</span>
+        <span className={`score-tile-score ${homeLead ? 'win' : ''}`}>{g.homeScore || '—'}</span>
       </div>
       <div className={`score-tile-status ${live ? 'live' : final ? 'final' : 'pre'}`}>
         {live && <span className="score-tile-dot"/>}
-        {g.status || (final ? 'FINAL' : fmtDate(g.date))}
+        {g._leagueLabel && <span className="score-tile-lg">{g._leagueLabel}</span>}
+        <span className="score-tile-when">{g.status || (final ? 'FINAL' : fmtDate(g.date))}</span>
       </div>
     </div>
   );
@@ -6010,19 +6037,19 @@ function FeedCard({a, cat, isSaved, onSave, onRead, relatedSources, isRead, user
           )}
           {/* What actually happened */}
           <div className="fc-summary">
-            <div className="fc-summary-lbl">✦ What Happened</div>
+            <div className="fc-summary-lbl"><Sparkles size={13} aria-hidden="true"/> What Happened</div>
             {loadingAI && !summary
               ? <div className="fc-ai-skeleton"><span/><span/><span style={{width:'70%'}}/></div>
               : aiErr && !summary
                 ? <div className="fc-ai-error">
                     <span className="fc-ai-error-msg">{aiErr}</span>
-                    <button className="fc-ai-retry" onClick={retryAI}>↻ Retry</button>
+                    <button className="fc-ai-retry" onClick={retryAI}><RefreshCw size={12} aria-hidden="true"/> Retry</button>
                   </div>
                 : summary
                   ? <div className="fc-summary-text">{summary}</div>
                   : <div className="fc-ai-error">
                       <span className="fc-ai-error-msg">No summary available for this story.</span>
-                      <button className="fc-ai-retry" onClick={retryAI}>↻ Retry</button>
+                      <button className="fc-ai-retry" onClick={retryAI}><RefreshCw size={12} aria-hidden="true"/> Retry</button>
                     </div>}
           </div>
           {/* Key points (3 bullets) */}
@@ -6095,7 +6122,7 @@ function FeedCard({a, cat, isSaved, onSave, onRead, relatedSources, isRead, user
         {actionsOpen && (
           <div className="fc-expanded-actions">
             <button className={`fc-act ${aiState!=='closed'?'ai-on':''}`} onClick={handleAI} disabled={loadingAI}>
-              ✦ {loadingAI?'Thinking...':aiState==='closed'?'AI Summary':'Hide AI'}
+              <Sparkles size={13} aria-hidden="true"/> {loadingAI?'Thinking...':aiState==='closed'?'AI Summary':'Hide AI'}
             </button>
             <button className={`fc-act ${showDisc?'disc-on':''}`} onClick={handleDisc} disabled={loadingDisc}>
               {loadingDisc?'Searching...':showDisc?'Hide Pulse':'Pulse'}
@@ -6108,7 +6135,7 @@ function FeedCard({a, cat, isSaved, onSave, onRead, relatedSources, isRead, user
           </div>
         )}
         <a className="fc-read-link" href={a.link} target="_blank" rel="noreferrer" onClick={e=>e.stopPropagation()}>
-          {readMins ? `${readMins} min · ` : ''}Full Story ↗
+          {readMins ? `${readMins} min · ` : ''}Full Story <ExternalLink size={12} aria-hidden="true" style={{verticalAlign:"-1px"}}/>
         </a>
       </div>
     </div>
@@ -6145,7 +6172,7 @@ function TodayItem({a, cc, onRead}) {
           <div className="today-item-src">{a.source} · {fmtDate(a.pubDate)}</div>
         </div>
         <button className={`today-ai-btn ${showSum?'on':''}`} title="AI Summary" onClick={handleAI} disabled={loading}>
-          {loading?'…':'✦'}
+          {loading?'…':<Sparkles size={13} aria-hidden="true"/>}
         </button>
         <ShareControl className="today-share" title={a.title} url={a.link} source={a.source}/>
       </div>
@@ -6304,7 +6331,7 @@ Output ONLY the paragraph followed by the bullets. No headers, no labels, no clo
         {/* F4: ONE button — Generate when no briefing exists for today, Refresh otherwise.
             Disabled while running (debounces double taps); one press = one generation. */}
         <button className="briefing-inline-refresh-btn" onClick={generate} disabled={loading}>
-          {loading ? 'Generating…' : body ? '↻ Refresh briefing' : "Generate today's briefing"}
+          {loading ? 'Generating…' : body ? <><RefreshCw size={12} aria-hidden="true"/> Refresh briefing</> : "Generate today's briefing"}
         </button>
       </div>
       <div className="briefing-inline-sources">
@@ -6464,7 +6491,7 @@ function Scoreboard({scores, loading, compact=false, favTeams}) {
           <span className={`sb-num ${homeWin?'winner':final?'loser':''}`}>{g.homeScore||'—'}</span>
         </div>
         <div className={`sb-status ${live?'live':final?'final':'pre'}`}>
-          {isFav&&<span className="sb-fav-star">★</span>}
+          {isFav&&<Star className="sb-fav-star" size={10} fill="currentColor" aria-hidden="true"/>}
           {live?'● LIVE · ':''}{g.status||fmtDate(g.date)}
         </div>
       </div>
@@ -6494,7 +6521,7 @@ function Scoreboard({scores, loading, compact=false, favTeams}) {
         <span className="sb-box-title">Scoreboard</span>
         <span className="sb-box-sub">
           {totalLive>0 && <span className="sb-live-pill">● {totalLive} LIVE</span>}
-          <span className="sb-collapse-chev">{collapsed?'▸':'▾'}</span>
+          <span className="sb-collapse-chev"><ChevronDown size={11} aria-hidden="true" style={{transform:collapsed?'rotate(-90deg)':'none',transition:"transform .15s"}}/></span>
         </span>
       </button>
       {!collapsed && leaguesToShow.map(L => {
@@ -6519,7 +6546,7 @@ function Scoreboard({scores, loading, compact=false, favTeams}) {
                 <span>{sorted.length} {sorted.length===1?'game':'games'}</span>
                 {favCount>0&&<span className="sb-league-fav">★ {favCount}</span>}
               </span>
-              <span className="sb-chevron">{isOpen?'▾':'▸'}</span>
+              <span className="sb-chevron"><ChevronDown size={11} aria-hidden="true" style={{transform:isOpen?'none':'rotate(-90deg)',transition:"transform .15s"}}/></span>
             </button>
             {isOpen&&sorted.length>0&&(
               <div className="sb-games">
@@ -6599,7 +6626,7 @@ function PredictionMarkets({ keywords }) {
       <div className="sidebar-sec-head">
         <button className="sidebar-sec-collapse" onClick={() => setOpen(o => !o)} aria-expanded={open}>
           <span className="sidebar-sec-label">Prediction Markets</span>
-          <span className="gs-collapse-chevron" style={{ fontSize: '10px', color: 'var(--text4)' }}>{open ? '▾' : '▸'}</span>
+          <span className="gs-collapse-chevron" style={{ fontSize: '10px', color: 'var(--text4)' }}><ChevronDown size={11} aria-hidden="true" style={{transform:open?'none':'rotate(-90deg)',transition:"transform .15s"}}/></span>
         </button>
       </div>
       {open && (
@@ -6652,7 +6679,7 @@ function SourceDirectory({ cat, feeds, onToggleFeed }) {
       <div className="sidebar-sec-head">
         <button className="sidebar-sec-collapse" onClick={() => setOpen(o => !o)} aria-expanded={open}>
           <span className="sidebar-sec-label">Source Directory · {onCount}/{list.length}</span>
-          <span className="gs-collapse-chevron" style={{ fontSize: '10px', color: 'var(--text4)' }}>{open ? '▾' : '▸'}</span>
+          <span className="gs-collapse-chevron" style={{ fontSize: '10px', color: 'var(--text4)' }}><ChevronDown size={11} aria-hidden="true" style={{transform:open?'none':'rotate(-90deg)',transition:"transform .15s"}}/></span>
         </button>
       </div>
       {open && (
@@ -6708,7 +6735,7 @@ function GithubSignal() {
       <div className="ghs-head">
         <span className="ghs-badge">◆ GitHub</span>
         <span className="ghs-note">alternative perspective · inferred, unverified street signal</span>
-        <button className="ghs-close" onClick={() => setOpen(false)} aria-label="Hide GitHub signal">×</button>
+        <button className="ghs-close" onClick={() => setOpen(false)} aria-label="Hide GitHub signal"><XIcon size={16} aria-hidden="true"/></button>
       </div>
       {loading && <div className="ghs-loading">Checking GitHub…</div>}
       {!loading && repos && repos.length > 0 && (
@@ -6793,8 +6820,8 @@ function Sidebar({cat, arts, kw, health, activeKw, setActiveKw, activeSource, se
     <div className="sidebar">
       {(activeKw||activeSource) && (
         <div className="gs-filter">
-          {activeKw && <><span className="gs-filter-label">{activeKw}</span><button className="gs-filter-x" onClick={()=>setActiveKw(null)}>✕</button></>}
-          {activeSource && <><span className="gs-filter-label" style={{color:cc.color}}>{activeSource}</span><button className="gs-filter-x" style={{color:cc.color}} onClick={()=>setActiveSource(null)}>✕</button></>}
+          {activeKw && <><span className="gs-filter-label">{activeKw}</span><button className="gs-filter-x" onClick={()=>setActiveKw(null)}><XIcon size={13} aria-hidden="true"/></button></>}
+          {activeSource && <><span className="gs-filter-label" style={{color:cc.color}}>{activeSource}</span><button className="gs-filter-x" style={{color:cc.color}} onClick={()=>setActiveSource(null)}><XIcon size={13} aria-hidden="true"/></button></>}
         </div>
       )}
 
@@ -6887,7 +6914,7 @@ function Sidebar({cat, arts, kw, health, activeKw, setActiveKw, activeSource, se
           <div className="sidebar-sec-head">
             <button className="sidebar-sec-collapse" onClick={()=>setTrendOpen(o=>!o)} aria-expanded={trendOpen}>
               <span className="sidebar-sec-label">Trending · {topicItems.length}</span>
-              <span className="gs-collapse-chevron" style={{fontSize:'10px',color:'var(--text4)'}}>{trendOpen?'▾':'▸'}</span>
+              <span className="gs-collapse-chevron" style={{fontSize:'10px',color:'var(--text4)'}}><ChevronDown size={11} aria-hidden="true" style={{transform:trendOpen?'none':'rotate(-90deg)',transition:"transform .15s"}}/></span>
             </button>
             {activeKw && trendOpen && <button className="sidebar-sec-action" onClick={()=>setActiveKw(null)}>Clear</button>}
           </div>
@@ -6908,7 +6935,7 @@ function Sidebar({cat, arts, kw, health, activeKw, setActiveKw, activeSource, se
                   {toggleTopic && (
                     <button type="button" className={`ttp-chip-star${followed?' on':''}`}
                       onClick={()=>toggleTopic(t.label)} aria-pressed={followed}
-                      aria-label={followed?`Unfollow ${t.label}`:`Follow ${t.label}`}>{followed?'★':'☆'}</button>
+                      aria-label={followed?`Unfollow ${t.label}`:`Follow ${t.label}`}><Star size={11} aria-hidden="true" fill={followed?'currentColor':'none'}/></button>
                   )}
                 </span>
               );
@@ -6940,7 +6967,7 @@ function Sidebar({cat, arts, kw, health, activeKw, setActiveKw, activeSource, se
               <span className="sidebar-sec-label">
                 {activeSource ? `Source: ${activeSource}` : `Sources · ${sources.length}`}
               </span>
-              <span className="gs-collapse-chevron" style={{fontSize:'10px',color:'var(--text4)'}}>{showSources?'▾':'▸'}</span>
+              <span className="gs-collapse-chevron" style={{fontSize:'10px',color:'var(--text4)'}}><ChevronDown size={11} aria-hidden="true" style={{transform:showSources?'none':'rotate(-90deg)',transition:"transform .15s"}}/></span>
             </button>
             {activeSource && showSources && <button className="sidebar-sec-action" onClick={()=>setActiveSource(null)}>Clear</button>}
           </div>
@@ -7119,7 +7146,7 @@ function CustomizePanel({feeds, kw, alerts, urgent, social, watchlist, teams, he
   return (
     <div className="cp-overlay" onClick={onClose}>
       <div className="cp-panel" onClick={e=>e.stopPropagation()}>
-        <div className="cp-head"><span className="cp-title">Customize</span><button className="cp-x" onClick={onClose}>✕</button></div>
+        <div className="cp-head"><span className="cp-title">Customize</span><button className="cp-x" onClick={onClose}><XIcon size={13} aria-hidden="true"/></button></div>
         <div className="cp-body">
           <div className="cp-sec-tabs">
             {['keywords','alerts','sources','social','voices','watchlist','teams','datastrip','briefing'].map(t=>(
@@ -7135,7 +7162,7 @@ function CustomizePanel({feeds, kw, alerts, urgent, social, watchlist, teams, he
               <div className="cp-desc">Keywords boost matching articles to the top and appear as clickable topic chips in the sidebar.</div>
               <div className="cp-cat-tabs">{Object.keys(CAT_LABELS).map(c=><button key={c} className={`cp-cat-tab ${kwTab===c?'active':''}`} onClick={()=>setKwTab(c)}>{CAT_LABELS[c]}</button>)}</div>
               <div className="cp-chips">
-                {(lk[kwTab]||[]).map((k,i)=><span key={i} className="cp-chip cp-chip-kw">{k}<button className="cp-chip-x" onClick={()=>setLk(p=>{const n={...p};n[kwTab]=n[kwTab].filter((_,j)=>j!==i);return n;})}>✕</button></span>)}
+                {(lk[kwTab]||[]).map((k,i)=><span key={i} className="cp-chip cp-chip-kw">{k}<button className="cp-chip-x" onClick={()=>setLk(p=>{const n={...p};n[kwTab]=n[kwTab].filter((_,j)=>j!==i);return n;})}><XIcon size={13} aria-hidden="true"/></button></span>)}
                 {(lk[kwTab]||[]).length===0&&<span style={{fontSize:'11px',color:'var(--text3)'}}>No keywords yet</span>}
               </div>
               <div className="cp-add">
@@ -7151,7 +7178,7 @@ function CustomizePanel({feeds, kw, alerts, urgent, social, watchlist, teams, he
               <div className="cp-lbl">Breaking News Ticker Words</div>
               <div className="cp-desc">Red scrolling ticker fires only on these words. Keep short and urgent-only — disasters, major incidents, crashes. Routine words create noise.</div>
               <div className="cp-chips">
-                {lu.map((u,i)=><span key={i} className="cp-chip cp-chip-alert">{u}<button className="cp-chip-x" onClick={()=>setLu(x=>x.filter((_,j)=>j!==i))}>✕</button></span>)}
+                {lu.map((u,i)=><span key={i} className="cp-chip cp-chip-alert">{u}<button className="cp-chip-x" onClick={()=>setLu(x=>x.filter((_,j)=>j!==i))}><XIcon size={13} aria-hidden="true"/></button></span>)}
                 {lu.length===0&&<span style={{fontSize:'11px',color:'var(--text3)'}}>No urgent words — ticker off</span>}
               </div>
               <div className="cp-add">
@@ -7163,7 +7190,7 @@ function CustomizePanel({feeds, kw, alerts, urgent, social, watchlist, teams, he
                 <div className="cp-lbl">Keyword Highlights</div>
                 <div className="cp-desc">Articles matching these show a badge but don't trigger the ticker. Use for routine tracking: team names, company names, etc.</div>
                 <div className="cp-chips">
-                  {la.map((a,i)=><span key={i} className="cp-chip cp-chip-kw">{a}<button className="cp-chip-x" onClick={()=>setLa(x=>x.filter((_,j)=>j!==i))}>✕</button></span>)}
+                  {la.map((a,i)=><span key={i} className="cp-chip cp-chip-kw">{a}<button className="cp-chip-x" onClick={()=>setLa(x=>x.filter((_,j)=>j!==i))}><XIcon size={13} aria-hidden="true"/></button></span>)}
                 </div>
               </div>
             </div>
@@ -7191,7 +7218,7 @@ function CustomizePanel({feeds, kw, alerts, urgent, social, watchlist, teams, he
                       {cnt>0&&<span className="cp-src-count">{cnt}</span>}
                       <button className="cp-test-btn" onClick={()=>testFeed(f.url,tk)}>Test</button>
                       <button className={`cp-tog ${f.on?'on':'off'}`} onClick={()=>setLf(prev=>{const n=JSON.parse(JSON.stringify(prev));n[srcTab][i].on=!n[srcTab][i].on;return n;})}/>
-                      <button className="cp-del" onClick={()=>setLf(prev=>{const n=JSON.parse(JSON.stringify(prev));n[srcTab].splice(i,1);return n;})}>✕</button>
+                      <button className="cp-del" onClick={()=>setLf(prev=>{const n=JSON.parse(JSON.stringify(prev));n[srcTab].splice(i,1);return n;})}><XIcon size={13} aria-hidden="true"/></button>
                     </div>
                     <TestResult tkey={tk}/>
                   </div>
@@ -7224,7 +7251,7 @@ function CustomizePanel({feeds, kw, alerts, urgent, social, watchlist, teams, he
               </div>
               <div className="cp-chips">
                 {(ls[socCat]?.[socPlat]||[]).map((h,i)=>(
-                  <span key={i} className="cp-chip cp-chip-social">{h}<button className="cp-chip-x" onClick={()=>removeHandle(i)}>✕</button></span>
+                  <span key={i} className="cp-chip cp-chip-social">{h}<button className="cp-chip-x" onClick={()=>removeHandle(i)}><XIcon size={13} aria-hidden="true"/></button></span>
                 ))}
                 {(ls[socCat]?.[socPlat]||[]).length===0&&<span style={{fontSize:'11px',color:'var(--text3)'}}>No accounts yet</span>}
               </div>
@@ -7277,7 +7304,7 @@ function CustomizePanel({feeds, kw, alerts, urgent, social, watchlist, teams, he
               {seedQueue && seedQueue.length > 0 && (
                 <div className="cp-seed-wrap">
                   <button className="cp-seed-toggle" onClick={()=>setShowSeeds(s=>!s)}>
-                    {showSeeds?'▾':'▸'} Suggested voices ({seedQueue.length})
+                    <ChevronDown size={12} aria-hidden="true" style={{transform:showSeeds?"none":"rotate(-90deg)",verticalAlign:"-2px"}}/> Suggested voices ({seedQueue.length})
                   </button>
                   {showSeeds && (
                     <div className="cp-seed-list">
@@ -7319,7 +7346,7 @@ function CustomizePanel({feeds, kw, alerts, urgent, social, watchlist, teams, he
                           <button className="cp-voice-btn" title="Edit handles" onClick={()=>setEditVoiceId(editVoiceId===v.id?null:v.id)}>Edit</button>
                           <button className="cp-voice-btn" aria-label="Move up" disabled={i===0} onClick={()=>reorderVoice(v.id,-1)}>↑</button>
                           <button className="cp-voice-btn" aria-label="Move down" disabled={i===inCat.length-1} onClick={()=>reorderVoice(v.id,1)}>↓</button>
-                          <button className="cp-voice-btn cp-voice-rm" aria-label="Remove" onClick={()=>removeVoiceById(v.id)}>✕</button>
+                          <button className="cp-voice-btn cp-voice-rm" aria-label="Remove" onClick={()=>removeVoiceById(v.id)}><XIcon size={13} aria-hidden="true"/></button>
                         </div>
                         {editVoiceId===v.id && (
                           <div className="cp-voice-edit">
@@ -7350,7 +7377,7 @@ function CustomizePanel({feeds, kw, alerts, urgent, social, watchlist, teams, he
                 <div key={i} className="cp-src-row">
                   <span style={{fontWeight:700,fontFamily:'monospace',color:'var(--accent)',fontSize:'12px',minWidth:'50px'}}>{w.sym}</span>
                   <span className="cp-src-name">{w.name}</span>
-                  <button className="cp-del" onClick={()=>setLw(prev=>prev.filter((_,j)=>j!==i))}>✕</button>
+                  <button className="cp-del" onClick={()=>setLw(prev=>prev.filter((_,j)=>j!==i))}><XIcon size={13} aria-hidden="true"/></button>
                 </div>
               ))}
               {lw.length===0&&<div style={{fontSize:'11px',color:'var(--text3)',padding:'10px 0'}}>No symbols yet</div>}
@@ -7381,7 +7408,7 @@ function CustomizePanel({feeds, kw, alerts, urgent, social, watchlist, teams, he
                     <span style={{fontSize:'18px'}}>{t.emoji}</span>
                     <strong style={{fontSize:'12px',color:'var(--text)',flex:1}}>{t.team}</strong>
                     <span style={{fontSize:'10px',color:'var(--text3)'}}>{(t.sport||'').toUpperCase()} · {(t.league||'').toUpperCase()}</span>
-                    <button className="cp-del" onClick={()=>setLt(prev=>prev.filter((_,j)=>j!==i))}>✕</button>
+                    <button className="cp-del" onClick={()=>setLt(prev=>prev.filter((_,j)=>j!==i))}><XIcon size={13} aria-hidden="true"/></button>
                   </div>
                   <div className="cp-team-row-body">
                     <div style={{fontSize:'10px',color:'var(--text3)'}}>Match: <span style={{color:'var(--text2)'}}>{t.match||'(none)'}</span></div>
@@ -7433,7 +7460,7 @@ function CustomizePanel({feeds, kw, alerts, urgent, social, watchlist, teams, he
               {lwx.map((city, i) => (
                 <div key={i} className="cp-src-row">
                   <span className="cp-src-name">{city.name} ({city.lat.toFixed(2)}, {city.lon.toFixed(2)})</span>
-                  <button className="cp-del" onClick={() => setLwx(prev => prev.filter((_,j) => j !== i))}>✕</button>
+                  <button className="cp-del" onClick={() => setLwx(prev => prev.filter((_,j) => j !== i))}><XIcon size={13} aria-hidden="true"/></button>
                 </div>
               ))}
               <div className="cp-add-src" style={{marginTop:'8px'}}>
@@ -7641,7 +7668,7 @@ function PtrIndicator({ distance, threshold, refreshing }) {
   return (
     <div className={`ptr-indicator ${!visible?'hidden':''} ${refreshing?'refreshing':''}`}
          style={{ top:`${top}px`, transform:`translateX(-50%) rotate(${progress * 360}deg)` }}>
-      <span className={refreshing?'ptr-spin':''}>↻</span>
+      <span className={refreshing?'ptr-spin':''}><RefreshCw size={14} aria-hidden="true"/></span>
     </div>
   );
 }
@@ -8017,7 +8044,7 @@ function PriorityNav({ tab, onPick, labels, classes }) {
         <button ref={moreBtnRef} className={`nav-tab nav-more-btn ${activeInMore?'active':''}`}
           aria-haspopup="menu" aria-expanded={menuOpen}
           onClick={()=>setMenuOpen(o=>!o)}>
-          More{moreItems.length?` (${moreItems.length})`:''} ▾
+          More{moreItems.length?` (${moreItems.length})`:''} <ChevronDown size={13} aria-hidden="true" style={{verticalAlign:'-2px'}}/>
         </button>
         {menuOpen && (
           <div className="nav-more-menu" role="menu" ref={menuRef}>
@@ -8079,6 +8106,9 @@ function TopBar({tab, setTab, search, setSearch, dark, setDark,
   // strip at the top of a phone screen). Persisted; desktop always shows the ticker.
   const [tickerOpen, setTickerOpen] = useState(() => ld('tickerOpen', false));
   useEffect(() => { sv('tickerOpen', tickerOpen); }, [tickerOpen]);
+  // H1: fetch Home weather ONCE here; render it both on the ticker line (>=1100px) and in
+  // the stacked band (<1100px) from this shared data — only one is visible per breakpoint.
+  const weatherData = useWeatherData(weatherCities, tab !== 'general');
   // D1: desktop search collapses to an icon (reclaims width for the nav); mobile
   // "More" chip opens a sheet holding Briefing/Podcasts/Sources/Saved.
   const [searchOpenDesktop, setSearchOpenDesktop] = useState(false);
@@ -8171,12 +8201,17 @@ function TopBar({tab, setTab, search, setSearch, dark, setDark,
               })}
             </div>
           </div>
+          {/* H1: at >=1100px the Home weather sits on the ticker line, right-aligned, with a
+              hairline separator (shared data; hidden <1100px via .ss-weather CSS). */}
+          {tab==='general' && weatherData.length > 0 && (
+            <div className="ss-weather"><RightNowWeather data={weatherData}/></div>
+          )}
         </div>
       </div>
 
-      {/* Home-only weather, stacked under the ticker as one contained top block. */}
+      {/* Home-only weather band, stacked under the ticker — shown only <1100px (H1). */}
       {tab==='general' && (
-        <div className="topbar-wx"><RightNowWeather cities={weatherCities}/></div>
+        <div className="topbar-wx"><RightNowWeather data={weatherData}/></div>
       )}
 
       {/* Scoreboard sits below weather and above the category nav (Pass G item 3).
@@ -8316,7 +8351,7 @@ function TopBar({tab, setTab, search, setSearch, dark, setDark,
           <button className={`chip chip-more ${MORE_SHEET_TABS.includes(tab)?'active':''}`}
             aria-haspopup="menu" aria-expanded={moreSheetOpen}
             onClick={()=>setMoreSheetOpen(true)}>
-            More ▾
+            More <ChevronDown size={13} aria-hidden="true" style={{verticalAlign:'-2px'}}/>
           </button>
         </div>
         </div>
@@ -8325,7 +8360,7 @@ function TopBar({tab, setTab, search, setSearch, dark, setDark,
             <div className="more-sheet" role="menu" onClick={e=>e.stopPropagation()}>
               <div className="more-sheet-head">
                 <span>More</span>
-                <button className="more-sheet-close" aria-label="Close" onClick={()=>setMoreSheetOpen(false)}>×</button>
+                <button className="more-sheet-close" aria-label="Close" onClick={()=>setMoreSheetOpen(false)}><XIcon size={16} aria-hidden="true"/></button>
               </div>
               {MORE_SHEET_TABS.map(t=>(
                 <button key={t} role="menuitem"
@@ -8345,16 +8380,27 @@ function TopBar({tab, setTab, search, setSearch, dark, setDark,
 // ─── RIGHT NOW (Home-only local context card) ─────────────────────────────────
 // Weather moved off the global status strip (Part B) to a compact Home card:
 // one-line local conditions, tap to expand a 3-day forecast.
-function RightNowWeather({ cities }) {
+// H1: weather fetch lifted into a hook so the Home weather can render in TWO places
+// (the >=1100px ticker line AND the <1100px stacked band) from ONE fetch — no duplication.
+function useWeatherData(cities, skip = false) {
   const use = (cities && cities.length ? cities : DEFAULT_WEATHER_CITIES).slice(0, 2);
   const [list, setList] = useState([]);
-  const [open, setOpen] = useState(false);
   useEffect(() => {
+    if (skip) return;
     let live = true;
     Promise.all(use.map(c => fetchWeatherCity(c))).then(r => { if (live) setList(r.filter(Boolean)); });
     return () => { live = false; };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [JSON.stringify(use.map(c => c.name))]);
+  }, [JSON.stringify(use.map(c => c.name)), skip]);
+  return list;
+}
+
+// `data` (optional) lets a parent pass shared weather so the component is presentational;
+// without it, it self-fetches (back-compat).
+function RightNowWeather({ cities, data }) {
+  const self = useWeatherData(cities, !!data);
+  const list = data || self;
+  const [open, setOpen] = useState(false);
   if (!list.length) return null;
   return (
     <div className={`rnw-card ${open ? 'open' : ''}`}>
@@ -8539,218 +8585,12 @@ function TopOfHourStrip({ catLead, arts, onRead, stories: storiesProp }) {
 }
 
 // ─── PASTE & BRIEF PANEL ──────────────────────────────────────────────────────
-function AnalyzePanel({ onClose }) {
-  const [tabType, setTabType] = useState('text'); // 'text' | 'youtube'
-  const [text, setText] = useState('');
-  const [ytUrl, setYtUrl] = useState('');
-  const [mode, setMode] = useState('summary');
-  const [result, setResult] = useState('');
-  const [loading, setLoading] = useState(false);
-
-  const MODES = [
-    { key:'summary',   label:'Summarize' },
-    { key:'takeaways', label:'Key Points' },
-    { key:'bias',      label:'Bias Check' },
-    { key:'brief',     label:'Full Brief' },
-  ];
-
-  const ytId = useMemo(() => {
-    const m = ytUrl.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/)([^&\s?]+)/);
-    return m ? m[1] : null;
-  }, [ytUrl]);
-
-  const analyze = async () => {
-    const isYt = tabType === 'youtube';
-    if (loading || (isYt ? !ytUrl.trim() : !text.trim())) return;
-    setLoading(true);
-    setResult('');
-    let res;
-    if (isYt) {
-      // Extract-first: fetch the real caption track server-side. No manual transcript
-      // paste. If the video has no captions, fetchAISummary returns the honest
-      // "No transcript available…" message rather than summarizing the description.
-      res = await fetchAISummary({ type:'article', title:'Analysis', content:'', mode, url: ytUrl.trim() });
-    } else {
-      const modePrompts = {
-        summary:   'Summarize this content in 3-5 sentences, hitting the key facts.',
-        takeaways: 'List the 5 most important takeaways as bullet points.',
-        bias:      'Analyze the bias and framing. What perspective does it favor? What might it omit?',
-        brief:     'Write a comprehensive brief covering: 1) Summary 2) Key Facts 3) Why It Matters 4) Notable Quotes or Data.',
-      };
-      const prompt = `${modePrompts[mode]}\n\nCONTENT:\n${text.trim()}`;
-      res = await fetchAISummary({ type:'article', title:'Analysis', content:prompt, mode });
-    }
-    const { summary, error, unavailable } = res;
-    setResult(unavailable ? error : (error ? 'Analysis failed — try again.' : (summary || 'No result.')));
-    setLoading(false);
-  };
-
-  return (
-    <div className="analyze-overlay" onClick={e => { if (e.target === e.currentTarget) onClose(); }}>
-      <div className="analyze-panel">
-        <div className="analyze-head">
-          <span className="analyze-title">Paste & Brief</span>
-          <button className="analyze-close" onClick={onClose}>✕</button>
-        </div>
-        <div className="analyze-type-tabs">
-          <button className={`analyze-type-tab${tabType==='text'?' active':''}`} onClick={()=>setTabType('text')}>Article / Text</button>
-          <button className={`analyze-type-tab${tabType==='youtube'?' active':''}`} onClick={()=>setTabType('youtube')}>▶ YouTube</button>
-        </div>
-        <div className="analyze-body">
-          {tabType === 'text' ? (
-            <textarea className="analyze-input" placeholder="Paste any article, transcript, or text here…" value={text} onChange={e=>setText(e.target.value)} rows={8}/>
-          ) : (
-            <>
-              <input className="analyze-url-input" placeholder="Paste YouTube URL (e.g. youtube.com/watch?v=…)" value={ytUrl} onChange={e=>setYtUrl(e.target.value)}/>
-              {ytId && (
-                <iframe className="analyze-yt-embed" src={`https://www.youtube-nocookie.com/embed/${ytId}`} allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowFullScreen title="YouTube video"/>
-              )}
-              <div className="analyze-yt-note">Captions are fetched automatically — no transcript to paste.</div>
-            </>
-          )}
-          <div className="analyze-modes">
-            {MODES.map(m => (
-              <button key={m.key} className={`analyze-mode-btn${mode===m.key?' active':''}`} onClick={()=>setMode(m.key)}>{m.label}</button>
-            ))}
-          </div>
-          <button className="analyze-go-btn" onClick={analyze}
-            disabled={loading || (tabType==='text' && !text.trim()) || (tabType==='youtube' && !ytUrl.trim())}>
-            {loading ? 'Analyzing…' : 'Analyze'}
-          </button>
-          {result && (
-            <div className="analyze-result">
-              <div className="analyze-result-label">{MODES.find(m=>m.key===mode)?.label}</div>
-              <div className="analyze-result-text">{result}</div>
-              <button className="analyze-result-clear" onClick={()=>{setResult('');setText('');setYtUrl('');}}>Clear</button>
-            </div>
-          )}
-        </div>
-      </div>
-    </div>
-  );
-}
+// AnalyzePanel extracted to ./modules/analyze (H5), lazy-loaded below.
 
 // ─── ARTICLE READER ───────────────────────────────────────────────────────────
 // XPulse component now lives in ./modules/x-pulse
 
-function ArticleReader({ article, onClose, onAskInChat, related = [], onOpen }) {
-  const [aiResult, setAiResult] = useState('');
-  const [aiErr, setAiErr] = useState('');
-  const [aiLoading, setAiLoading] = useState(false);
-  const [aiMode, setAiMode] = useState(null);
-  const [aiPreview, setAiPreview] = useState(false);
-  const dialogRef = useRef(null);
-  const closeRef = useRef(null);
-
-  // F9: focus trap + RETURN focus. Remember whatever was focused when the reader
-  // opened (the card/link), move focus into the dialog, keep Tab/Shift+Tab inside it,
-  // and restore focus to the opener on close. (Esc-to-close is wired globally.)
-  useEffect(() => {
-    const opener = document.activeElement;
-    const node = dialogRef.current;
-    closeRef.current?.focus();
-    const onKey = (e) => {
-      if (e.key !== 'Tab' || !node) return;
-      const f = node.querySelectorAll('a[href],button:not([disabled]),input,[tabindex]:not([tabindex="-1"])');
-      if (!f.length) return;
-      const first = f[0], last = f[f.length - 1];
-      if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
-      else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
-    };
-    node?.addEventListener('keydown', onKey);
-    return () => {
-      node?.removeEventListener('keydown', onKey);
-      if (opener && opener.focus) { try { opener.focus(); } catch {} }
-    };
-  }, []);
-
-  // Fix: pass the real mode (summary/takeaways/bias) and read the {summary,error}
-  // object fetchAISummary returns — previously it sent mode:'groq' (invalid) and
-  // rendered the object itself, producing a blank panel.
-  const runAI = async (mode) => {
-    setAiMode(mode);
-    setAiLoading(true);
-    setAiResult(''); setAiErr(''); setAiPreview(false);
-    const { summary, error, fromPreview } = await fetchAISummary({ type: 'article', title: article.title, content: article.desc || article.title, mode, url: article.link });
-    if (summary) { setAiResult(summary); setAiPreview(!!fromPreview); }
-    else setAiErr(error || 'Could not generate that right now — try again.');
-    setAiLoading(false);
-  };
-
-  return (
-    <div className="article-reader-overlay" onClick={e => { if (e.target === e.currentTarget) onClose(); }}>
-      <div className="article-reader" ref={dialogRef} role="dialog" aria-modal="true" aria-label={article.title}>
-        <button className="article-reader-close" ref={closeRef} onClick={onClose} aria-label="Close reader">×</button>
-        {article.img && <img className="article-reader-img" src={article.img} alt="" loading="lazy"/>}
-        <div className="article-reader-body">
-          {/* F9: header — source · time · Ask. Close is the top-right control (>=44px on mobile). */}
-          <div className="article-reader-source">
-            <span>{article.source}</span>
-            {article.pubDate && <span className="article-reader-date">· {fmtDate(article.pubDate)}</span>}
-            {onAskInChat && (
-              <button className="article-reader-ask" onClick={() => { onAskInChat(article); onClose(); }}
-                aria-label="Ask the assistant about this story">
-                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
-                Ask
-              </button>
-            )}
-          </div>
-          <h2 className="article-reader-title">{article.title}</h2>
-          {article.desc && <p className="article-reader-desc">{article.desc}</p>}
-          <div className="article-reader-actions">
-            {/* G7d: line icons, one set (currentColor), replacing ↗/✦/💬 glyphs. */}
-            <a className="article-reader-btn primary" href={article.link} target="_blank" rel="noreferrer" onClick={e=>e.stopPropagation()}>
-              Open Full Article
-              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M7 17 17 7"/><path d="M8 7h9v9"/></svg>
-            </a>
-            <button className="article-reader-btn" onClick={() => runAI('summary')}>
-              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M12 3l1.9 4.6L18.5 9.5l-4.6 1.9L12 16l-1.9-4.6L5.5 9.5l4.6-1.9z"/></svg>
-              Summarize
-            </button>
-            <button className="article-reader-btn" onClick={() => runAI('takeaways')}>Key Points</button>
-            <button className="article-reader-btn" onClick={() => runAI('bias')}>Bias Check</button>
-            <button className="article-reader-btn" onClick={() => { onAskInChat?.(article); onClose(); }}>
-              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
-              Ask in Chat
-            </button>
-          </div>
-          {aiLoading && <div className="article-reader-ai-result" style={{color:'var(--text3)'}}>Analyzing with AI…</div>}
-          {!aiLoading && aiErr && (
-            <div className="article-reader-ai-result" style={{color:'var(--red)'}}>
-              {aiErr} <button className="article-reader-btn" style={{marginLeft:'8px'}} onClick={()=>runAI(aiMode||'summary')}>
-                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5"/></svg>
-                Retry</button>
-            </div>
-          )}
-          {!aiLoading && aiResult && (
-            <div className="article-reader-ai-result">
-              {aiPreview && <div className="fc-preview-note" style={{marginBottom:'8px'}}>{PREVIEW_LABEL}</div>}
-              <div className="section-label" style={{color:'var(--accent)',marginBottom:'8px'}}>
-                {aiMode === 'summary' ? 'Summary' : aiMode === 'takeaways' ? 'Key Points' : 'Bias Check'}
-              </div>
-              {aiMode === 'takeaways' ? <TakeawaysContent text={aiResult}/> : aiResult}
-            </div>
-          )}
-          {/* Phase 4: inline X Pulse under the summary (fails silently) */}
-          <XPulse topic={article.title} variant="reader"/>
-          {/* F9: Related — 3–4 stories from EXISTING category/cluster data via the host's
-              getRelated() (keyword match over arts[cat]); NO new network fetch. */}
-          {related && related.length > 0 && (
-            <div className="article-reader-related">
-              <div className="section-label" style={{ color: 'var(--text3)', marginBottom: '8px' }}>Related</div>
-              {related.slice(0, 4).map((r, i) => (
-                <button key={r.link || i} className="article-reader-related-row" onClick={() => onOpen?.(r)}>
-                  <span className="arr-title">{r.title}</span>
-                  <span className="arr-src">{r.source}{r.pubDate ? ` · ${fmtDate(r.pubDate)}` : ''}</span>
-                </button>
-              ))}
-            </div>
-          )}
-        </div>
-      </div>
-    </div>
-  );
-}
+// ArticleReader extracted to ./modules/reader (H5), lazy-loaded below.
 
 // ─── PERSPECTIVES PANEL ───────────────────────────────────────────────────────
 // One consolidated view for a story cluster: AI Key Points, every source (reusing
@@ -8782,7 +8622,7 @@ function PerspectivesPanel({ article, onClose }) {
             <div className="persp-kicker" style={{ color: cc.color }}>Perspectives</div>
             <div className="persp-title">{article.title}</div>
           </div>
-          <button className="persp-close" onClick={onClose} aria-label="Close">×</button>
+          <button className="persp-close" onClick={onClose} aria-label="Close"><XIcon size={16} aria-hidden="true"/></button>
         </div>
         <div className="persp-body">
           <section className="persp-sec">
@@ -8816,7 +8656,7 @@ function AuthModal({ onClose, onSend, status, email, setEmail, userId, onSignOut
   return (
     <div style={overlay} onClick={onClose}>
       <div style={card} onClick={e=>e.stopPropagation()}>
-        <button onClick={onClose} style={{position:'absolute',top:12,right:14,border:'none',background:'none',fontSize:18,cursor:'pointer',color:'inherit',lineHeight:1}}>✕</button>
+        <button onClick={onClose} style={{position:'absolute',top:12,right:14,border:'none',background:'none',fontSize:18,cursor:'pointer',color:'inherit',lineHeight:1}}><XIcon size={13} aria-hidden="true"/></button>
         {userId ? (
           <>
             <h3 style={{margin:'0 0 6px',fontSize:18}}>You're signed in</h3>
@@ -9526,6 +9366,9 @@ export default function App() {
   // On load: adopt an existing session and pull its profile; then react to sign-in/out.
   useEffect(() => {
     if (!isCloudSyncEnabled()) return;
+    // H4: only auto-load the Supabase client when a session is already present (stored or
+    // in a magic-link return). Fresh/logged-out visitors defer it until they sign in.
+    if (!hasCloudSession()) return;
     getUserId().then(uid => { if (uid) { setUserId(uid); pullCloudProfile(uid); } });
     const unsub = onAuthStateChange((user) => {
       const id = user?.id || null;
@@ -9976,7 +9819,7 @@ export default function App() {
               </div>
               <div style={{display:'flex',gap:'8px',alignItems:'center'}}>
                 <button className="sport-league-all-btn" onClick={()=> teamFollowed ? unfollowTeam({name:teamName, league:sportTab}) : followTeam(teamName, sportTab)}>
-                  {teamFollowed ? '★ Following' : '☆ Follow'}
+                  {teamFollowed ? <><Star size={11} fill="currentColor" aria-hidden="true"/> Following</> : <><Star size={11} aria-hidden="true"/> Follow</>}
                 </button>
                 <button className="sport-league-all-btn" onClick={()=>navigate('sports', sportTab)}>← All {SPORT_TABS.find(s=>s.key===sportTab)?.label}</button>
               </div>
@@ -10044,9 +9887,9 @@ export default function App() {
                 <div className="team-hub-count">{sportItems.length} stories found · {activeTeam.league?.toUpperCase()}</div>
               </div>
               <div style={{display:'flex',alignItems:'center',gap:'8px'}}>
-                {activeTeam.espnUrl && <a className="team-hub-link" href={activeTeam.espnUrl} target="_blank" rel="noreferrer">ESPN ↗</a>}
-                {activeTeam.teamUrl && <a className="team-hub-link" href={activeTeam.teamUrl} target="_blank" rel="noreferrer">Team Site ↗</a>}
-                <button className="team-hub-clear" onClick={()=>setActiveTeam(null)}>✕ Clear</button>
+                {activeTeam.espnUrl && <a className="team-hub-link" href={activeTeam.espnUrl} target="_blank" rel="noreferrer"><span>ESPN</span> <ExternalLink size={12} aria-hidden="true" style={{verticalAlign:"-1px"}}/></a>}
+                {activeTeam.teamUrl && <a className="team-hub-link" href={activeTeam.teamUrl} target="_blank" rel="noreferrer"><span>Team Site</span> <ExternalLink size={12} aria-hidden="true" style={{verticalAlign:"-1px"}}/></a>}
+                <button className="team-hub-clear" onClick={()=>setActiveTeam(null)}><XIcon size={12} aria-hidden="true"/> Clear</button>
               </div>
             </div>
           </div>
@@ -10088,7 +9931,7 @@ export default function App() {
                     <div className="gn-card-meta">
                       <span className="gn-card-source" style={{color:cc.color}}>{a.source}</span>
                       <span>·</span><span>{fmtDate(a.pubDate)}</span>
-                      {a._favScore > 0 && <span style={{marginLeft:'4px',color:'#f59e0b',fontWeight:800}}>★</span>}
+                      {a._favScore > 0 && <Star size={11} aria-hidden="true" style={{marginLeft:'4px',color:'var(--amber)'}} fill="currentColor"/>}
                     </div>
                   </article>
                 ))}
@@ -10148,7 +9991,7 @@ export default function App() {
                             <span className="team-card-name">{t.team}</span>
                             <span className="team-card-league">{t.league?.toUpperCase()}</span>
                           </div>
-                          <span className="team-card-arrow">{menuOpen ? '▴' : '▾'}</span>
+                          <span className="team-card-arrow"><ChevronDown size={11} aria-hidden="true" style={{transform:menuOpen?'rotate(180deg)':'none',transition:"transform .15s"}}/></span>
                         </button>
                         {menuOpen && (
                           <div className="team-card-menu">
@@ -10156,10 +9999,10 @@ export default function App() {
                               setActiveTeam(isFiltered ? null : t); setSportTab('all');
                               setTeamMenuSym(null); setTimeout(scrollToFeed, 80);
                             }}>
-                              {isFiltered ? '✕ Clear filter' : 'Filter News'}
+                              {isFiltered ? <><XIcon size={12} aria-hidden="true"/> Clear filter</> : 'Filter News'}
                             </button>
-                            {t.espnUrl && <a className="team-menu-item" href={t.espnUrl} target="_blank" rel="noreferrer">ESPN ↗</a>}
-                            {t.teamUrl && <a className="team-menu-item" href={t.teamUrl} target="_blank" rel="noreferrer">Team Site ↗</a>}
+                            {t.espnUrl && <a className="team-menu-item" href={t.espnUrl} target="_blank" rel="noreferrer"><span>ESPN</span> <ExternalLink size={12} aria-hidden="true" style={{verticalAlign:"-1px"}}/></a>}
+                            {t.teamUrl && <a className="team-menu-item" href={t.teamUrl} target="_blank" rel="noreferrer"><span>Team Site</span> <ExternalLink size={12} aria-hidden="true" style={{verticalAlign:"-1px"}}/></a>}
                           </div>
                         )}
                       </div>
@@ -10520,7 +10363,7 @@ export default function App() {
                     <TeamLogo name={t.name} league={t.league} size={18}/>
                     <span className="following-chip-name">{t.name}{dup ? ` · ${(t.league||'').toUpperCase()}` : ''}</span>
                   </button>
-                  <button type="button" className="following-chip-x" onClick={()=>unfollowTeam(t)} aria-label={`Unfollow ${t.name}`}>×</button>
+                  <button type="button" className="following-chip-x" onClick={()=>unfollowTeam(t)} aria-label={`Unfollow ${t.name}`}><XIcon size={16} aria-hidden="true"/></button>
                 </span>
               );
             });
@@ -10530,7 +10373,7 @@ export default function App() {
               <button type="button" className="following-chip-main" onClick={()=>navigate('general','topic',teamSlug(t))}>
                 <span className="following-chip-name">{t}</span>
               </button>
-              <button type="button" className="following-chip-x" onClick={()=>toggleTopic(t)} aria-label={`Unfollow ${t}`}>×</button>
+              <button type="button" className="following-chip-x" onClick={()=>toggleTopic(t)} aria-label={`Unfollow ${t}`}><XIcon size={16} aria-hidden="true"/></button>
             </span>
           ))}
           {followedTeams.length === 0 && myTopics.length === 0 && (
@@ -10683,13 +10526,13 @@ export default function App() {
                     ? <><strong>{feedItems.length} articles</strong> matching <em style={{fontStyle:'normal',fontWeight:700}}>"{search}"</em> — including web sources below</>
                     : <>No results for "<strong>{search}</strong>" — showing web results below</>}
                 </span>
-                <button className="search-results-clear" onClick={()=>setSearch('')}>✕ Clear</button>
+                <button className="search-results-clear" onClick={()=>setSearch('')}><XIcon size={12} aria-hidden="true"/> Clear</button>
               </div>
             )}
             {(activeKw||activeSrc)&&(
               <div className="sticky-filter" style={{display:'flex',gap:'6px',flexWrap:'wrap',marginBottom:'12px'}}>
-                {activeKw&&<span style={{background:cc.bg,color:cc.color,borderRadius:'20px',padding:'3px 10px',fontSize:'10px',fontWeight:'600',display:'inline-flex',alignItems:'center',gap:'5px'}}>{activeKw}<button onClick={()=>setActiveKw(null)} style={{background:'none',border:'none',cursor:'pointer',color:'inherit',fontSize:'12px',padding:0}}>✕</button></span>}
-                {activeSrc&&<span style={{background:'var(--surface2)',color:'var(--text2)',borderRadius:'20px',padding:'3px 10px',fontSize:'10px',fontWeight:'600',border:'1px solid var(--border)',display:'inline-flex',alignItems:'center',gap:'5px'}}>{activeSrc}<button onClick={()=>setActiveSrc(null)} style={{background:'none',border:'none',cursor:'pointer',color:'inherit',fontSize:'12px',padding:0}}>✕</button></span>}
+                {activeKw&&<span style={{background:cc.bg,color:cc.color,borderRadius:'20px',padding:'3px 10px',fontSize:'10px',fontWeight:'600',display:'inline-flex',alignItems:'center',gap:'5px'}}>{activeKw}<button onClick={()=>setActiveKw(null)} style={{background:'none',border:'none',cursor:'pointer',color:'inherit',fontSize:'12px',padding:0}}><XIcon size={13} aria-hidden="true"/></button></span>}
+                {activeSrc&&<span style={{background:'var(--surface2)',color:'var(--text2)',borderRadius:'20px',padding:'3px 10px',fontSize:'10px',fontWeight:'600',border:'1px solid var(--border)',display:'inline-flex',alignItems:'center',gap:'5px'}}>{activeSrc}<button onClick={()=>setActiveSrc(null)} style={{background:'none',border:'none',cursor:'pointer',color:'inherit',fontSize:'12px',padding:0}}><XIcon size={13} aria-hidden="true"/></button></span>}
               </div>
             )}
             {isLoading&&!feedItems.length
@@ -10942,7 +10785,7 @@ export default function App() {
             </div>
             <div className="ba-actions" onClick={e=>e.stopPropagation()}>
               <button className={`ba-btn${showSum?' on':''}`} onClick={handleAI}>
-                {loadSum?'…':'✦'} {showSum?'Hide':'Summary'}
+                {loadSum?'…':<Sparkles size={13} aria-hidden="true"/>} {showSum?'Hide':'Summary'}
               </button>
               <button className={`ba-btn${showEx?' on':''}`} onClick={handleExplain}>
                 {loadEx?'…':''} {showEx?'Hide':'Explain'}
@@ -11117,7 +10960,7 @@ export default function App() {
           {podAiState!=='closed'&&(
             <div className="fc-ai-panel" style={{margin:'10px 0 0'}}>
               <div className="fc-summary">
-                <div className="fc-summary-lbl">✦ Summary · from show notes</div>
+                <div className="fc-summary-lbl"><Sparkles size={13} aria-hidden="true"/> Summary · from show notes</div>
                 {loadPod&&!podSum?<div style={{fontSize:'11px',color:'var(--text3)',fontStyle:'italic'}}>Generating summary…</div>
                 :podErr&&!podSum?<div style={{fontSize:'11px',color:'var(--red)'}}>{podErr}</div>
                 :<div className="fc-summary-text">{podSum}</div>}
@@ -11136,7 +10979,7 @@ export default function App() {
             <button className="pod-btn" onClick={()=>ep.link&&window.open(ep.link,'_blank')}>Listen</button>
             {(ep.desc||'').length >= 500 && (
               <button className={`pod-btn ${podAiState!=='closed'?'ai-on':''}`} onClick={handlePodAI} disabled={loadPod}>
-                ✦ {loadPod?'Thinking…':podAiState==='closed'?'AI Summary':'Hide AI'}
+                <Sparkles size={13} aria-hidden="true"/> {loadPod?'Thinking…':podAiState==='closed'?'AI Summary':'Hide AI'}
               </button>
             )}
             <button className={`pod-btn ${sv2?'saved':''}`} onClick={()=>onSave({...ep,link:ep.link||ep.show+idx,source:ep.show,cat:'podcasts'})}>{sv2?'★ Saved':'☆ Save'}</button>
@@ -11272,7 +11115,7 @@ export default function App() {
         </div>
       )}
       {saved.length===0
-        ?<div className="empty-state" style={{paddingTop:'80px'}}><div className="empty-icon">☆</div><div className="empty-msg">No saved items yet<br/><span style={{fontSize:'11px',color:'var(--text3)'}}>Tap Save on any article or episode</span></div></div>
+        ?<div className="empty-state" style={{paddingTop:'80px'}}><div className="empty-msg">No saved items yet<br/><span style={{fontSize:'11px',color:'var(--text3)'}}>Tap Save on any article or episode</span></div></div>
         :<div className="page-grid"><div className="feed-col"><span className="page-header" style={{marginBottom:'24px',display:'block'}}>Saved — {saved.length} items</span>{saved.map((a,i)=><FeedCard key={i} a={a} cat={a.cat||'general'} isSaved={true} onSave={onSave} onRead={onRead} isRead={isReadFn(a)} userKw={kw} userTeams={teams}/>)}</div></div>
       }
     </div>
@@ -11326,7 +11169,7 @@ export default function App() {
                         <span className={`source-status ${f.on?'on':'off'}`} title={f.on?'Active':'Disabled'}/>
                         <span className="source-name">{f.name}</span>
                         {n>0 && <span className="source-count" title={`${n} articles loaded`}>{n}</span>}
-                        {url && <span className="source-ext">↗</span>}
+                        {url && <span className="source-ext"><ExternalLink size={11} aria-hidden="true"/></span>}
                       </a>
                     );
                   })}
@@ -11457,7 +11300,7 @@ export default function App() {
                                   ))}
                                   <a className="fin-chart-ext" href={`https://finance.yahoo.com/chart/${w.sym}`}
                                     target="_blank" rel="noreferrer" onClick={e=>e.stopPropagation()}>
-                                    Yahoo ↗
+                                    Yahoo <ExternalLink size={11} aria-hidden="true" style={{verticalAlign:"-1px"}}/>
                                   </a>
                                 </div>
                                 <div className="fin-chart-links">
@@ -11465,10 +11308,10 @@ export default function App() {
                                     Full Chart on Yahoo Finance
                                   </a>
                                   <a className="fin-chart-link-btn" href={`https://www.tradingview.com/chart/?symbol=${w.sym}`} target="_blank" rel="noreferrer" onClick={e=>e.stopPropagation()}>
-                                    TradingView ↗
+                                    TradingView <ExternalLink size={11} aria-hidden="true" style={{verticalAlign:"-1px"}}/>
                                   </a>
                                   <a className="fin-chart-link-btn" href={`https://www.google.com/finance/quote/${w.sym}`} target="_blank" rel="noreferrer" onClick={e=>e.stopPropagation()}>
-                                    Google Finance ↗
+                                    Google Finance <ExternalLink size={11} aria-hidden="true" style={{verticalAlign:"-1px"}}/>
                                   </a>
                                 </div>
                               </div>
@@ -11623,12 +11466,13 @@ export default function App() {
       {/* D8: ?debug=1 scroll/render overlay (renders null unless the flag is on). */}
       <DebugOverlay/>
       {/* Inline article reader overlay */}
-      {readerArticle && <ArticleReader article={readerArticle} onClose={() => setReaderArticle(null)} onAskInChat={(a)=>setChatContext(a)}
-        related={getReaderRelated(readerArticle)} onOpen={(a)=>setReaderArticle(a)}/>}
+      {readerArticle && <Suspense fallback={null}><ArticleReader article={readerArticle} onClose={() => setReaderArticle(null)} onAskInChat={(a)=>setChatContext(a)}
+        related={getReaderRelated(readerArticle)} onOpen={(a)=>setReaderArticle(a)}
+        fetchAISummary={fetchAISummary} formatDate={fmtDate} previewLabel={PREVIEW_LABEL} TakeawaysContent={TakeawaysContent}/></Suspense>}
       {/* Perspectives panel (sources + X Pulse + AI key points) */}
       {perspArticle && <PerspectivesPanel article={perspArticle} onClose={() => setPerspArticle(null)}/>}
       {/* Paste & Brief panel */}
-      {showAnalyze && <AnalyzePanel onClose={() => setShowAnalyze(false)}/>}
+      {showAnalyze && <Suspense fallback={null}><AnalyzePanel onClose={() => setShowAnalyze(false)} fetchAISummary={fetchAISummary}/></Suspense>}
       {/* v26b: email magic-link sign-in */}
       {showAuth && <AuthModal onClose={()=>{setShowAuth(false);setAuthStatus('');}} onSend={handleSendMagicLink}
         status={authStatus} email={authEmail} setEmail={setAuthEmail} userId={userId} onSignOut={handleSignOut}/>}

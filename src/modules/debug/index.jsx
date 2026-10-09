@@ -17,6 +17,9 @@ export const DEBUG = typeof window !== 'undefined'
 
 // Mutable counters. Cheap plain object; only the overlay reads them.
 export const dbg = { renders: {}, pollFires: 0, cls: 0, scrollJumps: 0, lastJump: 0 };
+// H5: expose the debug counters on window under ?debug=1 so the Sports-twitch
+// measurement (App/SportsPage renders/s, CLS, scroll jumps) can read them headlessly.
+if (DEBUG && typeof window !== 'undefined') window.__dbg = dbg;
 
 export function dbgRender(name) { if (!DEBUG) return; dbg.renders[name] = (dbg.renders[name] || 0) + 1; }
 export function dbgPoll(name) {
