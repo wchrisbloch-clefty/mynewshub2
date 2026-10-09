@@ -39,6 +39,7 @@
 import { useState, useEffect, useLayoutEffect, useCallback, useMemo, useRef, Fragment } from 'react';
 // Extracted, dependency-isolated capability modules (see src/modules/*/README.md)
 import { clusterStories, hotClusterTopics, rankClusters, TREND_STOP, decodeEntities, capByPublisher } from './modules/clustering';
+import { opinionLabel } from './modules/opinion';
 import { qualifyBreaking, isPromoItem } from './modules/breaking';
 import { rankByVelocity, signalFor } from '../lib/voices/velocity';
 import { DEBUG, dbgRender, dbgPoll, DebugOverlay } from './modules/debug';
@@ -1432,6 +1433,9 @@ function whyItMatters(article, userKw, userTeams) {
 // `_clusterSize` and `_clusterSources` so the card can show "3 sources covering this".
 // clusterStories now lives in ./modules/clustering
 
+// F8: Opinion/Analysis label — rules-only, in its own module (one editable constant
+// OPINION_SOURCES). Imported at the top of the file; never read by tiering/ranking.
+
 // StateOfPlay + SnapshotCard components now live in ./modules/state-of-play and ./modules/snapshot-card
 
 // ─── GLOBAL CSS ───────────────────────────────────────────────────────────────
@@ -1569,7 +1573,11 @@ body{
 .houston-card-title{font-family:var(--font-publicsans);font-size:var(--fs-body);font-weight:600;line-height:1.35;color:var(--text);padding:0 10px;margin-bottom:6px;overflow-wrap:anywhere;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden;}
 .houston-card-meta{font-family:var(--font-publicsans);font-size:10px;color:var(--text3);padding:0 10px;display:flex;gap:5px;flex-wrap:wrap;font-variant-numeric:tabular-nums;}
 @media(max-width:640px){
-  .houston-scroll{scroll-snap-type:x mandatory;}
+  /* F1 bug fix: the flex row defaulted to align-items:stretch, so a short-title card
+     stretched to the tallest card and showed a large empty tail of white card background
+     below its meta (the reported "empty white space"). Top-align so each card is sized to
+     its own content — no blank tail, still a horizontal swipe row. Desktop is untouched. */
+  .houston-scroll{scroll-snap-type:x mandatory;align-items:flex-start;}
   .houston-card{flex-basis:82%;}
 }
 /* Following row (My Topics + My Teams) */
@@ -1753,9 +1761,11 @@ body:not(.dark) .pill-bar{
   color:var(--text);letter-spacing:-0.5px;line-height:1;
 }
 .logo span{color:var(--accent);}
+/* F5: lighter wordmark tagline (weight 500, muted) — integrated under the name; still
+   hidden when the header shrinks on scroll, and the header height is unchanged. */
 .logo-tag{
-  font-family:var(--font-sans);font-size:7px;color:var(--text3);
-  letter-spacing:0.18em;text-transform:uppercase;font-weight:600;margin-top:2px;
+  font-family:var(--font-sans);font-size:7px;color:var(--text4);
+  letter-spacing:0.16em;text-transform:uppercase;font-weight:500;margin-top:2px;
 }
 /* BBC-clean section tabs: no box, strong underline on active */
 .nav-tabs{
@@ -1765,14 +1775,16 @@ body:not(.dark) .pill-bar{
 .nav-tabs::-webkit-scrollbar{display:none;}
 .nav-tab{
   background:transparent;border:none;color:var(--text3);
-  padding:0 14px;height:54px;cursor:pointer;
+  padding:0 11px;height:54px;cursor:pointer; /* F7: tighter tab spacing (was 0 14px) */
   font-family:var(--font-sans);font-size:12px;font-weight:700;
   white-space:nowrap;border-bottom:3px solid transparent;
-  transition:color 0.12s,border-color 0.12s;letter-spacing:0.04em;
+  transition:color 0.12s,border-color 0.12s;letter-spacing:0.03em;
   text-transform:uppercase;
 }
-/* One accent for the active section — identity is the label, not a colour per tab */
-.nav-tab.active{color:var(--accent);border-bottom-color:var(--accent);}
+/* F7: ONE accent for the active section, made decisive — accent ink, heavier weight and
+   a full-weight 3px underline. Identity is the label + the single accent, never a colour
+   per tab. */
+.nav-tab.active{color:var(--accent);border-bottom-color:var(--accent);font-weight:800;}
 .nav-tab:hover:not(.active){color:var(--text2);}
 .nav-right{display:flex;gap:8px;align-items:center;flex-shrink:0;padding-left:16px;border-left:1px solid var(--border);}
 /* D1: priority-overflow nav. The visible row is flex (no scroll); the hidden
@@ -1905,6 +1917,12 @@ body:not(.dark) .pill-bar{
 .fc-topic{
   font-size:10px;font-weight:700;border-radius:20px;padding:2px 9px;
   letter-spacing:0.03em;text-transform:uppercase;font-family:var(--font-sans);
+}
+/* F8: Opinion/Analysis — rules-only neutral OUTLINE tag (never a tier/category). */
+.fc-opinion{
+  font-size:9px;font-weight:800;text-transform:uppercase;letter-spacing:0.06em;
+  color:var(--text3);border:1px solid var(--border);border-radius:4px;padding:1px 6px;
+  font-family:var(--font-publicsans);white-space:nowrap;
 }
 .fc-alert-badge{
   font-size:9px;font-weight:900;background:var(--accent);color:#fff;
@@ -2045,7 +2063,7 @@ body:not(.dark) .pill-bar{
    Scoreboard keeps its box (it's a widget).
 ═══════════════════════════════════════════ */
 .sidebar{
-  display:flex;flex-direction:column;gap:24px;min-width:0;
+  display:flex;flex-direction:column;gap:18px;min-width:0; /* F6: tighter secondary rhythm (was 24px) */
   border-left:1px solid var(--border2);padding-left:28px;
   /* Flows in normal document scroll along with the main column — no sticky/fixed
      positioning and no internal scroll container. */
@@ -2105,7 +2123,7 @@ body:not(.dark) .pill-bar{
 .sidebar-section{display:flex;flex-direction:column;gap:0;}
 .sidebar-sec-head{
   display:flex;align-items:center;justify-content:space-between;
-  padding-bottom:9px;border-bottom:2px solid var(--border);margin-bottom:12px;
+  padding-bottom:7px;border-bottom:2px solid var(--border);margin-bottom:9px; /* F6: tightened (was 9/12) */
 }
 .sidebar-sec-label{
   font-size:10px;font-weight:800;color:var(--text3);
@@ -2136,6 +2154,9 @@ body:not(.dark) .pill-bar{
    matches the Sports/Energy/Pop-Culture filter pills. */
 /* Prediction Markets sidebar module (Pass: item 4) — market sentiment, not news. */
 .pm-tag{font-family:var(--font-publicsans);font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:0.04em;color:var(--text4);}
+/* F6: tagline shown once under the collapsible header; muted, out of the way. */
+.pm-tagline{font-family:var(--font-publicsans);font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:0.04em;color:var(--text4);margin:-2px 0 8px;}
+.pm-empty{font-family:var(--font-publicsans);font-size:var(--fs-meta);color:var(--text3);padding:4px 0 2px;}
 .pm-list{display:flex;flex-direction:column;}
 .pm-row{display:flex;align-items:flex-start;gap:10px;padding:9px 0;border-top:1px solid var(--border2);text-decoration:none;}
 .pm-row:first-of-type{border-top:none;}
@@ -3905,8 +3926,8 @@ body{overscroll-behavior-y:contain;}
   -webkit-tap-highlight-color:transparent;
 }
 .chip:active{background:var(--surface2);}
-.chip.active{color:#fff;font-weight:700;background:#1a1a1a;}
-.dark .chip.active{background:rgba(255,255,255,0.15);}
+/* F5: active chip uses the single accent token (was #1a1a1a / per-category color). */
+.chip.active{color:#fff;font-weight:700;background:var(--accent);}
 /* D1: "More ▾" chip opens the mobile overflow sheet (Briefing/Podcasts/Sources/Saved). */
 .chip-more{font-weight:700;color:var(--text2);}
 .chip-more.active{color:#fff;}
@@ -4217,6 +4238,20 @@ body{overscroll-behavior-y:contain;}
   .pill-value{font-size:var(--fs-body);}
   .pill-chg{font-size:9px;padding:1px 5px;}
 
+  /* F7: default-collapsed market ticker — the header toggle reclaims the ~34px strip. */
+  .topbar-wrap.ticker-collapsed .status-strip{display:none;}
+  .mobile-ticker-toggle.on{color:var(--accent);border-color:var(--accent);}
+  /* F7: when the header auto-hides on scroll-down, the wrap no longer slides fully away.
+     The logo row + ticker + weather + scores hide, but the category CHIPS stay pinned at
+     the top (under env(safe-area-inset-top), already on .topbar-wrap) so switching
+     sections stays one tap while reading — no overlap, no dead zone. */
+  .topbar-wrap.hidden{transform:none;}
+  .topbar-wrap.hidden .status-strip,
+  .topbar-wrap.hidden .topbar-wx,
+  .topbar-wrap.hidden .topbar-scores,
+  .topbar-wrap.hidden .mobile-header,
+  .topbar-wrap.hidden .mobile-search{display:none;}
+
   body{padding-bottom:calc(58px + env(safe-area-inset-bottom, 0));}
   .page{padding:14px 14px 24px;}
 
@@ -4368,12 +4403,14 @@ body{overscroll-behavior-y:contain;}
 /* Paywall badge */
 .fc-paywall-badge{font-size:var(--fs-meta);cursor:default;flex-shrink:0;}
 
-/* Cluster badge — "N sources" indicator */
-.fc-cluster-badge{
-  font-size:9px;font-weight:700;color:var(--accent);background:var(--accent-bg);
-  border-radius:4px;padding:2px 7px;letter-spacing:0.04em;cursor:default;
+/* F8: ONE canonical "N sources" indicator, reused everywhere a cluster shows its
+   coverage count (State of Play, SnapshotCard, FeedCard). Matches the State of Play
+   pill — accent ink on a neutral surface, no decorative colour (the old dark-mode
+   purple #2d1f5a/#a78bfa is removed). */
+.sources-tag{
+  font-family:var(--font-publicsans);font-size:10px;font-weight:700;color:var(--accent);
+  background:var(--surface2);border-radius:10px;padding:2px 8px;white-space:nowrap;letter-spacing:0;
 }
-.dark .fc-cluster-badge{background:#2d1f5a;color:#a78bfa;}
 
 /* Category placeholder image with gradient */
 .gn-card-img-ph{
@@ -5103,10 +5140,28 @@ kbd{display:inline-block;padding:1px 5px;border:1px solid var(--border);border-r
   z-index:1;transition:background 0.15s;
 }
 .article-reader-close:hover{background:rgba(0,0,0,0.7);}
+/* F9: header Ask — compact, sits after source · time. */
+.article-reader-ask{
+  display:inline-flex;align-items:center;gap:4px;margin-left:auto;
+  font-family:var(--font-publicsans);font-size:11px;font-weight:700;letter-spacing:0;text-transform:none;
+  color:var(--accent);background:var(--accent-bg);border:1px solid transparent;border-radius:14px;
+  padding:3px 10px;cursor:pointer;transition:background 0.12s;
+}
+.article-reader-ask:hover{background:var(--surface2);border-color:var(--accent);}
+/* F9: Related — compact text rows from existing category/cluster data (no new fetch). */
+.article-reader-related{margin-top:22px;border-top:1px solid var(--border);padding-top:16px;}
+.article-reader-related-row{display:flex;flex-direction:column;gap:2px;width:100%;text-align:left;
+  background:none;border:none;border-top:1px solid var(--border2);padding:9px 0;cursor:pointer;font-family:inherit;}
+.article-reader-related-row:first-of-type{border-top:none;}
+.arr-title{font-family:var(--font-archivo);font-weight:600;font-size:var(--fs-body);line-height:1.3;color:var(--text);}
+.article-reader-related-row:hover .arr-title{color:var(--accent);}
+.arr-src{font-family:var(--font-publicsans);font-size:var(--fs-meta);color:var(--text3);}
 @media(max-width:640px){
   .article-reader-overlay{padding:0;}
   .article-reader{border-radius:0;min-height:100dvh;}
-  .article-reader-body{padding:18px 18px 32px;}
+  .article-reader-body{padding:16px 16px 32px;} /* F9: full-width, 16px pad */
+  /* F9: >=44px close target on touch. */
+  .article-reader-close{width:44px;height:44px;font-size:22px;top:10px;right:10px;}
 }
 
 /* ── PASTE & BRIEF PANEL ───────────────────────────────────────── */
@@ -5936,9 +5991,10 @@ function FeedCard({a, cat, isSaved, onSave, onRead, relatedSources, isRead, user
             title+desc keyword match that mis-tagged previews/interviews. Breaking now
             appears ONLY as tagged rows in State of Play. */}
         <TierBadge item={a}/>
+        {opinionLabel(a) && <span className="fc-opinion">{opinionLabel(a)}</span>}
         {topKw && <span className="fc-topic" style={{background:cc.bg,color:cc.color}}>{topKw}</span>}
         {clusterCount > 1 && (
-          <span className="fc-cluster-badge" title={`Also covered by: ${a._clusterSources?.join(', ')}`}>
+          <span className="sources-tag" title={`Also covered by: ${a._clusterSources?.join(', ')}`}>
             {clusterCount} sources
           </span>
         )}
@@ -6219,38 +6275,25 @@ Output ONLY the paragraph followed by the bullets. No headers, no labels, no clo
     });
     if (summary) {
       const { body: b, bullets: bs } = parseBriefing(summary.trim());
+      const now = Date.now();
       setBody(b);
       setBullets(bs);
-      setTs(Date.now());
+      setTs(now);
+      // F4: persist today's briefing so a remount shows it without re-spending, and
+      // "Refresh" vs "Generate" reflects whether today's briefing already exists.
+      try { sv('briefingCache', { date: new Date().toDateString(), body: b, bullets: bs, ts: now }); } catch {}
     } else {
       setError(err||'Could not generate briefing');
     }
     setLoading(false);
   }, [arts, dateStr]);
 
-  // Initial generation when feeds load (>10 articles total)
+  // F4: NO automatic generation (cost guardrail). On mount, load today's cached
+  // briefing if one exists; generation happens ONLY on the button press below.
   useEffect(() => {
-    const total = Object.values(arts).reduce((n,l)=>n+(l?.length||0),0);
-    if (total > 10 && !body && !loading) generate();
+    try { const c = ld('briefingCache', null); if (c && c.date === new Date().toDateString()) { setBody(c.body || ''); setBullets(c.bullets || []); setTs(c.ts || null); } } catch {}
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [arts]);
-
-  // ── TIER 3: time-aware auto-refresh ──
-  // If briefing exists but is older than BRIEFING_STALE_MS (90min), regenerate.
-  // Re-checks every 5 minutes so a user who leaves the tab open mid-morning
-  // gets a fresh briefing by midday without manual refresh.
-  useEffect(() => {
-    if (!ts || loading) return;
-    const checkStale = () => {
-      const age = Date.now() - ts;
-      if (age > BRIEFING_STALE_MS) {
-        const total = Object.values(arts).reduce((n,l)=>n+(l?.length||0),0);
-        if (total > 10) generate();
-      }
-    };
-    checkStale(); // D6: generate on demand when stale on mount/ts-change; no 5-min poll.
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [ts]);
+  }, []);
 
   // Freshness indicator: green <30min, amber older
   const tsLabel = useMemo(() => {
@@ -6274,8 +6317,10 @@ Output ONLY the paragraph followed by the bullets. No headers, no labels, no clo
             </span>
           )}
         </div>
+        {/* F4: ONE button — Generate when no briefing exists for today, Refresh otherwise.
+            Disabled while running (debounces double taps); one press = one generation. */}
         <button className="briefing-inline-refresh-btn" onClick={generate} disabled={loading}>
-          {loading ? 'Generating…' : '↻ Refresh'}
+          {loading ? 'Generating…' : body ? '↻ Refresh briefing' : "Generate today's briefing"}
         </button>
       </div>
       <div className="briefing-inline-sources">
@@ -6285,8 +6330,10 @@ Output ONLY the paragraph followed by the bullets. No headers, no labels, no clo
       {body
         ? <p className="briefing-inline-body" dangerouslySetInnerHTML={{__html: body.replace(/\*\*([^*]+)\*\*/g,'<strong>$1</strong>')}}/>
         : error
-          ? <p className="briefing-inline-empty">{error}</p>
-          : <p className="briefing-inline-empty">{loading?'Synthesizing today\'s headlines…':'Loading briefing…'}</p>}
+          ? <p className="briefing-inline-empty">Generation failed: {error}. Press “Generate today's briefing” to try again.</p>
+          : loading
+            ? <p className="briefing-inline-empty">Synthesizing today's headlines…</p>
+            : <p className="briefing-inline-empty">No briefing yet today — press “Generate today's briefing”.</p>}
       {bullets.length > 0 && (
         <ul className="briefing-inline-bullets">
           {bullets.map((b, i) => (
@@ -6317,94 +6364,15 @@ function BriefingTeaser({arts, excludeCats, onOpenFull, compact}) {
   const [error, setError]     = useState('');
   const dateStr = new Date().toLocaleDateString('en-US',{weekday:'long',month:'long',day:'numeric'});
 
-  const parseBriefing = (text) => {
-    const lines = text.split('\n').map(l => l.trim()).filter(Boolean);
-    const paragraphs = [];
-    const bulletLines = [];
-    for (const line of lines) {
-      const m = line.match(/^(?:[-•*]|\d+[.)])\s+(.+)$/);
-      if (m) bulletLines.push(m[1].trim());
-      else paragraphs.push(line);
-    }
-    return { body: paragraphs.join(' '), bullets: bulletLines.slice(0, 3) };
-  };
-
-  const generate = useCallback(async () => {
-    setLoading(true); setError('');
-    const allArts = Object.values(arts).flat();
-    const tier1 = [];
-    const tier1Keys = new Set();
-    briefingSourceList().forEach(srcName => {
-      allArts
-        .filter(a => a.source === srcName)
-        .sort((a,b) => new Date(b.pubDate) - new Date(a.pubDate))
-        .slice(0, 2)
-        .forEach(a => {
-          tier1.push(a);
-          tier1Keys.add(a.title.slice(0,60).toLowerCase().replace(/\s+/g,''));
-        });
-    });
-    const tier2 = {};
-    Object.entries(arts).forEach(([cat, list]) => {
-      if (effectiveExclude.includes(cat)) return;
-      const headlines = (list||[])
-        .filter(a => !tier1Keys.has(a.title.slice(0,60).toLowerCase().replace(/\s+/g,'')))
-        .sort((a,b) => new Date(b.pubDate) - new Date(a.pubDate))
-        .slice(0, 5)
-        .map(a => a.title);
-      if (headlines.length > 0) tier2[cat] = headlines;
-    });
-    const tier1Block = tier1.length > 0
-      ? `PRIORITY BRIEFINGS:\n${tier1.map(a => `• [${a.source}] ${a.title}`).join('\n')}`
-      : '';
-    const tier2Block = Object.entries(tier2).map(([cat, hl]) =>
-      `${CATS[cat]?.label || cat.toUpperCase()}:\n${hl.map(t => `• ${t}`).join('\n')}`
-    ).join('\n\n');
-
-    const prompt = `Synthesize a punchy 3-sentence opening + 3 specific bullet takeaways for a busy executive's morning briefing. Style: Morning Brew + Axios + Bloomberg 5 Things. Be specific and name actual stories.
-
-${tier1Block}
-
-FRESH HEADLINES BY CATEGORY:
-${tier2Block}
-
-OUTPUT: 3-sentence paragraph followed by exactly 3 bullets (- markers). No headers.`;
-
-    const {summary, error:err} = await fetchAISummary({
-      type:'article',
-      title:`Briefing Teaser — ${dateStr}`,
-      content: prompt,
-      mode:'briefing-gen',
-    });
-    if (summary) {
-      const { body: b, bullets: bs } = parseBriefing(summary.trim());
-      setBody(b);
-      setBullets(bs);
-      setTs(Date.now());
-    } else {
-      setError(err || 'Could not generate briefing');
-    }
-    setLoading(false);
-  }, [arts, dateStr]);
-
+  // F4: the Home teaser NEVER generates — it reflects the SAME cached briefing the
+  // Briefing page produces on its button press (no auto-generation, no double-spend).
+  // It re-reads on focus so a briefing generated in the Briefing tab shows up here.
   useEffect(() => {
-    const total = Object.values(arts).reduce((n,l)=>n+(l?.length||0),0);
-    if (total > 10 && !body && !loading) generate();
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [arts]);
-
-  // Time-aware refresh
-  useEffect(() => {
-    if (!ts || loading) return;
-    const checkStale = () => {
-      if (Date.now() - ts > BRIEFING_STALE_MS) {
-        const total = Object.values(arts).reduce((n,l)=>n+(l?.length||0),0);
-        if (total > 10) generate();
-      }
-    };
-    checkStale(); // D6: generate on demand when stale; no 5-min poll.
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [ts]);
+    const load = () => { try { const c = ld('briefingCache', null); if (c && c.date === new Date().toDateString()) { setBody(c.body || ''); setBullets(c.bullets || []); setTs(c.ts || null); } else { setBody(''); setBullets([]); setTs(null); } } catch {} };
+    load();
+    window.addEventListener('focus', load);
+    return () => window.removeEventListener('focus', load);
+  }, []);
 
   const tsLabel = useMemo(() => {
     if (!ts) return null;
@@ -6438,7 +6406,7 @@ OUTPUT: 3-sentence paragraph followed by exactly 3 bullets (- markers). No heade
             )
         }
         {!loading && !body && !error && bullets.length === 0 && (
-          <button className="briefing-sb-gen" onClick={onOpenFull}>Generate today's briefing →</button>
+          <button className="briefing-sb-gen" onClick={onOpenFull}>No briefing yet — open to generate →</button>
         )}
       </div>
     );
@@ -6599,34 +6567,77 @@ async function fetchPredictionMarkets(keywords) {
   } catch { return { markets: [] }; }
 }
 
+// F6: module-level cache + in-flight dedupe keyed by the keyword set. The sidebar can
+// remount PredictionMarkets several times while the feed loads; without this, each remount
+// would re-POST. The cache collapses concurrent/rapid remounts (same keywords) to ONE
+// network call, while a different category's keywords still miss and fetch fresh.
+let _pmCache = { key: null, markets: null, ts: 0 };
+let _pmInflight = {};
+const PM_TTL = 5 * 60 * 1000;
+function loadPredictionMarkets(kwKey) {
+  if (_pmCache.key === kwKey && Date.now() - _pmCache.ts < PM_TTL) return Promise.resolve(_pmCache.markets);
+  if (!_pmInflight[kwKey]) {
+    _pmInflight[kwKey] = fetchPredictionMarkets(kwKey.split('|')).then(r => {
+      const m = (r && r.markets) || [];
+      _pmCache = { key: kwKey, markets: m, ts: Date.now() };
+      delete _pmInflight[kwKey];
+      return m;
+    }).catch(() => { delete _pmInflight[kwKey]; return []; });
+  }
+  return _pmInflight[kwKey];
+}
+
 function PredictionMarkets({ keywords }) {
-  const [markets, setMarkets] = useState([]);
+  // F6: collapsed by default and persisted; the network request fires ONLY after the
+  // reader expands it (fetch-on-expand), so an idle load makes ZERO prediction-market
+  // requests. markets===null means "not loaded yet".
+  const [open, setOpen] = useState(() => ld('pmOpen', false));
+  const [markets, setMarkets] = useState(null);
+  const [loading, setLoading] = useState(false);
   const kwKey = (keywords || []).slice(0, 20).join('|');
+  useEffect(() => { sv('pmOpen', open); }, [open]);
   useEffect(() => {
+    if (!open) return;   // no fetch until expanded
+    if (!kwKey) return;  // wait for the feed to derive at least one keyword
     let alive = true;
-    fetchPredictionMarkets((kwKey ? kwKey.split('|') : [])).then(r => { if (alive) setMarkets((r && r.markets) || []); });
+    setLoading(true);
+    loadPredictionMarkets(kwKey).then(m => {
+      if (!alive) return;
+      setMarkets(m || []);
+      setLoading(false);
+    });
     return () => { alive = false; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [kwKey]);
-  if (!markets.length) return null;
+  }, [open, kwKey]);
   const probClass = p => p >= 60 ? 'pm-hi' : p <= 40 ? 'pm-lo' : 'pm-mid';
   return (
     <div className="sidebar-section pm-section">
       <div className="sidebar-sec-head">
-        <span className="sidebar-sec-label">Prediction Markets</span>
-        <span className="pm-tag">market sentiment · not news</span>
+        <button className="sidebar-sec-collapse" onClick={() => setOpen(o => !o)} aria-expanded={open}>
+          <span className="sidebar-sec-label">Prediction Markets</span>
+          <span className="gs-collapse-chevron" style={{ fontSize: '10px', color: 'var(--text4)' }}>{open ? '▾' : '▸'}</span>
+        </button>
       </div>
-      <div className="pm-list">
-        {markets.slice(0, 6).map((m, i) => (
-          <a key={i} className="pm-row" href={m.url} target="_blank" rel="noreferrer">
-            <span className={`pm-prob ${probClass(m.probability)}`}>{m.probability}%</span>
-            <span className="pm-body">
-              <span className="pm-q">{m.question}</span>
-              <span className="pm-src">{m.source}{m.matched ? '' : ' · trending'}</span>
-            </span>
-          </a>
-        ))}
-      </div>
+      {open && (
+        <>
+          <div className="pm-tagline">market sentiment · not news</div>
+          {loading && <div className="pm-empty">Loading markets…</div>}
+          {!loading && markets && markets.length === 0 && <div className="pm-empty">No active markets right now.</div>}
+          {!loading && markets && markets.length > 0 && (
+            <div className="pm-list">
+              {markets.slice(0, 6).map((m, i) => (
+                <a key={i} className="pm-row" href={m.url} target="_blank" rel="noreferrer">
+                  <span className={`pm-prob ${probClass(m.probability)}`}>{m.probability}%</span>
+                  <span className="pm-body">
+                    <span className="pm-q">{m.question}</span>
+                    <span className="pm-src">{m.source}{m.matched ? '' : ' · trending'}</span>
+                  </span>
+                </a>
+              ))}
+            </div>
+          )}
+        </>
+      )}
     </div>
   );
 }
@@ -6745,6 +6756,9 @@ function Sidebar({cat, arts, kw, health, activeKw, setActiveKw, activeSource, se
   const [showSources, setShowSources] = useState(false);
   const [showAllSrcs, setShowAllSrcs] = useState(false);
   useEffect(() => { if (activeSource) setShowSources(true); }, [activeSource]);
+  // F6: Trending is a secondary module — collapsed by default, state persisted.
+  const [trendOpen, setTrendOpen] = useState(() => ld('trendOpen', false));
+  useEffect(() => { sv('trendOpen', trendOpen); }, [trendOpen]);
 
   // Trending list respects active filters
   const sbItems = useMemo(() => {
@@ -6873,9 +6887,13 @@ function Sidebar({cat, arts, kw, health, activeKw, setActiveKw, activeSource, se
       {topicItems.length > 0 && (
         <div className="sidebar-section">
           <div className="sidebar-sec-head">
-            <span className="sidebar-sec-label">Trending</span>
-            {activeKw && <button className="sidebar-sec-action" onClick={()=>setActiveKw(null)}>Clear</button>}
+            <button className="sidebar-sec-collapse" onClick={()=>setTrendOpen(o=>!o)} aria-expanded={trendOpen}>
+              <span className="sidebar-sec-label">Trending · {topicItems.length}</span>
+              <span className="gs-collapse-chevron" style={{fontSize:'10px',color:'var(--text4)'}}>{trendOpen?'▾':'▸'}</span>
+            </button>
+            {activeKw && trendOpen && <button className="sidebar-sec-action" onClick={()=>setActiveKw(null)}>Clear</button>}
           </div>
+          {trendOpen && (
           <div className="ttp-chips">
             {topicItems.map((t, i) => {
               const followed = isTopicFollowed?.(t.label);
@@ -6898,6 +6916,7 @@ function Sidebar({cat, arts, kw, health, activeKw, setActiveKw, activeSource, se
               );
             })}
           </div>
+          )}
         </div>
       )}
 
@@ -8028,6 +8047,10 @@ function TopBar({tab, setTab, search, setSearch, dark, setDark,
                  scores, favTeams, onGoToSports}) {
   const [searchFocused, setSearchFocused] = useState(false);
   const [quotes, setQuotes] = useState({});
+  // F7: mobile market ticker is collapsible and DEFAULT-COLLAPSED (reclaims the ~34px
+  // strip at the top of a phone screen). Persisted; desktop always shows the ticker.
+  const [tickerOpen, setTickerOpen] = useState(() => ld('tickerOpen', false));
+  useEffect(() => { sv('tickerOpen', tickerOpen); }, [tickerOpen]);
   // D1: desktop search collapses to an icon (reclaims width for the nav); mobile
   // "More" chip opens a sheet holding Briefing/Podcasts/Sources/Saved.
   const [searchOpenDesktop, setSearchOpenDesktop] = useState(false);
@@ -8087,7 +8110,7 @@ function TopBar({tab, setTab, search, setSearch, dark, setDark,
   }, [tab]);
 
   return (
-    <div className={`topbar-wrap ${hidden?'hidden':''} ${shrunk?'shrunk':''}`}>
+    <div className={`topbar-wrap ${hidden?'hidden':''} ${shrunk?'shrunk':''} ${tickerOpen?'':'ticker-collapsed'}`}>
       {/* Unified status strip — collapses the old weather + ticker + breaking bars
           into one slim row: live/breaking signal LEFT, market ticker CENTER,
           compact weather chip RIGHT. Red is a signal here, never a texture. */}
@@ -8215,6 +8238,11 @@ function TopBar({tab, setTab, search, setSearch, dark, setDark,
             <div className="mobile-logo-sub">Daily briefing</div>
           </div>
           <div className="mobile-actions">
+            {/* F7: toggles the default-collapsed market ticker (mobile only). */}
+            <button className={`mobile-icon-btn mobile-ticker-toggle${tickerOpen?' on':''}`} onClick={()=>setTickerOpen(o=>!o)}
+              title={tickerOpen?'Hide markets':'Show markets'} aria-label={tickerOpen?'Hide market ticker':'Show market ticker'} aria-pressed={tickerOpen}>
+              <TrendingUp size={18} strokeWidth={2}/>
+            </button>
             <button className="mobile-icon-btn" onClick={onAnalyze} title="Analyze">
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><rect x="8" y="2" width="8" height="4" rx="1"/><line x1="9" y1="12" x2="15" y2="12"/><line x1="9" y1="16" x2="13" y2="16"/></svg>
             </button>
@@ -8249,7 +8277,8 @@ function TopBar({tab, setTab, search, setSearch, dark, setDark,
             return (
               <button key={c.key}
                 className={`chip ${isActive?'active':''}`}
-                style={isActive ? { background:c.color } : {}}
+                /* F5: the active chip uses the single accent, not each category's color
+                   (decorative rainbow removed). Styling lives in the .chip.active token rule. */
                 onClick={()=>{ setTab(c.key); }}>
                 {c.label}
               </button>
@@ -8257,7 +8286,6 @@ function TopBar({tab, setTab, search, setSearch, dark, setDark,
           })}
           {/* D1: More chip → sheet with Briefing/Podcasts/Sources/Saved. */}
           <button className={`chip chip-more ${MORE_SHEET_TABS.includes(tab)?'active':''}`}
-            style={MORE_SHEET_TABS.includes(tab)?{background:'#1a1a1a'}:{}}
             aria-haspopup="menu" aria-expanded={moreSheetOpen}
             onClick={()=>setMoreSheetOpen(true)}>
             More ▾
@@ -8556,12 +8584,36 @@ function AnalyzePanel({ onClose }) {
 // ─── ARTICLE READER ───────────────────────────────────────────────────────────
 // XPulse component now lives in ./modules/x-pulse
 
-function ArticleReader({ article, onClose, onAskInChat }) {
+function ArticleReader({ article, onClose, onAskInChat, related = [], onOpen }) {
   const [aiResult, setAiResult] = useState('');
   const [aiErr, setAiErr] = useState('');
   const [aiLoading, setAiLoading] = useState(false);
   const [aiMode, setAiMode] = useState(null);
   const [aiPreview, setAiPreview] = useState(false);
+  const dialogRef = useRef(null);
+  const closeRef = useRef(null);
+
+  // F9: focus trap + RETURN focus. Remember whatever was focused when the reader
+  // opened (the card/link), move focus into the dialog, keep Tab/Shift+Tab inside it,
+  // and restore focus to the opener on close. (Esc-to-close is wired globally.)
+  useEffect(() => {
+    const opener = document.activeElement;
+    const node = dialogRef.current;
+    closeRef.current?.focus();
+    const onKey = (e) => {
+      if (e.key !== 'Tab' || !node) return;
+      const f = node.querySelectorAll('a[href],button:not([disabled]),input,[tabindex]:not([tabindex="-1"])');
+      if (!f.length) return;
+      const first = f[0], last = f[f.length - 1];
+      if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
+      else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
+    };
+    node?.addEventListener('keydown', onKey);
+    return () => {
+      node?.removeEventListener('keydown', onKey);
+      if (opener && opener.focus) { try { opener.focus(); } catch {} }
+    };
+  }, []);
 
   // Fix: pass the real mode (summary/takeaways/bias) and read the {summary,error}
   // object fetchAISummary returns — previously it sent mode:'groq' (invalid) and
@@ -8578,13 +8630,21 @@ function ArticleReader({ article, onClose, onAskInChat }) {
 
   return (
     <div className="article-reader-overlay" onClick={e => { if (e.target === e.currentTarget) onClose(); }}>
-      <div className="article-reader">
-        <button className="article-reader-close" onClick={onClose} aria-label="Close">×</button>
+      <div className="article-reader" ref={dialogRef} role="dialog" aria-modal="true" aria-label={article.title}>
+        <button className="article-reader-close" ref={closeRef} onClick={onClose} aria-label="Close reader">×</button>
         {article.img && <img className="article-reader-img" src={article.img} alt="" loading="lazy"/>}
         <div className="article-reader-body">
+          {/* F9: header — source · time · Ask. Close is the top-right control (>=44px on mobile). */}
           <div className="article-reader-source">
-            {article.source}
+            <span>{article.source}</span>
             {article.pubDate && <span className="article-reader-date">· {fmtDate(article.pubDate)}</span>}
+            {onAskInChat && (
+              <button className="article-reader-ask" onClick={() => { onAskInChat(article); onClose(); }}
+                aria-label="Ask the assistant about this story">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+                Ask
+              </button>
+            )}
           </div>
           <h2 className="article-reader-title">{article.title}</h2>
           {article.desc && <p className="article-reader-desc">{article.desc}</p>}
@@ -8614,6 +8674,19 @@ function ArticleReader({ article, onClose, onAskInChat }) {
           )}
           {/* Phase 4: inline X Pulse under the summary (fails silently) */}
           <XPulse topic={article.title} variant="reader"/>
+          {/* F9: Related — 3–4 stories from EXISTING category/cluster data via the host's
+              getRelated() (keyword match over arts[cat]); NO new network fetch. */}
+          {related && related.length > 0 && (
+            <div className="article-reader-related">
+              <div className="section-label" style={{ color: 'var(--text3)', marginBottom: '8px' }}>Related</div>
+              {related.slice(0, 4).map((r, i) => (
+                <button key={r.link || i} className="article-reader-related-row" onClick={() => onOpen?.(r)}>
+                  <span className="arr-title">{r.title}</span>
+                  <span className="arr-src">{r.source}{r.pubDate ? ` · ${fmtDate(r.pubDate)}` : ''}</span>
+                </button>
+              ))}
+            </div>
+          )}
         </div>
       </div>
     </div>
@@ -9510,6 +9583,24 @@ export default function App() {
     const matched=kwMatch(a,cat);if(!matched.length)return[];
     return(arts[cat]||[]).filter(x=>x.link!==a.link&&matched.some(k=>(x.title+(x.desc||'')).toLowerCase().includes(k.toLowerCase()))).slice(0,4);
   };
+  // F9: related stories for the reader — EXISTING data only, no network fetch.
+  // (1) the story's own cluster members (from clusterStories' _clusterMembers), then
+  // (2) same-category siblings that share significant title words. Dedup, cap at 4.
+  const getReaderRelated = (a)=>{
+    if(!a) return [];
+    const self=a.link;
+    const members=(a._clusterMembers||[]).filter(x=>x&&x.link&&x.link!==self);
+    const cat=a.cat||tab||'general';
+    const pool=arts[cat]||[];
+    const words=(a.title||'').toLowerCase().split(/\W+/).filter(w=>w.length>4);
+    const sibs=pool
+      .filter(x=>x.link&&x.link!==self&&!members.some(m=>m.link===x.link))
+      .map(x=>{const t=(x.title+' '+(x.desc||'')).toLowerCase();return{x,n:words.reduce((s,w)=>s+(t.includes(w)?1:0),0)};})
+      .filter(o=>o.n>0).sort((p,q)=>q.n-p.n).map(o=>o.x);
+    const seen=new Set();const out=[];
+    for(const x of [...members,...sibs]){ if(!seen.has(x.link)){seen.add(x.link);out.push(x);} if(out.length>=4)break; }
+    return out;
+  };
 
   // Reading stats derived from clicks + readLinks
   const readingStats = useMemo(() => {
@@ -9843,7 +9934,7 @@ export default function App() {
                   : <div className="snap-feed">
                       {teamItems.slice(0,20).map((a,i)=>(
                         <Fragment key={a.link||i}>
-                          <SnapshotCard a={a} meta={CATS.sports} isSaved={isSavedFn(a)} onSave={onSave} onRead={onRead} onPerspectives={setPerspArticle} onAsk={setChatContext} formatDate={fmtDate} hideImage={i>=3}/>
+                          <SnapshotCard a={a} meta={CATS.sports} isSaved={isSavedFn(a)} onSave={onSave} onRead={onRead} onPerspectives={setPerspArticle} onAsk={setChatContext} formatDate={fmtDate} opinionLabel={opinionLabel(a)} hideImage={i>=3}/>
                           {i===2 && <XPulse topic={teamName} variant="feed"/>}
                         </Fragment>
                       ))}
@@ -10076,7 +10167,7 @@ export default function App() {
           : <div className="snap-feed">
               {entityItems.slice(0, 20).map((a, i) => (
                 <Fragment key={a.link || i}>
-                  <SnapshotCard a={a} meta={cc} isSaved={isSavedFn(a)} onSave={onSave} onRead={onRead} onPerspectives={setPerspArticle} onAsk={setChatContext} formatDate={fmtDate} hideImage={i>=3}/>
+                  <SnapshotCard a={a} meta={cc} isSaved={isSavedFn(a)} onSave={onSave} onRead={onRead} onPerspectives={setPerspArticle} onAsk={setChatContext} formatDate={fmtDate} opinionLabel={opinionLabel(a)} hideImage={i>=3}/>
                   {i === 2 && <XPulse topic={entity} variant="feed"/>}
                 </Fragment>
               ))}
@@ -10568,7 +10659,7 @@ export default function App() {
                   {cat==='tech' && !activeKw && !activeSrc && !search && <GithubSignal/>}
                   {(activeKw||activeSrc||search ? feedItems.slice(0,20) : dedupedFeed.slice(0,20)).map((a,i)=>(
                     <Fragment key={a.link||i}>
-                      <SnapshotCard a={a} meta={CATS[cat]||CATS.general} isSaved={isSavedFn(a)} onSave={onSave} onRead={onRead} onPerspectives={setPerspArticle} onAsk={setChatContext} formatDate={fmtDate} hideImage={i>=3} lead={i===0 && !activeKw && !activeSrc && !search}/>
+                      <SnapshotCard a={a} meta={CATS[cat]||CATS.general} isSaved={isSavedFn(a)} onSave={onSave} onRead={onRead} onPerspectives={setPerspArticle} onAsk={setChatContext} formatDate={fmtDate} opinionLabel={opinionLabel(a)} hideImage={i>=3} lead={i===0 && !activeKw && !activeSrc && !search}/>
                       {/* Review item 5: on mobile the category header moves BELOW the lead so
                           the lead is the first element in the body (desktop copy is hidden). */}
                       {i===0 && !activeKw && !activeSrc && !search && (
@@ -11350,7 +11441,7 @@ export default function App() {
                 :<div className="snap-feed" style={{padding:'12px 0 0'}}>
                     {newsItems.slice(0, 15).map((a, i) => (
                       <Fragment key={a.link||i}>
-                        <SnapshotCard a={a} meta={CATS.finance} isSaved={isSavedFn(a)} onSave={onSave} onRead={onRead} onPerspectives={setPerspArticle} onAsk={setChatContext} formatDate={fmtDate} hideImage={i>=3}/>
+                        <SnapshotCard a={a} meta={CATS.finance} isSaved={isSavedFn(a)} onSave={onSave} onRead={onRead} onPerspectives={setPerspArticle} onAsk={setChatContext} formatDate={fmtDate} opinionLabel={opinionLabel(a)} hideImage={i>=3}/>
                         {i===2 && <XPulse topic="Markets" variant="feed"/>}
                       </Fragment>
                     ))}
@@ -11467,7 +11558,8 @@ export default function App() {
       {/* D8: ?debug=1 scroll/render overlay (renders null unless the flag is on). */}
       <DebugOverlay/>
       {/* Inline article reader overlay */}
-      {readerArticle && <ArticleReader article={readerArticle} onClose={() => setReaderArticle(null)} onAskInChat={(a)=>setChatContext(a)}/>}
+      {readerArticle && <ArticleReader article={readerArticle} onClose={() => setReaderArticle(null)} onAskInChat={(a)=>setChatContext(a)}
+        related={getReaderRelated(readerArticle)} onOpen={(a)=>setReaderArticle(a)}/>}
       {/* Perspectives panel (sources + X Pulse + AI key points) */}
       {perspArticle && <PerspectivesPanel article={perspArticle} onClose={() => setPerspArticle(null)}/>}
       {/* Paste & Brief panel */}

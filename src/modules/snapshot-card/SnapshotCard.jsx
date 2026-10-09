@@ -22,35 +22,63 @@ import './SnapshotCard.css';
 
 const defaultFormatDate = d => { try { return new Date(d).toLocaleString(); } catch { return ''; } };
 
-export function SnapshotCard({ a, meta = {}, isSaved, onSave, onRead, onPerspectives, onAsk, formatDate = defaultFormatDate, hideImage = false, lead = false }) {
+export function SnapshotCard({ a, meta = {}, isSaved, onSave, onRead, onPerspectives, onAsk, formatDate = defaultFormatDate, hideImage = false, lead = false, opinionLabel = null }) {
   const color = meta.color;
   const bg = meta.bg;
   const [imgErr, setImgErr] = useState(false);
   const topKw = a.matchedKw?.[0] || null;
   const multi = a._clusterSize > 1;
+  // F2: a lead WITH an image renders as a hero — 16:9 cover image, a bottom-up dark
+  // gradient, and the source + headline overlaid in white (meta in one fixed position).
+  // The no-image lead keeps the D5 typographic treatment. Regular cards are unchanged.
+  const hasImg = a.img && !imgErr && !hideImage;
+  const heroImg = lead && hasImg;
   return (
-    <article className={`snap-card ${a.isAlert ? 'snap-breaking' : ''}${lead ? ' snap-lead' : ''}${lead && (!a.img || imgErr || hideImage) ? ' snap-lead-noimg' : ''}`} onClick={() => onRead(a)}>
+    <article className={`snap-card ${a.isAlert ? 'snap-breaking' : ''}${lead ? ' snap-lead' : ''}${lead && !hasImg ? ' snap-lead-noimg' : ''}${heroImg ? ' snap-lead-hero' : ''}`} onClick={() => onRead(a)}>
       <span className="snap-accent" style={{ background: color }} />
+      {heroImg && (
+        <div className="snap-hero-media">
+          <img className="snap-hero-img" src={a.img} loading="lazy" alt="" onError={() => setImgErr(true)} />
+          <div className="snap-hero-overlay">
+            <div className="snap-meta snap-hero-meta">
+              <span className="snap-hero-source">{a.source}</span>
+              {opinionLabel && <span className="snap-opinion">{opinionLabel}</span>}
+              {a.isAlert && <span className="snap-live">● LIVE</span>}
+              <span className="snap-hero-time">{formatDate(a.pubDate)}</span>
+            </div>
+            <h3 className="snap-title snap-hero-title">{a.title}</h3>
+          </div>
+        </div>
+      )}
       <div className="snap-main">
+        {!heroImg && (<>
         <div className="snap-meta">
           <span className="snap-source" style={{ color }}>{a.source}</span>
           <FollowSourceChip name={a.source} url={a.sourceUrl}/>
           {a.author && <span className="snap-byline">{a.author}</span>}
           {a.isAlert && <span className="snap-live">● LIVE</span>}
           <TierBadge item={a}/>
+          {opinionLabel && <span className="snap-opinion">{opinionLabel}</span>}
           {topKw && <span className="snap-tag" style={{ background: bg, color }}>{topKw}</span>}
-          <span className="snap-time">{formatDate(a.pubDate)}</span>
         </div>
         <h3 className="snap-title">{a.title}</h3>
+        </>)}
         {a.desc && <p className="snap-snippet">{a.desc}</p>}
+        {/* F3: ONE meta row — timestamp (+ sources) left, Ask/save right. The hero shows
+            its time in the overlay, so the foot omits it there to avoid duplication. */}
         <div className="snap-foot">
-          {multi
-            ? <button className="snap-sources snap-sources-btn"
+          <span className="snap-foot-left">
+            {!heroImg && <span className="snap-time">{formatDate(a.pubDate)}</span>}
+            {multi &&
+              <button className="snap-sources snap-sources-btn"
                 onClick={e => { e.stopPropagation(); onPerspectives?.(a); }}>
-                <strong>{a._clusterSize} sources</strong> · Perspectives
+                {/* F8: the "N sources" count reuses the shared .sources-tag pill (State of
+                    Play style); the button still opens Perspectives. */}
+                <span className="sources-tag">{a._clusterSize} sources</span>
+                <span className="snap-sources-cta">Perspectives</span>
                 <svg className="snap-cov-caret" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
-              </button>
-            : <span className="snap-single">{a.source}</span>}
+              </button>}
+          </span>
           <span className="snap-foot-actions">
             {/* D7: Ask the assistant about this specific story. */}
             {onAsk && (
@@ -67,7 +95,7 @@ export function SnapshotCard({ a, meta = {}, isSaved, onSave, onRead, onPerspect
           </span>
         </div>
       </div>
-      {a.img && !imgErr && !hideImage && <img className="snap-thumb" src={a.img} loading="lazy" alt="" onError={() => setImgErr(true)} />}
+      {!heroImg && hasImg && <img className="snap-thumb" src={a.img} loading="lazy" alt="" onError={() => setImgErr(true)} />}
     </article>
   );
 }

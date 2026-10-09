@@ -28,8 +28,9 @@
 /* Breaking rows folded in at the top (Pass L item 3): red pulse dot in place of the
    number + a "Breaking" tag, replacing the cramped status-strip marquee. */
 .sop-item-breaking .sop-item-title{font-weight:800;}
-.sop-brk-dot{width:8px;height:8px;min-width:8px;border-radius:50%;background:var(--red);align-self:center;margin:0 8px 0 8px;animation:sop-brk-pulse 1.8s ease-out infinite;}
-@keyframes sop-brk-pulse{0%{box-shadow:0 0 0 0 rgba(200,16,46,0.5);}70%{box-shadow:0 0 0 6px rgba(200,16,46,0);}100%{box-shadow:0 0 0 0 rgba(200,16,46,0);}}
+/* F6: stronger live indicator — larger dot, a solid red core and a wider pulse ring. */
+.sop-brk-dot{width:10px;height:10px;min-width:10px;border-radius:50%;background:var(--red);align-self:center;margin:0 8px 0 8px;box-shadow:0 0 0 2px rgba(200,16,46,0.25);animation:sop-brk-pulse 1.6s ease-out infinite;}
+@keyframes sop-brk-pulse{0%{box-shadow:0 0 0 0 rgba(200,16,46,0.6);}70%{box-shadow:0 0 0 8px rgba(200,16,46,0);}100%{box-shadow:0 0 0 0 rgba(200,16,46,0);}}
 .sop-brk-tag{font-family:var(--font-publicsans);font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:0.05em;color:#fff;background:var(--red);border-radius:10px;padding:2px 8px;white-space:nowrap;}
 .sop-sidebar .sop-brk-dot{margin-left:0;}
 @media(prefers-reduced-motion:reduce){ .sop-brk-dot{animation:none;} }
@@ -39,10 +40,12 @@
    (label + divider like other sidebar sections), with Coverage-Gap rows stacked
    for the narrow 32% column instead of an inline badge/outlets/Follow row. ── */
 .sop-sidebar{background:none;border:none;border-radius:0;padding:0;margin:0;}
-.sop-sidebar .sop-head{padding-bottom:9px;border-bottom:2px solid var(--border);margin-bottom:12px;gap:8px;align-items:center;}
-.sop-sidebar .sop-label{border-left:none;padding-left:0;font-family:var(--font-publicsans);font-size:10px;font-weight:800;color:var(--text3);letter-spacing:0.14em;}
+/* F6: SoP anchors the top of the rail — tighter header, a touch more label weight/ink
+   (text3 -> text2) and a thin accent rule so it reads as the lead module, not a peer. */
+.sop-sidebar .sop-head{padding-bottom:7px;border-bottom:2px solid var(--border);margin-bottom:9px;gap:8px;align-items:center;}
+.sop-sidebar .sop-label{border-left:none;padding-left:0;font-family:var(--font-publicsans);font-size:10px;font-weight:800;color:var(--text2);letter-spacing:0.14em;}
 .sop-sidebar .sop-collapse{margin-left:auto;}
-.sop-sidebar .sop-item{flex-wrap:wrap;align-items:flex-start;padding:9px 0;gap:3px 8px;}
+.sop-sidebar .sop-item{flex-wrap:wrap;align-items:flex-start;padding:7px 0;gap:3px 8px;}
 /* D4: tokenized (was 13px) — sidebar rows track the main body scale. */
 .sop-sidebar .sop-num{font-size:var(--fs-body);min-width:18px;}
 .sop-sidebar .sop-item-title{font-size:var(--fs-body);line-height:1.32;}

@@ -2,6 +2,32 @@
    `.snap-feed` is the list container consumers wrap cards in. `#fff` on the LIVE
    badge is an intentional contrast literal (white on the red badge in both themes). */
 .snap-feed{display:flex;flex-direction:column;gap:14px;}
+/* F2: standardized HERO (a lead with an image). 16:9 cover, bottom-up dark gradient,
+   white source/headline overlaid in one fixed position; headline clamped to 3 lines.
+   The deck + Ask/Save render below in the normal card flow. */
+.snap-lead-hero{flex-direction:column;border:none;border-radius:0;background:none;box-shadow:none;}
+.snap-lead-hero:hover{transform:none;box-shadow:none;}
+.snap-lead-hero .snap-accent{display:none;}
+.snap-hero-media{position:relative;width:100%;aspect-ratio:16/9;overflow:hidden;border-radius:10px;}
+.snap-hero-img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;display:block;background:var(--surface2);}
+.snap-hero-overlay{position:absolute;inset:0;display:flex;flex-direction:column;justify-content:flex-end;padding:16px;
+  /* >=0.70 opacity across the whole text band (bottom ~45%) so white passes 4.5:1 even on a bright image */
+  background:linear-gradient(to top, rgba(0,0,0,0.88) 0%, rgba(0,0,0,0.80) 28%, rgba(0,0,0,0.45) 52%, rgba(0,0,0,0) 72%);}
+.snap-hero-meta{display:flex;align-items:center;gap:8px;margin-bottom:6px;}
+.snap-hero-overlay .snap-hero-source{font-family:var(--font-publicsans);font-size:var(--fs-meta);font-weight:800;text-transform:uppercase;letter-spacing:0.06em;color:#fff;}
+.snap-hero-overlay .snap-hero-time{font-family:var(--font-publicsans);font-size:var(--fs-meta);color:rgba(255,255,255,0.85);}
+/* Scoped under the overlay so white reliably beats the equal-specificity, later-in-source
+   `.snap-title{color:var(--text)}` on this same element (the title carries both classes). */
+.snap-hero-overlay .snap-hero-title{color:#fff;font-family:var(--font-archivo);font-weight:800;font-size:24px;line-height:1.14;letter-spacing:-0.3px;margin:0;
+  display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden;text-shadow:0 1px 4px rgba(0,0,0,0.35);}
+.snap-lead-hero .snap-main{padding:10px 0 12px;}
+.snap-lead-hero .snap-snippet{font-size:var(--fs-body);-webkit-line-clamp:2;}
+@media(max-width:640px){
+  /* Mobile: hero image full-bleed; only the TEXT block keeps the 16px side padding. */
+  .snap-lead-hero .snap-hero-media{width:100vw;max-width:none;margin:0 -16px;border-radius:0;}
+  .snap-lead-hero .snap-main{padding:10px 0 14px;}
+  .snap-hero-overlay .snap-hero-title{font-size:22px;}
+}
 .snap-card{display:flex;background:var(--surface);border:1px solid var(--border);border-radius:10px;overflow:hidden;cursor:pointer;transition:transform 0.14s,box-shadow 0.14s;}
 .snap-card:hover{transform:translateY(-2px);box-shadow:0 6px 20px rgba(0,0,0,0.09);}
 .snap-accent{width:4px;flex-shrink:0;}
@@ -11,16 +37,25 @@
 .snap-source{font-family:var(--font-publicsans);font-size:var(--fs-meta);font-weight:700;text-transform:uppercase;letter-spacing:0.05em;}
 .snap-live{font-family:var(--font-publicsans);font-size:9px;font-weight:800;color:#fff;background:var(--red);border-radius:4px;padding:2px 6px;letter-spacing:0.06em;}
 .snap-tag{font-family:var(--font-publicsans);font-size:10px;font-weight:700;border-radius:20px;padding:2px 9px;text-transform:uppercase;letter-spacing:0.03em;}
-.snap-time{font-family:var(--font-publicsans);font-size:var(--fs-meta);color:var(--text3);margin-left:auto;}
+/* F8: Opinion/Analysis label — rules-only metadata, styled as a neutral OUTLINE tag so it
+   never reads as a trust tier/category (no fill, no accent). */
+.snap-opinion{font-family:var(--font-publicsans);font-size:9px;font-weight:800;text-transform:uppercase;letter-spacing:0.06em;color:var(--text3);border:1px solid var(--border);border-radius:4px;padding:1px 6px;white-space:nowrap;}
+.snap-hero-overlay .snap-opinion{color:#fff;border-color:rgba(255,255,255,0.55);}
+.snap-time{font-family:var(--font-publicsans);font-size:var(--fs-meta);color:var(--text3);}
+/* F3: single meta row — time (+ sources) left, actions right. */
+.snap-foot-left{display:inline-flex;align-items:center;gap:10px;min-width:0;flex-wrap:wrap;}
 .snap-title{font-family:var(--font-archivo);font-weight:800;font-size:18px;line-height:1.22;letter-spacing:-0.2px;color:var(--text);margin:0 0 6px;overflow-wrap:anywhere;word-break:break-word;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden;}
 .snap-snippet{font-family:var(--font-publicsans);font-size:var(--fs-body);line-height:1.5;color:var(--text2);margin:0 0 10px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;overflow-wrap:anywhere;word-break:break-word;}
+/* F5: mobile deck/summary text = 14px / 1.5 (headlines unchanged, dense list rows unchanged). */
+@media(max-width:640px){ .snap-snippet{font-size:14px;line-height:1.5;} }
 .snap-byline{font-family:var(--font-publicsans);font-size:var(--fs-meta);color:var(--text3);}
 .snap-byline::before{content:"·";margin-right:5px;color:var(--text4);}
 .snap-foot{display:flex;align-items:center;justify-content:space-between;gap:10px;}
 /* Full Coverage — "N sources" is a tappable disclosure that lists every article in
    the cluster (publisher · byline · relative time), max 2 per publisher then Show all. */
-.snap-sources-btn{background:none;border:none;cursor:pointer;font-family:inherit;display:inline-flex;align-items:center;gap:4px;padding:2px 0;}
-.snap-sources-btn:hover{color:var(--accent);}
+.snap-sources-btn{background:none;border:none;cursor:pointer;font-family:inherit;display:inline-flex;align-items:center;gap:6px;padding:2px 0;}
+.snap-sources-cta{font-family:var(--font-publicsans);font-size:var(--fs-meta);color:var(--text3);}
+.snap-sources-btn:hover .snap-sources-cta{color:var(--accent);}
 .snap-cov-caret{transition:transform 0.15s;}
 .snap-cov-caret.open{transform:rotate(180deg);}
 .snap-coverage{margin-top:10px;border-top:1px solid var(--border2);padding-top:10px;animation:fade-in 0.15s ease-out;}
@@ -87,7 +122,7 @@
   .snap-lead .snap-thumb{order:-1;width:100vw;max-width:100%;height:auto;aspect-ratio:3/2;margin:0 -16px;border-radius:0;align-self:stretch;}
   .snap-lead .snap-main{padding:14px 0 16px;}
   .snap-lead .snap-title{font-family:var(--font-archivo);font-size:26px;line-height:1.12;letter-spacing:-0.3px;-webkit-line-clamp:4;}
-  .snap-lead .snap-snippet{display:-webkit-box;font-size:var(--fs-body);-webkit-line-clamp:2;margin-bottom:8px;}
+  .snap-lead .snap-snippet{display:-webkit-box;font-size:14px;line-height:1.5;-webkit-line-clamp:2;margin-bottom:8px;}
   /* D5 fix 2: typographic lead fallback — no image box. Small-caps kicker (the source)
      + oversized serif headline + one meta line, filling a similar height budget. */
   .snap-lead-noimg{min-height:220px;justify-content:center;padding:8px 0 16px;border-bottom:2px solid var(--border);}

@@ -78,7 +78,7 @@ export function StateOfPlay({ items, meta = {}, onRead, onAsk, formatDate = defa
             <span className="sop-num" style={{ color }}>{String(i + 1).padStart(2, '0')}</span>
             <span className="sop-item-title">{a.title}</span>
             <span className="sop-item-meta">
-              {a._clusterSize > 1 && <span className="sop-item-sources">{a._clusterSize} sources</span>}
+              {a._clusterSize > 1 && <span className="sources-tag sop-item-sources">{a._clusterSize} sources</span>}
               <span className="sop-item-time">{formatDate(a.pubDate)}</span>
               {onAsk && <button className="sop-ask" onClick={e => { e.stopPropagation(); onAsk(a); }} aria-label="Ask about this story" title="Ask the assistant">Ask</button>}
             </span>
