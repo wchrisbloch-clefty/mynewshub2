@@ -4889,7 +4889,7 @@ kbd{display:inline-block;padding:1px 5px;border:1px solid var(--border);border-r
   text-transform:uppercase;letter-spacing:0.12em;
   display:flex;align-items:center;gap:6px;
 }
-.home-scores-label::before{content:'●';color:var(--green);font-size:7px;animation:score-pulse 2s ease-in-out infinite;}
+.home-scores-label.is-live::before{content:'●';color:var(--red);font-size:7px;animation:score-pulse 2s ease-in-out infinite;}
 @keyframes score-pulse{0%,100%{opacity:1;}50%{opacity:0.4;}}
 .home-scores-see-all{
   font-size:10px;font-weight:600;color:var(--text3);
@@ -5829,14 +5829,14 @@ function ScoreTile({ g }) {
           <ScoreLogo url={g.awayLogo} abbr={away}/>
           <span className={`score-tile-team ${awayLead ? 'win' : ''}`}>{away}</span>
         </span>
-        <span className={`score-tile-score ${awayLead ? 'win' : ''}`}>{g.awayScore || '—'}</span>
+        <span className={`score-tile-score ${awayLead ? 'win' : ''}`}>{(live || final) ? g.awayScore : '—'}</span>
       </div>
       <div className="score-tile-row">
         <span className="score-tile-side">
           <ScoreLogo url={g.homeLogo} abbr={home}/>
           <span className={`score-tile-team ${homeLead ? 'win' : ''}`}>{home}</span>
         </span>
-        <span className={`score-tile-score ${homeLead ? 'win' : ''}`}>{g.homeScore || '—'}</span>
+        <span className={`score-tile-score ${homeLead ? 'win' : ''}`}>{(live || final) ? g.homeScore : '—'}</span>
       </div>
       <div className={`score-tile-status ${live ? 'live' : final ? 'final' : 'pre'}`}>
         {live && <span className="score-tile-dot"/>}
@@ -5856,19 +5856,22 @@ function ActiveScoresBar({ scores, onGoToSports, favTeams }) {
     Object.entries(scores || {}).forEach(([key, gs]) =>
       (gs || []).filter(isGameActive).forEach(g => all.push({ ...g, _league: key })));
     if (!all.length) return [];
-    const isLive = g => g.state === 'in';
+    // I0.2: sort live first, then favourites, then upcoming by kickoff time, finals last.
+    const rank = g => g.state === 'in' ? 0 : g._fav ? 1 : g.state === 'pre' ? 2 : 3;
     return all
       .map(g => ({ ...g, _fav: !!favoriteInList(g, favTeams || []), _leagueLabel: SCORE_LEAGUE_LABEL[g._league] || (g._league || '').toUpperCase() }))
-      .sort((a, b) => ((a._fav ? 0 : 1) - (b._fav ? 0 : 1)) || ((isLive(a) ? 0 : 1) - (isLive(b) ? 0 : 1)))
+      .sort((a, b) => rank(a) - rank(b) || (new Date(a.date) - new Date(b.date)))
       .slice(0, 12);
   }, [scores, favTeams]);
 
+  const anyLive = games.some(g => g.state === 'in');
   if (!games.length) return null;
 
   return (
     <div className="home-scores">
       <div className="home-scores-head">
-        <span className="home-scores-label">Live Scores</span>
+        {/* I0.2: "LIVE SCORES" + pulsing dot only when a game is live; else plain "SCORES". */}
+        <span className={`home-scores-label${anyLive ? ' is-live' : ''}`}>{anyLive ? 'Live Scores' : 'Scores'}</span>
         <button className="home-scores-see-all" onClick={onGoToSports}>Sports →</button>
       </div>
       <div className="score-strip-scroll home-scores-scroll">
