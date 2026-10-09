@@ -65,7 +65,8 @@ const ChatBot = lazy(() => import('./modules/concierge').then(m => ({ default: m
 const prefetchLazy = () => { import('./modules/concierge'); import('./modules/voices/ResolveModal'); };
 // Icons: single set (lucide-react), fixed size per context — item 7.
 import { Settings, RefreshCw, Moon, Sun, User,
-  Zap, Droplet, Leaf, TrendingUp, Scale, LayoutGrid, Film, Music, BookOpen, Laugh, Trophy } from 'lucide-react';
+  Zap, Droplet, Leaf, TrendingUp, Scale, LayoutGrid, Film, Music, BookOpen, Laugh, Trophy,
+  ChevronDown, X as XIcon, ExternalLink, Sparkles, Star, Check, ArrowRight } from 'lucide-react';
 import { isCloudSyncEnabled, getUserId, signInWithEmail, signOut, onAuthStateChange, loadProfileFromCloud, saveProfileToCloud, emitEvent } from './lib/cloudSync';
 
 // ─── CATEGORIES ───────────────────────────────────────────────────────────────
@@ -540,12 +541,12 @@ function FollowAdd({ isFollowingTeam, isTopicFollowed, onAddTeam, onAddTopic, on
               <TeamLogo name={t.name} league={t.league} size={20}/>
               <span className="follow-add-name">{t.name}</span>
               <span className="follow-add-league">{t.league.toUpperCase()}</span>
-              <span className="follow-add-star">{isFollowingTeam(t) ? '★' : '☆'}</span>
+              <span className="follow-add-star"><Star size={12} aria-hidden="true" fill={isFollowingTeam(t)?'currentColor':'none'}/></span>
             </button>
           ))}
           <button className="follow-add-item follow-add-topic" onClick={() => { onAddTopic(q.trim()); setQ(''); }}>
             <span className="follow-add-name">Follow topic “{q.trim()}”</span>
-            <span className="follow-add-star">{isTopicFollowed(q.trim()) ? '★' : '☆'}</span>
+            <span className="follow-add-star"><Star size={12} aria-hidden="true" fill={isTopicFollowed(q.trim())?'currentColor':'none'}/></span>
           </button>
         </div>
       )}
@@ -5789,7 +5790,7 @@ function AudioListen({ text, title }) {
       {listening ? (
         <><span className="listen-wave"><span className="listen-bar"/><span className="listen-bar"/><span className="listen-bar"/><span className="listen-bar"/><span className="listen-bar"/></span> Stop</>
       ) : (
-        <><span>♪</span> Listen</>
+        <><Music size={13} aria-hidden="true"/> Listen</>
       )}
     </button>
   );
@@ -5820,7 +5821,7 @@ function ScoreTile({ g }) {
   return (
     <div className={`score-tile ${live ? 'live' : ''} ${g._fav ? 'fav' : ''}`}
       onClick={() => g.link && window.open(g.link, '_blank')}>
-      {g._fav && <span className="score-tile-star" title="Following">★</span>}
+      {g._fav && <Star className="score-tile-star" size={9} fill="currentColor" aria-hidden="true"/>}
       <div className="score-tile-row">
         <span className="score-tile-side">
           <ScoreLogo url={g.awayLogo} abbr={away}/>
@@ -6034,19 +6035,19 @@ function FeedCard({a, cat, isSaved, onSave, onRead, relatedSources, isRead, user
           )}
           {/* What actually happened */}
           <div className="fc-summary">
-            <div className="fc-summary-lbl">✦ What Happened</div>
+            <div className="fc-summary-lbl"><Sparkles size={13} aria-hidden="true"/> What Happened</div>
             {loadingAI && !summary
               ? <div className="fc-ai-skeleton"><span/><span/><span style={{width:'70%'}}/></div>
               : aiErr && !summary
                 ? <div className="fc-ai-error">
                     <span className="fc-ai-error-msg">{aiErr}</span>
-                    <button className="fc-ai-retry" onClick={retryAI}>↻ Retry</button>
+                    <button className="fc-ai-retry" onClick={retryAI}><RefreshCw size={12} aria-hidden="true"/> Retry</button>
                   </div>
                 : summary
                   ? <div className="fc-summary-text">{summary}</div>
                   : <div className="fc-ai-error">
                       <span className="fc-ai-error-msg">No summary available for this story.</span>
-                      <button className="fc-ai-retry" onClick={retryAI}>↻ Retry</button>
+                      <button className="fc-ai-retry" onClick={retryAI}><RefreshCw size={12} aria-hidden="true"/> Retry</button>
                     </div>}
           </div>
           {/* Key points (3 bullets) */}
@@ -6119,7 +6120,7 @@ function FeedCard({a, cat, isSaved, onSave, onRead, relatedSources, isRead, user
         {actionsOpen && (
           <div className="fc-expanded-actions">
             <button className={`fc-act ${aiState!=='closed'?'ai-on':''}`} onClick={handleAI} disabled={loadingAI}>
-              ✦ {loadingAI?'Thinking...':aiState==='closed'?'AI Summary':'Hide AI'}
+              <Sparkles size={13} aria-hidden="true"/> {loadingAI?'Thinking...':aiState==='closed'?'AI Summary':'Hide AI'}
             </button>
             <button className={`fc-act ${showDisc?'disc-on':''}`} onClick={handleDisc} disabled={loadingDisc}>
               {loadingDisc?'Searching...':showDisc?'Hide Pulse':'Pulse'}
@@ -6132,7 +6133,7 @@ function FeedCard({a, cat, isSaved, onSave, onRead, relatedSources, isRead, user
           </div>
         )}
         <a className="fc-read-link" href={a.link} target="_blank" rel="noreferrer" onClick={e=>e.stopPropagation()}>
-          {readMins ? `${readMins} min · ` : ''}Full Story ↗
+          {readMins ? `${readMins} min · ` : ''}Full Story <ExternalLink size={12} aria-hidden="true" style={{verticalAlign:"-1px"}}/>
         </a>
       </div>
     </div>
@@ -6169,7 +6170,7 @@ function TodayItem({a, cc, onRead}) {
           <div className="today-item-src">{a.source} · {fmtDate(a.pubDate)}</div>
         </div>
         <button className={`today-ai-btn ${showSum?'on':''}`} title="AI Summary" onClick={handleAI} disabled={loading}>
-          {loading?'…':'✦'}
+          {loading?'…':<Sparkles size={13} aria-hidden="true"/>}
         </button>
         <ShareControl className="today-share" title={a.title} url={a.link} source={a.source}/>
       </div>
@@ -6328,7 +6329,7 @@ Output ONLY the paragraph followed by the bullets. No headers, no labels, no clo
         {/* F4: ONE button — Generate when no briefing exists for today, Refresh otherwise.
             Disabled while running (debounces double taps); one press = one generation. */}
         <button className="briefing-inline-refresh-btn" onClick={generate} disabled={loading}>
-          {loading ? 'Generating…' : body ? '↻ Refresh briefing' : "Generate today's briefing"}
+          {loading ? 'Generating…' : body ? <><RefreshCw size={12} aria-hidden="true"/> Refresh briefing</> : "Generate today's briefing"}
         </button>
       </div>
       <div className="briefing-inline-sources">
@@ -6488,7 +6489,7 @@ function Scoreboard({scores, loading, compact=false, favTeams}) {
           <span className={`sb-num ${homeWin?'winner':final?'loser':''}`}>{g.homeScore||'—'}</span>
         </div>
         <div className={`sb-status ${live?'live':final?'final':'pre'}`}>
-          {isFav&&<span className="sb-fav-star">★</span>}
+          {isFav&&<Star className="sb-fav-star" size={10} fill="currentColor" aria-hidden="true"/>}
           {live?'● LIVE · ':''}{g.status||fmtDate(g.date)}
         </div>
       </div>
@@ -6518,7 +6519,7 @@ function Scoreboard({scores, loading, compact=false, favTeams}) {
         <span className="sb-box-title">Scoreboard</span>
         <span className="sb-box-sub">
           {totalLive>0 && <span className="sb-live-pill">● {totalLive} LIVE</span>}
-          <span className="sb-collapse-chev">{collapsed?'▸':'▾'}</span>
+          <span className="sb-collapse-chev"><ChevronDown size={11} aria-hidden="true" style={{transform:collapsed?'rotate(-90deg)':'none',transition:"transform .15s"}}/></span>
         </span>
       </button>
       {!collapsed && leaguesToShow.map(L => {
@@ -6543,7 +6544,7 @@ function Scoreboard({scores, loading, compact=false, favTeams}) {
                 <span>{sorted.length} {sorted.length===1?'game':'games'}</span>
                 {favCount>0&&<span className="sb-league-fav">★ {favCount}</span>}
               </span>
-              <span className="sb-chevron">{isOpen?'▾':'▸'}</span>
+              <span className="sb-chevron"><ChevronDown size={11} aria-hidden="true" style={{transform:isOpen?'none':'rotate(-90deg)',transition:"transform .15s"}}/></span>
             </button>
             {isOpen&&sorted.length>0&&(
               <div className="sb-games">
@@ -6623,7 +6624,7 @@ function PredictionMarkets({ keywords }) {
       <div className="sidebar-sec-head">
         <button className="sidebar-sec-collapse" onClick={() => setOpen(o => !o)} aria-expanded={open}>
           <span className="sidebar-sec-label">Prediction Markets</span>
-          <span className="gs-collapse-chevron" style={{ fontSize: '10px', color: 'var(--text4)' }}>{open ? '▾' : '▸'}</span>
+          <span className="gs-collapse-chevron" style={{ fontSize: '10px', color: 'var(--text4)' }}><ChevronDown size={11} aria-hidden="true" style={{transform:open?'none':'rotate(-90deg)',transition:"transform .15s"}}/></span>
         </button>
       </div>
       {open && (
@@ -6676,7 +6677,7 @@ function SourceDirectory({ cat, feeds, onToggleFeed }) {
       <div className="sidebar-sec-head">
         <button className="sidebar-sec-collapse" onClick={() => setOpen(o => !o)} aria-expanded={open}>
           <span className="sidebar-sec-label">Source Directory · {onCount}/{list.length}</span>
-          <span className="gs-collapse-chevron" style={{ fontSize: '10px', color: 'var(--text4)' }}>{open ? '▾' : '▸'}</span>
+          <span className="gs-collapse-chevron" style={{ fontSize: '10px', color: 'var(--text4)' }}><ChevronDown size={11} aria-hidden="true" style={{transform:open?'none':'rotate(-90deg)',transition:"transform .15s"}}/></span>
         </button>
       </div>
       {open && (
@@ -6732,7 +6733,7 @@ function GithubSignal() {
       <div className="ghs-head">
         <span className="ghs-badge">◆ GitHub</span>
         <span className="ghs-note">alternative perspective · inferred, unverified street signal</span>
-        <button className="ghs-close" onClick={() => setOpen(false)} aria-label="Hide GitHub signal">×</button>
+        <button className="ghs-close" onClick={() => setOpen(false)} aria-label="Hide GitHub signal"><XIcon size={16} aria-hidden="true"/></button>
       </div>
       {loading && <div className="ghs-loading">Checking GitHub…</div>}
       {!loading && repos && repos.length > 0 && (
@@ -6817,8 +6818,8 @@ function Sidebar({cat, arts, kw, health, activeKw, setActiveKw, activeSource, se
     <div className="sidebar">
       {(activeKw||activeSource) && (
         <div className="gs-filter">
-          {activeKw && <><span className="gs-filter-label">{activeKw}</span><button className="gs-filter-x" onClick={()=>setActiveKw(null)}>✕</button></>}
-          {activeSource && <><span className="gs-filter-label" style={{color:cc.color}}>{activeSource}</span><button className="gs-filter-x" style={{color:cc.color}} onClick={()=>setActiveSource(null)}>✕</button></>}
+          {activeKw && <><span className="gs-filter-label">{activeKw}</span><button className="gs-filter-x" onClick={()=>setActiveKw(null)}><XIcon size={13} aria-hidden="true"/></button></>}
+          {activeSource && <><span className="gs-filter-label" style={{color:cc.color}}>{activeSource}</span><button className="gs-filter-x" style={{color:cc.color}} onClick={()=>setActiveSource(null)}><XIcon size={13} aria-hidden="true"/></button></>}
         </div>
       )}
 
@@ -6911,7 +6912,7 @@ function Sidebar({cat, arts, kw, health, activeKw, setActiveKw, activeSource, se
           <div className="sidebar-sec-head">
             <button className="sidebar-sec-collapse" onClick={()=>setTrendOpen(o=>!o)} aria-expanded={trendOpen}>
               <span className="sidebar-sec-label">Trending · {topicItems.length}</span>
-              <span className="gs-collapse-chevron" style={{fontSize:'10px',color:'var(--text4)'}}>{trendOpen?'▾':'▸'}</span>
+              <span className="gs-collapse-chevron" style={{fontSize:'10px',color:'var(--text4)'}}><ChevronDown size={11} aria-hidden="true" style={{transform:trendOpen?'none':'rotate(-90deg)',transition:"transform .15s"}}/></span>
             </button>
             {activeKw && trendOpen && <button className="sidebar-sec-action" onClick={()=>setActiveKw(null)}>Clear</button>}
           </div>
@@ -6932,7 +6933,7 @@ function Sidebar({cat, arts, kw, health, activeKw, setActiveKw, activeSource, se
                   {toggleTopic && (
                     <button type="button" className={`ttp-chip-star${followed?' on':''}`}
                       onClick={()=>toggleTopic(t.label)} aria-pressed={followed}
-                      aria-label={followed?`Unfollow ${t.label}`:`Follow ${t.label}`}>{followed?'★':'☆'}</button>
+                      aria-label={followed?`Unfollow ${t.label}`:`Follow ${t.label}`}><Star size={11} aria-hidden="true" fill={followed?'currentColor':'none'}/></button>
                   )}
                 </span>
               );
@@ -6964,7 +6965,7 @@ function Sidebar({cat, arts, kw, health, activeKw, setActiveKw, activeSource, se
               <span className="sidebar-sec-label">
                 {activeSource ? `Source: ${activeSource}` : `Sources · ${sources.length}`}
               </span>
-              <span className="gs-collapse-chevron" style={{fontSize:'10px',color:'var(--text4)'}}>{showSources?'▾':'▸'}</span>
+              <span className="gs-collapse-chevron" style={{fontSize:'10px',color:'var(--text4)'}}><ChevronDown size={11} aria-hidden="true" style={{transform:showSources?'none':'rotate(-90deg)',transition:"transform .15s"}}/></span>
             </button>
             {activeSource && showSources && <button className="sidebar-sec-action" onClick={()=>setActiveSource(null)}>Clear</button>}
           </div>
@@ -7143,7 +7144,7 @@ function CustomizePanel({feeds, kw, alerts, urgent, social, watchlist, teams, he
   return (
     <div className="cp-overlay" onClick={onClose}>
       <div className="cp-panel" onClick={e=>e.stopPropagation()}>
-        <div className="cp-head"><span className="cp-title">Customize</span><button className="cp-x" onClick={onClose}>✕</button></div>
+        <div className="cp-head"><span className="cp-title">Customize</span><button className="cp-x" onClick={onClose}><XIcon size={13} aria-hidden="true"/></button></div>
         <div className="cp-body">
           <div className="cp-sec-tabs">
             {['keywords','alerts','sources','social','voices','watchlist','teams','datastrip','briefing'].map(t=>(
@@ -7159,7 +7160,7 @@ function CustomizePanel({feeds, kw, alerts, urgent, social, watchlist, teams, he
               <div className="cp-desc">Keywords boost matching articles to the top and appear as clickable topic chips in the sidebar.</div>
               <div className="cp-cat-tabs">{Object.keys(CAT_LABELS).map(c=><button key={c} className={`cp-cat-tab ${kwTab===c?'active':''}`} onClick={()=>setKwTab(c)}>{CAT_LABELS[c]}</button>)}</div>
               <div className="cp-chips">
-                {(lk[kwTab]||[]).map((k,i)=><span key={i} className="cp-chip cp-chip-kw">{k}<button className="cp-chip-x" onClick={()=>setLk(p=>{const n={...p};n[kwTab]=n[kwTab].filter((_,j)=>j!==i);return n;})}>✕</button></span>)}
+                {(lk[kwTab]||[]).map((k,i)=><span key={i} className="cp-chip cp-chip-kw">{k}<button className="cp-chip-x" onClick={()=>setLk(p=>{const n={...p};n[kwTab]=n[kwTab].filter((_,j)=>j!==i);return n;})}><XIcon size={13} aria-hidden="true"/></button></span>)}
                 {(lk[kwTab]||[]).length===0&&<span style={{fontSize:'11px',color:'var(--text3)'}}>No keywords yet</span>}
               </div>
               <div className="cp-add">
@@ -7175,7 +7176,7 @@ function CustomizePanel({feeds, kw, alerts, urgent, social, watchlist, teams, he
               <div className="cp-lbl">Breaking News Ticker Words</div>
               <div className="cp-desc">Red scrolling ticker fires only on these words. Keep short and urgent-only — disasters, major incidents, crashes. Routine words create noise.</div>
               <div className="cp-chips">
-                {lu.map((u,i)=><span key={i} className="cp-chip cp-chip-alert">{u}<button className="cp-chip-x" onClick={()=>setLu(x=>x.filter((_,j)=>j!==i))}>✕</button></span>)}
+                {lu.map((u,i)=><span key={i} className="cp-chip cp-chip-alert">{u}<button className="cp-chip-x" onClick={()=>setLu(x=>x.filter((_,j)=>j!==i))}><XIcon size={13} aria-hidden="true"/></button></span>)}
                 {lu.length===0&&<span style={{fontSize:'11px',color:'var(--text3)'}}>No urgent words — ticker off</span>}
               </div>
               <div className="cp-add">
@@ -7187,7 +7188,7 @@ function CustomizePanel({feeds, kw, alerts, urgent, social, watchlist, teams, he
                 <div className="cp-lbl">Keyword Highlights</div>
                 <div className="cp-desc">Articles matching these show a badge but don't trigger the ticker. Use for routine tracking: team names, company names, etc.</div>
                 <div className="cp-chips">
-                  {la.map((a,i)=><span key={i} className="cp-chip cp-chip-kw">{a}<button className="cp-chip-x" onClick={()=>setLa(x=>x.filter((_,j)=>j!==i))}>✕</button></span>)}
+                  {la.map((a,i)=><span key={i} className="cp-chip cp-chip-kw">{a}<button className="cp-chip-x" onClick={()=>setLa(x=>x.filter((_,j)=>j!==i))}><XIcon size={13} aria-hidden="true"/></button></span>)}
                 </div>
               </div>
             </div>
@@ -7215,7 +7216,7 @@ function CustomizePanel({feeds, kw, alerts, urgent, social, watchlist, teams, he
                       {cnt>0&&<span className="cp-src-count">{cnt}</span>}
                       <button className="cp-test-btn" onClick={()=>testFeed(f.url,tk)}>Test</button>
                       <button className={`cp-tog ${f.on?'on':'off'}`} onClick={()=>setLf(prev=>{const n=JSON.parse(JSON.stringify(prev));n[srcTab][i].on=!n[srcTab][i].on;return n;})}/>
-                      <button className="cp-del" onClick={()=>setLf(prev=>{const n=JSON.parse(JSON.stringify(prev));n[srcTab].splice(i,1);return n;})}>✕</button>
+                      <button className="cp-del" onClick={()=>setLf(prev=>{const n=JSON.parse(JSON.stringify(prev));n[srcTab].splice(i,1);return n;})}><XIcon size={13} aria-hidden="true"/></button>
                     </div>
                     <TestResult tkey={tk}/>
                   </div>
@@ -7248,7 +7249,7 @@ function CustomizePanel({feeds, kw, alerts, urgent, social, watchlist, teams, he
               </div>
               <div className="cp-chips">
                 {(ls[socCat]?.[socPlat]||[]).map((h,i)=>(
-                  <span key={i} className="cp-chip cp-chip-social">{h}<button className="cp-chip-x" onClick={()=>removeHandle(i)}>✕</button></span>
+                  <span key={i} className="cp-chip cp-chip-social">{h}<button className="cp-chip-x" onClick={()=>removeHandle(i)}><XIcon size={13} aria-hidden="true"/></button></span>
                 ))}
                 {(ls[socCat]?.[socPlat]||[]).length===0&&<span style={{fontSize:'11px',color:'var(--text3)'}}>No accounts yet</span>}
               </div>
@@ -7301,7 +7302,7 @@ function CustomizePanel({feeds, kw, alerts, urgent, social, watchlist, teams, he
               {seedQueue && seedQueue.length > 0 && (
                 <div className="cp-seed-wrap">
                   <button className="cp-seed-toggle" onClick={()=>setShowSeeds(s=>!s)}>
-                    {showSeeds?'▾':'▸'} Suggested voices ({seedQueue.length})
+                    <ChevronDown size={12} aria-hidden="true" style={{transform:showSeeds?"none":"rotate(-90deg)",verticalAlign:"-2px"}}/> Suggested voices ({seedQueue.length})
                   </button>
                   {showSeeds && (
                     <div className="cp-seed-list">
@@ -7343,7 +7344,7 @@ function CustomizePanel({feeds, kw, alerts, urgent, social, watchlist, teams, he
                           <button className="cp-voice-btn" title="Edit handles" onClick={()=>setEditVoiceId(editVoiceId===v.id?null:v.id)}>Edit</button>
                           <button className="cp-voice-btn" aria-label="Move up" disabled={i===0} onClick={()=>reorderVoice(v.id,-1)}>↑</button>
                           <button className="cp-voice-btn" aria-label="Move down" disabled={i===inCat.length-1} onClick={()=>reorderVoice(v.id,1)}>↓</button>
-                          <button className="cp-voice-btn cp-voice-rm" aria-label="Remove" onClick={()=>removeVoiceById(v.id)}>✕</button>
+                          <button className="cp-voice-btn cp-voice-rm" aria-label="Remove" onClick={()=>removeVoiceById(v.id)}><XIcon size={13} aria-hidden="true"/></button>
                         </div>
                         {editVoiceId===v.id && (
                           <div className="cp-voice-edit">
@@ -7374,7 +7375,7 @@ function CustomizePanel({feeds, kw, alerts, urgent, social, watchlist, teams, he
                 <div key={i} className="cp-src-row">
                   <span style={{fontWeight:700,fontFamily:'monospace',color:'var(--accent)',fontSize:'12px',minWidth:'50px'}}>{w.sym}</span>
                   <span className="cp-src-name">{w.name}</span>
-                  <button className="cp-del" onClick={()=>setLw(prev=>prev.filter((_,j)=>j!==i))}>✕</button>
+                  <button className="cp-del" onClick={()=>setLw(prev=>prev.filter((_,j)=>j!==i))}><XIcon size={13} aria-hidden="true"/></button>
                 </div>
               ))}
               {lw.length===0&&<div style={{fontSize:'11px',color:'var(--text3)',padding:'10px 0'}}>No symbols yet</div>}
@@ -7405,7 +7406,7 @@ function CustomizePanel({feeds, kw, alerts, urgent, social, watchlist, teams, he
                     <span style={{fontSize:'18px'}}>{t.emoji}</span>
                     <strong style={{fontSize:'12px',color:'var(--text)',flex:1}}>{t.team}</strong>
                     <span style={{fontSize:'10px',color:'var(--text3)'}}>{(t.sport||'').toUpperCase()} · {(t.league||'').toUpperCase()}</span>
-                    <button className="cp-del" onClick={()=>setLt(prev=>prev.filter((_,j)=>j!==i))}>✕</button>
+                    <button className="cp-del" onClick={()=>setLt(prev=>prev.filter((_,j)=>j!==i))}><XIcon size={13} aria-hidden="true"/></button>
                   </div>
                   <div className="cp-team-row-body">
                     <div style={{fontSize:'10px',color:'var(--text3)'}}>Match: <span style={{color:'var(--text2)'}}>{t.match||'(none)'}</span></div>
@@ -7457,7 +7458,7 @@ function CustomizePanel({feeds, kw, alerts, urgent, social, watchlist, teams, he
               {lwx.map((city, i) => (
                 <div key={i} className="cp-src-row">
                   <span className="cp-src-name">{city.name} ({city.lat.toFixed(2)}, {city.lon.toFixed(2)})</span>
-                  <button className="cp-del" onClick={() => setLwx(prev => prev.filter((_,j) => j !== i))}>✕</button>
+                  <button className="cp-del" onClick={() => setLwx(prev => prev.filter((_,j) => j !== i))}><XIcon size={13} aria-hidden="true"/></button>
                 </div>
               ))}
               <div className="cp-add-src" style={{marginTop:'8px'}}>
@@ -7665,7 +7666,7 @@ function PtrIndicator({ distance, threshold, refreshing }) {
   return (
     <div className={`ptr-indicator ${!visible?'hidden':''} ${refreshing?'refreshing':''}`}
          style={{ top:`${top}px`, transform:`translateX(-50%) rotate(${progress * 360}deg)` }}>
-      <span className={refreshing?'ptr-spin':''}>↻</span>
+      <span className={refreshing?'ptr-spin':''}><RefreshCw size={14} aria-hidden="true"/></span>
     </div>
   );
 }
@@ -8041,7 +8042,7 @@ function PriorityNav({ tab, onPick, labels, classes }) {
         <button ref={moreBtnRef} className={`nav-tab nav-more-btn ${activeInMore?'active':''}`}
           aria-haspopup="menu" aria-expanded={menuOpen}
           onClick={()=>setMenuOpen(o=>!o)}>
-          More{moreItems.length?` (${moreItems.length})`:''} ▾
+          More{moreItems.length?` (${moreItems.length})`:''} <ChevronDown size={13} aria-hidden="true" style={{verticalAlign:'-2px'}}/>
         </button>
         {menuOpen && (
           <div className="nav-more-menu" role="menu" ref={menuRef}>
@@ -8348,7 +8349,7 @@ function TopBar({tab, setTab, search, setSearch, dark, setDark,
           <button className={`chip chip-more ${MORE_SHEET_TABS.includes(tab)?'active':''}`}
             aria-haspopup="menu" aria-expanded={moreSheetOpen}
             onClick={()=>setMoreSheetOpen(true)}>
-            More ▾
+            More <ChevronDown size={13} aria-hidden="true" style={{verticalAlign:'-2px'}}/>
           </button>
         </div>
         </div>
@@ -8357,7 +8358,7 @@ function TopBar({tab, setTab, search, setSearch, dark, setDark,
             <div className="more-sheet" role="menu" onClick={e=>e.stopPropagation()}>
               <div className="more-sheet-head">
                 <span>More</span>
-                <button className="more-sheet-close" aria-label="Close" onClick={()=>setMoreSheetOpen(false)}>×</button>
+                <button className="more-sheet-close" aria-label="Close" onClick={()=>setMoreSheetOpen(false)}><XIcon size={16} aria-hidden="true"/></button>
               </div>
               {MORE_SHEET_TABS.map(t=>(
                 <button key={t} role="menuitem"
@@ -8633,7 +8634,7 @@ function AnalyzePanel({ onClose }) {
       <div className="analyze-panel">
         <div className="analyze-head">
           <span className="analyze-title">Paste & Brief</span>
-          <button className="analyze-close" onClick={onClose}>✕</button>
+          <button className="analyze-close" onClick={onClose}><XIcon size={13} aria-hidden="true"/></button>
         </div>
         <div className="analyze-type-tabs">
           <button className={`analyze-type-tab${tabType==='text'?' active':''}`} onClick={()=>setTabType('text')}>Article / Text</button>
@@ -8723,7 +8724,7 @@ function ArticleReader({ article, onClose, onAskInChat, related = [], onOpen }) 
   return (
     <div className="article-reader-overlay" onClick={e => { if (e.target === e.currentTarget) onClose(); }}>
       <div className="article-reader" ref={dialogRef} role="dialog" aria-modal="true" aria-label={article.title}>
-        <button className="article-reader-close" ref={closeRef} onClick={onClose} aria-label="Close reader">×</button>
+        <button className="article-reader-close" ref={closeRef} onClick={onClose} aria-label="Close reader"><XIcon size={16} aria-hidden="true"/></button>
         {article.img && <img className="article-reader-img" src={article.img} alt="" loading="lazy"/>}
         <div className="article-reader-body">
           {/* F9: header — source · time · Ask. Close is the top-right control (>=44px on mobile). */}
@@ -8825,7 +8826,7 @@ function PerspectivesPanel({ article, onClose }) {
             <div className="persp-kicker" style={{ color: cc.color }}>Perspectives</div>
             <div className="persp-title">{article.title}</div>
           </div>
-          <button className="persp-close" onClick={onClose} aria-label="Close">×</button>
+          <button className="persp-close" onClick={onClose} aria-label="Close"><XIcon size={16} aria-hidden="true"/></button>
         </div>
         <div className="persp-body">
           <section className="persp-sec">
@@ -8859,7 +8860,7 @@ function AuthModal({ onClose, onSend, status, email, setEmail, userId, onSignOut
   return (
     <div style={overlay} onClick={onClose}>
       <div style={card} onClick={e=>e.stopPropagation()}>
-        <button onClick={onClose} style={{position:'absolute',top:12,right:14,border:'none',background:'none',fontSize:18,cursor:'pointer',color:'inherit',lineHeight:1}}>✕</button>
+        <button onClick={onClose} style={{position:'absolute',top:12,right:14,border:'none',background:'none',fontSize:18,cursor:'pointer',color:'inherit',lineHeight:1}}><XIcon size={13} aria-hidden="true"/></button>
         {userId ? (
           <>
             <h3 style={{margin:'0 0 6px',fontSize:18}}>You're signed in</h3>
@@ -10019,7 +10020,7 @@ export default function App() {
               </div>
               <div style={{display:'flex',gap:'8px',alignItems:'center'}}>
                 <button className="sport-league-all-btn" onClick={()=> teamFollowed ? unfollowTeam({name:teamName, league:sportTab}) : followTeam(teamName, sportTab)}>
-                  {teamFollowed ? '★ Following' : '☆ Follow'}
+                  {teamFollowed ? <><Star size={11} fill="currentColor" aria-hidden="true"/> Following</> : <><Star size={11} aria-hidden="true"/> Follow</>}
                 </button>
                 <button className="sport-league-all-btn" onClick={()=>navigate('sports', sportTab)}>← All {SPORT_TABS.find(s=>s.key===sportTab)?.label}</button>
               </div>
@@ -10087,9 +10088,9 @@ export default function App() {
                 <div className="team-hub-count">{sportItems.length} stories found · {activeTeam.league?.toUpperCase()}</div>
               </div>
               <div style={{display:'flex',alignItems:'center',gap:'8px'}}>
-                {activeTeam.espnUrl && <a className="team-hub-link" href={activeTeam.espnUrl} target="_blank" rel="noreferrer">ESPN ↗</a>}
-                {activeTeam.teamUrl && <a className="team-hub-link" href={activeTeam.teamUrl} target="_blank" rel="noreferrer">Team Site ↗</a>}
-                <button className="team-hub-clear" onClick={()=>setActiveTeam(null)}>✕ Clear</button>
+                {activeTeam.espnUrl && <a className="team-hub-link" href={activeTeam.espnUrl} target="_blank" rel="noreferrer"><span>ESPN</span> <ExternalLink size={12} aria-hidden="true" style={{verticalAlign:"-1px"}}/></a>}
+                {activeTeam.teamUrl && <a className="team-hub-link" href={activeTeam.teamUrl} target="_blank" rel="noreferrer"><span>Team Site</span> <ExternalLink size={12} aria-hidden="true" style={{verticalAlign:"-1px"}}/></a>}
+                <button className="team-hub-clear" onClick={()=>setActiveTeam(null)}><XIcon size={12} aria-hidden="true"/> Clear</button>
               </div>
             </div>
           </div>
@@ -10131,7 +10132,7 @@ export default function App() {
                     <div className="gn-card-meta">
                       <span className="gn-card-source" style={{color:cc.color}}>{a.source}</span>
                       <span>·</span><span>{fmtDate(a.pubDate)}</span>
-                      {a._favScore > 0 && <span style={{marginLeft:'4px',color:'#f59e0b',fontWeight:800}}>★</span>}
+                      {a._favScore > 0 && <Star size={11} aria-hidden="true" style={{marginLeft:'4px',color:'var(--amber)'}} fill="currentColor"/>}
                     </div>
                   </article>
                 ))}
@@ -10191,7 +10192,7 @@ export default function App() {
                             <span className="team-card-name">{t.team}</span>
                             <span className="team-card-league">{t.league?.toUpperCase()}</span>
                           </div>
-                          <span className="team-card-arrow">{menuOpen ? '▴' : '▾'}</span>
+                          <span className="team-card-arrow"><ChevronDown size={11} aria-hidden="true" style={{transform:menuOpen?'rotate(180deg)':'none',transition:"transform .15s"}}/></span>
                         </button>
                         {menuOpen && (
                           <div className="team-card-menu">
@@ -10199,10 +10200,10 @@ export default function App() {
                               setActiveTeam(isFiltered ? null : t); setSportTab('all');
                               setTeamMenuSym(null); setTimeout(scrollToFeed, 80);
                             }}>
-                              {isFiltered ? '✕ Clear filter' : 'Filter News'}
+                              {isFiltered ? <><XIcon size={12} aria-hidden="true"/> Clear filter</> : 'Filter News'}
                             </button>
-                            {t.espnUrl && <a className="team-menu-item" href={t.espnUrl} target="_blank" rel="noreferrer">ESPN ↗</a>}
-                            {t.teamUrl && <a className="team-menu-item" href={t.teamUrl} target="_blank" rel="noreferrer">Team Site ↗</a>}
+                            {t.espnUrl && <a className="team-menu-item" href={t.espnUrl} target="_blank" rel="noreferrer"><span>ESPN</span> <ExternalLink size={12} aria-hidden="true" style={{verticalAlign:"-1px"}}/></a>}
+                            {t.teamUrl && <a className="team-menu-item" href={t.teamUrl} target="_blank" rel="noreferrer"><span>Team Site</span> <ExternalLink size={12} aria-hidden="true" style={{verticalAlign:"-1px"}}/></a>}
                           </div>
                         )}
                       </div>
@@ -10563,7 +10564,7 @@ export default function App() {
                     <TeamLogo name={t.name} league={t.league} size={18}/>
                     <span className="following-chip-name">{t.name}{dup ? ` · ${(t.league||'').toUpperCase()}` : ''}</span>
                   </button>
-                  <button type="button" className="following-chip-x" onClick={()=>unfollowTeam(t)} aria-label={`Unfollow ${t.name}`}>×</button>
+                  <button type="button" className="following-chip-x" onClick={()=>unfollowTeam(t)} aria-label={`Unfollow ${t.name}`}><XIcon size={16} aria-hidden="true"/></button>
                 </span>
               );
             });
@@ -10573,7 +10574,7 @@ export default function App() {
               <button type="button" className="following-chip-main" onClick={()=>navigate('general','topic',teamSlug(t))}>
                 <span className="following-chip-name">{t}</span>
               </button>
-              <button type="button" className="following-chip-x" onClick={()=>toggleTopic(t)} aria-label={`Unfollow ${t}`}>×</button>
+              <button type="button" className="following-chip-x" onClick={()=>toggleTopic(t)} aria-label={`Unfollow ${t}`}><XIcon size={16} aria-hidden="true"/></button>
             </span>
           ))}
           {followedTeams.length === 0 && myTopics.length === 0 && (
@@ -10726,13 +10727,13 @@ export default function App() {
                     ? <><strong>{feedItems.length} articles</strong> matching <em style={{fontStyle:'normal',fontWeight:700}}>"{search}"</em> — including web sources below</>
                     : <>No results for "<strong>{search}</strong>" — showing web results below</>}
                 </span>
-                <button className="search-results-clear" onClick={()=>setSearch('')}>✕ Clear</button>
+                <button className="search-results-clear" onClick={()=>setSearch('')}><XIcon size={12} aria-hidden="true"/> Clear</button>
               </div>
             )}
             {(activeKw||activeSrc)&&(
               <div className="sticky-filter" style={{display:'flex',gap:'6px',flexWrap:'wrap',marginBottom:'12px'}}>
-                {activeKw&&<span style={{background:cc.bg,color:cc.color,borderRadius:'20px',padding:'3px 10px',fontSize:'10px',fontWeight:'600',display:'inline-flex',alignItems:'center',gap:'5px'}}>{activeKw}<button onClick={()=>setActiveKw(null)} style={{background:'none',border:'none',cursor:'pointer',color:'inherit',fontSize:'12px',padding:0}}>✕</button></span>}
-                {activeSrc&&<span style={{background:'var(--surface2)',color:'var(--text2)',borderRadius:'20px',padding:'3px 10px',fontSize:'10px',fontWeight:'600',border:'1px solid var(--border)',display:'inline-flex',alignItems:'center',gap:'5px'}}>{activeSrc}<button onClick={()=>setActiveSrc(null)} style={{background:'none',border:'none',cursor:'pointer',color:'inherit',fontSize:'12px',padding:0}}>✕</button></span>}
+                {activeKw&&<span style={{background:cc.bg,color:cc.color,borderRadius:'20px',padding:'3px 10px',fontSize:'10px',fontWeight:'600',display:'inline-flex',alignItems:'center',gap:'5px'}}>{activeKw}<button onClick={()=>setActiveKw(null)} style={{background:'none',border:'none',cursor:'pointer',color:'inherit',fontSize:'12px',padding:0}}><XIcon size={13} aria-hidden="true"/></button></span>}
+                {activeSrc&&<span style={{background:'var(--surface2)',color:'var(--text2)',borderRadius:'20px',padding:'3px 10px',fontSize:'10px',fontWeight:'600',border:'1px solid var(--border)',display:'inline-flex',alignItems:'center',gap:'5px'}}>{activeSrc}<button onClick={()=>setActiveSrc(null)} style={{background:'none',border:'none',cursor:'pointer',color:'inherit',fontSize:'12px',padding:0}}><XIcon size={13} aria-hidden="true"/></button></span>}
               </div>
             )}
             {isLoading&&!feedItems.length
@@ -10985,7 +10986,7 @@ export default function App() {
             </div>
             <div className="ba-actions" onClick={e=>e.stopPropagation()}>
               <button className={`ba-btn${showSum?' on':''}`} onClick={handleAI}>
-                {loadSum?'…':'✦'} {showSum?'Hide':'Summary'}
+                {loadSum?'…':<Sparkles size={13} aria-hidden="true"/>} {showSum?'Hide':'Summary'}
               </button>
               <button className={`ba-btn${showEx?' on':''}`} onClick={handleExplain}>
                 {loadEx?'…':''} {showEx?'Hide':'Explain'}
@@ -11160,7 +11161,7 @@ export default function App() {
           {podAiState!=='closed'&&(
             <div className="fc-ai-panel" style={{margin:'10px 0 0'}}>
               <div className="fc-summary">
-                <div className="fc-summary-lbl">✦ Summary · from show notes</div>
+                <div className="fc-summary-lbl"><Sparkles size={13} aria-hidden="true"/> Summary · from show notes</div>
                 {loadPod&&!podSum?<div style={{fontSize:'11px',color:'var(--text3)',fontStyle:'italic'}}>Generating summary…</div>
                 :podErr&&!podSum?<div style={{fontSize:'11px',color:'var(--red)'}}>{podErr}</div>
                 :<div className="fc-summary-text">{podSum}</div>}
@@ -11179,7 +11180,7 @@ export default function App() {
             <button className="pod-btn" onClick={()=>ep.link&&window.open(ep.link,'_blank')}>Listen</button>
             {(ep.desc||'').length >= 500 && (
               <button className={`pod-btn ${podAiState!=='closed'?'ai-on':''}`} onClick={handlePodAI} disabled={loadPod}>
-                ✦ {loadPod?'Thinking…':podAiState==='closed'?'AI Summary':'Hide AI'}
+                <Sparkles size={13} aria-hidden="true"/> {loadPod?'Thinking…':podAiState==='closed'?'AI Summary':'Hide AI'}
               </button>
             )}
             <button className={`pod-btn ${sv2?'saved':''}`} onClick={()=>onSave({...ep,link:ep.link||ep.show+idx,source:ep.show,cat:'podcasts'})}>{sv2?'★ Saved':'☆ Save'}</button>
@@ -11315,7 +11316,7 @@ export default function App() {
         </div>
       )}
       {saved.length===0
-        ?<div className="empty-state" style={{paddingTop:'80px'}}><div className="empty-icon">☆</div><div className="empty-msg">No saved items yet<br/><span style={{fontSize:'11px',color:'var(--text3)'}}>Tap Save on any article or episode</span></div></div>
+        ?<div className="empty-state" style={{paddingTop:'80px'}}><div className="empty-msg">No saved items yet<br/><span style={{fontSize:'11px',color:'var(--text3)'}}>Tap Save on any article or episode</span></div></div>
         :<div className="page-grid"><div className="feed-col"><span className="page-header" style={{marginBottom:'24px',display:'block'}}>Saved — {saved.length} items</span>{saved.map((a,i)=><FeedCard key={i} a={a} cat={a.cat||'general'} isSaved={true} onSave={onSave} onRead={onRead} isRead={isReadFn(a)} userKw={kw} userTeams={teams}/>)}</div></div>
       }
     </div>
@@ -11369,7 +11370,7 @@ export default function App() {
                         <span className={`source-status ${f.on?'on':'off'}`} title={f.on?'Active':'Disabled'}/>
                         <span className="source-name">{f.name}</span>
                         {n>0 && <span className="source-count" title={`${n} articles loaded`}>{n}</span>}
-                        {url && <span className="source-ext">↗</span>}
+                        {url && <span className="source-ext"><ExternalLink size={11} aria-hidden="true"/></span>}
                       </a>
                     );
                   })}
@@ -11500,7 +11501,7 @@ export default function App() {
                                   ))}
                                   <a className="fin-chart-ext" href={`https://finance.yahoo.com/chart/${w.sym}`}
                                     target="_blank" rel="noreferrer" onClick={e=>e.stopPropagation()}>
-                                    Yahoo ↗
+                                    Yahoo <ExternalLink size={11} aria-hidden="true" style={{verticalAlign:"-1px"}}/>
                                   </a>
                                 </div>
                                 <div className="fin-chart-links">
@@ -11508,10 +11509,10 @@ export default function App() {
                                     Full Chart on Yahoo Finance
                                   </a>
                                   <a className="fin-chart-link-btn" href={`https://www.tradingview.com/chart/?symbol=${w.sym}`} target="_blank" rel="noreferrer" onClick={e=>e.stopPropagation()}>
-                                    TradingView ↗
+                                    TradingView <ExternalLink size={11} aria-hidden="true" style={{verticalAlign:"-1px"}}/>
                                   </a>
                                   <a className="fin-chart-link-btn" href={`https://www.google.com/finance/quote/${w.sym}`} target="_blank" rel="noreferrer" onClick={e=>e.stopPropagation()}>
-                                    Google Finance ↗
+                                    Google Finance <ExternalLink size={11} aria-hidden="true" style={{verticalAlign:"-1px"}}/>
                                   </a>
                                 </div>
                               </div>
