@@ -43,6 +43,7 @@ import { opinionLabel } from './modules/opinion';
 import { ShareControl, buildBriefingExcerpt } from './modules/share';
 import { ConnectionsStrip, findConnections } from './modules/connections';
 import { qualifyBreaking, isPromoItem } from './modules/breaking';
+import { partitionSatire } from './modules/satire';
 import { rankByVelocity, signalFor } from '../lib/voices/velocity';
 import { DEBUG, dbgRender, dbgPoll, DebugOverlay } from './modules/debug';
 import { makeVoice, upsertVoice, removeVoice as removeVoiceModel, mergeVoices, clearTombstone, voiceId, VOICE_PLATFORMS } from './modules/voices/model';
@@ -9078,7 +9079,20 @@ export default function App() {
   // page by relevance (see catBreaking) and capped at 3. Previews/interviews/promos
   // never qualify because they are neither multi-outlet nor title-strong.
   const breakingItems = useMemo(
-    () => qualifyBreaking(Object.values(arts).flat(), { now: Date.now() }),
+    () => {
+      // I0.8: strip satire (The Onion, Babylon Bee, …) BEFORE breaking qualification, by
+      // rule, so a joke "Hurricane…" headline can never surface as Breaking. Under
+      // ?debug=1, log the before/after and name each held-back source — this is how we
+      // tell which source a flagged headline (e.g. the hurricane one) came from.
+      const all = Object.values(arts).flat();
+      const { satire, rest } = partitionSatire(all);
+      if (DEBUG && satire.length) {
+        // eslint-disable-next-line no-console
+        console.log(`[satire] before ${all.length} → after ${rest.length} (held back ${satire.length}):`);
+        for (const s of satire) console.log(`[satire]   "${s.title}" — source: ${s.source || 'unknown'} (${s.link || ''})`);
+      }
+      return qualifyBreaking(rest, { now: Date.now() });
+    },
     [arts]
   );
 
