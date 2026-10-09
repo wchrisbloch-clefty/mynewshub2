@@ -35,6 +35,10 @@
   /* The ONE brand accent — deep editorial blue. Links, selected states, active nav. */
   --accent:#12558c;
   --accent-bg:#eaf1f7;   /* pale wash behind selected chips/rows */
+  /* Text/icon colour that sits ON a solid --accent fill. White on the dark light-mode
+     accent = 7.77:1. In dark mode the accent is light (#5aa2e6), so this flips to a dark
+     ink (see .dark) for legibility — white there would be only ~2.7:1. */
+  --on-accent:#fff;
 
   /* SIGNAL colors — never decorative. */
   --red:#c8102e;         /* breaking / live ONLY */
@@ -95,6 +99,7 @@
 
   --accent:#5aa2e6;      /* luminous editorial blue — legible on charcoal */
   --accent-bg:#15202c;
+  --on-accent:#0d1b2e;   /* dark ink on the light dark-mode accent = 6.38:1 (white = ~2.7:1) */
 
   --red:#f0533f;         /* breaking / live ONLY */
   --green:#43d17f;
