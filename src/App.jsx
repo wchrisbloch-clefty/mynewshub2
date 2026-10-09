@@ -46,6 +46,7 @@ import { qualifyBreaking, isPromoItem } from './modules/breaking';
 import { partitionSatire } from './modules/satire';
 import { rankByVelocity, signalFor } from '../lib/voices/velocity';
 import { DEBUG, dbgRender, dbgPoll, DebugOverlay } from './modules/debug';
+import { useScores, configureScores, loadScores as loadScoresStore, anyLiveGame } from './state';
 import { makeVoice, upsertVoice, removeVoice as removeVoiceModel, mergeVoices, clearTombstone, voiceId, VOICE_PLATFORMS } from './modules/voices/model';
 import { SEED_VOICES } from './modules/voices/seeds';
 // G4: code-split heavy, not-needed-at-first-paint surfaces. Home is never lazy.
@@ -5870,7 +5871,10 @@ function ScoreTile({ g }) {
   );
 }
 
-function ActiveScoresBar({ scores, onGoToSports, favTeams }) {
+function ActiveScoresBar({ onGoToSports, favTeams }) {
+  // I1: scores come from the store, not props — this subscribes ActiveScoresBar alone, so
+  // a score tick on Home re-renders only this bar, never App or the feed.
+  const { scores } = useScores();
   // Followed/favorite teams' games sort to the FRONT and get an accent highlight;
   // then live games; then the rest. `favTeams` is a list of {match} terms built from
   // the user's favorites config AND their My Teams follow set.
@@ -6484,7 +6488,9 @@ function BriefingTeaser({arts, excludeCats, onOpenFull, compact}) {
 }
 
 // ─── SCOREBOARD ───────────────────────────────────────────────────────────────
-function Scoreboard({scores, loading, compact=false, favTeams}) {
+function Scoreboard({compact=false, favTeams}) {
+  // I1: scores come from the store, not props — this subscribes Scoreboard alone.
+  const { scores, loading } = useScores();
   const [collapsed, setCollapsed] = useState(false);
   const [expanded, setExpanded] = useState(() => {
     const init={};
@@ -6781,7 +6787,7 @@ function GithubSignal() {
 }
 
 // ─── GHOST SIDEBAR ────────────────────────────────────────────────────────────
-function Sidebar({cat, arts, kw, health, activeKw, setActiveKw, activeSource, setActiveSource, onRead, scores, scoresLoading, showScoreboard, recommended, showBriefing, onOpenBriefing, briefingExcludeCats, onTopicOpen, trendingItems, isTopicFollowed, toggleTopic, onTrendingOpen,
+function Sidebar({cat, arts, kw, health, activeKw, setActiveKw, activeSource, setActiveSource, onRead, showScoreboard, recommended, showBriefing, onOpenBriefing, briefingExcludeCats, onTopicOpen, trendingItems, isTopicFollowed, toggleTopic, onTrendingOpen,
   sopItems, sopGapItems, sopMeta, sopCollapsed, onToggleSop, formatDate, acrossSections, onAcrossSeeAll, followingModule, sopBreakingItems, feeds, onToggleFeed, favTeams, onAsk, hideSopMobile, voicesNode}) {
   const cc = CATS[cat]||CATS.general;
   const catKws = kw[cat]||[];
@@ -6851,7 +6857,7 @@ function Sidebar({cat, arts, kw, health, activeKw, setActiveKw, activeSource, se
         </div>
       )}
 
-      {showScoreboard && <Scoreboard scores={scores} loading={scoresLoading} favTeams={favTeams}/>}
+      {showScoreboard && <Scoreboard favTeams={favTeams}/>}
 
       {/* The default "Trending in [cat]" list duplicated the main-column State of Play
           (same data), so it's removed. This section now renders ONLY when a keyword or
@@ -8125,7 +8131,7 @@ function TopBar({tab, setTab, search, setSearch, dark, setDark,
                  onCustomize, onRefresh, breakingItems, onTickerClick,
                  hidden, shrunk, mobileSearchOpen, onMobileSearchToggle, weatherCities, hiddenIndices,
                  onAnalyze, searchHistory, trendingTopics, onAccount, signedIn,
-                 scores, favTeams, onGoToSports}) {
+                 favTeams, onGoToSports}) {
   const [searchFocused, setSearchFocused] = useState(false);
   const [quotes, setQuotes] = useState({});
   // F7: mobile market ticker is collapsible and DEFAULT-COLLAPSED (reclaims the ~34px
@@ -8395,7 +8401,7 @@ function TopBar({tab, setTab, search, setSearch, dark, setDark,
       <div className="home-subbands">
         <div className="topbar-wx"><RightNowWeather data={weatherData}/></div>
         <div className="topbar-scores">
-          <ActiveScoresBar scores={scores} favTeams={favTeams} onGoToSports={onGoToSports}/>
+          <ActiveScoresBar favTeams={favTeams} onGoToSports={onGoToSports}/>
         </div>
       </div>
     )}
@@ -9010,8 +9016,9 @@ export default function App() {
   const [panelInitial, setPanelInitial] = useState({tab:'keywords',cat:'general'});
   const [activeKw, setActiveKw]     = useState(null);
   const [activeSrc, setActiveSrc]   = useState(null);
-  const [scores, setScores]         = useState({});
-  const [scoresLoading, setScoresLoading] = useState(false);
+  // I1: live scores moved OUT of App into the external scores store (src/state). App no
+  // longer holds them, so a score tick does not re-render App or the feed pages — only
+  // the components that call useScores() (ActiveScoresBar, Scoreboard, SportsPage).
   // Sports team-hub filter. Lifted to App (from inside SportsPage) so it survives
   // SportsPage remounts — SportsPage is defined inline in App and remounts on any
   // App re-render (scroll/header/poll), which previously wiped a locally-held value.
@@ -9208,11 +9215,12 @@ export default function App() {
     setPodLoading(l=>({...l,[pod.name]:false}));
   },[]);
 
-  const loadScores = useCallback(async ()=>{
-    setScoresLoading(true);
-    setScores(await fetchAllScores());
-    setScoresLoading(false);
-  },[]);
+  // I1: loadScores now drives the external store (configured with fetchAllScores at mount).
+  const loadScores = loadScoresStore;
+  // I1 measurement hook: under ?debug=1 only, expose a way to trigger a scores update so
+  // the App/feed-page render count on a "score tick" can be measured headlessly (no 120s
+  // wait). Zero cost when the flag is off.
+  useEffect(() => { if (DEBUG && typeof window !== 'undefined') window.__loadScores = loadScoresStore; }, []);
 
   const loadMarketData = useCallback(async ()=>{
     setMarketLoading(true);
@@ -9244,6 +9252,7 @@ export default function App() {
     // every page has a manual "Updated Nm ago" refresh control.
     Object.keys(DEFAULT_FEEDS).forEach(c=>loadCat(c));
     PODCAST_FEEDS.forEach(p=>loadPod(p));
+    configureScores(fetchAllScores); // I1: wire the store's fetcher, then load once
     loadScores();
     loadMarketData(); // preload so RightNowStrip + watchlist widgets have ticker data
     // G4: warm the lazy chunks on idle so they open instantly after first paint (no poll).
@@ -9252,24 +9261,10 @@ export default function App() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   },[]);
 
-  // D6: the ONE opt-in polling exception — live scores refresh every 120s, but
-  // ONLY while the user is on a Sports page AND at least one game is `live` AND
-  // the tab is visible. Pauses on document.hidden; stops the moment no game is
-  // live or the user leaves Sports. (The "N new stories" pill logic is retained in
-  // render but no longer runs on a background interval — only manual refresh.)
-  const hasLiveGame = useMemo(
-    () => Object.values(scores||{}).some(list => Array.isArray(list) && list.some(g => g && g.state === 'in')),
-    [scores]
-  );
-  useEffect(()=>{
-    if (tab !== 'sports' || !hasLiveGame) return;
-    let stopped = false;
-    const tick = () => { if (typeof document!=='undefined' && document.hidden) return; dbgPoll('live-scores'); loadScores(); };
-    const iv = setInterval(tick, 120000);
-    const onVis = () => { if (!document.hidden && !stopped) loadScores(); };
-    document.addEventListener('visibilitychange', onVis);
-    return () => { stopped = true; clearInterval(iv); document.removeEventListener('visibilitychange', onVis); };
-  }, [tab, hasLiveGame, loadScores]);
+  // D6: the ONE opt-in polling exception — live scores refresh every 120s, but ONLY on a
+  // Sports page, while a game is live, and the tab is visible. I1: this effect moved INTO
+  // SportsPage (it only matters there, and it reads scores via the store), so App no
+  // longer subscribes to scores and never re-renders on a score tick.
 
   const onRead  = a=>{
     setClicks(c=>({...c,[a.source]:(c[a.source]||0)+1}));
@@ -9572,6 +9567,22 @@ export default function App() {
   // stories feed. Yahoo Sports' actual layout pattern.
   const SportsPage = () => {
     dbgRender('SportsPage'); // D8: ?debug=1 render counter (no-op when off)
+    // I1: SportsPage subscribes to the scores store directly. A score tick re-renders
+    // THIS page (expected — it shows scores) but NOT App, so the feed pages are untouched.
+    const { scores, loading: scoresLoading } = useScores();
+    // D6: the ONE opt-in poll — live scores every 120s, only while a game is live and the
+    // tab is visible. Lives here (not App) so App never subscribes to scores. (Reuses the
+    // app's single live-scores interval budget — no new setInterval surface.)
+    const hasLiveGame = anyLiveGame(scores);
+    useEffect(() => {
+      if (!hasLiveGame) return;
+      let stopped = false;
+      const tick = () => { if (typeof document !== 'undefined' && document.hidden) return; dbgPoll('live-scores'); loadScoresStore(); };
+      const iv = setInterval(tick, 120000);
+      const onVis = () => { if (!document.hidden && !stopped) loadScoresStore(); };
+      document.addEventListener('visibilitychange', onVis);
+      return () => { stopped = true; clearInterval(iv); document.removeEventListener('visibilitychange', onVis); };
+    }, [hasLiveGame]);
     // Phase 2: subcategory comes from the URL (never local state). Chips navigate.
     const sportTab = subcat || 'all'; // 'all' | 'nfl' | 'nba' | 'mlb' | 'cfb' | 'cbb' | 'cbase' | 'racing' | 'golf'
     const setSportTab = (key) => navigate('sports', key === 'all' ? null : key);
@@ -9887,7 +9898,7 @@ export default function App() {
               <Sidebar cat="sports" voicesNode={voicesStripFor('sports')} arts={arts} kw={kw} health={health} onAsk={setChatContext}
                 activeKw={activeKw} setActiveKw={k=>{setActiveKw(k);setActiveSrc(null);}}
                 activeSource={activeSrc} setActiveSource={s=>{setActiveSrc(s);setActiveKw(null);}}
-                onRead={onRead} scores={scores} scoresLoading={scoresLoading} showScoreboard={false}
+                onRead={onRead} showScoreboard={false}
                 isTopicFollowed={isTopicFollowed} toggleTopic={toggleTopic}/>
             </div>
           </>
@@ -10064,7 +10075,7 @@ export default function App() {
           <Sidebar cat="sports" voicesNode={voicesStripFor('sports')} arts={arts} kw={kw} health={health} onAsk={setChatContext}
             activeKw={activeKw} setActiveKw={k=>{setActiveKw(k);setActiveSrc(null);}}
             activeSource={activeSrc} setActiveSource={s=>{setActiveSrc(s);setActiveKw(null);}}
-            onRead={onRead} scores={scores} scoresLoading={scoresLoading}
+            onRead={onRead}
             showScoreboard={false} recommended={recommended}
             isTopicFollowed={isTopicFollowed} toggleTopic={toggleTopic}
             sopItems={(sportTab === 'all' || activeTeam) && !activeSrc && !search ? sportItems : null}
@@ -10742,7 +10753,7 @@ export default function App() {
           <Sidebar cat={cat} hideSopMobile voicesNode={voicesStripFor(cat)} arts={arts} kw={kw} health={health} onAsk={setChatContext}
             activeKw={activeKw} setActiveKw={k=>{setActiveKw(k);setActiveSrc(null);}}
             activeSource={activeSrc} setActiveSource={s=>{setActiveSrc(s);setActiveKw(null);}}
-            onRead={onRead} scores={scores} scoresLoading={scoresLoading}
+            onRead={onRead}
             showScoreboard={cat==='sports'} recommended={recommended}
             favTeams={[...teams, ...myTeams.map(t=>({match:t.name, league:t.league}))]}
             onTopicOpen={label => navigate(cat, 'topic', teamSlug(label))}
@@ -11400,7 +11411,7 @@ export default function App() {
             activeKw={activeKw} setActiveKw={k=>{setActiveKw(k);setActiveSrc(null);}}
             activeSource={activeSrc} setActiveSource={s=>{setActiveSrc(s);setActiveKw(null);}}
             onTopicOpen={label => navigate('finance', 'topic', teamSlug(label))}
-            onRead={onRead} scores={scores} scoresLoading={scoresLoading} showScoreboard={false}/>
+            onRead={onRead} showScoreboard={false}/>
         </div>
       </div>
     );
@@ -11426,7 +11437,7 @@ export default function App() {
           searchHistory={searchHistory}
           trendingTopics={homeTrendingTopics}
           onAccount={()=>setShowAuth(true)} signedIn={!!userId}
-          scores={scores} favTeams={[...teams, ...myTeams.map(t=>({match:t.name, league:t.league}))]}
+          favTeams={[...teams, ...myTeams.map(t=>({match:t.name, league:t.league}))]}
           onGoToSports={() => handleTabChange('sports')}/>
 
         {/* Pull-to-refresh indicator (mobile, touch-only) */}
