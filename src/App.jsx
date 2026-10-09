@@ -1508,6 +1508,23 @@ body{
 }
 .topbar-wx .rnw-row{padding:5px 0;} /* G7f item 7: trimmed weather band padding */
 .topbar-wx .rnw-forecast{padding-left:var(--s4);padding-right:var(--s4);}
+
+/* ── H1: weather ON the ticker line at >=1100px ───────────────────────────────
+   Inline weather is hidden by default (stacked band shows); at >=1100px the band
+   hides and the inline weather appears right-aligned on the ticker line, divided by
+   a hairline. D3 token roles (label/value/change) are unchanged. The forecast opens
+   as an absolute dropdown so the 30px strip never grows. */
+.ss-weather{display:none;}
+@media(min-width:1100px){
+  .topbar-wx{display:none;}                 /* band off — merged onto the ticker line */
+  .ss-weather{display:flex;align-items:center;flex-shrink:0;padding-left:14px;border-left:1px solid var(--border);height:100%;}
+  .ss-weather .rnw-card{background:none;border:none;border-radius:0;margin:0;overflow:visible;position:relative;}
+  .ss-weather .rnw-row{width:auto;padding:0;gap:10px;}
+  .ss-weather .rnw-cities{gap:var(--s3);flex:0 0 auto;overflow:visible;}
+  .ss-weather .rnw-forecast{position:absolute;top:calc(100% + 8px);right:0;width:min(380px,80vw);
+    background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);
+    box-shadow:var(--shadow-lg);padding:10px 14px;z-index:400;}
+}
 .ss-flag{display:inline-flex;align-items:center;gap:6px;flex-shrink:0;
   font-family:var(--font-sans);font-size:var(--fs-eyebrow);font-weight:700;text-transform:uppercase;letter-spacing:0.08em;
   border:none;background:none;padding:0;}
@@ -8079,6 +8096,9 @@ function TopBar({tab, setTab, search, setSearch, dark, setDark,
   // strip at the top of a phone screen). Persisted; desktop always shows the ticker.
   const [tickerOpen, setTickerOpen] = useState(() => ld('tickerOpen', false));
   useEffect(() => { sv('tickerOpen', tickerOpen); }, [tickerOpen]);
+  // H1: fetch Home weather ONCE here; render it both on the ticker line (>=1100px) and in
+  // the stacked band (<1100px) from this shared data — only one is visible per breakpoint.
+  const weatherData = useWeatherData(weatherCities, tab !== 'general');
   // D1: desktop search collapses to an icon (reclaims width for the nav); mobile
   // "More" chip opens a sheet holding Briefing/Podcasts/Sources/Saved.
   const [searchOpenDesktop, setSearchOpenDesktop] = useState(false);
@@ -8171,12 +8191,17 @@ function TopBar({tab, setTab, search, setSearch, dark, setDark,
               })}
             </div>
           </div>
+          {/* H1: at >=1100px the Home weather sits on the ticker line, right-aligned, with a
+              hairline separator (shared data; hidden <1100px via .ss-weather CSS). */}
+          {tab==='general' && weatherData.length > 0 && (
+            <div className="ss-weather"><RightNowWeather data={weatherData}/></div>
+          )}
         </div>
       </div>
 
-      {/* Home-only weather, stacked under the ticker as one contained top block. */}
+      {/* Home-only weather band, stacked under the ticker — shown only <1100px (H1). */}
       {tab==='general' && (
-        <div className="topbar-wx"><RightNowWeather cities={weatherCities}/></div>
+        <div className="topbar-wx"><RightNowWeather data={weatherData}/></div>
       )}
 
       {/* Scoreboard sits below weather and above the category nav (Pass G item 3).
@@ -8345,16 +8370,27 @@ function TopBar({tab, setTab, search, setSearch, dark, setDark,
 // ─── RIGHT NOW (Home-only local context card) ─────────────────────────────────
 // Weather moved off the global status strip (Part B) to a compact Home card:
 // one-line local conditions, tap to expand a 3-day forecast.
-function RightNowWeather({ cities }) {
+// H1: weather fetch lifted into a hook so the Home weather can render in TWO places
+// (the >=1100px ticker line AND the <1100px stacked band) from ONE fetch — no duplication.
+function useWeatherData(cities, skip = false) {
   const use = (cities && cities.length ? cities : DEFAULT_WEATHER_CITIES).slice(0, 2);
   const [list, setList] = useState([]);
-  const [open, setOpen] = useState(false);
   useEffect(() => {
+    if (skip) return;
     let live = true;
     Promise.all(use.map(c => fetchWeatherCity(c))).then(r => { if (live) setList(r.filter(Boolean)); });
     return () => { live = false; };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [JSON.stringify(use.map(c => c.name))]);
+  }, [JSON.stringify(use.map(c => c.name)), skip]);
+  return list;
+}
+
+// `data` (optional) lets a parent pass shared weather so the component is presentational;
+// without it, it self-fetches (back-compat).
+function RightNowWeather({ cities, data }) {
+  const self = useWeatherData(cities, !!data);
+  const list = data || self;
+  const [open, setOpen] = useState(false);
   if (!list.length) return null;
   return (
     <div className={`rnw-card ${open ? 'open' : ''}`}>
