@@ -43,20 +43,22 @@ function tierRank(a) { return tierRankOf(a && (a._tier || a.tier), 2); }
 // within a 6-hour window. Returns one representative per cluster — the highest-tier
 // member (ties keep the first seen, which is also the most recent when input is sorted
 // newest-first) — annotated with _clusterSize and up to 5 _clusterSources.
-export function clusterStories(articles) {
-  function bigrams(str) {
-    const words = (str || '').toLowerCase().replace(/[^a-z0-9 ]/g, '').split(/\s+/).filter(w => w.length > 2);
-    const bg = new Set();
-    for (let i = 0; i < words.length - 1; i++) bg.add(words[i] + '_' + words[i + 1]);
-    return bg;
-  }
-  function jaccard(a, b) {
-    if (!a.size || !b.size) return 0;
-    let inter = 0;
-    for (const k of a) if (b.has(k)) inter++;
-    return inter / (a.size + b.size - inter);
-  }
+// Title → set of word bigrams (words >2 chars, punctuation stripped). Module-level so
+// the same similarity primitive powers clusterStories AND the cross-list sameStory test.
+function bigrams(str) {
+  const words = (str || '').toLowerCase().replace(/[^a-z0-9 ]/g, '').split(/\s+/).filter(w => w.length > 2);
+  const bg = new Set();
+  for (let i = 0; i < words.length - 1; i++) bg.add(words[i] + '_' + words[i + 1]);
+  return bg;
+}
+function jaccard(a, b) {
+  if (!a.size || !b.size) return 0;
+  let inter = 0;
+  for (const k of a) if (b.has(k)) inter++;
+  return inter / (a.size + b.size - inter);
+}
 
+export function clusterStories(articles) {
   const sixHoursMs = 6 * 60 * 60 * 1000;
   const clustered = new Set();
   const result = [];
@@ -132,17 +134,40 @@ export function capByPublisher(items, max = 2) {
   return out;
 }
 
+// Cluster identity for a headline: decode entities, strip punctuation, keep the first
+// 10 words. Two headlines that normalize to the same key are the same story even when
+// title-bigram clustering missed them (e.g. one source encoded its entities, another
+// didn't). This is the de-facto cluster id used to dedupe any ranked list — within one
+// list (rankClusters) AND across lists (e.g. State of Play's Breaking rows vs its
+// numbered rows, so a breaking story never repeats below — I0.7).
+export function clusterKey(title) {
+  return decodeEntities(title || '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim().split(' ').slice(0, 10).join(' ');
+}
+
+// Are two articles the same story (same cluster)? True when they are the same link, a
+// member of each other's cluster (_clusterMembers), share a clusterKey, or their titles
+// pass the same bigram-Jaccard threshold clusterStories uses (>=0.28). This is the
+// cross-list cluster-identity test — e.g. to stop a Breaking story repeating in State of
+// Play's numbered rows even when the two headlines are only near-identical (I0.7).
+export function sameStory(a, b) {
+  if (!a || !b) return false;
+  if (a.link && b.link && a.link === b.link) return true;
+  const inMembers = (x, y) => Array.isArray(x._clusterMembers) && x._clusterMembers.some(m => m && m.link && m.link === y.link);
+  if (inMembers(a, b) || inMembers(b, a)) return true;
+  const ka = clusterKey(a.title), kb = clusterKey(b.title);
+  if (ka && ka === kb) return true;
+  return jaccard(bigrams(a.title), bigrams(b.title)) >= 0.28;
+}
+
 // Rank clusters by heat, then apply the per-publisher cap. This is the correct
 // primitive for any "ranked list" (Trending, State of Play, Top Stories).
 export function rankClusters(items, { max = 2, limit } = {}) {
   const ranked = [...(items || [])].sort((a, b) => heatScore(b) - heatScore(a));
-  // Drop near-identical headlines that title-bigram clustering missed — e.g. when
-  // one source encoded its entities and another didn't, so "'The Hawk' LA premiere"
-  // and "&#8216;The Hawk&#8217; LA premiere" never matched and both ranked (the
-  // duplicate-in-State-of-Play bug). Normalize by decoding + stripping punctuation.
+  // Drop near-identical headlines that title-bigram clustering missed (the
+  // duplicate-in-State-of-Play bug), keyed by the shared clusterKey normalization.
   const seen = new Set(), deduped = [];
   for (const a of ranked) {
-    const key = decodeEntities(a.title || '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim().split(' ').slice(0, 10).join(' ');
+    const key = clusterKey(a.title);
     if (key && seen.has(key)) continue;
     if (key) seen.add(key);
     deduped.push(a);
