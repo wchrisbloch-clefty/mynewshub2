@@ -36,16 +36,20 @@
 //  • Storage v25a_ → v25b_, migration from v25a/v24/v23/v22
 // ─────────────────────────────────────────────────────────────────────────────
 
-import { useState, useEffect, useLayoutEffect, useCallback, useMemo, useRef, Fragment } from 'react';
+import { useState, useEffect, useLayoutEffect, useCallback, useMemo, useRef, Fragment, lazy, Suspense } from 'react';
 // Extracted, dependency-isolated capability modules (see src/modules/*/README.md)
 import { clusterStories, hotClusterTopics, rankClusters, TREND_STOP, decodeEntities, capByPublisher } from './modules/clustering';
 import { opinionLabel } from './modules/opinion';
+import { ShareControl, buildBriefingExcerpt } from './modules/share';
+import { ConnectionsStrip, findConnections } from './modules/connections';
 import { qualifyBreaking, isPromoItem } from './modules/breaking';
 import { rankByVelocity, signalFor } from '../lib/voices/velocity';
 import { DEBUG, dbgRender, dbgPoll, DebugOverlay } from './modules/debug';
 import { makeVoice, upsertVoice, removeVoice as removeVoiceModel, mergeVoices, clearTombstone, voiceId, VOICE_PLATFORMS } from './modules/voices/model';
 import { SEED_VOICES } from './modules/voices/seeds';
-import { ResolveModal } from './modules/voices/ResolveModal';
+// G4: code-split heavy, not-needed-at-first-paint surfaces. Home is never lazy.
+// ChatBot is always mounted but not first-paint; ResolveModal is rare.
+const ResolveModal = lazy(() => import('./modules/voices/ResolveModal').then(m => ({ default: m.ResolveModal })));
 import { VoicesStrip } from './modules/voices/VoicesStrip';
 import { extractContent, extractionFallbackMessage } from './modules/extractor';
 import { retrieveFeedContext, buildFeedContextBlock } from './modules/retrieval';
@@ -57,7 +61,8 @@ import { MarketsSurface, useMarkets } from './modules/markets-surface';
 import { parseRoute, buildPath } from './modules/routing';
 import { PROMPT_VERSION } from '../lib/ai-models.js';
 import { TIER_LABEL, tagProvenance, TierBadge } from './modules/provenance';
-import { ChatBot } from './modules/concierge';
+const ChatBot = lazy(() => import('./modules/concierge').then(m => ({ default: m.ChatBot })));
+const prefetchLazy = () => { import('./modules/concierge'); import('./modules/voices/ResolveModal'); };
 // Icons: single set (lucide-react), fixed size per context — item 7.
 import { Settings, RefreshCw, Moon, Sun, User,
   Zap, Droplet, Leaf, TrendingUp, Scale, LayoutGrid, Film, Music, BookOpen, Laugh, Trophy } from 'lucide-react';
@@ -1477,9 +1482,9 @@ body{
    live/breaking · market ticker · weather chip
 ═══════════════════════════════════════════ */
 .status-strip{
-  height:38px;
+  height:30px; /* G7f item 7: slimmer ticker band (was 38px) */
   background:var(--surface);border-bottom:1px solid var(--border2);
-  font-family:var(--font-publicsans);
+  font-family:var(--font-sans);
 }
 /* Contain the ticker to the same max-width as the nav/content below it. */
 .status-strip-inner{
@@ -1493,7 +1498,7 @@ body{
 /* Scoreboard band in the top bar (below weather, above nav — Pass G item 3).
    Dark ESPN theme so the homepage strip matches the Sports-page strip (item 6). */
 .topbar-scores{background:var(--surface2);border-bottom:1px solid var(--border2);}
-.topbar-scores .home-scores{max-width:1400px;margin:0 auto;padding:6px var(--s4) 8px;border:none;border-radius:0;background:none;overflow:visible;}
+.topbar-scores .home-scores{max-width:1400px;margin:0 auto;padding:4px var(--s4) 5px;border:none;border-radius:0;background:none;overflow:visible;}
 .topbar-wrap.shrunk .topbar-scores{display:none;}
 /* Right-edge fade cue: partial cards read as "scroll for more," not a cutoff. */
 .topbar-scores .home-scores,.sports-score-strip{position:relative;}
@@ -1501,11 +1506,11 @@ body{
   content:'';position:absolute;top:0;right:0;bottom:0;width:34px;pointer-events:none;
   background:linear-gradient(90deg,transparent,var(--surface2));
 }
-.topbar-wx .rnw-row{padding:8px 0;}
+.topbar-wx .rnw-row{padding:5px 0;} /* G7f item 7: trimmed weather band padding */
 .topbar-wx .rnw-forecast{padding-left:var(--s4);padding-right:var(--s4);}
 .ss-flag{display:inline-flex;align-items:center;gap:6px;flex-shrink:0;
-  font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:0.09em;
-  border:none;background:none;font-family:inherit;padding:0;}
+  font-family:var(--font-sans);font-size:var(--fs-eyebrow);font-weight:700;text-transform:uppercase;letter-spacing:0.08em;
+  border:none;background:none;padding:0;}
 .ss-flag-markets{color:var(--text3);cursor:default;}
 .ss-flag-breaking{color:var(--red);cursor:default;}
 /* (.ss-breaking-head retired in Pass L item 3 — breaking headlines now fold into the
@@ -1514,8 +1519,10 @@ body{
   animation:ss-pulse 1.8s ease-out infinite;}
 @keyframes ss-pulse{0%{box-shadow:0 0 0 0 rgba(200,16,46,0.5);}70%{box-shadow:0 0 0 6px rgba(200,16,46,0);}100%{box-shadow:0 0 0 0 rgba(200,16,46,0);}}
 .ss-ticker{flex:1;min-width:0;overflow:hidden;
-  -webkit-mask-image:linear-gradient(90deg,transparent,#000 20px,#000 calc(100% - 20px),transparent);
-          mask-image:linear-gradient(90deg,transparent,#000 20px,#000 calc(100% - 20px),transparent);}
+  /* G7f item 5: no left fade — the first symbol (S&P) is fully visible at scroll 0.
+     Only the right edge fades as a "more →" cue. */
+  -webkit-mask-image:linear-gradient(90deg,#000 0,#000 calc(100% - 24px),transparent);
+          mask-image:linear-gradient(90deg,#000 0,#000 calc(100% - 24px),transparent);}
 .ss-ticker-inner{display:flex;align-items:center;gap:var(--s4);overflow-x:auto;scrollbar-width:none;}
 .ss-ticker-inner::-webkit-scrollbar{display:none;}
 .ss-tk{display:inline-flex;align-items:baseline;gap:6px;flex-shrink:0;
@@ -1532,8 +1539,8 @@ body{
 
 /* ═══ HOME: Right Now weather card + Houston local row (Part B) ═══ */
 .rnw-card{background:var(--surface);border:1px solid var(--border2);border-radius:var(--radius);margin-bottom:var(--s4);overflow:hidden;}
-.rnw-row{width:100%;display:flex;align-items:center;gap:var(--s3);padding:12px var(--s4);background:none;border:none;cursor:pointer;font-family:var(--font-publicsans);text-align:left;}
-.rnw-label{font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:0.08em;color:var(--accent);flex-shrink:0;}
+.rnw-row{width:100%;display:flex;align-items:center;gap:var(--s3);padding:12px var(--s4);background:none;border:none;cursor:pointer;font-family:var(--font-sans);text-align:left;}
+.rnw-label{font-family:var(--font-sans);font-size:var(--fs-eyebrow);font-weight:700;text-transform:uppercase;letter-spacing:0.08em;color:var(--text3);flex-shrink:0;}
 .rnw-city{font-size:var(--fs-meta);font-weight:700;color:var(--text);text-transform:uppercase;letter-spacing:0.04em;}
 .rnw-temp{font-size:var(--fs-body);font-weight:700;color:var(--text);font-variant-numeric:tabular-nums;}
 .rnw-desc{font-size:var(--fs-meta);color:var(--text2);}
@@ -1560,8 +1567,8 @@ body{
 }
 .houston-row{margin-bottom:var(--s4);}
 .houston-head{display:flex;align-items:baseline;gap:8px;margin-bottom:10px;}
-.houston-label{font-family:var(--font-archivo);font-weight:800;font-size:var(--fs-headline);color:var(--text);letter-spacing:-0.2px;}
-.houston-sub{font-family:var(--font-publicsans);font-size:var(--fs-meta);font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:var(--text3);}
+.houston-label{font-family:var(--font-serif);font-weight:800;font-size:var(--fs-headline);color:var(--text);letter-spacing:-0.2px;}
+.houston-sub{font-family:var(--font-sans);font-size:var(--fs-meta);font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:var(--text3);}
 /* Horizontal scroll strip (Pass H item 3) — a compact rail instead of a full-width
    3-up grid row, so consecutive image blocks don't stack into a tall wall. */
 .houston-scroll{display:flex;gap:var(--s3);overflow-x:auto;scroll-snap-type:x proximity;scrollbar-width:none;-webkit-overflow-scrolling:touch;}
@@ -1570,8 +1577,8 @@ body{
 .houston-card:hover{border-color:var(--accent);}
 .houston-img{width:100%;aspect-ratio:16/9;object-fit:cover;background:var(--surface2);margin-bottom:8px;}
 .houston-img-ph{display:flex;align-items:center;justify-content:center;background:linear-gradient(135deg,var(--surface2),var(--surface));}
-.houston-card-title{font-family:var(--font-publicsans);font-size:var(--fs-body);font-weight:600;line-height:1.35;color:var(--text);padding:0 10px;margin-bottom:6px;overflow-wrap:anywhere;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden;}
-.houston-card-meta{font-family:var(--font-publicsans);font-size:10px;color:var(--text3);padding:0 10px;display:flex;gap:5px;flex-wrap:wrap;font-variant-numeric:tabular-nums;}
+.houston-card-title{font-family:var(--font-sans);font-size:var(--fs-body);font-weight:600;line-height:1.35;color:var(--text);padding:0 10px;margin-bottom:6px;overflow-wrap:anywhere;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden;}
+.houston-card-meta{font-family:var(--font-sans);font-size:10px;color:var(--text3);padding:0 10px;display:flex;gap:5px;flex-wrap:wrap;font-variant-numeric:tabular-nums;}
 @media(max-width:640px){
   /* F1 bug fix: the flex row defaulted to align-items:stretch, so a short-title card
      stretched to the tallest card and showed a large empty tail of white card background
@@ -1582,9 +1589,9 @@ body{
 }
 /* Following row (My Topics + My Teams) */
 .following-row{display:flex;align-items:center;gap:var(--s3);flex-wrap:wrap;margin-bottom:var(--s4);padding-bottom:var(--s3);border-bottom:1px solid var(--border2);}
-.following-label{font-family:var(--font-archivo);font-weight:800;font-size:12px;text-transform:uppercase;letter-spacing:0.07em;color:var(--text3);flex-shrink:0;}
+.following-label{font-family:var(--font-serif);font-weight:800;font-size:12px;text-transform:uppercase;letter-spacing:0.07em;color:var(--text3);flex-shrink:0;}
 .following-chips{display:flex;gap:8px;flex-wrap:wrap;}
-.following-chip{display:inline-flex;align-items:center;gap:6px;background:var(--accent-bg);border:1px solid var(--border2);border-radius:16px;padding:4px 6px 4px 12px;font-family:var(--font-publicsans);}
+.following-chip{display:inline-flex;align-items:center;gap:6px;background:var(--accent-bg);border:1px solid var(--border2);border-radius:16px;padding:4px 6px 4px 12px;font-family:var(--font-sans);}
 .following-chip-team{padding-left:5px;}
 /* a11y (row 117): wrapper stays a <span>; the navigate action is the inner
    .following-chip-main <button> and the × unfollow is a sibling <button>. */
@@ -1592,13 +1599,13 @@ body{
 .following-chip-main:focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:8px;}
 /* ── Team logos (ESPN CDN) + initials fallback (Sports only) ── */
 .team-logo{border-radius:6px;object-fit:contain;flex-shrink:0;background:var(--surface2);}
-.team-logo-ph{display:inline-flex;align-items:center;justify-content:center;font-family:var(--font-archivo);font-weight:800;color:var(--accent);letter-spacing:0.02em;line-height:1;}
+.team-logo-ph{display:inline-flex;align-items:center;justify-content:center;font-family:var(--font-serif);font-weight:800;color:var(--accent);letter-spacing:0.02em;line-height:1;}
 /* ── Entity mini-hub header (Markets/Energy/etc.) ── */
 .entity-hub-header{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:var(--s4);padding-bottom:var(--s3);border-bottom:1px solid var(--border2);}
-.entity-hub-title{font-family:var(--font-archivo);font-weight:900;font-size:26px;letter-spacing:-0.4px;color:var(--text);line-height:1.1;text-transform:capitalize;}
-.entity-hub-sub{font-family:var(--font-publicsans);font-size:12px;color:var(--text3);margin-top:4px;}
+.entity-hub-title{font-family:var(--font-serif);font-weight:900;font-size:26px;letter-spacing:-0.4px;color:var(--text);line-height:1.1;text-transform:capitalize;}
+.entity-hub-sub{font-family:var(--font-sans);font-size:12px;color:var(--text3);margin-top:4px;}
 .entity-hub-actions{display:flex;gap:8px;align-items:center;flex-shrink:0;}
-.entity-hub-btn{font-size:12px;font-weight:700;color:var(--text2);background:var(--surface);border:1px solid var(--border);border-radius:20px;padding:7px 16px;cursor:pointer;font-family:var(--font-publicsans);transition:all 0.12s;}
+.entity-hub-btn{font-size:12px;font-weight:700;color:var(--text2);background:var(--surface);border:1px solid var(--border);border-radius:20px;padding:7px 16px;cursor:pointer;font-family:var(--font-sans);transition:all 0.12s;}
 .entity-hub-btn:hover{border-color:var(--accent);color:var(--accent);}
 .entity-hub-btn.on{color:var(--amber);border-color:var(--amber);}
 .following-chip:hover{border-color:var(--accent);}
@@ -1609,13 +1616,13 @@ body{
 .following-empty{font-size:12px;color:var(--text3);font-style:italic;}
 /* Search-and-add popover for teams/topics */
 .follow-add-wrap{position:relative;display:inline-block;}
-.following-add-btn{background:none;border:1px dashed var(--border);border-radius:16px;padding:4px 12px;font-family:var(--font-publicsans);font-size:12px;font-weight:600;color:var(--text2);cursor:pointer;}
+.following-add-btn{background:none;border:1px dashed var(--border);border-radius:16px;padding:4px 12px;font-family:var(--font-sans);font-size:12px;font-weight:600;color:var(--text2);cursor:pointer;}
 .following-add-btn:hover{border-color:var(--accent);color:var(--accent);border-style:solid;}
 .follow-add{position:absolute;top:calc(100% + 6px);left:0;z-index:400;width:280px;background:var(--surface);border:1px solid var(--border);border-radius:10px;box-shadow:var(--shadow-lg);padding:8px;}
-.follow-add-input{width:100%;box-sizing:border-box;border:1px solid var(--border);border-radius:8px;padding:8px 10px;font-family:var(--font-publicsans);font-size:var(--fs-body);background:var(--surface);color:var(--text);}
+.follow-add-input{width:100%;box-sizing:border-box;border:1px solid var(--border);border-radius:8px;padding:8px 10px;font-family:var(--font-sans);font-size:var(--fs-body);background:var(--surface);color:var(--text);}
 .follow-add-input:focus{outline:none;border-color:var(--accent);}
 .follow-add-results{margin-top:6px;display:flex;flex-direction:column;gap:1px;max-height:260px;overflow-y:auto;}
-.follow-add-item{display:flex;align-items:center;gap:8px;width:100%;background:none;border:none;cursor:pointer;padding:7px 6px;border-radius:7px;text-align:left;font-family:var(--font-publicsans);}
+.follow-add-item{display:flex;align-items:center;gap:8px;width:100%;background:none;border:none;cursor:pointer;padding:7px 6px;border-radius:7px;text-align:left;font-family:var(--font-sans);}
 .follow-add-item:hover{background:var(--surface2);}
 .follow-add-name{flex:1;min-width:0;font-size:var(--fs-body);font-weight:600;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
 .follow-add-league{font-size:10px;font-weight:700;color:var(--text3);}
@@ -1755,7 +1762,7 @@ body:not(.dark) .pill-bar{
   height:54px;padding:0 24px;
 }
 .logo-wrap{flex-shrink:0;line-height:1;padding-right:20px;border-right:1px solid var(--border);}
-/* Playfair Display for logo — TIME-magazine DNA */
+/* Source Serif 4 for logo — TIME-magazine DNA */
 .logo{
   font-family:var(--font-serif);font-size:20px;font-weight:900;
   color:var(--text);letter-spacing:-0.5px;line-height:1;
@@ -1922,7 +1929,7 @@ body:not(.dark) .pill-bar{
 .fc-opinion{
   font-size:9px;font-weight:800;text-transform:uppercase;letter-spacing:0.06em;
   color:var(--text3);border:1px solid var(--border);border-radius:4px;padding:1px 6px;
-  font-family:var(--font-publicsans);white-space:nowrap;
+  font-family:var(--font-sans);white-space:nowrap;
 }
 .fc-alert-badge{
   font-size:9px;font-weight:900;background:var(--accent);color:var(--on-accent);
@@ -1942,12 +1949,12 @@ body:not(.dark) .pill-bar{
 }
 /* Typographic fallback for image-less cards: publisher name in the display face
    on a neutral field (replaces the old emoji placeholders). */
-.ph-label{font-family:var(--font-archivo);font-weight:800;font-size:var(--fs-meta);letter-spacing:0.03em;
+.ph-label{font-family:var(--font-serif);font-weight:800;font-size:var(--fs-meta);letter-spacing:0.03em;
   text-transform:uppercase;color:var(--text3);text-align:center;padding:0 8px;line-height:1.25;
   overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;}
 .fc-text{flex:1;min-width:0;}
 .fc-title{
-  /* TIME Magazine: Playfair Display bold serif headline — the definitive editorial signal */
+  /* TIME Magazine: Source Serif 4 bold serif headline — the definitive editorial signal */
   font-family:var(--font-serif);
   font-size:18px;font-weight:700;color:var(--text);line-height:1.25;
   letter-spacing:-0.2px;margin-bottom:6px;
@@ -2019,7 +2026,7 @@ body:not(.dark) .pill-bar{
 .fc-disc{margin-top:10px;background:var(--surface2);border-radius:8px;padding:10px 12px;border-left:3px dashed var(--border);}
 .fc-disc-head{display:flex;align-items:baseline;gap:8px;flex-wrap:wrap;margin-bottom:8px;}
 .fc-disc-lbl{font-size:9px;font-weight:700;color:#0284c7;text-transform:uppercase;letter-spacing:0.08em;}
-.fc-disc-note{font-family:var(--font-publicsans);font-size:10px;color:var(--text4);font-style:italic;margin-left:auto;}
+.fc-disc-note{font-family:var(--font-sans);font-size:10px;color:var(--text4);font-style:italic;margin-left:auto;}
 @media(max-width:640px){ .fc-disc-note{width:100%;margin-left:0;} }
 .fc-disc-item{display:flex;align-items:center;gap:8px;padding:5px 0;text-decoration:none;color:var(--text);font-size:var(--fs-meta);transition:color 0.1s;}
 .fc-disc-item:hover{color:#0284c7;}
@@ -2036,7 +2043,7 @@ body:not(.dark) .pill-bar{
 .ghs-trigger-label{font-size:12px;color:var(--text3);}
 .ghs{background:var(--surface2);border-left:3px dashed var(--border);border-radius:10px;padding:10px 14px;margin:4px 0;}
 .ghs-head{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:8px;}
-.ghs-note{font-family:var(--font-publicsans);font-size:10px;color:var(--text4);font-style:italic;margin-left:auto;}
+.ghs-note{font-family:var(--font-sans);font-size:10px;color:var(--text4);font-style:italic;margin-left:auto;}
 .ghs-close{background:none;border:none;color:var(--text3);font-size:18px;line-height:1;cursor:pointer;}
 .ghs-loading,.ghs-empty{font-size:11px;color:var(--text3);font-style:italic;}
 .ghs-list{display:flex;flex-direction:column;}
@@ -2090,8 +2097,8 @@ body:not(.dark) .pill-bar{
 .sd-list{display:flex;flex-direction:column;gap:2px;}
 .sd-row{display:flex;align-items:center;gap:10px;padding:7px 0;border-top:1px solid var(--border2);}
 .sd-row:first-of-type{border-top:none;}
-.sd-name{flex:1;min-width:0;font-family:var(--font-publicsans);font-size:12px;font-weight:600;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
-.sd-tier{flex-shrink:0;font-family:var(--font-publicsans);font-size:9px;font-weight:800;text-transform:uppercase;letter-spacing:0.04em;border-radius:10px;padding:2px 7px;}
+.sd-name{flex:1;min-width:0;font-family:var(--font-sans);font-size:12px;font-weight:600;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.sd-tier{flex-shrink:0;font-family:var(--font-sans);font-size:9px;font-weight:800;text-transform:uppercase;letter-spacing:0.04em;border-radius:10px;padding:2px 7px;}
 .sd-tier-verified{color:#fff;background:var(--green);}
 .sd-tier-reported{color:var(--amber);background:rgba(154,98,7,0.12);}
 .sd-tier-inferred{color:var(--text3);background:var(--surface2);border:1px solid var(--border);}
@@ -2125,15 +2132,14 @@ body:not(.dark) .pill-bar{
   display:flex;align-items:center;justify-content:space-between;
   padding-bottom:7px;border-bottom:2px solid var(--border);margin-bottom:9px; /* F6: tightened (was 9/12) */
 }
+/* G7c: all section labels resolve to the ONE eyebrow spec (see .eyebrow in tokens.css):
+   Inter, --fs-eyebrow, weight 700, uppercase, 0.08em tracking, meta colour. */
 .sidebar-sec-label{
-  font-size:10px;font-weight:800;color:var(--text3);
-  text-transform:uppercase;letter-spacing:0.14em;
+  font-family:var(--font-sans);font-size:var(--fs-eyebrow);font-weight:700;color:var(--text3);
+  text-transform:uppercase;letter-spacing:0.08em;
 }
-/* D5 fix 4: ONE canonical small-caps section label. .rail-label (previously undefined,
-   styled only by inline one-offs at each use) now shares it, as do the migrated inline
-   "From the Web" / section headers. */
 .section-label,.rail-label{
-  font-family:var(--font-sans);font-size:var(--fs-meta);font-weight:800;
+  font-family:var(--font-sans);font-size:var(--fs-eyebrow);font-weight:700;
   color:var(--text3);text-transform:uppercase;letter-spacing:0.08em;
 }
 .sidebar-sec-action{
@@ -2153,22 +2159,22 @@ body:not(.dark) .pill-bar{
    and a fixed min-height so count/star chips line up with plain ones. Spacing rhythm
    matches the Sports/Energy/Pop-Culture filter pills. */
 /* Prediction Markets sidebar module (Pass: item 4) — market sentiment, not news. */
-.pm-tag{font-family:var(--font-publicsans);font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:0.04em;color:var(--text4);}
+.pm-tag{font-family:var(--font-sans);font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:0.04em;color:var(--text4);}
 /* F6: tagline shown once under the collapsible header; muted, out of the way. */
-.pm-tagline{font-family:var(--font-publicsans);font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:0.04em;color:var(--text4);margin:-2px 0 8px;}
-.pm-empty{font-family:var(--font-publicsans);font-size:var(--fs-meta);color:var(--text3);padding:4px 0 2px;}
+.pm-tagline{font-family:var(--font-sans);font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:0.04em;color:var(--text4);margin:-2px 0 8px;}
+.pm-empty{font-family:var(--font-sans);font-size:var(--fs-meta);color:var(--text3);padding:4px 0 2px;}
 .pm-list{display:flex;flex-direction:column;}
 .pm-row{display:flex;align-items:flex-start;gap:10px;padding:9px 0;border-top:1px solid var(--border2);text-decoration:none;}
 .pm-row:first-of-type{border-top:none;}
 .pm-row:hover .pm-q{color:var(--accent);}
-.pm-prob{flex-shrink:0;min-width:38px;text-align:right;font-family:var(--font-archivo);font-weight:800;font-size:15px;font-variant-numeric:tabular-nums;line-height:1.15;}
+.pm-prob{flex-shrink:0;min-width:38px;text-align:right;font-family:var(--font-serif);font-weight:800;font-size:15px;font-variant-numeric:tabular-nums;line-height:1.15;}
 .pm-prob.pm-hi{color:var(--pos);}
 .pm-prob.pm-lo{color:var(--neg);}
 .pm-prob.pm-mid{color:var(--text2);}
 .pm-body{display:flex;flex-direction:column;gap:2px;min-width:0;}
 /* D4: tokenized (was 12px) — sidebar body tracks the main body scale. */
-.pm-q{font-family:var(--font-publicsans);font-size:var(--fs-body);font-weight:600;line-height:1.3;color:var(--text);display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;overflow-wrap:anywhere;}
-.pm-src{font-family:var(--font-publicsans);font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:0.03em;color:var(--text3);}
+.pm-q{font-family:var(--font-sans);font-size:var(--fs-body);font-weight:600;line-height:1.3;color:var(--text);display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;overflow-wrap:anywhere;}
+.pm-src{font-family:var(--font-sans);font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:0.03em;color:var(--text3);}
 .ttp-chips{display:flex;flex-wrap:wrap;gap:6px;}
 /* a11y (row 117): the pill is a non-interactive wrapper; the primary "filter by topic"
    action is the inner .ttp-chip-main <button> (aria-pressed = active), and the follow
@@ -2201,7 +2207,7 @@ body:not(.dark) .pill-bar{
 .sb-across-clabel:hover{text-decoration:underline;}
 .sb-across-item{cursor:pointer;padding:5px 0;border-top:1px solid var(--border2);}
 .sb-across-cat .sb-across-item:first-of-type{border-top:none;}
-.sb-across-title{font-family:var(--font-archivo);font-weight:600;font-size:var(--fs-body);line-height:1.3;color:var(--text);display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;}/* D4: tokenized (was 12px) */
+.sb-across-title{font-family:var(--font-serif);font-weight:600;font-size:var(--fs-body);line-height:1.3;color:var(--text);display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;}/* D4: tokenized (was 12px) */
 .sb-across-item:hover .sb-across-title{color:var(--accent);}
 .sb-across-src{font-size:10px;color:var(--text3);margin-top:2px;}
 
@@ -2291,9 +2297,11 @@ body:not(.dark) .pill-bar{
 .sb-game:hover{border-color:var(--accent);}
 .sb-game.fav{border-color:#f59e0b;background:#fffbeb;}
 .dark .sb-game.fav{background:rgba(245,158,11,0.07);}
-.sb-game.live{border-color:var(--red);background:#fef2f2;}
-.dark .sb-game.live{background:rgba(220,38,38,0.1);}
-.sb-game.fav.live{border-color:var(--red);}
+/* G7f item 6: live games use a NEUTRAL hairline card (red lives in the small live dot +
+   period/clock only), not a heavy red box/wash. */
+.sb-game.live{border-color:var(--border);background:none;}
+.dark .sb-game.live{background:none;}
+.sb-game.fav.live{border-color:var(--accent);}
 .sb-game-row{display:flex;align-items:center;justify-content:space-between;gap:6px;padding:1px 0;}
 .sb-side{display:flex;align-items:center;gap:6px;flex:1;min-width:0;}
 .sb-logo{width:15px;height:15px;object-fit:contain;flex-shrink:0;}
@@ -2386,7 +2394,7 @@ body:not(.dark) .pill-bar{
 .hero-prev{left:12px;}.hero-next{right:12px;}
 .hero-lead-text{padding:18px 20px 20px;}
 .hero-lead-title{
-  /* TIME-style: big bold Playfair Display serif — this is the centrepiece headline */
+  /* TIME-style: big bold Source Serif 4 serif — this is the centrepiece headline */
   font-family:var(--font-serif);
   font-size:26px;font-weight:700;color:var(--text);line-height:1.2;
   letter-spacing:-0.3px;margin:0 0 10px;
@@ -2716,7 +2724,7 @@ body:not(.dark) .pill-bar{
 .cp-vs-seed{color:#b45309;background:rgba(217,119,6,0.12);}
 .cp-vs-unconfirmed{color:var(--text3);background:var(--surface2);}
 .cp-voice-flag{font-size:9px;color:#b45309;font-weight:700;}
-.cp-voice-handles{font-size:var(--fs-meta);color:var(--text3);font-family:var(--font-publicsans);}
+.cp-voice-handles{font-size:var(--fs-meta);color:var(--text3);font-family:var(--font-sans);}
 .cp-voice-actions{display:inline-flex;align-items:center;gap:4px;flex-shrink:0;}
 .cp-voice-btn{background:none;border:1px solid var(--border);border-radius:6px;min-width:34px;min-height:34px;padding:0 8px;cursor:pointer;color:var(--text3);font-size:12px;font-weight:700;font-family:inherit;}
 .cp-voice-btn:hover:not(:disabled){border-color:var(--accent);color:var(--accent);}
@@ -2732,7 +2740,7 @@ body:not(.dark) .pill-bar{
 .cp-seed-actions{margin-left:auto;display:inline-flex;gap:6px;}
 /* E5: Test voices results */
 .cp-vtest{margin-top:8px;display:flex;flex-direction:column;gap:3px;}
-.cp-vtest-row{display:flex;align-items:center;gap:8px;font-family:var(--font-publicsans);font-size:var(--fs-meta);}
+.cp-vtest-row{display:flex;align-items:center;gap:8px;font-family:var(--font-sans);font-size:var(--fs-meta);}
 .cp-vtest-dot{width:7px;height:7px;border-radius:50%;flex-shrink:0;}
 .cp-vtest-dot.ok{background:var(--pos,#0f9d58);}
 .cp-vtest-dot.fail{background:var(--neg,#d02f2f);}
@@ -3066,9 +3074,9 @@ body:not(.dark) .pill-bar{
   transition:border-color 0.15s, transform 0.1s;
 }
 .score-tile:hover{border-color:var(--accent);transform:translateY(-1px);}
-.score-tile.live{border-color:var(--red);}
+.score-tile.live{border-color:var(--border);} /* G7f item 6: neutral hairline, not red box */
 .score-tile.fav{border-color:var(--accent);}
-.score-tile.fav.live{border-color:var(--red);}
+.score-tile.fav.live{border-color:var(--accent);}
 .score-tile-star{
   position:absolute;top:5px;right:8px;
   color:var(--amber);font-size:10px;
@@ -3813,7 +3821,7 @@ body:not(.dark) .pill-bar{
    parent; the <CoverImg> React helper hides the <img> on load failure so the labeled
    placeholder underneath shows through — never a blank box. */
 .cover-img-ph{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;text-align:center;padding:0 10px;border-radius:inherit;background:linear-gradient(135deg,var(--navy-light) 0%,var(--navy) 100%);}
-.cover-img-ph-label{font-family:var(--font-archivo);font-weight:800;font-size:13px;letter-spacing:0.02em;color:rgba(255,255,255,0.55);display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;overflow-wrap:anywhere;}
+.cover-img-ph-label{font-family:var(--font-serif);font-weight:800;font-size:13px;letter-spacing:0.02em;color:rgba(255,255,255,0.55);display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;overflow-wrap:anywhere;}
 .cover-img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;object-position:center top;border-radius:inherit;display:block;}
 /* Ensure the card-image containers clip the absolute CoverImg to their rounded box. */
 .gn-card-img{position:relative;overflow:hidden;}
@@ -4408,7 +4416,7 @@ body{overscroll-behavior-y:contain;}
    pill — accent ink on a neutral surface, no decorative colour (the old dark-mode
    purple #2d1f5a/#a78bfa is removed). */
 .sources-tag{
-  font-family:var(--font-publicsans);font-size:10px;font-weight:700;color:var(--accent);
+  font-family:var(--font-sans);font-size:10px;font-weight:700;color:var(--accent);
   background:var(--surface2);border-radius:10px;padding:2px 8px;white-space:nowrap;letter-spacing:0;
 }
 
@@ -4434,7 +4442,7 @@ body{overscroll-behavior-y:contain;}
 .gn-lead-solo{cursor:pointer;transition:opacity 0.15s;}
 .gn-lead-solo:hover{opacity:0.92;}
 .gn-lead-solo .gn-lead-img{border-radius:var(--radius);margin-bottom:16px;}
-/* TIME-magazine lead headline: largest Playfair Display on the page */
+/* TIME-magazine lead headline: largest Source Serif 4 on the page */
 .gn-lead-solo .gn-lead-title{
   font-family:var(--font-serif);
   font-size:32px;font-weight:700;line-height:1.15;letter-spacing:-0.3px;
@@ -5066,12 +5074,12 @@ kbd{display:inline-block;padding:1px 5px;border:1px solid var(--border);border-r
 @keyframes persp-slide-in{from{transform:translateX(100%);}to{transform:translateX(0);}}
 .persp-head{display:flex;align-items:flex-start;gap:12px;padding:var(--s4);border-bottom:1px solid var(--border2);position:sticky;top:0;background:var(--surface);z-index:1;}
 .persp-head-text{flex:1;min-width:0;}
-.persp-kicker{font-family:var(--font-publicsans);font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:0.08em;margin-bottom:4px;}
-.persp-title{font-family:var(--font-archivo);font-weight:800;font-size:17px;line-height:1.25;color:var(--text);letter-spacing:-0.2px;overflow-wrap:anywhere;}
+.persp-kicker{font-family:var(--font-sans);font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:0.08em;margin-bottom:4px;}
+.persp-title{font-family:var(--font-serif);font-weight:800;font-size:17px;line-height:1.25;color:var(--text);letter-spacing:-0.2px;overflow-wrap:anywhere;}
 .persp-close{background:none;border:none;font-size:24px;line-height:1;color:var(--text3);cursor:pointer;flex-shrink:0;padding:0 2px;}
 .persp-close:hover{color:var(--text);}
 .persp-body{flex:1;overflow-y:auto;padding:var(--s4);display:flex;flex-direction:column;gap:var(--s5);-webkit-overflow-scrolling:touch;}
-.persp-sec-lbl{font-family:var(--font-publicsans);font-size:var(--fs-meta);font-weight:800;text-transform:uppercase;letter-spacing:0.07em;color:var(--text3);margin-bottom:10px;padding-bottom:6px;border-bottom:1px solid var(--border2);}
+.persp-sec-lbl{font-family:var(--font-sans);font-size:var(--fs-meta);font-weight:800;text-transform:uppercase;letter-spacing:0.07em;color:var(--text3);margin-bottom:10px;padding-bottom:6px;border-bottom:1px solid var(--border2);}
 .persp-muted{font-size:12px;color:var(--text3);font-style:italic;padding:2px 0;}
 @media(max-width:640px){
   .persp-overlay{justify-content:center;align-items:flex-end;}
@@ -5116,9 +5124,11 @@ kbd{display:inline-block;padding:1px 5px;border:1px solid var(--border);border-r
   display:flex;gap:8px;flex-wrap:wrap;margin-bottom:20px;
 }
 .article-reader-btn{
-  font-size:12px;font-weight:700;padding:7px 14px;border-radius:6px;
+  font-size:12px;font-weight:700;padding:7px 14px;border-radius:var(--radius);
   border:1px solid var(--border);background:var(--surface2);
   color:var(--text2);cursor:pointer;transition:all 0.15s;
+  display:inline-flex;align-items:center;gap:6px;font-family:var(--font-sans);
+  text-decoration:none;
 }
 .article-reader-btn:hover{border-color:var(--accent);color:var(--accent);}
 .article-reader-btn.primary{
@@ -5143,7 +5153,7 @@ kbd{display:inline-block;padding:1px 5px;border:1px solid var(--border);border-r
 /* F9: header Ask — compact, sits after source · time. */
 .article-reader-ask{
   display:inline-flex;align-items:center;gap:4px;margin-left:auto;
-  font-family:var(--font-publicsans);font-size:11px;font-weight:700;letter-spacing:0;text-transform:none;
+  font-family:var(--font-sans);font-size:11px;font-weight:700;letter-spacing:0;text-transform:none;
   color:var(--accent);background:var(--accent-bg);border:1px solid transparent;border-radius:14px;
   padding:3px 10px;cursor:pointer;transition:background 0.12s;
 }
@@ -5153,9 +5163,9 @@ kbd{display:inline-block;padding:1px 5px;border:1px solid var(--border);border-r
 .article-reader-related-row{display:flex;flex-direction:column;gap:2px;width:100%;text-align:left;
   background:none;border:none;border-top:1px solid var(--border2);padding:9px 0;cursor:pointer;font-family:inherit;}
 .article-reader-related-row:first-of-type{border-top:none;}
-.arr-title{font-family:var(--font-archivo);font-weight:600;font-size:var(--fs-body);line-height:1.3;color:var(--text);}
+.arr-title{font-family:var(--font-serif);font-weight:600;font-size:var(--fs-body);line-height:1.3;color:var(--text);}
 .article-reader-related-row:hover .arr-title{color:var(--accent);}
-.arr-src{font-family:var(--font-publicsans);font-size:var(--fs-meta);color:var(--text3);}
+.arr-src{font-family:var(--font-sans);font-size:var(--fs-meta);color:var(--text3);}
 @media(max-width:640px){
   .article-reader-overlay{padding:0;}
   .article-reader{border-radius:0;min-height:100dvh;}
@@ -5339,94 +5349,91 @@ kbd{display:inline-block;padding:1px 5px;border:1px solid var(--border);border-r
   margin-bottom:14px;
 }
 .toh-strip-label{
-  font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:0.12em;
+  font-family:var(--font-sans);font-size:var(--fs-eyebrow);font-weight:700;text-transform:uppercase;letter-spacing:0.08em;
   color:var(--text3);
 }
 /* ONE ROW (Pass G item 4): a tall hero (~53%) on the left + a rail of up to three
    compact secondaries stacked on the right — never a second row of picture-cards.
    The hero spans all three rail rows so the module is one band, not a grid of
    equal boxes. One column on mobile (see media query). */
-.toh-grid{
-  display:grid;
-  grid-template-columns:53% 1fr;
-  grid-auto-rows:104px;
-  gap:14px;
-}
-.toh-card-lead{grid-column:1;grid-row:1 / span 3;}
-.toh-card:not(.toh-card-lead){grid-column:2;}
+/* G7f item 1: lead (overlay) LEFT, an independent column of secondaries RIGHT. Flex,
+   not a spanning grid, so the lead's height is no longer coupled to the rail. */
+.toh-grid{display:grid;grid-template-columns:53% 1fr;gap:14px;align-items:stretch;}
+.toh-side{display:flex;flex-direction:column;gap:14px;min-width:0;}
 .toh-card{
-  position:relative;border-radius:10px;overflow:hidden;
-  cursor:pointer;display:block;
-  background:var(--surface2);
+  border-radius:var(--radius);overflow:hidden;cursor:pointer;
   transition:transform 0.2s,box-shadow 0.2s;
 }
-.toh-card:hover{transform:translateY(-2px);box-shadow:0 12px 40px rgba(0,0,0,0.22);}
-/* Card height comes from the grid rows now, not an aspect-ratio spacer. */
+.toh-card:hover{transform:translateY(-1px);box-shadow:var(--shadow-md);}
 .toh-card::before{content:none;}
-.toh-img-ph{position:absolute;inset:0;background-size:cover;background-position:center top;}
-.toh-img{
-  position:absolute;inset:0;width:100%;height:100%;
-  object-fit:cover;object-position:center top;display:block;
-}
+.toh-img{object-fit:cover;object-position:center top;display:block;width:100%;height:100%;}
 .toh-img-ph{
   display:flex;align-items:center;justify-content:center;
-  /* Branded neutral field (never a bare grey box) with the publisher set large in
-     the display face, sitting UNDER the gradient+headline as a watermark. */
   background:linear-gradient(135deg,var(--navy-light) 0%,var(--navy) 100%);
 }
-.toh-img-ph .ph-label{font-size:clamp(20px,4vw,34px);color:rgba(255,255,255,0.16);-webkit-line-clamp:3;letter-spacing:0.02em;}
-.toh-grad{
+.toh-img-ph .ph-label{color:rgba(255,255,255,0.16);letter-spacing:0.02em;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden;text-align:center;padding:0 10px;}
+
+/* ── THE LEAD — the single overlay card: image fills, headline in white over the F2
+   gradient. Only the lead carries text over the image (G7f item 1). ── */
+.toh-card-lead{position:relative;display:block;background:var(--surface2);min-height:320px;}
+.toh-card-lead .toh-img,.toh-card-lead .toh-img-ph{position:absolute;inset:0;background-size:cover;background-position:center top;}
+.toh-card-lead .toh-img-ph .ph-label{font-size:clamp(20px,4vw,34px);}
+.toh-card-lead .toh-grad{
   position:absolute;inset:0;
   background:linear-gradient(to top,rgba(0,0,0,0.92) 0%,rgba(0,0,0,0.45) 45%,rgba(0,0,0,0.06) 100%);
 }
-.toh-body{
-  position:absolute;inset:0;
-  padding:14px;
-  display:flex;flex-direction:column;justify-content:flex-end;
+.toh-card-lead .toh-body{position:absolute;inset:0;padding:16px 18px;display:flex;flex-direction:column;justify-content:flex-end;}
+.toh-card-lead .toh-cat{color:#fff;}
+.toh-card-lead .toh-title{font-family:var(--font-serif);font-size:var(--fs-lead);font-weight:800;color:#fff;line-height:1.16;margin:0 0 5px;text-shadow:0 1px 4px rgba(0,0,0,0.7);display:-webkit-box;-webkit-line-clamp:4;-webkit-box-orient:vertical;overflow:hidden;}
+.toh-card-lead .toh-meta{font-size:10px;color:rgba(255,255,255,0.72);font-weight:600;font-family:var(--font-sans);}
+/* G7f item 2: no-image lead — typographic (D5 style), NOT a giant watermark. Surface
+   card, small-caps source kicker + oversized serif headline in ink. */
+.toh-card-noimg{background:var(--surface);border:1px solid var(--border);}
+.toh-card-noimg .toh-img,.toh-card-noimg .toh-img-ph,.toh-card-noimg .toh-grad{display:none;}
+.toh-card-noimg .toh-body{position:absolute;inset:0;justify-content:center;padding:22px 24px;}
+.toh-card-noimg .toh-cat{color:var(--accent);}
+.toh-card-noimg .toh-title{color:var(--text);text-shadow:none;font-size:clamp(24px,3.2vw,34px);line-height:1.1;-webkit-line-clamp:5;}
+.toh-card-noimg .toh-meta{color:var(--text3);}
+
+/* ── SECONDARIES — image on TOP, text BELOW on a surface card (NYT/Axios). No text over
+   the image, so nothing clips. Compact image height keeps the rail tidy. ── */
+.toh-side .toh-card{
+  position:relative;display:flex;flex-direction:column;background:var(--surface);
+  border:1px solid var(--border);border-radius:var(--radius);flex:1;min-height:0;
 }
+/* The placeholder sizes the image slot (in flow); the real image absolutely covers it,
+   so a missing image shows the branded field instead of leaving a gap. */
+.toh-side .toh-img-ph{position:relative;inset:auto;width:100%;height:96px;flex-shrink:0;}
+.toh-side .toh-img{position:absolute;top:0;left:0;width:100%;height:96px;}
+.toh-side .toh-grad{display:none;}
+.toh-side .toh-body{position:static;padding:8px 11px 10px;display:flex;flex-direction:column;flex:1;}
 .toh-cat{
-  font-size:9px;font-weight:800;text-transform:uppercase;letter-spacing:0.1em;
-  color:#fff;padding:2px 9px;border-radius:20px;
-  margin-bottom:8px;align-self:flex-start;
-  display:inline-block;
+  font-family:var(--font-sans);font-size:var(--fs-eyebrow);font-weight:700;text-transform:uppercase;letter-spacing:0.08em;
+  color:var(--text3);margin-bottom:5px;align-self:flex-start;background:none;padding:0;
 }
-.toh-title{
-  font-family:var(--font-serif);
-  font-size:15px;font-weight:700;color:#fff;
-  line-height:1.25;margin:0 0 5px;
-  text-shadow:0 1px 4px rgba(0,0,0,0.7);
-  display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden;
+.toh-side .toh-title{
+  font-family:var(--font-serif);font-size:var(--fs-subhead);font-weight:700;color:var(--text);
+  line-height:1.22;margin:0 0 4px;
+  display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;text-overflow:ellipsis;
 }
-.toh-card-lead .toh-title{font-size:var(--fs-lead);-webkit-line-clamp:4;}
-.toh-meta{
-  font-size:10px;color:rgba(255,255,255,0.6);
-  font-weight:600;font-family:var(--font-sans);
-}
+.toh-meta{font-size:var(--fs-meta);color:var(--text3);font-weight:500;font-family:var(--font-sans);}
 /* Tablet/iPad: single column — hero on top, then the secondaries stacked. Cap at
    hero + 2 secondaries so it never becomes a tall wall of picture-cards. */
 @media(max-width:1024px){
-  .toh-grid{grid-template-columns:1fr;grid-auto-rows:168px;}
-  .toh-card-lead{grid-column:auto;grid-row:auto;}
-  /* Secondaries must also drop to the single column — the desktop rule pins them to
-     column 2, which on a 1-col grid creates a phantom column and a blank gap. */
-  .toh-card:not(.toh-card-lead){grid-column:auto;}
+  /* Lead on top (full width), the 3 secondaries in a row beneath it. */
+  .toh-grid{grid-template-columns:1fr;gap:14px;}
+  .toh-card-lead{min-height:0;aspect-ratio:16/9;}
   .toh-card-lead .toh-title{font-size:20px;}
-  .toh-card:nth-child(n+4){display:none;}
+  .toh-side{flex-direction:row;}
+  .toh-side .toh-card{flex:1;min-width:0;}
 }
-/* Mobile: single column, stacking order preserved (lead first). Buzzfeed-style pass
-   (Pass L item 5) — the hero image dominates (spans two rows ≈ 4:3 on a phone) with a
-   punchy one-wrap headline; desktop tokens are untouched. */
 @media(max-width:640px){
   .toh-strip{margin-bottom:22px;}
-  .toh-grid{
-    grid-template-columns:1fr;
-    grid-auto-rows:190px;
-    gap:14px;
-  }
-  .toh-card-lead{grid-column:auto;grid-row:span 2;}
-  .toh-card-lead::before{content:none;}
-  .toh-title{font-size:var(--fs-headline);}
+  .toh-card-lead{aspect-ratio:4/3;}
   .toh-card-lead .toh-title{font-size:27px;font-weight:800;line-height:1.15;-webkit-line-clamp:3;}
+  /* Secondaries: keep one per row for comfortable thumb targets. */
+  .toh-side{flex-direction:column;}
+  .toh-side .toh-img,.toh-side .toh-img-ph{height:160px;}
 }
 
 /* ── BRIEFING TEASER — editorial dark card ─────────────────────── */
@@ -5950,19 +5957,6 @@ function FeedCard({a, cat, isSaved, onSave, onRead, relatedSources, isRead, user
     setLoadingExplain(false);
   };
 
-  const handleShare = async (e) => {
-    e.stopPropagation();
-    if (navigator.share) {
-      try {
-        await navigator.share({ title: a.title, url: a.link });
-      } catch {}
-    } else {
-      try { await navigator.clipboard.writeText(a.link); } catch {}
-      // simple fallback: open the link directly
-      window.open(a.link, '_blank');
-    }
-  };
-
   const handleDisc = async (e) => {
     e.stopPropagation();
     if (showDisc) { setShowDisc(false); return; }
@@ -6109,9 +6103,7 @@ function FeedCard({a, cat, isSaved, onSave, onRead, relatedSources, isRead, user
             <button className={`fc-act ${showExplain?'explain-on':''}`} onClick={handleExplain} disabled={loadingExplain}>
               {loadingExplain?'Analyzing…':showExplain?'Hide':'Explain'}
             </button>
-            {navigator.share !== undefined && (
-              <button className="fc-act" onClick={handleShare}>Share ↗</button>
-            )}
+            <ShareControl className="fc-act-share" title={a.title} url={a.link} source={a.source}/>
             <AudioListen text={`${a.title}. ${a.desc || ''}`} title={null} />
           </div>
         )}
@@ -6142,12 +6134,6 @@ function TodayItem({a, cc, onRead}) {
     setLoading(false);
   };
 
-  const handleShare = async (e) => {
-    e.stopPropagation();
-    if (navigator.share) { try { await navigator.share({title:a.title,url:a.link}); return; } catch {} }
-    try { await navigator.clipboard.writeText(a.link); } catch {}
-  };
-
   return (
     <div className="today-item-wrap">
       <div className="today-item" onClick={()=>onRead(a)}>
@@ -6161,9 +6147,7 @@ function TodayItem({a, cc, onRead}) {
         <button className={`today-ai-btn ${showSum?'on':''}`} title="AI Summary" onClick={handleAI} disabled={loading}>
           {loading?'…':'✦'}
         </button>
-        <button className="today-ai-btn" title="Share" onClick={handleShare} style={{marginLeft:'2px',fontSize:'13px'}}>
-          ⤴
-        </button>
+        <ShareControl className="today-share" title={a.title} url={a.link} source={a.source}/>
       </div>
       {showSum && (
         <div className="today-summary" onClick={e=>e.stopPropagation()}>
@@ -6786,6 +6770,15 @@ function Sidebar({cat, arts, kw, health, activeKw, setActiveKw, activeSource, se
     })).filter(t => t.count > 0).sort((a,b) => b.count - a.count).slice(0, 16);
   }, [catArts, catKws]);
 
+  // G6: cross-category connections over all loaded articles (AI-free). Home shows the top
+  // 3 overall; a category page shows bridges that involve that category. Max 3.
+  const connItems = useMemo(() => {
+    const flat = Object.entries(arts).flatMap(([c, list]) => (list || []).map(a => ({ ...a, cat: a.cat || c })));
+    const all = findConnections(flat, { kw: DEFAULT_KW, max: 12, catLabel: c => (CATS[c]?.label) || c });
+    const scoped = cat === 'general' ? all : all.filter(c => c.categories.includes(cat));
+    return scoped.slice(0, 3);
+  }, [arts, cat]);
+
   const visibleSrcs = showAllSrcs ? sources : sources.slice(0, 10);
 
   const handleTopicClick = (label) => {
@@ -6840,6 +6833,11 @@ function Sidebar({cat, arts, kw, health, activeKw, setActiveKw, activeSource, se
             meta={sopMeta||cc} onRead={onRead} onAsk={onAsk} formatDate={formatDate||fmtDate}
             collapsed={sopCollapsed} onToggleCollapse={onToggleSop}/>
         </div>
+      )}
+
+      {/* G6: Connections — cross-category bridges, under State of Play. Empty => nothing. */}
+      {!activeKw && !activeSource && (
+        <ConnectionsStrip connections={connItems} onRead={onRead} formatDate={formatDate||fmtDate} debug={DEBUG}/>
       )}
 
       {/* E3: Voices strip, below State of Play in the sidebar. */}
@@ -8036,6 +8034,36 @@ function PriorityNav({ tab, onPick, labels, classes }) {
   );
 }
 
+// ─── EMPTY STATE (G5) ─────────────────────────────────────────────────────────
+// ONE shared honest empty/error state: a single line + (optionally) one action.
+// No emoji, no illustration, no jokes — just what happened and what to do next.
+function EmptyState({ message, actionLabel, onAction }) {
+  return (
+    <div className="empty-state" role="status">
+      <p className="empty-msg">{message}</p>
+      {actionLabel && onAction && (
+        <button className="refresh-btn" onClick={onAction}>{actionLabel}</button>
+      )}
+    </div>
+  );
+}
+
+// ─── WORDMARK (G7e) ───────────────────────────────────────────────────────────
+// Original SVG lockup: a rounded-ink tile with an accent "N" monogram (news flow) +
+// the two-tone "MyNewsHub" set in Inter. Ink + accent come from tokens via currentColor
+// and CSS vars, so it flips cleanly in dark mode. The app icon (G3) reuses the monogram.
+function Wordmark({ height = 24 }) {
+  return (
+    <svg className="wordmark" viewBox="0 0 156 26" height={height} role="img" aria-label="MyNewsHub" style={{ display: 'block' }}>
+      <rect x="0" y="2" width="22" height="22" rx="4" fill="var(--text)"/>
+      <path d="M6 19V7l10 12V7" fill="none" stroke="var(--accent)" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round"/>
+      <text x="30" y="19.5" fontFamily="Inter, -apple-system, sans-serif" fontSize="18" fontWeight="800" letterSpacing="-0.4">
+        <tspan fill="var(--text)">My</tspan><tspan fill="var(--accent)">News</tspan><tspan fill="var(--text)">Hub</tspan>
+      </text>
+    </svg>
+  );
+}
+
 // ─── TOP BAR ──────────────────────────────────────────────────────────────────
 // Renders BOTH desktop (whisper + nav) AND mobile (compact header + chip bar)
 // in DOM. CSS media queries decide which is visible. `hidden` prop drives
@@ -8163,7 +8191,7 @@ function TopBar({tab, setTab, search, setSearch, dark, setDark,
       <div className="nav-bar">
         <div className="nav-bar-inner">
           <div className="logo-wrap">
-            <div className="logo">My<span>News</span>Hub</div>
+            <Wordmark height={24}/>
             <div className="logo-tag">Your daily briefing</div>
           </div>
           <PriorityNav tab={tab} onPick={t=>{setTab(t);setSearch('');}} labels={TAB_LABELS} classes={TAB_CLASS}/>
@@ -8234,7 +8262,7 @@ function TopBar({tab, setTab, search, setSearch, dark, setDark,
       <div className="mobile-top">
         <div className="mobile-header">
           <div>
-            <div className="mobile-logo">My<span>News</span>Hub</div>
+            <Wordmark height={22}/>
             <div className="mobile-logo-sub">Daily briefing</div>
           </div>
           <div className="mobile-actions">
@@ -8468,8 +8496,8 @@ function TopOfHourStrip({ catLead, arts, onRead, stories: storiesProp }) {
       <div className="toh-grid">
         {stories.map((a, i) => {
           const badge = catBadge(a);
-          return (
-            <article key={i} className={`toh-card${i===0?' toh-card-lead':''}`} onClick={() => onRead(a)}>
+          const card = (
+            <article key={i} className={`toh-card${i===0?' toh-card-lead':''}${i===0 && !a.img?' toh-card-noimg':''}`} onClick={() => onRead(a)}>
               {/* Placeholder sits underneath; the real image loads on top and hides
                   itself if the URL fails, so a broken image never leaves a grey slot. */}
               <div className="toh-img-ph"><span className="ph-label">{a.source}</span></div>
@@ -8477,13 +8505,34 @@ function TopOfHourStrip({ catLead, arts, onRead, stories: storiesProp }) {
                 onError={e => { e.currentTarget.style.display = 'none'; }}/>}
               <div className="toh-grad"/>
               <div className="toh-body">
-                <span className="toh-cat" style={{background:badge.color}}>{badge.label}</span>
+                <span className="toh-cat">{badge.label}</span>
                 <h3 className="toh-title">{a.title}</h3>
                 <div className="toh-meta">{a.source} · {fmtDate(a.pubDate)}</div>
               </div>
             </article>
           );
+          return i === 0 ? card : null;
         })}
+        {stories.length > 1 && (
+          <div className="toh-side">
+            {stories.slice(1).map((a, i) => {
+              const badge = catBadge(a);
+              return (
+                <article key={i} className="toh-card" onClick={() => onRead(a)}>
+                  <div className="toh-img-ph"><span className="ph-label">{a.source}</span></div>
+                  {a.img && <img className="toh-img" src={a.img} alt="" loading="lazy"
+                    onError={e => { e.currentTarget.style.display = 'none'; }}/>}
+                  <div className="toh-grad"/>
+                  <div className="toh-body">
+                    <span className="toh-cat">{badge.label}</span>
+                    <h3 className="toh-title">{a.title}</h3>
+                    <div className="toh-meta">{a.source} · {fmtDate(a.pubDate)}</div>
+                  </div>
+                </article>
+              );
+            })}
+          </div>
+        )}
       </div>
     </div>
   );
@@ -8649,18 +8698,28 @@ function ArticleReader({ article, onClose, onAskInChat, related = [], onOpen }) 
           <h2 className="article-reader-title">{article.title}</h2>
           {article.desc && <p className="article-reader-desc">{article.desc}</p>}
           <div className="article-reader-actions">
+            {/* G7d: line icons, one set (currentColor), replacing ↗/✦/💬 glyphs. */}
             <a className="article-reader-btn primary" href={article.link} target="_blank" rel="noreferrer" onClick={e=>e.stopPropagation()}>
-              Open Full Article ↗
+              Open Full Article
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M7 17 17 7"/><path d="M8 7h9v9"/></svg>
             </a>
-            <button className="article-reader-btn" onClick={() => runAI('summary')}>✦ Summarize</button>
+            <button className="article-reader-btn" onClick={() => runAI('summary')}>
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M12 3l1.9 4.6L18.5 9.5l-4.6 1.9L12 16l-1.9-4.6L5.5 9.5l4.6-1.9z"/></svg>
+              Summarize
+            </button>
             <button className="article-reader-btn" onClick={() => runAI('takeaways')}>Key Points</button>
             <button className="article-reader-btn" onClick={() => runAI('bias')}>Bias Check</button>
-            <button className="article-reader-btn" onClick={() => { onAskInChat?.(article); onClose(); }}>💬 Ask in Chat</button>
+            <button className="article-reader-btn" onClick={() => { onAskInChat?.(article); onClose(); }}>
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+              Ask in Chat
+            </button>
           </div>
           {aiLoading && <div className="article-reader-ai-result" style={{color:'var(--text3)'}}>Analyzing with AI…</div>}
           {!aiLoading && aiErr && (
             <div className="article-reader-ai-result" style={{color:'var(--red)'}}>
-              {aiErr} <button className="article-reader-btn" style={{marginLeft:'8px'}} onClick={()=>runAI(aiMode||'summary')}>↻ Retry</button>
+              {aiErr} <button className="article-reader-btn" style={{marginLeft:'8px'}} onClick={()=>runAI(aiMode||'summary')}>
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5"/></svg>
+                Retry</button>
             </div>
           )}
           {!aiLoading && aiResult && (
@@ -9308,6 +9367,9 @@ export default function App() {
     PODCAST_FEEDS.forEach(p=>loadPod(p));
     loadScores();
     loadMarketData(); // preload so RightNowStrip + watchlist widgets have ticker data
+    // G4: warm the lazy chunks on idle so they open instantly after first paint (no poll).
+    const ric = window.requestIdleCallback || (fn => setTimeout(fn, 1200));
+    ric(() => prefetchLazy());
   // eslint-disable-next-line react-hooks/exhaustive-deps
   },[]);
 
@@ -9930,7 +9992,7 @@ export default function App() {
                 <TrendingPills label={`Trending · ${teamName}`} items={teamItems} onOpen={t=>setSearch(t.toLowerCase())} isTopicFollowed={isTopicFollowed} toggleTopic={toggleTopic}/>
                 <SourcesDisagree topic={teamName} items={teamItems}/>
                 {teamItems.length === 0
-                  ? <div className="empty-state"><div className="empty-icon"></div><div className="empty-msg">No recent stories for {teamName}</div><button className="refresh-btn" onClick={()=>loadCat('sports')}>Refresh</button></div>
+                  ? <EmptyState message={`No recent stories for .`} actionLabel="Refresh" onAction={()=>loadCat('sports')}/>
                   : <div className="snap-feed">
                       {teamItems.slice(0,20).map((a,i)=>(
                         <Fragment key={a.link||i}>
@@ -10034,17 +10096,13 @@ export default function App() {
             )}
 
             {isLoading && !feedItems.length
-              ? <div className="empty-state"><div className="empty-icon"></div><div className="empty-msg">Loading sports…</div></div>
+              ? <div aria-busy="true" aria-label="Loading sports">{Array.from({length:5}).map((_,i)=>(
+                  <div key={i} className="fc-skeleton"><div className="fc-skeleton-title"/><div className="fc-skeleton-line"/><div className="fc-skeleton-line" style={{width:'60%'}}/></div>
+                ))}</div>
               : feedItems.length === 0
-                ? <div className="empty-state">
-                    <div className="empty-icon">{activeTeam ? activeTeam.emoji : ''}</div>
-                    <div className="empty-msg">{activeTeam ? `No stories found for ${activeTeam.team} yet` : 'No articles loaded yet'}</div>
-                    <div style={{fontSize:'12px',color:'var(--text3)',marginTop:'6px',marginBottom:'12px'}}>
-                      {activeTeam ? 'Try refreshing or check ESPN directly.' : 'Pull to refresh or tap below.'}
-                    </div>
-                    {activeTeam?.espnUrl && <a href={activeTeam.espnUrl} target="_blank" rel="noreferrer" className="refresh-btn" style={{textDecoration:'none',display:'inline-block'}}>Open on ESPN ↗</a>}
-                    <button className="refresh-btn" style={{marginTop:'8px'}} onClick={refreshAll}>Refresh</button>
-                  </div>
+                ? <EmptyState
+                    message={activeTeam ? `No stories for ${activeTeam.team} yet.` : `Couldn't load Sports. Try refresh.`}
+                    actionLabel="Refresh" onAction={refreshAll}/>
                 : feedItems.slice(activeTeam?0:3, 30).map((a, i) => (
                     <FeedCard key={i} a={a} cat="sports" isSaved={isSavedFn(a)} onSave={onSave} onRead={onRead} relatedSources={getRelated(a,'sports')} isRead={isReadFn(a)} userKw={kw} userTeams={teams}/>
                   ))
@@ -10163,7 +10221,7 @@ export default function App() {
         <TrendingPills label={`Trending · ${entity}`} items={entityItems} onOpen={t => navigate(cat, 'topic', teamSlug(t))} isTopicFollowed={isTopicFollowed} toggleTopic={toggleTopic}/>
         <SourcesDisagree topic={entity} items={entityItems}/>
         {entityItems.length === 0
-          ? <div className="empty-state"><div className="empty-icon"></div><div className="empty-msg">No recent stories mentioning “{entity}”.</div><button className="refresh-btn" onClick={() => loadCat(cat)}>Refresh</button></div>
+          ? <EmptyState message={`No recent stories mentioning “${entity}”.`} actionLabel="Refresh" onAction={() => loadCat(cat)}/>
           : <div className="snap-feed">
               {entityItems.slice(0, 20).map((a, i) => (
                 <Fragment key={a.link || i}>
@@ -10651,7 +10709,10 @@ export default function App() {
                   ))}
                  </div>
               :feedItems.length===0
-                ?<div className="empty-state"><div className="empty-icon"></div><div className="empty-msg">{activeKw||activeSrc?'No articles match this filter':search?`No internal results for "${search}"`:'No articles loaded yet'}</div><button className="refresh-btn" onClick={refreshAll}>Refresh</button></div>
+                ?<EmptyState
+                   message={activeKw||activeSrc?'No stories match this filter.':search?`No results for "${search}".`:`Couldn't load ${cc.label}. Try refresh.`}
+                   actionLabel={activeKw?'Clear filter':activeSrc?'Clear filter':search?null:'Refresh'}
+                   onAction={activeKw?()=>setActiveKw(null):activeSrc?()=>setActiveSrc(null):search?null:refreshAll}/>
                 :<div className={`snap-feed${['business','bloom','tech','popculture'].includes(cat)?' snap-feed-divided':''}`}>
                   {/* D5 fix 3: Business/Energy/AI&Tech/Pop Culture carry the divided-list
                       treatment on desktop secondary rows; the lead stays a prominent card. */}
@@ -10870,12 +10931,6 @@ export default function App() {
       window.speechSynthesis.speak(utt); setSpeaking(true);
     };
 
-    const handleShare = async (e) => {
-      e.stopPropagation();
-      if (navigator.share) { try { await navigator.share({title:a.title,url:a.link}); return; } catch {} }
-      try { await navigator.clipboard.writeText(a.link); } catch {}
-    };
-
     return (
       <div className="ba-item">
         <div className="ba-main" onClick={()=>onRead(a)}>
@@ -10895,7 +10950,7 @@ export default function App() {
               <button className={`ba-btn${speaking?' on':''}`} onClick={handleListen}>
                 {speaking?'⏹':''} {speaking?'Stop':'Listen'}
               </button>
-              <button className="ba-btn" onClick={handleShare}>⤴ Share</button>
+              <ShareControl className="ba-share" title={a.title} url={a.link} source={a.source}/>
             </div>
           </div>
         </div>
@@ -10947,8 +11002,16 @@ export default function App() {
           <header className="briefing-page-head">
             <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:'10px',flexWrap:'wrap'}}>
               <h1 className="briefing-page-title">The Briefing</h1>
-              {/* D6: manual refresh — reloads the feeds the briefing is built from. */}
-              <LastUpdated timestamp={lastUpdated.general} onRefresh={() => Object.keys(DEFAULT_FEEDS).forEach(c=>loadCat(c))}/>
+              <div style={{display:'flex',alignItems:'center',gap:'8px'}}>
+                {/* G2: share a plain-text briefing excerpt (same ShareControl, text override). */}
+                <ShareControl label="Share briefing" title="MyNewsHub — The Briefing"
+                  url="https://mynewshub2.vercel.app"
+                  text={buildBriefingExcerpt([...tier1.items, ...Object.values(tier2).flat()], {
+                    date: new Date().toLocaleDateString(undefined,{weekday:'long',month:'long',day:'numeric'}),
+                    site: 'https://mynewshub2.vercel.app' })}/>
+                {/* D6: manual refresh — reloads the feeds the briefing is built from. */}
+                <LastUpdated timestamp={lastUpdated.general} onRefresh={() => Object.keys(DEFAULT_FEEDS).forEach(c=>loadCat(c))}/>
+              </div>
             </div>
             <p className="briefing-page-sub">
               A daily synthesis in the spirit of Morning Brew, Axios, and Bloomberg 5 Things —
@@ -11542,10 +11605,11 @@ export default function App() {
           onResolveVoice={resolveVoiceFlow} seedQueue={seedQueue} onAcceptSeed={resolveVoiceFlow} onSkipSeed={skipSeed}
           onTestVoices={testVoices} voicesTest={voicesTest} searchKeyPresent={false}
           onClose={()=>setShowPanel(false)} onSave={handleCustomizeSave}/>}
-        {/* E2: Voices add+confirm discovery modal. */}
-        {voiceResolve && <ResolveModal voice={voiceResolve.voice} state={voiceResolve} onAccept={acceptCandidate} onClose={()=>setVoiceResolve(null)}/>}
+        {/* E2: Voices add+confirm discovery modal (lazy). */}
+        {voiceResolve && <Suspense fallback={null}><ResolveModal voice={voiceResolve.voice} state={voiceResolve} onAccept={acceptCandidate} onClose={()=>setVoiceResolve(null)}/></Suspense>}
       </div>
-      {/* Floating AI chatbot — available on all pages */}
+      {/* Floating AI chatbot — available on all pages (lazy; prefetched on idle). */}
+      <Suspense fallback={null}>
       <ChatBot arts={arts}
         onNavigate={(path)=>{ const p=(path||'').split('/').filter(Boolean); navigate(p[0]||'general', p[1]||null, p[2]||null); }}
         fetchSummary={fetchAISummary}
@@ -11555,6 +11619,7 @@ export default function App() {
         onClearContext={()=>setChatContext(null)}
         pageContext={pageContext}
         resolveDeepLink={({entities})=>{ for(const [lg,names] of Object.entries(TEAM_CHIPS)){ const hit=names.find(n=>{const w=n.toLowerCase().split(' ');return w.some(x=>entities.includes(x))||entities.some(k=>k.length>3&&n.toLowerCase().includes(k));}); if(hit) return `/sports/${lg}/${teamSlug(hit)}`; } return null; }}/>
+      </Suspense>
       {/* D8: ?debug=1 scroll/render overlay (renders null unless the flag is on). */}
       <DebugOverlay/>
       {/* Inline article reader overlay */}

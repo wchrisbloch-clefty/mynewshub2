@@ -1,6 +1,6 @@
 # Snapshot Card
 
-A deduped story card — category accent bar, source/breaking meta, Archivo headline, snippet, "N sources" row, and a Save button.
+A deduped story card — category accent bar, source/breaking meta, Source Serif 4 headline, snippet, "N sources" row, and a Save button.
 
 **What it does:** renders one clustered article as a compact, tappable card. Clicking the card fires `onRead`; the Save button fires `onSave`.
 

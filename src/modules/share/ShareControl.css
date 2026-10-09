@@ -1,0 +1,45 @@
+/* Share control — co-located styles (design tokens). Desktop: popover anchored to the
+   icon. Mobile (<=640px): bottom sheet, >=44px rows, safe-area padding. */
+.share{position:relative;display:inline-flex;align-items:center;}
+.share-btn{
+  display:inline-flex;align-items:center;justify-content:center;
+  background:none;border:none;cursor:pointer;color:var(--text3);padding:3px;border-radius:var(--radius);
+  transition:color 0.12s;
+}
+.share-btn:hover,.share-btn:focus-visible{color:var(--accent);}
+.share-btn:focus-visible{outline:2px solid var(--accent);outline-offset:2px;}
+
+.share-backdrop{position:fixed;inset:0;z-index:2400;background:transparent;}
+.share-sheet{
+  position:absolute;z-index:2401;top:calc(100% + 6px);right:0;min-width:188px;
+  background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);
+  box-shadow:var(--shadow-lg);padding:5px;display:flex;flex-direction:column;
+}
+.share-sheet-handle{display:none;}
+.share-row{
+  display:flex;align-items:center;gap:10px;width:100%;text-align:left;
+  background:none;border:none;cursor:pointer;font-family:var(--font-sans);
+  font-size:var(--fs-body);font-weight:600;color:var(--text);
+  padding:9px 10px;border-radius:var(--radius-sm);text-decoration:none;white-space:nowrap;
+}
+.share-row svg{color:var(--text3);flex-shrink:0;}
+.share-row:hover,.share-row:focus-visible{background:var(--surface2);color:var(--accent);}
+.share-row:hover svg,.share-row:focus-visible svg{color:var(--accent);}
+.share-row:focus-visible{outline:none;}
+
+/* Visually-hidden live region for copy feedback + clipboard fallback field. */
+.share-live{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap;}
+.share-fallback{position:absolute;left:-9999px;top:0;width:1px;height:1px;opacity:0;display:none;}
+
+@media(max-width:640px){
+  /* Bottom sheet — full-width, backdrop dim, >=44px rows, safe-area padding. */
+  .share-backdrop{background:rgba(0,0,0,0.45);}
+  .share-sheet{
+    position:fixed;top:auto;left:0;right:0;bottom:0;min-width:0;border-radius:14px 14px 0 0;
+    padding:8px 10px calc(14px + env(safe-area-inset-bottom,0));
+    box-shadow:0 -8px 30px rgba(0,0,0,0.28);animation:share-sheet-up 0.2s ease-out;
+  }
+  .share-sheet-handle{display:block;width:36px;height:4px;border-radius:3px;background:var(--border);margin:4px auto 8px;}
+  .share-row{min-height:44px;font-size:15px;padding:10px 12px;}
+}
+@keyframes share-sheet-up{from{transform:translateY(100%);}to{transform:translateY(0);}}

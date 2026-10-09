@@ -27,6 +27,19 @@ import './StateOfPlay.css';
 
 const defaultFormatDate = d => { try { return new Date(d).toLocaleString(); } catch { return ''; } };
 
+// G7f item 4: Ask is a QUIET icon-only button in list rows — the "Ask" word only appears
+// on hover/focus (and the full control shows in the reader/lead). Keeps a 44px touch
+// target on mobile and an aria-label always.
+function AskBtn({ onAsk, item }) {
+  return (
+    <button className="sop-ask" onClick={e => { e.stopPropagation(); onAsk(item); }}
+      aria-label="Ask about this story" title="Ask the assistant">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+      <span className="sop-ask-label">Ask</span>
+    </button>
+  );
+}
+
 export function StateOfPlay({ items, meta = {}, onRead, onAsk, formatDate = defaultFormatDate, collapsed = false, onToggleCollapse, gapItems = [], breakingItems = [], variant = 'strip' }) {
   const color = meta.color;
   const label = meta.label || '';
@@ -65,10 +78,11 @@ export function StateOfPlay({ items, meta = {}, onRead, onAsk, formatDate = defa
             <span className="sop-brk-dot" aria-hidden="true"/>
             <span className="sop-item-title">{b.title}</span>
             <span className="sop-item-meta">
-              {/* D2: "why it's breaking" — e.g. "4 outlets · 38m" — in place of the bare time. */}
+              {/* G7f item 3: one breaking signal — plain red "BREAKING" eyebrow (no filled
+                  pill) + the age only. The red dot (left) carries the colour. */}
               <span className="sop-brk-tag">Breaking</span>
-              <span className="sop-item-time">{b._breakingWhy || formatDate(b.pubDate)}</span>
-              {onAsk && <button className="sop-ask" onClick={e => { e.stopPropagation(); onAsk(b); }} aria-label="Ask about this story" title="Ask the assistant">Ask</button>}
+              <span className="sop-item-time">{formatDate(b.pubDate)}</span>
+              {onAsk && <AskBtn onAsk={onAsk} item={b}/>}
             </span>
           </div>
         ))}
@@ -80,7 +94,7 @@ export function StateOfPlay({ items, meta = {}, onRead, onAsk, formatDate = defa
             <span className="sop-item-meta">
               {a._clusterSize > 1 && <span className="sources-tag sop-item-sources">{a._clusterSize} sources</span>}
               <span className="sop-item-time">{formatDate(a.pubDate)}</span>
-              {onAsk && <button className="sop-ask" onClick={e => { e.stopPropagation(); onAsk(a); }} aria-label="Ask about this story" title="Ask the assistant">Ask</button>}
+              {onAsk && <AskBtn onAsk={onAsk} item={a}/>}
             </span>
           </div>
         ))}

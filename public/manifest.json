@@ -1,18 +1,21 @@
 {
-  "name": "MyNewsHub",
-  "short_name": "NewsHub",
-  "description": "Personalized news, markets, sports, and briefings",
+  "name": "MyNewsHub — Your Daily Briefing",
+  "short_name": "MyNewsHub",
+  "description": "Personalized news, markets, sports, and a daily briefing.",
   "start_url": "/",
   "display": "standalone",
   "orientation": "portrait-primary",
-  "background_color": "#f9fafb",
-  "theme_color": "#1d4ed8",
+  "background_color": "#f4f4f2",
+  "theme_color": "#12558c",
   "icons": [
-    {
-      "src": "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 192 192'%3E%3Crect width='192' height='192' rx='24' fill='%231d4ed8'/%3E%3Ctext x='50%25' y='55%25' dominant-baseline='middle' text-anchor='middle' font-size='120' font-family='system-ui'>📰%3C/text%3E%3C/svg%3E",
-      "sizes": "192x192",
-      "type": "image/svg+xml"
-    }
+    { "src": "/icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "/icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "/icons/icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ],
+  "shortcuts": [
+    { "name": "Home", "short_name": "Home", "url": "/?tab=general", "icons": [{ "src": "/icons/icon-192.png", "sizes": "192x192" }] },
+    { "name": "Sports", "short_name": "Sports", "url": "/?tab=sports", "icons": [{ "src": "/icons/icon-192.png", "sizes": "192x192" }] },
+    { "name": "Briefing", "short_name": "Briefing", "url": "/?tab=briefing", "icons": [{ "src": "/icons/icon-192.png", "sizes": "192x192" }] }
   ],
   "categories": ["news", "finance", "sports"],
   "lang": "en-US"
