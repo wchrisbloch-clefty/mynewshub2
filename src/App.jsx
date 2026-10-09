@@ -1965,12 +1965,12 @@ body:not(.dark) .pill-bar{
 }
 .fc-thumb-ph{
   width:160px;height:107px;border-radius:4px;flex-shrink:0;
-  display:flex;align-items:center;justify-content:center;font-size:24px;background:var(--surface2);
+  display:flex;align-items:center;justify-content:center;font-size:24px;background:var(--ph-field);
 }
 /* Typographic fallback for image-less cards: publisher name in the display face
    on a neutral field (replaces the old emoji placeholders). */
 .ph-label{font-family:var(--font-serif);font-weight:800;font-size:var(--fs-meta);letter-spacing:0.03em;
-  text-transform:uppercase;color:var(--text3);text-align:center;padding:0 8px;line-height:1.25;
+  text-transform:uppercase;color:var(--ph-ink);text-align:center;padding:0 8px;line-height:1.25;
   overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;}
 .fc-text{flex:1;min-width:0;}
 .fc-title{
@@ -2478,7 +2478,7 @@ body:not(.dark) .pill-bar{
 .today-item:last-child{border-bottom:none;}
 .today-item:hover{background:var(--surface2);}
 .today-thumb{width:48px;height:36px;border-radius:4px;object-fit:cover;flex-shrink:0;}
-.today-thumb-ph{width:48px;height:36px;border-radius:4px;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:12px;background:var(--surface2);}
+.today-thumb-ph{width:48px;height:36px;border-radius:4px;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:12px;background:var(--ph-field);}
 .today-item-body{flex:1;min-width:0;}
 .today-item-title{font-size:var(--fs-meta);font-weight:600;color:var(--text);line-height:1.35;margin-bottom:2px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;}
 .today-item-src{font-size:10px;color:var(--text3);}
@@ -3844,8 +3844,8 @@ body:not(.dark) .pill-bar{
 /* Shared cover-image fallback (Pass: broken-image fix). Fills its position:relative
    parent; the <CoverImg> React helper hides the <img> on load failure so the labeled
    placeholder underneath shows through — never a blank box. */
-.cover-img-ph{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;text-align:center;padding:0 10px;border-radius:inherit;background:linear-gradient(135deg,var(--navy-light) 0%,var(--navy) 100%);}
-.cover-img-ph-label{font-family:var(--font-serif);font-weight:800;font-size:13px;letter-spacing:0.02em;color:rgba(255,255,255,0.55);display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;overflow-wrap:anywhere;}
+.cover-img-ph{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;text-align:center;padding:0 10px;border-radius:inherit;background:var(--ph-field);}
+.cover-img-ph-label{font-family:var(--font-serif);font-weight:800;font-size:13px;letter-spacing:0.02em;color:var(--ph-ink);display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;overflow-wrap:anywhere;}
 .cover-img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;object-position:center top;border-radius:inherit;display:block;}
 /* Ensure the card-image containers clip the absolute CoverImg to their rounded box. */
 .gn-card-img{position:relative;overflow:hidden;}
@@ -4447,9 +4447,9 @@ body{overscroll-behavior-y:contain;}
 /* Category placeholder image with gradient */
 .gn-card-img-ph{
   display:flex;align-items:center;justify-content:center;
-  background:linear-gradient(135deg,var(--surface2) 0%,var(--surface) 100%);
+  background:var(--ph-field);
 }
-.gn-card-img-ph .ph-label{font-size:15px;color:var(--accent);opacity:0.8;-webkit-line-clamp:2;}
+.gn-card-img-ph .ph-label{font-size:15px;-webkit-line-clamp:2;}
 
 /* v26: Why It Matters — gold callout under AI panel */
 .fc-why{background:linear-gradient(135deg,#fbf5e8 0%,#f9eed2 100%);border-left:3px solid #b8893d;border-radius:0 8px 8px 0;padding:10px 12px;margin-top:8px;}
@@ -5393,9 +5393,9 @@ kbd{display:inline-block;padding:1px 5px;border:1px solid var(--border);border-r
 .toh-img{object-fit:cover;object-position:center top;display:block;width:100%;height:100%;}
 .toh-img-ph{
   display:flex;align-items:center;justify-content:center;
-  background:linear-gradient(135deg,var(--navy-light) 0%,var(--navy) 100%);
+  background:var(--ph-field);
 }
-.toh-img-ph .ph-label{color:rgba(255,255,255,0.16);letter-spacing:0.02em;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden;text-align:center;padding:0 10px;}
+.toh-img-ph .ph-label{letter-spacing:0.02em;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden;text-align:center;padding:0 10px;}
 
 /* ── THE LEAD — the single overlay card: image fills, headline in white over the F2
    gradient. Only the lead carries text over the image (G7f item 1). ── */
@@ -5406,7 +5406,11 @@ kbd{display:inline-block;padding:1px 5px;border:1px solid var(--border);border-r
    align-self:start keeps the cinematic shape and opts the lead out of the stretch. */
 .toh-card-lead{position:relative;display:block;background:var(--surface2);aspect-ratio:16/9;align-self:start;}
 .toh-card-lead .toh-img,.toh-card-lead .toh-img-ph{position:absolute;inset:0;background-size:cover;background-position:center top;}
-.toh-card-lead .toh-img-ph .ph-label{font-size:clamp(20px,4vw,34px);}
+/* I0.5 exception: the hero lead overlays a white headline + white category badge,
+   so its placeholder (shown only if the lead image URL fails) must stay a dark
+   field. --ph-overlay-ink is 4.8:1 on this navy — above 4.5:1. */
+.toh-card-lead .toh-img-ph{background:linear-gradient(135deg,var(--navy-light) 0%,var(--navy) 100%);}
+.toh-card-lead .toh-img-ph .ph-label{font-size:clamp(20px,4vw,34px);color:var(--ph-overlay-ink);}
 .toh-card-lead .toh-grad{
   position:absolute;inset:0;
   background:linear-gradient(to top,rgba(0,0,0,0.92) 0%,rgba(0,0,0,0.45) 45%,rgba(0,0,0,0.06) 100%);
