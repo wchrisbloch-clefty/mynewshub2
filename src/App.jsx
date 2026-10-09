@@ -3159,7 +3159,17 @@ body:not(.dark) .pill-bar{
   -webkit-tap-highlight-color:transparent;
   min-height:30px;
 }
-.sport-tab:hover{background:var(--surface);color:var(--text);border-color:var(--text3);}
+/* I0.10: hover only where a real pointer can hover. On touch (iPad) an unguarded
+   :hover sticks to the last-tapped chip — e.g. Horse Racing kept the lighter hover
+   fill + darker border after tapping away, reading as a stuck "selected" state next
+   to the real accent-filled active chip. */
+@media (hover: hover) {
+  .sport-tab:hover{background:var(--surface);color:var(--text);border-color:var(--text3);}
+}
+/* And a tap must not leave a lingering focus ring; keyboard focus still shows one. */
+.sport-tab:focus{outline:none;}
+.sport-tab:focus-visible{outline:2px solid var(--accent);outline-offset:2px;}
+.sport-tab.active:focus-visible{outline-color:#fff;}
 .sport-tab.active{
   background:var(--accent);color:var(--on-accent);border-color:var(--accent);
   box-shadow:var(--shadow-sm);
