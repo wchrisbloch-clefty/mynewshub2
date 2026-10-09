@@ -40,6 +40,7 @@ import { useState, useEffect, useLayoutEffect, useCallback, useMemo, useRef, Fra
 // Extracted, dependency-isolated capability modules (see src/modules/*/README.md)
 import { clusterStories, hotClusterTopics, rankClusters, TREND_STOP, decodeEntities, capByPublisher } from './modules/clustering';
 import { opinionLabel } from './modules/opinion';
+import { ShareControl, buildBriefingExcerpt } from './modules/share';
 import { qualifyBreaking, isPromoItem } from './modules/breaking';
 import { rankByVelocity, signalFor } from '../lib/voices/velocity';
 import { DEBUG, dbgRender, dbgPoll, DebugOverlay } from './modules/debug';
@@ -5952,19 +5953,6 @@ function FeedCard({a, cat, isSaved, onSave, onRead, relatedSources, isRead, user
     setLoadingExplain(false);
   };
 
-  const handleShare = async (e) => {
-    e.stopPropagation();
-    if (navigator.share) {
-      try {
-        await navigator.share({ title: a.title, url: a.link });
-      } catch {}
-    } else {
-      try { await navigator.clipboard.writeText(a.link); } catch {}
-      // simple fallback: open the link directly
-      window.open(a.link, '_blank');
-    }
-  };
-
   const handleDisc = async (e) => {
     e.stopPropagation();
     if (showDisc) { setShowDisc(false); return; }
@@ -6111,9 +6099,7 @@ function FeedCard({a, cat, isSaved, onSave, onRead, relatedSources, isRead, user
             <button className={`fc-act ${showExplain?'explain-on':''}`} onClick={handleExplain} disabled={loadingExplain}>
               {loadingExplain?'Analyzing…':showExplain?'Hide':'Explain'}
             </button>
-            {navigator.share !== undefined && (
-              <button className="fc-act" onClick={handleShare}>Share ↗</button>
-            )}
+            <ShareControl className="fc-act-share" title={a.title} url={a.link} source={a.source}/>
             <AudioListen text={`${a.title}. ${a.desc || ''}`} title={null} />
           </div>
         )}
@@ -6144,12 +6130,6 @@ function TodayItem({a, cc, onRead}) {
     setLoading(false);
   };
 
-  const handleShare = async (e) => {
-    e.stopPropagation();
-    if (navigator.share) { try { await navigator.share({title:a.title,url:a.link}); return; } catch {} }
-    try { await navigator.clipboard.writeText(a.link); } catch {}
-  };
-
   return (
     <div className="today-item-wrap">
       <div className="today-item" onClick={()=>onRead(a)}>
@@ -6163,9 +6143,7 @@ function TodayItem({a, cc, onRead}) {
         <button className={`today-ai-btn ${showSum?'on':''}`} title="AI Summary" onClick={handleAI} disabled={loading}>
           {loading?'…':'✦'}
         </button>
-        <button className="today-ai-btn" title="Share" onClick={handleShare} style={{marginLeft:'2px',fontSize:'13px'}}>
-          ⤴
-        </button>
+        <ShareControl className="today-share" title={a.title} url={a.link} source={a.source}/>
       </div>
       {showSum && (
         <div className="today-summary" onClick={e=>e.stopPropagation()}>
@@ -10919,12 +10897,6 @@ export default function App() {
       window.speechSynthesis.speak(utt); setSpeaking(true);
     };
 
-    const handleShare = async (e) => {
-      e.stopPropagation();
-      if (navigator.share) { try { await navigator.share({title:a.title,url:a.link}); return; } catch {} }
-      try { await navigator.clipboard.writeText(a.link); } catch {}
-    };
-
     return (
       <div className="ba-item">
         <div className="ba-main" onClick={()=>onRead(a)}>
@@ -10944,7 +10916,7 @@ export default function App() {
               <button className={`ba-btn${speaking?' on':''}`} onClick={handleListen}>
                 {speaking?'⏹':''} {speaking?'Stop':'Listen'}
               </button>
-              <button className="ba-btn" onClick={handleShare}>⤴ Share</button>
+              <ShareControl className="ba-share" title={a.title} url={a.link} source={a.source}/>
             </div>
           </div>
         </div>
@@ -10996,8 +10968,16 @@ export default function App() {
           <header className="briefing-page-head">
             <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:'10px',flexWrap:'wrap'}}>
               <h1 className="briefing-page-title">The Briefing</h1>
-              {/* D6: manual refresh — reloads the feeds the briefing is built from. */}
-              <LastUpdated timestamp={lastUpdated.general} onRefresh={() => Object.keys(DEFAULT_FEEDS).forEach(c=>loadCat(c))}/>
+              <div style={{display:'flex',alignItems:'center',gap:'8px'}}>
+                {/* G2: share a plain-text briefing excerpt (same ShareControl, text override). */}
+                <ShareControl label="Share briefing" title="MyNewsHub — The Briefing"
+                  url="https://mynewshub2.vercel.app"
+                  text={buildBriefingExcerpt([...tier1.items, ...Object.values(tier2).flat()], {
+                    date: new Date().toLocaleDateString(undefined,{weekday:'long',month:'long',day:'numeric'}),
+                    site: 'https://mynewshub2.vercel.app' })}/>
+                {/* D6: manual refresh — reloads the feeds the briefing is built from. */}
+                <LastUpdated timestamp={lastUpdated.general} onRefresh={() => Object.keys(DEFAULT_FEEDS).forEach(c=>loadCat(c))}/>
+              </div>
             </div>
             <p className="briefing-page-sub">
               A daily synthesis in the spirit of Morning Brew, Axios, and Bloomberg 5 Things —
