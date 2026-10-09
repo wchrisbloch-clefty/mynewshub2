@@ -36,7 +36,7 @@
 //  • Storage v25a_ → v25b_, migration from v25a/v24/v23/v22
 // ─────────────────────────────────────────────────────────────────────────────
 
-import { useState, useEffect, useLayoutEffect, useCallback, useMemo, useRef, Fragment } from 'react';
+import { useState, useEffect, useLayoutEffect, useCallback, useMemo, useRef, Fragment, lazy, Suspense } from 'react';
 // Extracted, dependency-isolated capability modules (see src/modules/*/README.md)
 import { clusterStories, hotClusterTopics, rankClusters, TREND_STOP, decodeEntities, capByPublisher } from './modules/clustering';
 import { opinionLabel } from './modules/opinion';
@@ -46,7 +46,9 @@ import { rankByVelocity, signalFor } from '../lib/voices/velocity';
 import { DEBUG, dbgRender, dbgPoll, DebugOverlay } from './modules/debug';
 import { makeVoice, upsertVoice, removeVoice as removeVoiceModel, mergeVoices, clearTombstone, voiceId, VOICE_PLATFORMS } from './modules/voices/model';
 import { SEED_VOICES } from './modules/voices/seeds';
-import { ResolveModal } from './modules/voices/ResolveModal';
+// G4: code-split heavy, not-needed-at-first-paint surfaces. Home is never lazy.
+// ChatBot is always mounted but not first-paint; ResolveModal is rare.
+const ResolveModal = lazy(() => import('./modules/voices/ResolveModal').then(m => ({ default: m.ResolveModal })));
 import { VoicesStrip } from './modules/voices/VoicesStrip';
 import { extractContent, extractionFallbackMessage } from './modules/extractor';
 import { retrieveFeedContext, buildFeedContextBlock } from './modules/retrieval';
@@ -58,7 +60,8 @@ import { MarketsSurface, useMarkets } from './modules/markets-surface';
 import { parseRoute, buildPath } from './modules/routing';
 import { PROMPT_VERSION } from '../lib/ai-models.js';
 import { TIER_LABEL, tagProvenance, TierBadge } from './modules/provenance';
-import { ChatBot } from './modules/concierge';
+const ChatBot = lazy(() => import('./modules/concierge').then(m => ({ default: m.ChatBot })));
+const prefetchLazy = () => { import('./modules/concierge'); import('./modules/voices/ResolveModal'); };
 // Icons: single set (lucide-react), fixed size per context — item 7.
 import { Settings, RefreshCw, Moon, Sun, User,
   Zap, Droplet, Leaf, TrendingUp, Scale, LayoutGrid, Film, Music, BookOpen, Laugh, Trophy } from 'lucide-react';
@@ -9335,6 +9338,9 @@ export default function App() {
     PODCAST_FEEDS.forEach(p=>loadPod(p));
     loadScores();
     loadMarketData(); // preload so RightNowStrip + watchlist widgets have ticker data
+    // G4: warm the lazy chunks on idle so they open instantly after first paint (no poll).
+    const ric = window.requestIdleCallback || (fn => setTimeout(fn, 1200));
+    ric(() => prefetchLazy());
   // eslint-disable-next-line react-hooks/exhaustive-deps
   },[]);
 
@@ -11571,10 +11577,11 @@ export default function App() {
           onResolveVoice={resolveVoiceFlow} seedQueue={seedQueue} onAcceptSeed={resolveVoiceFlow} onSkipSeed={skipSeed}
           onTestVoices={testVoices} voicesTest={voicesTest} searchKeyPresent={false}
           onClose={()=>setShowPanel(false)} onSave={handleCustomizeSave}/>}
-        {/* E2: Voices add+confirm discovery modal. */}
-        {voiceResolve && <ResolveModal voice={voiceResolve.voice} state={voiceResolve} onAccept={acceptCandidate} onClose={()=>setVoiceResolve(null)}/>}
+        {/* E2: Voices add+confirm discovery modal (lazy). */}
+        {voiceResolve && <Suspense fallback={null}><ResolveModal voice={voiceResolve.voice} state={voiceResolve} onAccept={acceptCandidate} onClose={()=>setVoiceResolve(null)}/></Suspense>}
       </div>
-      {/* Floating AI chatbot — available on all pages */}
+      {/* Floating AI chatbot — available on all pages (lazy; prefetched on idle). */}
+      <Suspense fallback={null}>
       <ChatBot arts={arts}
         onNavigate={(path)=>{ const p=(path||'').split('/').filter(Boolean); navigate(p[0]||'general', p[1]||null, p[2]||null); }}
         fetchSummary={fetchAISummary}
@@ -11584,6 +11591,7 @@ export default function App() {
         onClearContext={()=>setChatContext(null)}
         pageContext={pageContext}
         resolveDeepLink={({entities})=>{ for(const [lg,names] of Object.entries(TEAM_CHIPS)){ const hit=names.find(n=>{const w=n.toLowerCase().split(' ');return w.some(x=>entities.includes(x))||entities.some(k=>k.length>3&&n.toLowerCase().includes(k));}); if(hit) return `/sports/${lg}/${teamSlug(hit)}`; } return null; }}/>
+      </Suspense>
       {/* D8: ?debug=1 scroll/render overlay (renders null unless the flag is on). */}
       <DebugOverlay/>
       {/* Inline article reader overlay */}
