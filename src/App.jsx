@@ -1512,13 +1512,13 @@ body{
 .topbar-wx .rnw-row{padding:5px 0;} /* G7f item 7: trimmed weather band padding */
 .topbar-wx .rnw-forecast{padding-left:var(--s4);padding-right:var(--s4);}
 
-/* ── H1: weather ON the ticker line at >=1100px ───────────────────────────────
-   Inline weather is hidden by default (stacked band shows); at >=1100px the band
+/* ── I0.1: weather ON the ticker line at >=900px (covers iPad landscape 1024-1366) ───────────────────────────────
+   Inline weather is hidden by default (stacked band shows); at >=900px the band
    hides and the inline weather appears right-aligned on the ticker line, divided by
    a hairline. D3 token roles (label/value/change) are unchanged. The forecast opens
    as an absolute dropdown so the 30px strip never grows. */
 .ss-weather{display:none;}
-@media(min-width:1100px){
+@media(min-width:900px){
   .topbar-wx{display:none;}                 /* band off — merged onto the ticker line */
   .ss-weather{display:flex;align-items:center;flex-shrink:0;padding-left:14px;border-left:1px solid var(--border);height:100%;}
   .ss-weather .rnw-card{background:none;border:none;border-radius:0;margin:0;overflow:visible;position:relative;}
