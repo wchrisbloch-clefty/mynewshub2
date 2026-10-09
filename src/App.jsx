@@ -67,7 +67,7 @@ const prefetchLazy = () => { import('./modules/concierge'); import('./modules/vo
 import { Settings, RefreshCw, Moon, Sun, User,
   Zap, Droplet, Leaf, TrendingUp, Scale, LayoutGrid, Film, Music, BookOpen, Laugh, Trophy,
   ChevronDown, X as XIcon, ExternalLink, Sparkles, Star, Check, ArrowRight } from 'lucide-react';
-import { isCloudSyncEnabled, getUserId, signInWithEmail, signOut, onAuthStateChange, loadProfileFromCloud, saveProfileToCloud, emitEvent } from './lib/cloudSync';
+import { isCloudSyncEnabled, hasCloudSession, getUserId, signInWithEmail, signOut, onAuthStateChange, loadProfileFromCloud, saveProfileToCloud, emitEvent } from './lib/cloudSync';
 
 // ─── CATEGORIES ───────────────────────────────────────────────────────────────
 // One brand accent across all sections — hierarchy comes from type, not colour-coded
@@ -9570,6 +9570,9 @@ export default function App() {
   // On load: adopt an existing session and pull its profile; then react to sign-in/out.
   useEffect(() => {
     if (!isCloudSyncEnabled()) return;
+    // H4: only auto-load the Supabase client when a session is already present (stored or
+    // in a magic-link return). Fresh/logged-out visitors defer it until they sign in.
+    if (!hasCloudSession()) return;
     getUserId().then(uid => { if (uid) { setUserId(uid); pullCloudProfile(uid); } });
     const unsub = onAuthStateChange((user) => {
       const id = user?.id || null;
