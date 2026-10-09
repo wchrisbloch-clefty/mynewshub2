@@ -3082,50 +3082,51 @@ body:not(.dark) .pill-bar{
 .score-strip-scroll::-webkit-scrollbar{display:none;}
 /* Light, compact tile: white/surface card, dark text for names + scores; colour
    is reserved for status accents (live/final/winner), not the whole tile. */
+/* H2: neutral hairline card — no coloured boxes. Leader = heavier weight (not colour);
+   live = a small red dot + period/clock; scheduled/final in quiet meta text; a favourite
+   keeps a quiet accent star only. Tighter height than before. */
 .score-tile{
   position:relative;
   flex-shrink:0;scroll-snap-align:start;
   background:var(--surface);border:1px solid var(--border);
-  border-radius:7px;padding:5px 9px;
+  border-radius:var(--radius);padding:4px 9px 3px;
   min-width:112px;max-width:132px;cursor:pointer;
   transition:border-color 0.15s, transform 0.1s;
 }
-.score-tile:hover{border-color:var(--accent);transform:translateY(-1px);}
-.score-tile.live{border-color:var(--border);} /* G7f item 6: neutral hairline, not red box */
-.score-tile.fav{border-color:var(--accent);}
-.score-tile.fav.live{border-color:var(--accent);}
+.score-tile:hover{border-color:var(--text3);transform:translateY(-1px);}
+.score-tile.live,.score-tile.fav,.score-tile.fav.live{border-color:var(--border);}
 .score-tile-star{
-  position:absolute;top:5px;right:8px;
-  color:var(--amber);font-size:10px;
+  position:absolute;top:4px;right:8px;
+  color:var(--accent);font-size:9px;
 }
-.score-tile-league{
-  font-size:8px;font-weight:800;color:var(--text3);
-  text-transform:uppercase;letter-spacing:0.08em;margin-bottom:3px;
-}
+/* H2: league moved INTO the status row (saves a line, hides no info). */
+.score-tile-lg{font-weight:800;color:var(--text3);}
+.score-tile-when{opacity:0.95;}
+.score-tile-status .score-tile-lg + .score-tile-when::before{content:'·';margin:0 3px;opacity:0.6;}
 .score-tile-row{
   display:flex;justify-content:space-between;align-items:center;
   font-size:12px;color:var(--text);
-  font-variant-numeric:tabular-nums;padding:1px 0;gap:8px;
+  font-variant-numeric:tabular-nums;padding:0;gap:8px;line-height:1.35;
 }
 .score-tile-side{display:flex;align-items:center;gap:5px;min-width:0;}
-.score-tile-logo{width:14px;height:14px;object-fit:contain;flex-shrink:0;}
-.score-tile-team{font-weight:600;letter-spacing:-0.2px;color:var(--text2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
-.score-tile-team.win{color:var(--text);font-weight:800;}
-.score-tile-team.loss{color:var(--text3);}
-.score-tile-score{font-weight:900;font-size:var(--fs-body);color:var(--text);min-width:22px;text-align:right;}
-.score-tile-score.win{color:var(--green);}
-.score-tile-score.loss{color:var(--text3);}
+.score-tile-logo{width:16px;height:16px;object-fit:contain;flex-shrink:0;}
+.score-tile-logo-ph{display:inline-flex;align-items:center;justify-content:center;
+  border-radius:50%;background:var(--surface2);color:var(--text2);
+  font-family:var(--font-sans);font-size:7px;font-weight:800;letter-spacing:0;}
+.score-tile-team{font-weight:500;letter-spacing:-0.2px;color:var(--text2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.score-tile-team.win{color:var(--text);font-weight:700;}
+.score-tile-score{font-weight:600;font-size:var(--fs-body);color:var(--text2);min-width:22px;text-align:right;font-variant-numeric:tabular-nums;}
+.score-tile-score.win{color:var(--text);font-weight:900;} /* leader: WEIGHT, not colour */
 .score-tile-status{
-  font-size:9px;color:var(--text3);
+  font-family:var(--font-sans);font-size:9px;color:var(--text3);
   text-transform:uppercase;letter-spacing:0.05em;
-  margin-top:3px;display:flex;align-items:center;gap:4px;
-  border-top:1px solid var(--border2);padding-top:3px;
+  margin-top:2px;display:flex;align-items:center;gap:4px;
+  border-top:1px solid var(--border2);padding-top:2px;
 }
 .score-tile-status.live{color:var(--red);font-weight:700;}
-.score-tile-status.final{color:var(--text3);}
-.score-tile-status.pre{color:#3b82f6;}
+.score-tile-status.final,.score-tile-status.pre{color:var(--text3);}
 .score-tile-dot{
-  width:5px;height:5px;border-radius:50%;background:var(--red);
+  width:5px;height:5px;border-radius:50%;background:var(--red);flex-shrink:0;
   animation:pulse-badge 1.4s ease-in-out infinite;
 }
 
@@ -5802,36 +5803,42 @@ function AudioListen({ text, title }) {
 // scoreboard looks like one component everywhere (Pass G item 6). Each strip
 // prepares `_leagueLabel` + `_fav` on the game before handing it here.
 const SCORE_LEAGUE_LABEL = { nfl:'NFL', nba:'NBA', mlb:'MLB', cfb:'CFB', cbb:'CBB' };
+// H2: consistent circular abbreviation fallback when a team logo image fails/blocks.
+function ScoreLogo({ url, abbr }) {
+  const [err, setErr] = useState(false);
+  if (!url || err) return <span className="score-tile-logo score-tile-logo-ph" aria-hidden="true">{(abbr || '').replace(/[^A-Za-z]/g, '').slice(0, 2).toUpperCase()}</span>;
+  return <img className="score-tile-logo" src={url} alt="" loading="lazy" onError={() => setErr(true)}/>;
+}
 function ScoreTile({ g }) {
   const live = g.state === 'in';
   const final = g.state === 'post';
   const home = g.homeAbbr || g.homeName || 'HOME';
   const away = g.awayAbbr || g.awayName || 'AWAY';
   const h = parseInt(g.homeScore) || 0, a = parseInt(g.awayScore) || 0;
-  const homeWin = final && h > a, awayWin = final && a > h;
-  const hideLogo = e => { e.currentTarget.style.visibility = 'hidden'; };
+  // H2: "leading/winning" gets a heavier WEIGHT, never colour — for live and final.
+  const homeLead = (final || live) && h > a, awayLead = (final || live) && a > h;
   return (
     <div className={`score-tile ${live ? 'live' : ''} ${g._fav ? 'fav' : ''}`}
       onClick={() => g.link && window.open(g.link, '_blank')}>
-      {g._fav && <span className="score-tile-star">★</span>}
-      {g._leagueLabel && <div className="score-tile-league">{g._leagueLabel}</div>}
+      {g._fav && <span className="score-tile-star" title="Following">★</span>}
       <div className="score-tile-row">
         <span className="score-tile-side">
-          {g.awayLogo && <img className="score-tile-logo" src={g.awayLogo} alt="" loading="lazy" onError={hideLogo}/>}
-          <span className={`score-tile-team ${awayWin ? 'win' : final ? 'loss' : ''}`}>{away}</span>
+          <ScoreLogo url={g.awayLogo} abbr={away}/>
+          <span className={`score-tile-team ${awayLead ? 'win' : ''}`}>{away}</span>
         </span>
-        <span className={`score-tile-score ${awayWin ? 'win' : final ? 'loss' : ''}`}>{g.awayScore || '—'}</span>
+        <span className={`score-tile-score ${awayLead ? 'win' : ''}`}>{g.awayScore || '—'}</span>
       </div>
       <div className="score-tile-row">
         <span className="score-tile-side">
-          {g.homeLogo && <img className="score-tile-logo" src={g.homeLogo} alt="" loading="lazy" onError={hideLogo}/>}
-          <span className={`score-tile-team ${homeWin ? 'win' : final ? 'loss' : ''}`}>{home}</span>
+          <ScoreLogo url={g.homeLogo} abbr={home}/>
+          <span className={`score-tile-team ${homeLead ? 'win' : ''}`}>{home}</span>
         </span>
-        <span className={`score-tile-score ${homeWin ? 'win' : final ? 'loss' : ''}`}>{g.homeScore || '—'}</span>
+        <span className={`score-tile-score ${homeLead ? 'win' : ''}`}>{g.homeScore || '—'}</span>
       </div>
       <div className={`score-tile-status ${live ? 'live' : final ? 'final' : 'pre'}`}>
         {live && <span className="score-tile-dot"/>}
-        {g.status || (final ? 'FINAL' : fmtDate(g.date))}
+        {g._leagueLabel && <span className="score-tile-lg">{g._leagueLabel}</span>}
+        <span className="score-tile-when">{g.status || (final ? 'FINAL' : fmtDate(g.date))}</span>
       </div>
     </div>
   );
