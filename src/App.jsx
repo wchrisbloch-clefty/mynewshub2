@@ -149,8 +149,8 @@ const IconGear = ({size=ICON.meta}) => (
 const SWIPE_ORDER = ['general','business','bloom','tech','sports','health','popculture'];
 
 const TICKERS = [
-  { sym:'BE',      label:'Bloom Energy', color:'#60a5fa' },
-  { sym:'CL=F',    label:'Crude Oil',    color:'#4ade80' },
+  { sym:'BE',      label:'Bloom Energy', short:'BLOOM', color:'#60a5fa' }, // I0.9: NYSE:BE — themed pick for the Energy vertical
+  { sym:'CL=F',    label:'Crude Oil',    short:'OIL',   color:'#4ade80' },
   // D3: fetch 'BTC-USD' (actual Bitcoin). Plain 'BTC' on Yahoo is a ~$36 Grayscale
   // fund, which is what produced the bogus "$36.86" tile. `short` keeps the label tidy.
   { sym:'BTC-USD', label:'Bitcoin', short:'BTC', color:'#fbbf24' },
@@ -590,7 +590,7 @@ const DEFAULT_URGENT = [
 const INDICES = [
   { sym:'^GSPC', label:'S&P 500',     short:'S&P' },
   { sym:'^DJI',  label:'Dow Jones',   short:'DOW' },
-  { sym:'^IXIC', label:'Nasdaq',      short:'NDQ' },
+  { sym:'^IXIC', label:'Nasdaq',      short:'NASDAQ' },
   { sym:'NG=F',  label:'Natural Gas', short:'Gas' },
 ];
 
