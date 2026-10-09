@@ -66,7 +66,12 @@ import { TIER_LABEL, tagProvenance, TierBadge } from './modules/provenance';
 const ChatBot = lazy(() => import('./modules/concierge').then(m => ({ default: m.ChatBot })));
 const AnalyzePanel = lazy(() => import('./modules/analyze/AnalyzePanel').then(m => ({ default: m.AnalyzePanel })));
 const ArticleReader = lazy(() => import('./modules/reader/ArticleReader').then(m => ({ default: m.ArticleReader })));
-const prefetchLazy = () => { import('./modules/concierge'); import('./modules/voices/ResolveModal'); import('./modules/analyze/AnalyzePanel'); import('./modules/reader/ArticleReader'); };
+// I2: full pages are code-split and lazy. Each has an idle prefetch (prefetchLazy) and a
+// hover prefetch (prefetchPage) so the chunk is warm before the reader clicks its nav tab.
+const PodcastsPage = lazy(() => import('./modules/podcasts/PodcastsPage').then(m => ({ default: m.PodcastsPage })));
+const PAGE_IMPORTERS = { podcasts: () => import('./modules/podcasts/PodcastsPage') };
+export const prefetchPage = (name) => { const f = PAGE_IMPORTERS[name]; if (f) f(); };
+const prefetchLazy = () => { import('./modules/concierge'); import('./modules/voices/ResolveModal'); import('./modules/analyze/AnalyzePanel'); import('./modules/reader/ArticleReader'); Object.values(PAGE_IMPORTERS).forEach(f => f()); };
 // Icons: single set (lucide-react), fixed size per context — item 7.
 import { Settings, RefreshCw, Moon, Sun, User,
   Zap, Droplet, Leaf, TrendingUp, Scale, LayoutGrid, Film, Music, BookOpen, Laugh, Trophy,
@@ -7978,6 +7983,29 @@ function HeroBand({ heroStories, heroIdx, setHeroIdx, paused, setPaused, onRead 
 }
 
 
+// I2: G5 skeleton shown as the Suspense fallback while the lazy Podcasts chunk loads —
+// the same pod-card shimmer the page shows for an empty feed, so there is no visual pop.
+function PodPageSkeleton() {
+  return (
+    <div className="page"><div className="pod-page"><div className="pod-col">
+      {Array.from({ length: 5 }).map((_, i) => (
+        <div key={i} className="pod-card" aria-busy="true">
+          <div className="pod-card-top">
+            <div className="pod-skel-line" style={{ width: '22px', height: '15px', flexShrink: 0 }}/>
+            <div className="pod-body">
+              <div className="pod-skel-line" style={{ width: '34%', height: '10px', marginBottom: '6px' }}/>
+              <div className="pod-skel-line" style={{ width: '92%', height: '14px', marginBottom: '5px' }}/>
+              <div className="pod-skel-line" style={{ width: '70%', height: '14px', marginBottom: '8px' }}/>
+              <div className="pod-skel-line" style={{ width: '100%', height: '11px', marginBottom: '4px' }}/>
+              <div className="pod-skel-line" style={{ width: '85%', height: '11px' }}/>
+            </div>
+          </div>
+        </div>
+      ))}
+    </div></div></div>
+  );
+}
+
 // D6: per-page manual refresh control. A small "↻ Updated Nm ago" BUTTON in the
 // page header (never floating). Tapping calls onRefresh for that page only and the
 // stamp updates. Renders whenever onRefresh is given — even before the first stamp
@@ -8068,7 +8096,8 @@ function PriorityNav({ tab, onPick, labels, classes }) {
         {NAV_PRIMARY.map(t => <button key={t} className={`nav-tab ${classes[t]||''}`} tabIndex={-1}>{lbl(t)}</button>)}
       </div>
       {visible.map(t => (
-        <button key={t} className={`nav-tab ${classes[t]||''} ${isActive(t)?'active':''}`} onClick={()=>onPick(t)}>
+        <button key={t} className={`nav-tab ${classes[t]||''} ${isActive(t)?'active':''}`} onClick={()=>onPick(t)}
+          onMouseEnter={()=>prefetchPage(t)} onFocus={()=>prefetchPage(t)}>
           {lbl(t)}
         </button>
       ))}
@@ -9488,6 +9517,11 @@ export default function App() {
   };
 
   const handleTabChange = t => navigate(t, null, null);
+
+  // I2 test hook: under ?debug=1 only, expose navigate() so headless before/after proofs
+  // can reach any page deterministically at any width (the More-overflow menu is width-
+  // dependent and brittle to drive by click). Zero cost when the flag is off.
+  useEffect(() => { if (DEBUG && typeof window !== 'undefined') window.__nav = navigate; });
 
   // Phase 2: back/forward buttons re-apply the URL as source of truth.
   useEffect(()=>{
@@ -10967,155 +11001,8 @@ export default function App() {
 
 
   // ─── PODCASTS PAGE ─────────────────────────────────────────────────────
-  const PodcastsPage = () => {
-    const allEps=PODCAST_FEEDS.flatMap(p=>(podEps[p.name]||[]).slice(0,3).map(e=>({...e,show:p.name,host:p.host,emoji:p.emoji}))).sort((a,b)=>new Date(b.pubDate)-new Date(a.pubDate));
-    const displayEps=activePod?(podEps[activePod.name]||[]).map(e=>({...e,show:activePod.name,host:activePod.host,emoji:activePod.emoji})):allEps;
-
-    const PodCard = ({ep, idx}) => {
-      const [podAiState,setPodAiState]=useState('closed');
-      const [podSum,setPodSum]=useState('');
-      const [podTake,setPodTake]=useState('');
-      const [podErr,setPodErr]=useState('');
-      const [loadPod,setLoadPod]=useState(false);
-      const sv2=isSavedFn({...ep,link:ep.link||ep.show+idx});
-
-      const handlePodAI = async () => {
-        if (podAiState !== 'closed') { setPodAiState('closed'); return; }
-        setPodAiState('takeaways');
-        const needSum = !podSum, needTake = !podTake;
-        if (!needSum && !needTake) return;
-        setLoadPod(true);
-        const tasks = [];
-        if (needSum) tasks.push(fetchAISummary({type:'podcast',title:ep.title,content:ep.desc||'',mode:'summary'}).then(r=>({k:'s',...r})));
-        if (needTake) tasks.push(fetchAISummary({type:'podcast',title:ep.title,content:ep.desc||'',mode:'takeaways'}).then(r=>({k:'t',...r})));
-        const results = await Promise.all(tasks);
-        for (const r of results) {
-          if (r.summary) { if (r.k==='s') setPodSum(r.summary); else setPodTake(r.summary); }
-          else if (r.error) setPodErr(r.error);
-        }
-        setLoadPod(false);
-      };
-
-      return (
-        <div className="pod-card">
-          <div className="pod-card-top">
-            <div className="pod-num">{idx+1}</div>
-            <div className="pod-body">
-              <div className="pod-show">{ep.emoji} {ep.show}</div>
-              <div className="pod-title" onClick={()=>ep.link&&window.open(ep.link,'_blank')}>{ep.title}</div>
-              <div className="pod-meta"><span>{fmtDate(ep.pubDate)}</span>{ep.duration&&<span>{fmtDuration(ep.duration)}</span>}</div>
-              {ep.desc&&<div className="pod-desc">{ep.desc}</div>}
-            </div>
-          </div>
-          {podAiState!=='closed'&&(
-            <div className="fc-ai-panel" style={{margin:'10px 0 0'}}>
-              <div className="fc-summary">
-                <div className="fc-summary-lbl"><Sparkles size={13} aria-hidden="true"/> Summary · from show notes</div>
-                {loadPod&&!podSum?<div style={{fontSize:'11px',color:'var(--text3)',fontStyle:'italic'}}>Generating summary…</div>
-                :podErr&&!podSum?<div style={{fontSize:'11px',color:'var(--red)'}}>{podErr}</div>
-                :<div className="fc-summary-text">{podSum}</div>}
-              </div>
-              {podAiState==='takeaways'&&(
-                <div className="fc-takeaways">
-                  <div className="fc-takeaways-lbl">Key Takeaways</div>
-                  {loadPod&&!podTake?<div style={{fontSize:'11px',color:'var(--text3)',fontStyle:'italic'}}>Analyzing episode…</div>
-                  :podErr&&!podTake?<div style={{fontSize:'11px',color:'var(--red)'}}>{podErr}</div>
-                  :<TakeawaysContent text={podTake}/>}
-                </div>
-              )}
-            </div>
-          )}
-          <div className="pod-actions">
-            <button className="pod-btn" onClick={()=>ep.link&&window.open(ep.link,'_blank')}>Listen</button>
-            {(ep.desc||'').length >= 500 && (
-              <button className={`pod-btn ${podAiState!=='closed'?'ai-on':''}`} onClick={handlePodAI} disabled={loadPod}>
-                <Sparkles size={13} aria-hidden="true"/> {loadPod?'Thinking…':podAiState==='closed'?'AI Summary':'Hide AI'}
-              </button>
-            )}
-            <button className={`pod-btn ${sv2?'saved':''}`} onClick={()=>onSave({...ep,link:ep.link||ep.show+idx,source:ep.show,cat:'podcasts'})}>{sv2?'★ Saved':'☆ Save'}</button>
-          </div>
-        </div>
-      );
-    };
-
-    return (
-      <div className="page">
-        <div className="pod-page">
-          <div className="pod-col">
-            <div className="pod-header">
-              <div className="pod-header-emoji">{activePod?activePod.emoji:''}</div>
-              <div>
-                <div className="pod-header-name">{activePod?activePod.name:'All Podcasts'}</div>
-                <div className="pod-header-sub">{activePod?`Hosted by ${activePod.host}`:`${PODCAST_FEEDS.length} shows`}</div>
-              </div>
-              {/* D6: per-page refresh — reloads podcast feeds. */}
-              <span style={{marginLeft:'auto'}}><LastUpdated onRefresh={() => PODCAST_FEEDS.forEach(p=>loadPod(p))}/></span>
-            </div>
-            {displayEps.length===0
-              ?Array.from({length:5}).map((_,i)=>(
-                  <div key={i} className="pod-card" aria-busy="true">
-                    <div className="pod-card-top">
-                      <div className="pod-skel-line" style={{width:'22px',height:'15px',flexShrink:0}}/>
-                      <div className="pod-body">
-                        <div className="pod-skel-line" style={{width:'34%',height:'10px',marginBottom:'6px'}}/>
-                        <div className="pod-skel-line" style={{width:'92%',height:'14px',marginBottom:'5px'}}/>
-                        <div className="pod-skel-line" style={{width:'70%',height:'14px',marginBottom:'8px'}}/>
-                        <div className="pod-skel-line" style={{width:'100%',height:'11px',marginBottom:'4px'}}/>
-                        <div className="pod-skel-line" style={{width:'85%',height:'11px'}}/>
-                      </div>
-                    </div>
-                  </div>
-                ))
-              :displayEps.slice(0,podLimit).map((ep,i)=><PodCard key={i} ep={ep} idx={i}/>)}
-            {displayEps.length>podLimit && (
-              <div className="pod-load-more">
-                <button onClick={()=>setPodLimit(n=>n+20)}>
-                  Load more · {displayEps.length-podLimit} left
-                </button>
-              </div>
-            )}
-          </div>
-          <div className="sidebar">
-            <div className="pod-shows">
-              <div className="section-label" style={{marginBottom:'8px',paddingBottom:'8px',borderBottom:'1px solid var(--border2)'}}>Shows</div>
-              <div className="pod-show-item" onClick={()=>{setActivePod(null);setPodLimit(20);}}>
-                <div className="pod-show-emoji"></div>
-                <div><div className="pod-show-name" style={{color:!activePod?'var(--accent)':''}}>All Shows</div><div className="pod-show-ep">Latest from all {PODCAST_FEEDS.length} podcasts</div></div>
-                {!activePod&&<div className="pod-show-dot"/>}
-              </div>
-              {PODCAST_FEEDS.map((p,i)=>{
-                const eps=podEps[p.name]||[];const latest=eps[0];const isA=activePod?.name===p.name;
-                return (
-                  <div key={i} className="pod-show-item" onClick={()=>{setActivePod(isA?null:p);setPodLimit(20);}}>
-                    <div className="pod-show-emoji">{p.emoji}</div>
-                    <div style={{flex:1,minWidth:0}}>
-                      <div className="pod-show-name" style={{color:isA?'var(--accent)':''}}>{p.name}</div>
-                      <div className="pod-show-ep">{podLoading[p.name]?'Loading…':(latest?latest.title.slice(0,36)+'…':'No episodes yet')}</div>
-                    </div>
-                    {isA&&<div className="pod-show-dot"/>}
-                  </div>
-                );
-              })}
-            </div>
-            {allEps.length>0&&(
-              <div className="gs-section">
-                <div className="gs-label">Trending Episodes</div>
-                {allEps.slice(0,6).map((ep,i)=>(
-                  <div key={i} className="trend-row" onClick={()=>ep.link&&window.open(ep.link,'_blank')}>
-                    <div className="trend-num">{i+1}</div>
-                    <div className="trend-body">
-                      <div className="trend-title">{ep.title}</div>
-                      <div className="trend-src">{ep.show} · {fmtDate(ep.pubDate)}</div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-        </div>
-      </div>
-    );
-  };
+  // I2: PodcastsPage extracted to src/modules/podcasts (lazy). Rendered below via
+  // <Suspense> with a pod-card skeleton fallback; every dependency is passed as a prop.
 
   const SavedPage = () => (
     <div className="page">
@@ -11456,7 +11343,18 @@ export default function App() {
               {tab==='sports'&&<SportsPage/>}
               {NEWS_CATS.filter(c=>c!=='sports').includes(tab)&&<FeedPage cat={tab}/>}
               {tab==='finance'&&<FinancePage/>}
-              {tab==='podcasts'&&<PodcastsPage/>}
+              {tab==='podcasts'&&(
+                <Suspense fallback={<PodPageSkeleton/>}>
+                  <PodcastsPage
+                    podEps={podEps} podLoading={podLoading}
+                    activePod={activePod} setActivePod={setActivePod}
+                    podLimit={podLimit} setPodLimit={setPodLimit}
+                    onSave={onSave} isSaved={isSavedFn} loadPod={loadPod}
+                    fetchAISummary={fetchAISummary} fmtDate={fmtDate} fmtDuration={fmtDuration}
+                    TakeawaysContent={TakeawaysContent} LastUpdated={LastUpdated}
+                    PODCAST_FEEDS={PODCAST_FEEDS}/>
+                </Suspense>
+              )}
               {tab==='sources'&&<SourcesPage/>}
               {tab==='saved'&&<SavedPage/>}
             </>
