@@ -7388,7 +7388,25 @@ function MiniScoreboardStrip({ scores, onOpen }) {
 // score tile strip. Sits at the top of SportsPage. Each tile shows a game
 // (live → recent → upcoming priority). Favorites starred + pinned first.
 // Click any tile → opens ESPN game page.
-function SportsScoreStrip({ scores, teams }) {
+function SportsScoreStrip({ sportTab = 'all', teams }) {
+  // I3: the strip subscribes to the scores store ITSELF and does the per-tab filtering,
+  // so a live-score tick re-renders ONLY this strip — not the whole SportsPage (feed,
+  // rails, State of Play). It also hosts the 120s live poll (the single live-scores
+  // interval, moved here from SportsPage — no new setInterval).
+  const { scores: allScores } = useScores();
+  const scores = useMemo(
+    () => sportTab === 'all' ? allScores : { [sportTab]: allScores[sportTab] || [] },
+    [allScores, sportTab]);
+  const hasLiveGame = anyLiveGame(allScores);
+  useEffect(() => {
+    if (!hasLiveGame) return;
+    let stopped = false;
+    const tick = () => { if (typeof document !== 'undefined' && document.hidden) return; dbgPoll('live-scores'); loadScoresStore(); };
+    const iv = setInterval(tick, 120000);
+    const onVis = () => { if (!document.hidden && !stopped) loadScoresStore(); };
+    document.addEventListener('visibilitychange', onVis);
+    return () => { stopped = true; clearInterval(iv); document.removeEventListener('visibilitychange', onVis); };
+  }, [hasLiveGame]);
   const tiles = useMemo(() => {
     // Keep each game's league key so the shared tile can show a consistent badge.
     const all = Object.entries(scores || {})
@@ -9163,22 +9181,10 @@ export default function App() {
   // stories feed. Yahoo Sports' actual layout pattern.
   const SportsPage = () => {
     dbgRender('SportsPage'); // D8: ?debug=1 render counter (no-op when off)
-    // I1: SportsPage subscribes to the scores store directly. A score tick re-renders
-    // THIS page (expected — it shows scores) but NOT App, so the feed pages are untouched.
-    const { scores, loading: scoresLoading } = useScores();
-    // D6: the ONE opt-in poll — live scores every 120s, only while a game is live and the
-    // tab is visible. Lives here (not App) so App never subscribes to scores. (Reuses the
-    // app's single live-scores interval budget — no new setInterval surface.)
-    const hasLiveGame = anyLiveGame(scores);
-    useEffect(() => {
-      if (!hasLiveGame) return;
-      let stopped = false;
-      const tick = () => { if (typeof document !== 'undefined' && document.hidden) return; dbgPoll('live-scores'); loadScoresStore(); };
-      const iv = setInterval(tick, 120000);
-      const onVis = () => { if (!document.hidden && !stopped) loadScoresStore(); };
-      document.addEventListener('visibilitychange', onVis);
-      return () => { stopped = true; clearInterval(iv); document.removeEventListener('visibilitychange', onVis); };
-    }, [hasLiveGame]);
+    // I3: SportsPage no longer subscribes to the scores store — the live-score tile strip
+    // (SportsScoreStrip) subscribes itself and hosts the poll. So a score tick re-renders
+    // ONLY the strip, not this whole page (feed, team rails, State of Play). This is the
+    // Sports-twitch fix: App +0 (I1) AND SportsPage +0 on a tick.
     // Phase 2: subcategory comes from the URL (never local state). Chips navigate.
     const sportTab = subcat || 'all'; // 'all' | 'nfl' | 'nba' | 'mlb' | 'cfb' | 'cbb' | 'cbase' | 'racing' | 'golf'
     const setSportTab = (key) => navigate('sports', key === 'all' ? null : key);
@@ -9264,13 +9270,6 @@ export default function App() {
     // its inputs actually change.
     const allItems = useMemo(() => sorted('sports'), [sorted]);
     const isLoading = loading.sports;
-
-    // Filter scoreboard by sport tab
-    const visibleScores = useMemo(() => {
-      if (sportTab === 'all') return scores;
-      const leagueKey = sportTab; // already aligned with LEAGUES[].key
-      return { [leagueKey]: scores[leagueKey] || [] };
-    }, [scores, sportTab]);
 
     // Filter teams by sport tab — pill rail respects tab
     const visibleTeams = useMemo(() => {
@@ -9404,7 +9403,7 @@ export default function App() {
         )}
 
         {/* ── SCORES — live scoreboard, anchored at the very top of the ribbon ── */}
-        {!teamName && <SportsScoreStrip scores={visibleScores} teams={[...teams, ...myTeams.map(t=>({match:t.name, league:t.league}))]}/>}
+        {!teamName && <SportsScoreStrip sportTab={sportTab} teams={[...teams, ...myTeams.map(t=>({match:t.name, league:t.league}))]}/>}
 
         {/* ── LEAGUES — ESPN pill-style tab row ── */}
         <div className="sport-tabs" ref={sportTabsRef}>
