@@ -5,7 +5,7 @@
   position:fixed;bottom:calc(70px + env(safe-area-inset-bottom, 0));right:20px;
   width:52px;height:52px;border-radius:50%;
   background:var(--accent);
-  color:#fff;border:none;cursor:pointer;
+  color:var(--on-accent);border:none;cursor:pointer;
   display:flex;align-items:center;justify-content:center;font-size:var(--fs-lead);
   box-shadow:var(--shadow-md);
   z-index:200;transition:transform 0.15s,box-shadow 0.15s;
@@ -62,7 +62,7 @@
 }
 .chat-msg-time{font-size:9px;color:var(--text3);padding:0 4px;}
 .chat-deeplink{align-self:flex-start;margin:4px 0 0;background:var(--surface2);border:1px solid var(--border);border-radius:14px;padding:4px 11px;font-size:var(--fs-meta);font-weight:700;color:var(--accent);cursor:pointer;font-family:inherit;transition:background 0.12s;}
-.chat-deeplink:hover{background:var(--accent);color:#fff;border-color:var(--accent);}
+.chat-deeplink:hover{background:var(--accent);color:var(--on-accent);border-color:var(--accent);}
 .chat-typing{display:flex;gap:4px;padding:8px 12px;align-items:center;}
 .chat-typing-dot{
   width:7px;height:7px;border-radius:50%;background:var(--text3);

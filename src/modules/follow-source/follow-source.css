@@ -7,4 +7,4 @@
   padding:1px 7px;margin-left:2px;cursor:pointer;line-height:1.5;white-space:nowrap;
   flex-shrink:0;transition:background 0.12s,color 0.12s;
 }
-.follow-src-chip:hover{background:var(--accent);color:#fff;}
+.follow-src-chip:hover{background:var(--accent);color:var(--on-accent);}
