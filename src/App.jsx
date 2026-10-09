@@ -2092,6 +2092,9 @@ body:not(.dark) .pill-bar{
 .sidebar{
   display:flex;flex-direction:column;gap:18px;min-width:0; /* F6: tighter secondary rhythm (was 24px) */
   border-left:1px solid var(--border2);padding-left:28px;
+  /* I0.6: reserve clearance so the fixed chat button (bottom-right, ~52px + 70px offset)
+     never covers the last sidebar items (State of Play / Connections). */
+  padding-bottom:132px;
   /* Flows in normal document scroll along with the main column — no sticky/fixed
      positioning and no internal scroll container. */
 }
