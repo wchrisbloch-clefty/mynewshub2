@@ -19,7 +19,18 @@ export function VoicesStrip({ tiles = [], failures = [], loading = false, sideba
         <span className="voices-label">Voices</span>
         <span className="voices-inferred" title="Social/discussion signal — unverified. Velocity never raises trust.">· inferred</span>
       </div>
-      {loading && !tiles.length && <div className="voices-empty">Loading voices…</div>}
+      {/* G5: skeleton reserves height while loading; honest "No signals yet" otherwise. */}
+      {loading && !tiles.length && (
+        <div className="voices-list" aria-busy="true">
+          {[0, 1, 2].map(i => (
+            <div key={i} className="voices-tile voices-skel">
+              <span className="voices-skel-badge"/>
+              <span className="voices-tile-main"><span className="voices-skel-line" style={{ width: '45%' }}/><span className="voices-skel-line" style={{ width: '90%' }}/></span>
+            </div>
+          ))}
+        </div>
+      )}
+      {!loading && !tiles.length && <div className="voices-empty">No signals yet</div>}
       <div className="voices-list">
         {tiles.slice(0, 4).map((t, i) => (
           <a key={t.url || i} className="voices-tile" href={t.url} target="_blank" rel="noreferrer">

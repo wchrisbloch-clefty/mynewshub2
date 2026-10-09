@@ -8019,6 +8019,20 @@ function PriorityNav({ tab, onPick, labels, classes }) {
   );
 }
 
+// ─── EMPTY STATE (G5) ─────────────────────────────────────────────────────────
+// ONE shared honest empty/error state: a single line + (optionally) one action.
+// No emoji, no illustration, no jokes — just what happened and what to do next.
+function EmptyState({ message, actionLabel, onAction }) {
+  return (
+    <div className="empty-state" role="status">
+      <p className="empty-msg">{message}</p>
+      {actionLabel && onAction && (
+        <button className="refresh-btn" onClick={onAction}>{actionLabel}</button>
+      )}
+    </div>
+  );
+}
+
 // ─── WORDMARK (G7e) ───────────────────────────────────────────────────────────
 // Original SVG lockup: a rounded-ink tile with an accent "N" monogram (news flow) +
 // the two-tone "MyNewsHub" set in Inter. Ink + accent come from tokens via currentColor
@@ -9963,7 +9977,7 @@ export default function App() {
                 <TrendingPills label={`Trending · ${teamName}`} items={teamItems} onOpen={t=>setSearch(t.toLowerCase())} isTopicFollowed={isTopicFollowed} toggleTopic={toggleTopic}/>
                 <SourcesDisagree topic={teamName} items={teamItems}/>
                 {teamItems.length === 0
-                  ? <div className="empty-state"><div className="empty-icon"></div><div className="empty-msg">No recent stories for {teamName}</div><button className="refresh-btn" onClick={()=>loadCat('sports')}>Refresh</button></div>
+                  ? <EmptyState message={`No recent stories for .`} actionLabel="Refresh" onAction={()=>loadCat('sports')}/>
                   : <div className="snap-feed">
                       {teamItems.slice(0,20).map((a,i)=>(
                         <Fragment key={a.link||i}>
@@ -10067,17 +10081,13 @@ export default function App() {
             )}
 
             {isLoading && !feedItems.length
-              ? <div className="empty-state"><div className="empty-icon"></div><div className="empty-msg">Loading sports…</div></div>
+              ? <div aria-busy="true" aria-label="Loading sports">{Array.from({length:5}).map((_,i)=>(
+                  <div key={i} className="fc-skeleton"><div className="fc-skeleton-title"/><div className="fc-skeleton-line"/><div className="fc-skeleton-line" style={{width:'60%'}}/></div>
+                ))}</div>
               : feedItems.length === 0
-                ? <div className="empty-state">
-                    <div className="empty-icon">{activeTeam ? activeTeam.emoji : ''}</div>
-                    <div className="empty-msg">{activeTeam ? `No stories found for ${activeTeam.team} yet` : 'No articles loaded yet'}</div>
-                    <div style={{fontSize:'12px',color:'var(--text3)',marginTop:'6px',marginBottom:'12px'}}>
-                      {activeTeam ? 'Try refreshing or check ESPN directly.' : 'Pull to refresh or tap below.'}
-                    </div>
-                    {activeTeam?.espnUrl && <a href={activeTeam.espnUrl} target="_blank" rel="noreferrer" className="refresh-btn" style={{textDecoration:'none',display:'inline-block'}}>Open on ESPN ↗</a>}
-                    <button className="refresh-btn" style={{marginTop:'8px'}} onClick={refreshAll}>Refresh</button>
-                  </div>
+                ? <EmptyState
+                    message={activeTeam ? `No stories for ${activeTeam.team} yet.` : `Couldn't load Sports. Try refresh.`}
+                    actionLabel="Refresh" onAction={refreshAll}/>
                 : feedItems.slice(activeTeam?0:3, 30).map((a, i) => (
                     <FeedCard key={i} a={a} cat="sports" isSaved={isSavedFn(a)} onSave={onSave} onRead={onRead} relatedSources={getRelated(a,'sports')} isRead={isReadFn(a)} userKw={kw} userTeams={teams}/>
                   ))
@@ -10196,7 +10206,7 @@ export default function App() {
         <TrendingPills label={`Trending · ${entity}`} items={entityItems} onOpen={t => navigate(cat, 'topic', teamSlug(t))} isTopicFollowed={isTopicFollowed} toggleTopic={toggleTopic}/>
         <SourcesDisagree topic={entity} items={entityItems}/>
         {entityItems.length === 0
-          ? <div className="empty-state"><div className="empty-icon"></div><div className="empty-msg">No recent stories mentioning “{entity}”.</div><button className="refresh-btn" onClick={() => loadCat(cat)}>Refresh</button></div>
+          ? <EmptyState message={`No recent stories mentioning “${entity}”.`} actionLabel="Refresh" onAction={() => loadCat(cat)}/>
           : <div className="snap-feed">
               {entityItems.slice(0, 20).map((a, i) => (
                 <Fragment key={a.link || i}>
@@ -10684,7 +10694,10 @@ export default function App() {
                   ))}
                  </div>
               :feedItems.length===0
-                ?<div className="empty-state"><div className="empty-icon"></div><div className="empty-msg">{activeKw||activeSrc?'No articles match this filter':search?`No internal results for "${search}"`:'No articles loaded yet'}</div><button className="refresh-btn" onClick={refreshAll}>Refresh</button></div>
+                ?<EmptyState
+                   message={activeKw||activeSrc?'No stories match this filter.':search?`No results for "${search}".`:`Couldn't load ${cc.label}. Try refresh.`}
+                   actionLabel={activeKw?'Clear filter':activeSrc?'Clear filter':search?null:'Refresh'}
+                   onAction={activeKw?()=>setActiveKw(null):activeSrc?()=>setActiveSrc(null):search?null:refreshAll}/>
                 :<div className={`snap-feed${['business','bloom','tech','popculture'].includes(cat)?' snap-feed-divided':''}`}>
                   {/* D5 fix 3: Business/Energy/AI&Tech/Pop Culture carry the divided-list
                       treatment on desktop secondary rows; the lead stays a prominent card. */}

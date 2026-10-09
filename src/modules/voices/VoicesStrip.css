@@ -4,6 +4,10 @@
 .voices-label{font-family:var(--font-sans);font-size:10px;font-weight:800;color:var(--text3);letter-spacing:0.14em;text-transform:uppercase;}
 .voices-inferred{font-family:var(--font-sans);font-size:10px;font-weight:700;color:var(--text4);letter-spacing:0.04em;}
 .voices-empty{font-family:var(--font-sans);font-size:var(--fs-meta);color:var(--text3);padding:6px 0;}
+/* G5: loading skeleton — reserves the tile height so there's no layout shift. */
+.voices-skel{pointer-events:none;}
+.voices-skel-badge{width:22px;height:14px;border-radius:3px;flex-shrink:0;background:linear-gradient(90deg,var(--surface2) 25%,var(--border) 50%,var(--surface2) 75%);background-size:200% 100%;animation:shimmer 1.4s infinite;}
+.voices-skel-line{display:block;height:9px;border-radius:4px;margin:2px 0;background:linear-gradient(90deg,var(--surface2) 25%,var(--border) 50%,var(--surface2) 75%);background-size:200% 100%;animation:shimmer 1.4s infinite;}
 .voices-list{display:flex;flex-direction:column;}
 .voices-tile{display:flex;align-items:flex-start;gap:9px;padding:9px 0;border-top:1px solid var(--border2);text-decoration:none;transition:opacity 0.12s;}
 .voices-tile:first-child{border-top:none;}
