@@ -41,6 +41,7 @@ import { useState, useEffect, useLayoutEffect, useCallback, useMemo, useRef, Fra
 import { clusterStories, hotClusterTopics, rankClusters, TREND_STOP, decodeEntities, capByPublisher } from './modules/clustering';
 import { opinionLabel } from './modules/opinion';
 import { ShareControl, buildBriefingExcerpt } from './modules/share';
+import { ConnectionsStrip, findConnections } from './modules/connections';
 import { qualifyBreaking, isPromoItem } from './modules/breaking';
 import { rankByVelocity, signalFor } from '../lib/voices/velocity';
 import { DEBUG, dbgRender, dbgPoll, DebugOverlay } from './modules/debug';
@@ -6769,6 +6770,15 @@ function Sidebar({cat, arts, kw, health, activeKw, setActiveKw, activeSource, se
     })).filter(t => t.count > 0).sort((a,b) => b.count - a.count).slice(0, 16);
   }, [catArts, catKws]);
 
+  // G6: cross-category connections over all loaded articles (AI-free). Home shows the top
+  // 3 overall; a category page shows bridges that involve that category. Max 3.
+  const connItems = useMemo(() => {
+    const flat = Object.entries(arts).flatMap(([c, list]) => (list || []).map(a => ({ ...a, cat: a.cat || c })));
+    const all = findConnections(flat, { kw: DEFAULT_KW, max: 12, catLabel: c => (CATS[c]?.label) || c });
+    const scoped = cat === 'general' ? all : all.filter(c => c.categories.includes(cat));
+    return scoped.slice(0, 3);
+  }, [arts, cat]);
+
   const visibleSrcs = showAllSrcs ? sources : sources.slice(0, 10);
 
   const handleTopicClick = (label) => {
@@ -6823,6 +6833,11 @@ function Sidebar({cat, arts, kw, health, activeKw, setActiveKw, activeSource, se
             meta={sopMeta||cc} onRead={onRead} onAsk={onAsk} formatDate={formatDate||fmtDate}
             collapsed={sopCollapsed} onToggleCollapse={onToggleSop}/>
         </div>
+      )}
+
+      {/* G6: Connections — cross-category bridges, under State of Play. Empty => nothing. */}
+      {!activeKw && !activeSource && (
+        <ConnectionsStrip connections={connItems} onRead={onRead} formatDate={formatDate||fmtDate} debug={DEBUG}/>
       )}
 
       {/* E3: Voices strip, below State of Play in the sidebar. */}
