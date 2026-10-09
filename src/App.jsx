@@ -69,7 +69,8 @@ const ArticleReader = lazy(() => import('./modules/reader/ArticleReader').then(m
 // I2: full pages are code-split and lazy. Each has an idle prefetch (prefetchLazy) and a
 // hover prefetch (prefetchPage) so the chunk is warm before the reader clicks its nav tab.
 const PodcastsPage = lazy(() => import('./modules/podcasts/PodcastsPage').then(m => ({ default: m.PodcastsPage })));
-const PAGE_IMPORTERS = { podcasts: () => import('./modules/podcasts/PodcastsPage') };
+const SourcesPage = lazy(() => import('./modules/sources/SourcesPage').then(m => ({ default: m.SourcesPage })));
+const PAGE_IMPORTERS = { podcasts: () => import('./modules/podcasts/PodcastsPage'), sources: () => import('./modules/sources/SourcesPage') };
 export const prefetchPage = (name) => { const f = PAGE_IMPORTERS[name]; if (f) f(); };
 const prefetchLazy = () => { import('./modules/concierge'); import('./modules/voices/ResolveModal'); import('./modules/analyze/AnalyzePanel'); import('./modules/reader/ArticleReader'); Object.values(PAGE_IMPORTERS).forEach(f => f()); };
 // Icons: single set (lucide-react), fixed size per context — item 7.
@@ -8006,6 +8007,27 @@ function PodPageSkeleton() {
   );
 }
 
+// I2: G5 skeleton shown while the lazy Sources chunk loads — the sources hero + a few
+// placeholder rows, so the directory does not pop in.
+function SourcesSkeleton() {
+  return (
+    <div className="page">
+      <div className="sources-hero">
+        <div><div className="pod-skel-line" style={{ width: '160px', height: '22px', marginBottom: '8px' }}/>
+          <div className="pod-skel-line" style={{ width: '220px', height: '12px' }}/></div>
+      </div>
+      <div className="sources-cat-grid">
+        {Array.from({ length: 6 }).map((_, i) => (
+          <div key={i} className="sources-cat" aria-busy="true">
+            <div className="pod-skel-line" style={{ width: '40%', height: '14px', margin: '0 0 10px' }}/>
+            {Array.from({ length: 4 }).map((_, j) => <div key={j} className="pod-skel-line" style={{ width: '85%', height: '11px', margin: '0 0 8px' }}/>)}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 // D6: per-page manual refresh control. A small "↻ Updated Nm ago" BUTTON in the
 // page header (never floating). Tapping calls onRefresh for that page only and the
 // stamp updates. Renders whenever onRefresh is given — even before the first stamp
@@ -11061,63 +11083,8 @@ export default function App() {
   // ─── SOURCES PAGE (v46) ─────────────────────────────────────────────────
   // Dedicated destination surfacing every feed powering the hub, grouped by
   // category, with live article counts, on/off status, and outbound links.
-  const SourcesPage = () => {
-    const [q, setQ] = useState('');
-    const counts = useMemo(() => {
-      const m = {};
-      Object.values(arts).flat().forEach(a => { if (a.source) m[a.source] = (m[a.source]||0)+1; });
-      return m;
-    }, []);
-    const CAT_ORDER = ['general','business','finance','bloom','tech','sports','popculture','comedy'];
-    const ql = q.trim().toLowerCase();
-    let totalSources = 0, activeSources = 0;
-    CAT_ORDER.forEach(c => (feeds[c]||[]).forEach(f => { totalSources++; if (f.on) activeSources++; }));
-    return (
-      <div className="page">
-        <div className="sources-hero">
-          <div>
-            <h1 className="sources-title">News Sources</h1>
-            <p className="sources-sub">{activeSources} active · {totalSources} feeds powering your hub</p>
-          </div>
-          <button className="sources-manage-btn" onClick={()=>openCustomize('sources','general')}><IconGear/> Manage feeds</button>
-        </div>
-        <input className="sources-search" placeholder="Filter sources…" value={q} onChange={e=>setQ(e.target.value)}/>
-        <div className="sources-cat-grid">
-          {CAT_ORDER.map(c => {
-            const cc = CATS[c]||CATS.general;
-            const list = (feeds[c]||[]).filter(f => !ql || f.name.toLowerCase().includes(ql));
-            if (!list.length) return null;
-            const sorted = [...list].sort((a,b)=>(counts[b.name]||0)-(counts[a.name]||0));
-            return (
-              <div key={c} className="sources-cat">
-                <button className="sources-cat-head" style={{borderLeftColor:cc.color}} onClick={()=>handleTabChange(c)}>
-                  
-                  <span className="sources-cat-label" style={{color:cc.color}}>{cc.label}</span>
-                  <span className="sources-cat-count">{list.length}</span>
-                </button>
-                <div className="sources-list">
-                  {sorted.map(f => {
-                    const url = SOURCE_URLS[f.name];
-                    const n = counts[f.name]||0;
-                    return (
-                      <a key={f.name} className={`source-row ${f.on?'':'source-off'}`}
-                         href={url||'#'} target="_blank" rel="noreferrer"
-                         onClick={e=>{ if(!url) e.preventDefault(); }}>
-                        <span className={`source-status ${f.on?'on':'off'}`} title={f.on?'Active':'Disabled'}/>
-                        <span className="source-name">{f.name}</span>
-                        {n>0 && <span className="source-count" title={`${n} articles loaded`}>{n}</span>}
-                        {url && <span className="source-ext"><ExternalLink size={11} aria-hidden="true"/></span>}
-                      </a>
-                    );
-                  })}
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      </div>
-    );
-  };
+  // I2: SourcesPage extracted to src/modules/sources (lazy). Rendered below via
+  // <Suspense>; every dependency is passed as a prop.
 
   // ─── FINANCE PAGE ──────────────────────────────────────────────────────
   const FinancePage = () => {
@@ -11355,7 +11322,12 @@ export default function App() {
                     PODCAST_FEEDS={PODCAST_FEEDS}/>
                 </Suspense>
               )}
-              {tab==='sources'&&<SourcesPage/>}
+              {tab==='sources'&&(
+                <Suspense fallback={<SourcesSkeleton/>}>
+                  <SourcesPage arts={arts} feeds={feeds} openCustomize={openCustomize}
+                    handleTabChange={handleTabChange} CATS={CATS} SOURCE_URLS={SOURCE_URLS} IconGear={IconGear}/>
+                </Suspense>
+              )}
               {tab==='saved'&&<SavedPage/>}
             </>
           );
