@@ -5399,7 +5399,12 @@ kbd{display:inline-block;padding:1px 5px;border:1px solid var(--border);border-r
 
 /* ── THE LEAD — the single overlay card: image fills, headline in white over the F2
    gradient. Only the lead carries text over the image (G7f item 1). ── */
-.toh-card-lead{position:relative;display:block;background:var(--surface2);min-height:320px;}
+/* I0.4: the lead is a true 16:9 cover at every width. It used to be min-height:320px
+   with no ratio, so .toh-grid's align-items:stretch stretched it to match the 3-card
+   side rail — on iPad landscape (1180–1366px, all above the 1024 breakpoint) that made
+   a tall, near-portrait box and the top-biased crop read as a face close-up. 16:9 +
+   align-self:start keeps the cinematic shape and opts the lead out of the stretch. */
+.toh-card-lead{position:relative;display:block;background:var(--surface2);aspect-ratio:16/9;align-self:start;}
 .toh-card-lead .toh-img,.toh-card-lead .toh-img-ph{position:absolute;inset:0;background-size:cover;background-position:center top;}
 .toh-card-lead .toh-img-ph .ph-label{font-size:clamp(20px,4vw,34px);}
 .toh-card-lead .toh-grad{
