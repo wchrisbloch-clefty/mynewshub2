@@ -8851,29 +8851,30 @@ function FeedPage({ cat, ctx }) {
                       treatment on desktop secondary rows; the lead stays a prominent card. */}
                   {/* AI & Tech only: optional GitHub street signal, click-to-load (3c). */}
                   {cat==='tech' && !activeKw && !activeSrc && !search && <GithubSignal/>}
+                  {/* K2: the mobile category header + State of Play are DECOUPLED from the
+                      feed lead — rendered once here, before the rows, so they appear with or
+                      without a lead (and even when the feed is empty). The feed itself has NO
+                      lead card now: Top Stories (above) is the single hero per page, and the
+                      article that used to be the feed lead is simply the first normal row. */}
+                  {!activeKw && !activeSrc && !search && (
+                    <div className="page-header-row phr-mobile">
+                      <span className="page-header" style={{fontFamily:'var(--font-sans)'}}>
+                        {cc.label}{feedItems.length>0?` — ${feedItems.length} articles`:''}
+                        <span style={{marginLeft:'10px'}}><LastUpdated timestamp={lastUpdated[cat]} onRefresh={() => loadCat(cat)}/></span>
+                      </span>
+                      <button className="page-customize-btn" onClick={()=>openCustomize('sources',cat)}><IconGear/> Customize</button>
+                    </div>
+                  )}
+                  {!activeKw && !activeSrc && !search && (
+                    <div className="sop-mobile">
+                      <StateOfPlay variant="sidebar" items={sopSourceItems} gapItems={gapItems} breakingItems={catBreaking}
+                        meta={CATS[cat]||CATS.general} onRead={onRead} onAsk={setChatContext} formatDate={fmtDate}
+                        collapsed={sopCollapsed} onToggleCollapse={toggleSop}/>
+                    </div>
+                  )}
                   {(activeKw||activeSrc||search ? feedItems.slice(0,20) : dedupedFeed.slice(0,20)).map((a,i)=>(
                     <Fragment key={a.link||i}>
-                      <SnapshotCard a={a} meta={CATS[cat]||CATS.general} isSaved={isSavedFn(a)} onSave={onSave} onRead={onRead} onPerspectives={setPerspArticle} onAsk={setChatContext} formatDate={fmtDate} opinionLabel={opinionLabel(a)} hideImage={i>=3} lead={i===0 && !activeKw && !activeSrc && !search}/>
-                      {/* Review item 5: on mobile the category header moves BELOW the lead so
-                          the lead is the first element in the body (desktop copy is hidden). */}
-                      {i===0 && !activeKw && !activeSrc && !search && (
-                        <div className="page-header-row phr-mobile">
-                          <span className="page-header" style={{fontFamily:'var(--font-sans)'}}>
-                            {cc.label}{feedItems.length>0?` — ${feedItems.length} articles`:''}
-                            <span style={{marginLeft:'10px'}}><LastUpdated timestamp={lastUpdated[cat]} onRefresh={() => loadCat(cat)}/></span>
-                          </span>
-                          <button className="page-customize-btn" onClick={()=>openCustomize('sources',cat)}><IconGear/> Customize</button>
-                        </div>
-                      )}
-                      {/* D5 fix 1: on mobile, State of Play sits directly under the lead (the
-                          sidebar copy is hidden on mobile via hideSopMobile). Mobile-only. */}
-                      {i===0 && !activeKw && !activeSrc && !search && (
-                        <div className="sop-mobile">
-                          <StateOfPlay variant="sidebar" items={sopSourceItems} gapItems={gapItems} breakingItems={catBreaking}
-                            meta={CATS[cat]||CATS.general} onRead={onRead} onAsk={setChatContext} formatDate={fmtDate}
-                            collapsed={sopCollapsed} onToggleCollapse={toggleSop}/>
-                        </div>
-                      )}
+                      <SnapshotCard a={a} meta={CATS[cat]||CATS.general} isSaved={isSavedFn(a)} onSave={onSave} onRead={onRead} onPerspectives={setPerspArticle} onAsk={setChatContext} formatDate={fmtDate} opinionLabel={opinionLabel(a)} hideImage={i>=3} lead={false}/>
                       {i===2 && <XPulse topic={cc?.label||cat} variant="feed"/>}
                     </Fragment>
                   ))}
