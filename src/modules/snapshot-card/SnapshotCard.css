@@ -35,7 +35,9 @@
 .snap-card{display:flex;align-items:flex-start;gap:14px;background:none;border:none;border-radius:0;
   border-bottom:1px solid var(--border2);cursor:pointer;transition:background 0.12s;}
 .snap-card:hover{background:var(--surface2);}
-.snap-row{min-height:108px;}
+/* K7: skip rendering rows that are off-screen (the browser keeps their reserved height
+   via contain-intrinsic-size, so scrolling stays cheap and nothing shifts). */
+.snap-row{min-height:108px;content-visibility:auto;contain-intrinsic-size:auto 156px;}
 .snap-accent{display:none;}                 /* accent left bar removed */
 .snap-breaking .snap-accent{display:none;}
 .snap-main{flex:1;min-width:0;padding:12px 0;order:1;}
