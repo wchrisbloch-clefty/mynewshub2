@@ -28,11 +28,17 @@
   .snap-lead-hero .snap-main{padding:10px 0 14px;}
   .snap-hero-overlay .snap-hero-title{font-size:22px;}
 }
-.snap-card{display:flex;background:var(--surface);border:1px solid var(--border);border-radius:10px;overflow:hidden;cursor:pointer;transition:transform 0.14s,box-shadow 0.14s;}
-.snap-card:hover{transform:translateY(-2px);box-shadow:0 6px 20px rgba(0,0,0,0.09);}
-.snap-accent{width:4px;flex-shrink:0;}
-.snap-breaking .snap-accent{background:var(--red)!important;}
-.snap-main{flex:1;min-width:0;padding:14px 16px;}
+/* K6: ONE standard row at every width — borderless (no card box, no shadow, no accent
+   left bar), a single bottom divider, LEFT thumbnail at a fixed 4:3 with its space
+   reserved (aspect-ratio + fixed box) so images never shift the layout, one vertical
+   padding token, and a min-height so a text-only row matches an image row (rhythm holds). */
+.snap-card{display:flex;align-items:flex-start;gap:14px;background:none;border:none;border-radius:0;
+  border-bottom:1px solid var(--border2);cursor:pointer;transition:background 0.12s;}
+.snap-card:hover{background:var(--surface2);}
+.snap-row{min-height:108px;}
+.snap-accent{display:none;}                 /* accent left bar removed */
+.snap-breaking .snap-accent{display:none;}
+.snap-main{flex:1;min-width:0;padding:12px 0;order:1;}
 .snap-meta{display:flex;align-items:center;gap:8px;margin-bottom:7px;flex-wrap:wrap;}
 .snap-source{font-family:var(--font-sans);font-size:var(--fs-meta);font-weight:700;text-transform:uppercase;letter-spacing:0.05em;}
 .snap-live{font-family:var(--font-sans);font-size:9px;font-weight:800;color:#fff;background:var(--red);border-radius:4px;padding:2px 6px;letter-spacing:0.06em;}
@@ -45,7 +51,9 @@
 /* F3: single meta row — time (+ sources) left, actions right. */
 .snap-foot-left{display:inline-flex;align-items:center;gap:10px;min-width:0;flex-wrap:wrap;}
 .snap-title{font-family:var(--font-serif);font-weight:800;font-size:18px;line-height:1.22;letter-spacing:-0.2px;color:var(--text);margin:0 0 6px;overflow-wrap:anywhere;word-break:break-word;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden;}
-.snap-snippet{font-family:var(--font-sans);font-size:var(--fs-body);line-height:1.5;color:var(--text2);margin:0 0 10px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;overflow-wrap:anywhere;word-break:break-word;}
+/* K6: the deck is clamped to 2 lines AND reserves 2 lines of height, so a short standfirst
+   doesn't shorten the row — the list rhythm stays even across mixed content. */
+.snap-snippet{font-family:var(--font-sans);font-size:var(--fs-body);line-height:1.5;color:var(--text2);margin:0 0 10px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;overflow-wrap:anywhere;word-break:break-word;min-height:3em;}
 /* F5: mobile deck/summary text = 14px / 1.5 (headlines unchanged, dense list rows unchanged). */
 @media(max-width:640px){ .snap-snippet{font-size:14px;line-height:1.5;} }
 .snap-byline{font-family:var(--font-sans);font-size:var(--fs-meta);color:var(--text3);}
@@ -93,7 +101,7 @@
    standard feed cards stay headline-forward and balanced against the sidebar. Height
    is capped too so a tall card can't stretch the image into a large square. (The
    hero/Top-Stories images are separate — .gn-lead-img / .gn-card-img — and untouched.) */
-.snap-thumb{width:150px;aspect-ratio:4/3;align-self:center;flex-shrink:0;object-fit:cover;border-radius:6px;background:var(--surface2);margin:0 12px;}
+.snap-thumb{width:112px;height:84px;aspect-ratio:4/3;flex-shrink:0;object-fit:cover;border-radius:8px;background:var(--ph-field);margin:12px 0;order:0;}
 /* Loading skeleton — mirrors the real card's layout so it reserves the SAME
    height. Content then swaps in place instead of popping in and shifting scroll. */
 .snap-skel{cursor:default;}
@@ -106,15 +114,13 @@
   /* D5 — NYT/Bloomberg mobile: ONE dominant lead, then a DIVIDED LIST (no boxes).
      Fewer boxes, more whitespace. Exactly one hero-weight element above the fold. */
   .snap-feed{gap:0;}
-  /* Divided list rows: borderless, thin top rule, small 4:3 thumb RIGHT, headline LEFT. */
-  .snap-card{flex-direction:row;border:none;border-radius:0;border-top:1px solid var(--border2);background:none;box-shadow:none;}
+  /* K6 phone: same LEFT-thumb row, smaller 88x66 4:3 thumbnail. */
   .snap-card:first-child{border-top:none;}
-  .snap-card:hover{transform:none;box-shadow:none;}
-  .snap-accent{display:none;}
-  .snap-main,.snap-skel-main{order:0;padding:14px 0;}
-  .snap-thumb,.snap-skel-thumb{order:1;width:92px;height:69px;aspect-ratio:4/3;align-self:center;margin:0 0 0 12px;border-radius:6px;}
-  .snap-title{font-family:var(--font-serif);font-size:16px;line-height:1.25;-webkit-line-clamp:3;}
-  .snap-snippet{display:none;} /* calmer list — headline + one meta line only */
+  .snap-main,.snap-skel-main{order:1;padding:12px 0;}
+  .snap-thumb,.snap-skel-thumb{order:0;width:88px;height:66px;aspect-ratio:4/3;margin:12px 0;border-radius:8px;}
+  .snap-row{min-height:90px;}
+  .snap-title{font-family:var(--font-serif);font-size:16px;line-height:1.25;-webkit-line-clamp:2;} /* K6: one consistent clamp for rhythm */
+  .snap-snippet{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;} /* K6: 2-line deck */
   .snap-meta{margin-bottom:4px;}
   /* THE LEAD — full-bleed image, large serif headline, one meta line. */
   .snap-lead{flex-direction:column;border-top:none;margin:0 0 6px;}
@@ -136,22 +142,18 @@
 .snap-feed-divided .snap-card:first-child{border-top:none;}
 .snap-feed-divided .snap-card:hover{transform:none;box-shadow:none;}
 .snap-feed-divided .snap-accent{display:none;}
-.snap-feed-divided .snap-thumb{width:120px;height:80px;aspect-ratio:3/2;}
-.snap-feed-divided .snap-snippet{-webkit-line-clamp:1;}
+.snap-feed-divided .snap-thumb{width:112px;height:84px;aspect-ratio:4/3;} /* K6: one ratio */
+.snap-feed-divided .snap-snippet{-webkit-line-clamp:2;}
 /* D5 fix 3: the LEAD stays a prominent card on desktop even inside a divided feed. */
 @media(min-width:641px){
   .snap-feed-divided .snap-lead{border:1px solid var(--border);border-radius:10px;background:var(--surface);margin-bottom:14px;}
   .snap-feed-divided .snap-lead .snap-accent{display:block;}
   .snap-feed-divided .snap-lead .snap-snippet{-webkit-line-clamp:2;}
 }
-/* iPad (768–1279): the feed LIST is a 2-column card grid (the original responsive
-   spec). Cards flip to VERTICAL (image on top, headline + body full-cell-width) so
-   the body copy gets a comfortable measure (~65 chars) instead of the crushed
-   single-stretched-column it regressed to. Hero/lead grids (.gn-grid) set their own
-   columns and are untouched. */
+/* K6 iPad (768–1279): one rhythm, same LEFT-thumb rows as desktop — NOT a 2-column
+   grid of mixed-size top-image cards. Single column, 112x84 thumbnail on the left. */
 @media (min-width:768px) and (max-width:1279px){
-  .snap-feed{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:20px;align-items:start;}
-  .snap-card{flex-direction:column;}
-  .snap-accent{width:100%;height:4px;order:-2;}
-  .snap-thumb,.snap-skel-thumb{order:-1;width:100%;aspect-ratio:16/9;align-self:stretch;margin:0;border-radius:0;}
+  .snap-feed{display:block;}
+  .snap-card{flex-direction:row;}
+  .snap-thumb,.snap-skel-thumb{order:0;width:112px;height:84px;aspect-ratio:4/3;margin:12px 0;border-radius:8px;}
 }
