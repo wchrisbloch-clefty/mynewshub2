@@ -43,6 +43,7 @@ import { opinionLabel } from './modules/opinion';
 import { ShareControl, buildBriefingExcerpt } from './modules/share';
 import { ConnectionsStrip, findConnections } from './modules/connections';
 import { qualifyBreaking, isPromoItem } from './modules/breaking';
+import { claimConnections, claimAcrossSections } from './modules/dedup/railDedup';
 import { partitionSatire } from './modules/satire';
 import { rankByVelocity, signalFor } from '../lib/voices/velocity';
 import { DEBUG, dbgRender, dbgPoll, dbgMount, DebugOverlay } from './modules/debug';
@@ -1458,6 +1459,9 @@ body{
    Goal: present but unobtrusive — data visible
    when you look, invisible when you don't
 ═══════════════════════════════════════════ */
+/* L1: the scores + markets block is NON-sticky (scrolls away); only .topbar-wrap (the
+   nav, and on mobile the chips) is sticky, so the pinned bar is just the nav. */
+.header-scroll{position:relative;z-index:290;}
 .topbar-wrap{position:sticky;top:0;z-index:300;}
 /* Mobile notch: fill the status-bar strip with the bar's own surface and push the
    header below it (viewport-fit=cover lets content sit under the notch). 0 on
@@ -1486,7 +1490,7 @@ body{
    Dark ESPN theme so the homepage strip matches the Sports-page strip (item 6). */
 .topbar-scores{background:var(--surface2);border-bottom:1px solid var(--border2);}
 .topbar-scores .home-scores{max-width:1400px;margin:0 auto;padding:4px var(--s4) 5px;border:none;border-radius:0;background:none;overflow:visible;}
-.topbar-wrap.shrunk .topbar-scores{display:none;}
+/* L1: scores now scroll away in .header-scroll (not hidden on shrink). */
 /* Right-edge fade cue: partial cards read as "scroll for more," not a cutoff. */
 .topbar-scores .home-scores,.sports-score-strip{position:relative;}
 .topbar-scores .home-scores::after,.sports-score-strip::after{
@@ -2077,7 +2081,7 @@ body:not(.dark) .pill-bar{
    Scoreboard keeps its box (it's a widget).
 ═══════════════════════════════════════════ */
 .sidebar{
-  display:flex;flex-direction:column;gap:18px;min-width:0; /* F6: tighter secondary rhythm (was 24px) */
+  display:flex;flex-direction:column;gap:var(--rail-gap);min-width:0; /* L4: one gap token between modules (was 18px / F6 was 24px) */
   border-left:1px solid var(--border2);padding-left:28px;
   /* I0.6: reserve clearance so the fixed chat button (bottom-right, ~52px + 70px offset)
      never covers the last sidebar items (State of Play / Connections). */
@@ -4268,16 +4272,15 @@ body{overscroll-behavior-y:contain;}
   .pill-chg{font-size:9px;padding:1px 5px;}
 
   /* F7: default-collapsed market ticker — the header toggle reclaims the ~34px strip. */
-  .topbar-wrap.ticker-collapsed .status-strip{display:none;}
+  .header-scroll.ticker-collapsed .status-strip{display:none;}
   .mobile-ticker-toggle.on{color:var(--accent);border-color:var(--accent);}
   /* F7: when the header auto-hides on scroll-down, the wrap no longer slides fully away.
      The logo row + ticker + weather + scores hide, but the category CHIPS stay pinned at
      the top (under env(safe-area-inset-top), already on .topbar-wrap) so switching
      sections stays one tap while reading — no overlap, no dead zone. */
+  /* L1: on mobile, scroll-down hides only the compact mobile header/search; the chips
+     stay pinned. Scores/markets are no longer in here — they scroll away above the nav. */
   .topbar-wrap.hidden{transform:none;}
-  .topbar-wrap.hidden .status-strip,
-  .topbar-wrap.hidden .topbar-wx,
-  .topbar-wrap.hidden .topbar-scores,
   .topbar-wrap.hidden .mobile-header,
   .topbar-wrap.hidden .mobile-search{display:none;}
 
@@ -5373,14 +5376,22 @@ kbd{display:inline-block;padding:1px 5px;border:1px solid var(--border);border-r
   font-family:var(--font-sans);font-size:var(--fs-eyebrow);font-weight:700;text-transform:uppercase;letter-spacing:0.08em;
   color:var(--text3);
 }
-/* ONE ROW (Pass G item 4): a tall hero (~53%) on the left + a rail of up to three
-   compact secondaries stacked on the right — never a second row of picture-cards.
-   The hero spans all three rail rows so the module is one band, not a grid of
-   equal boxes. One column on mobile (see media query). */
-/* G7f item 1: lead (overlay) LEFT, an independent column of secondaries RIGHT. Flex,
-   not a spanning grid, so the lead's height is no longer coupled to the rail. */
-.toh-grid{display:grid;grid-template-columns:53% 1fr;gap:14px;align-items:stretch;}
-.toh-side{display:flex;flex-direction:column;gap:14px;min-width:0;}
+/* L2 — BALANCED TOP STORIES. Left column: one 16:9 overlay hero + 2–3 text-only
+   headlines under it (divided list, no boxes). Right column: 3 compact K6-style rows
+   (left thumbnail 112x84 if an image exists, else text-only). Two equal-weight columns
+   (not 53/47 picture boxes) so their heights stay within ~40px of each other, and
+   exactly ONE hero-weight element (.toh-card-lead). One column on mobile. */
+.toh-grid{display:grid;grid-template-columns:1.35fr 1fr;gap:24px;align-items:start;}
+.toh-lead-col{display:flex;flex-direction:column;min-width:0;}
+/* The hero opted out of GRID stretch (I0.4) with align-self:start; now it lives in a
+   FLEX column, where that same value would shrink its width to content and collapse the
+   16:9 box — so stretch it back to the column's full width here. It is a 16:9 cover at
+   narrow widths and caps its HEIGHT at wide ones (crop stays landscape): that keeps the
+   left column's total height nearly width-independent, so it lands within ~40px of the
+   fixed-height compact column (L2) across 1024–1440 instead of ballooning past it. */
+.toh-lead-col .toh-card-lead{align-self:stretch;width:100%;max-height:210px;}
+.toh-lead-col .toh-card-lead .toh-img{object-fit:cover;}
+.toh-side{display:flex;flex-direction:column;min-width:0;}
 .toh-card{
   border-radius:var(--radius);overflow:hidden;cursor:pointer;
   transition:transform 0.2s,box-shadow 0.2s;
@@ -5425,45 +5436,64 @@ kbd{display:inline-block;padding:1px 5px;border:1px solid var(--border);border-r
 .toh-card-noimg .toh-title{color:var(--text);text-shadow:none;font-size:clamp(24px,3.2vw,34px);line-height:1.1;-webkit-line-clamp:5;}
 .toh-card-noimg .toh-meta{color:var(--text3);}
 
-/* ── SECONDARIES — image on TOP, text BELOW on a surface card (NYT/Axios). No text over
-   the image, so nothing clips. Compact image height keeps the rail tidy. ── */
-.toh-side .toh-card{
-  position:relative;display:flex;flex-direction:column;background:var(--surface);
-  border:1px solid var(--border);border-radius:var(--radius);flex:1;min-height:0;
-}
-/* The placeholder sizes the image slot (in flow); the real image absolutely covers it,
-   so a missing image shows the branded field instead of leaving a gap. */
-.toh-side .toh-img-ph{position:relative;inset:auto;width:100%;height:96px;flex-shrink:0;}
-.toh-side .toh-img{position:absolute;top:0;left:0;width:100%;height:96px;}
-.toh-side .toh-grad{display:none;}
-.toh-side .toh-body{position:static;padding:8px 11px 10px;display:flex;flex-direction:column;flex:1;}
 .toh-cat{
   font-family:var(--font-sans);font-size:var(--fs-eyebrow);font-weight:700;text-transform:uppercase;letter-spacing:0.08em;
   color:var(--text3);margin-bottom:5px;align-self:flex-start;background:none;padding:0;
 }
-.toh-side .toh-title{
-  font-family:var(--font-serif);font-size:var(--fs-subhead);font-weight:700;color:var(--text);
-  line-height:1.22;margin:0 0 4px;
-  display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;text-overflow:ellipsis;
-}
 .toh-meta{font-size:var(--fs-meta);color:var(--text3);font-weight:500;font-family:var(--font-sans);}
-/* Tablet/iPad: single column — hero on top, then the secondaries stacked. Cap at
-   hero + 2 secondaries so it never becomes a tall wall of picture-cards. */
-@media(max-width:1024px){
-  /* Lead on top (full width), the 3 secondaries in a row beneath it. */
-  .toh-grid{grid-template-columns:1fr;gap:14px;}
+
+/* ── LEFT: text-only headlines under the hero. A divided list (no boxes), matching the
+   K6 row rhythm: one bottom divider, one serif headline + one meta line. ── */
+.toh-textlist{display:flex;flex-direction:column;margin-top:4px;}
+.toh-text-row{
+  display:flex;flex-direction:column;gap:3px;text-align:left;cursor:pointer;
+  background:none;border:none;border-top:1px solid var(--border2);
+  padding:12px 0;font-family:inherit;transition:background 0.12s;
+}
+.toh-text-row:hover{background:var(--surface2);}
+.toh-text-title{
+  font-family:var(--font-serif);font-size:var(--fs-subhead);font-weight:700;color:var(--text);
+  line-height:1.24;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;
+}
+.toh-text-meta{font-family:var(--font-sans);font-size:var(--fs-meta);color:var(--text3);font-weight:500;}
+
+/* ── RIGHT: 3 compact K6-style rows — a fixed 112x84 (4:3) thumbnail on the LEFT when an
+   image exists (else the body fills the row), a single bottom divider, one vertical
+   padding token. No boxed cards. ── */
+.toh-compact-row{
+  display:flex;align-items:flex-start;gap:14px;text-align:left;cursor:pointer;
+  background:none;border:none;border-bottom:1px solid var(--border2);
+  padding:12px 0;font-family:inherit;transition:background 0.12s;min-height:84px;
+}
+.toh-compact-row:first-child{border-top:1px solid var(--border2);}
+.toh-compact-row:hover{background:var(--surface2);}
+.toh-compact-thumb{
+  width:112px;height:84px;aspect-ratio:4/3;flex-shrink:0;object-fit:cover;
+  border-radius:8px;background:var(--ph-field);
+}
+.toh-compact-body{display:flex;flex-direction:column;gap:4px;min-width:0;flex:1;}
+.toh-compact-cat{
+  font-family:var(--font-sans);font-size:var(--fs-eyebrow);font-weight:700;text-transform:uppercase;letter-spacing:0.06em;
+}
+.toh-compact-title{
+  font-family:var(--font-serif);font-size:var(--fs-subhead);font-weight:700;color:var(--text);
+  line-height:1.24;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden;
+}
+.toh-compact-meta{font-family:var(--font-sans);font-size:var(--fs-meta);color:var(--text3);font-weight:500;}
+
+/* Below 900 (iPad portrait / phones): hero + text headlines on top (full width), compact
+   rows beneath. The two columns (1024/1180/1280/1440) stay side-by-side above this. */
+@media(max-width:899px){
+  .toh-grid{grid-template-columns:1fr;gap:16px;}
   .toh-card-lead{min-height:0;aspect-ratio:16/9;}
   .toh-card-lead .toh-title{font-size:20px;}
-  .toh-side{flex-direction:row;}
-  .toh-side .toh-card{flex:1;min-width:0;}
 }
 @media(max-width:640px){
   .toh-strip{margin-bottom:22px;}
   .toh-card-lead{aspect-ratio:4/3;}
   .toh-card-lead .toh-title{font-size:27px;font-weight:800;line-height:1.15;-webkit-line-clamp:3;}
-  /* Secondaries: keep one per row for comfortable thumb targets. */
-  .toh-side{flex-direction:column;}
-  .toh-side .toh-img,.toh-side .toh-img-ph{height:160px;}
+  .toh-compact-thumb{width:88px;height:66px;}
+  .toh-compact-row{min-height:66px;}
 }
 
 /* ── BRIEFING TEASER — editorial dark card ─────────────────────── */
@@ -5590,7 +5620,9 @@ kbd{display:inline-block;padding:1px 5px;border:1px solid var(--border);border-r
 .topbar-wrap{transition:box-shadow 0.2s;}
 .topbar-wrap.shrunk .pill-bar{max-height:0;padding-top:0;padding-bottom:0;overflow:hidden;opacity:0;transition:all 0.22s ease;}
 .topbar-wrap.shrunk .logo-tag,.topbar-wrap.shrunk .mobile-logo-sub{display:none;}
-.topbar-wrap.shrunk .nav-bar-inner{padding-top:6px;padding-bottom:6px;}
+/* L1: the pinned nav slims on scroll (48px incl. borders vs 58px) so the pinned bar is
+   ~45% shorter than the old full masthead on iPad landscape. */
+.topbar-wrap.shrunk .nav-bar-inner{height:44px;}
 .topbar-wrap.shrunk{box-shadow:0 2px 12px rgba(0,0,0,0.08);}
 .pill-bar{transition:max-height 0.22s ease,opacity 0.22s ease;}
 
@@ -6409,6 +6441,11 @@ function BriefingTeaser({arts, excludeCats, onOpenFull, compact}) {
   }, [ts]);
 
   if (compact) {
+    // L3: "Today's Briefing (only when one exists)" — the sidebar module renders ONLY
+    // when there's a cached briefing (or one is actively loading). When none exists it
+    // renders nothing, instead of a standing "No briefing yet" placeholder row.
+    const hasContent = bullets.length > 0 || !!body;
+    if (!hasContent && !loading && !error) return null;
     return (
       <div className="sidebar-section">
         <div className="sidebar-sec-head">
@@ -6431,9 +6468,6 @@ function BriefingTeaser({arts, excludeCats, onOpenFull, compact}) {
                 dangerouslySetInnerHTML={{__html: body.replace(/\*\*([^*]+)\*\*/g,'<strong>$1</strong>').slice(0,220)+'…'}}/>
             )
         }
-        {!loading && !body && !error && bullets.length === 0 && (
-          <button className="briefing-sb-gen" onClick={onOpenFull}>No briefing yet — open to generate →</button>
-        )}
       </div>
     );
   }
@@ -6773,7 +6807,7 @@ function GithubSignal() {
 
 // ─── GHOST SIDEBAR ────────────────────────────────────────────────────────────
 function Sidebar({cat, arts, kw, health, activeKw, setActiveKw, activeSource, setActiveSource, onRead, showScoreboard, recommended, showBriefing, onOpenBriefing, briefingExcludeCats, onTopicOpen, trendingItems, isTopicFollowed, toggleTopic, onTrendingOpen,
-  sopItems, sopGapItems, sopMeta, sopCollapsed, onToggleSop, formatDate, acrossSections, onAcrossSeeAll, followingModule, sopBreakingItems, feeds, onToggleFeed, favTeams, onAsk, hideSopMobile, voicesNode}) {
+  sopItems, sopGapItems, sopMeta, sopCollapsed, onToggleSop, formatDate, acrossSections, onAcrossSeeAll, followingModule, sopBreakingItems, feeds, onToggleFeed, favTeams, onAsk, hideSopMobile, voicesNode, connItems: connItemsProp}) {
   const cc = CATS[cat]||CATS.general;
   const catKws = kw[cat]||[];
   const catArts = arts[cat]||[];
@@ -6781,8 +6815,11 @@ function Sidebar({cat, arts, kw, health, activeKw, setActiveKw, activeSource, se
   catArts.forEach(a=>{srcCounts[a.source]=(srcCounts[a.source]||0)+1;});
   const sources = [...new Set(catArts.map(a=>a.source))];
 
-  const [showSources, setShowSources] = useState(false);
+  // L3: Sources collapsed by default AND remembered (persisted), like Trending / Following
+  // / Prediction Markets. Still force-opens when a source filter is active.
+  const [showSources, setShowSources] = useState(() => ld('sourcesOpen', false));
   const [showAllSrcs, setShowAllSrcs] = useState(false);
+  useEffect(() => { sv('sourcesOpen', showSources); }, [showSources]);
   useEffect(() => { if (activeSource) setShowSources(true); }, [activeSource]);
   // F6: Trending is a secondary module — collapsed by default, state persisted.
   const [trendOpen, setTrendOpen] = useState(() => ld('trendOpen', false));
@@ -6816,12 +6853,16 @@ function Sidebar({cat, arts, kw, health, activeKw, setActiveKw, activeSource, se
 
   // G6: cross-category connections over all loaded articles (AI-free). Home shows the top
   // 3 overall; a category page shows bridges that involve that category. Max 3.
+  // L3: FeedPage computes these with the shared one-story-once used-keys set and passes
+  // them in as `connItemsProp`; other callers (Finance, entity hub) fall back to computing
+  // here (no feed-column dedup needed there).
   const connItems = useMemo(() => {
+    if (connItemsProp) return connItemsProp;
     const flat = Object.entries(arts).flatMap(([c, list]) => (list || []).map(a => ({ ...a, cat: a.cat || c }))).filter(a => !isPromoItem(a)); // K3
     const all = findConnections(flat, { kw: DEFAULT_KW, max: 12, catLabel: c => (CATS[c]?.label) || c });
     const scoped = cat === 'general' ? all : all.filter(c => c.categories.includes(cat));
     return scoped.slice(0, 3);
-  }, [arts, cat]);
+  }, [connItemsProp, arts, cat]);
 
   const visibleSrcs = showAllSrcs ? sources : sources.slice(0, 10);
 
@@ -7850,7 +7891,13 @@ function TopBar({tab, setTab, search, setSearch, dark, setDark,
 
   return (
     <>
-    <div className={`topbar-wrap ${hidden?'hidden':''} ${shrunk?'shrunk':''} ${tickerOpen?'':'ticker-collapsed'}`}>
+    {/* L1: SCORES -> Markets/weather live in a NON-sticky block that scrolls away; only
+        the nav below stays pinned. Scores are General-only; markets show on every page.
+        The mobile ticker-collapse class rides here now (the strip moved out of the nav). */}
+    <div className={`header-scroll ${tickerOpen?'':'ticker-collapsed'}`}>
+      {tab==='general' && (
+        <div className="topbar-scores"><ActiveScoresBar favTeams={favTeams} onGoToSports={onGoToSports}/></div>
+      )}
       {/* Unified status strip — collapses the old weather + ticker + breaking bars
           into one slim row: live/breaking signal LEFT, market ticker CENTER,
           compact weather chip RIGHT. Red is a signal here, never a texture. */}
@@ -7890,6 +7937,14 @@ function TopBar({tab, setTab, search, setSearch, dark, setDark,
           )}
         </div>
       </div>
+      {/* Home weather band (<900px, where it is NOT merged onto the ticker line). */}
+      {tab==='general' && weatherData.length > 0 && (
+        <div className="topbar-wx"><RightNowWeather data={weatherData}/></div>
+      )}
+    </div>
+
+    {/* L1: STICKY block — only the nav (and, on mobile, the pinned chips). */}
+    <div className={`topbar-wrap ${hidden?'hidden':''} ${shrunk?'shrunk':''}`}>
 
       {/* ━━━ DESKTOP: nav bar ━━━ */}
       <div className="nav-bar">
@@ -8043,17 +8098,8 @@ function TopBar({tab, setTab, search, setSearch, dark, setDark,
         )}
       </div>
     </div>
-    {/* I0.3: Home weather + scores moved OUT of the sticky masthead so the sticky header
-        (ticker + nav) is a constant height on every page — no content jump Home<->Sports,
-        and nothing can sit under the nav. They scroll as the first page content on Home. */}
-    {tab==='general' && (
-      <div className="home-subbands">
-        <div className="topbar-wx"><RightNowWeather data={weatherData}/></div>
-        <div className="topbar-scores">
-          <ActiveScoresBar favTeams={favTeams} onGoToSports={onGoToSports}/>
-        </div>
-      </div>
-    )}
+    {/* L1: scores + markets/weather now live in the non-sticky header-scroll block ABOVE
+        the nav (see top of this component); the old home-subbands block is retired. */}
     </>
   );
 }
@@ -8198,66 +8244,70 @@ function TopOfHourStrip({ catLead, arts, onRead, stories: storiesProp }) {
     const picks = catLead && catLead.img ? [catLead] : (catLead ? [] : []);
     const used = new Set(catLead ? [catLead.link] : []);
     const catOrder = ['sports','business','finance','bloom','popculture','general','tech'];
-    // One row: hero + up to 3 secondaries (4 total). Two passes — one per category
-    // first (variety), then top up from any category if some feeds were empty.
+    // L2: hero (image) + up to 6 more (2-3 text headlines + 3 compact rows). Two passes
+    // — one image-bearing per category first (variety), then top up from any category
+    // (text-only allowed) if some feeds were empty.
     for (const c of catOrder) {
-      if (picks.length >= 4) break;
+      if (picks.length >= 6) break;
       const item = (arts[c]||[]).find(a => a.img && !used.has(a.link));
       if (item) { picks.push({...item, cat: item.cat||c}); used.add(item.link); }
     }
     for (const c of catOrder) {
-      if (picks.length >= 4) break;
+      if (picks.length >= 6) break;
       for (const a of (arts[c]||[])) {
-        if (picks.length >= 4) break;
-        if (a.img && !used.has(a.link)) { picks.push({...a, cat: a.cat||c}); used.add(a.link); }
+        if (picks.length >= 6) break;
+        if (!used.has(a.link)) { picks.push({...a, cat: a.cat||c}); used.add(a.link); }
       }
     }
-    return picks.slice(0,4);
+    return picks.slice(0,6);
   }, [catLead, arts, storiesProp]);
   if (stories.length < 1) return null;
+  const hero = stories[0];
+  const heroBadge = catBadge(hero);
+  const textHeads = stories.slice(1, 3);   // L2 left: 2 text-only headlines under the hero
+  const compact = stories.slice(3, 6);     // L2 right: 3 compact rows (image left or text)
   return (
     <div className="toh-strip">
       <div className="toh-strip-head">
         <span className="toh-strip-label">Top Stories</span>
       </div>
+      {/* L2: balanced — LEFT a 16:9 hero + text headlines, RIGHT compact rows (K6 style).
+          No boxed grid; exactly one hero-weight element (.toh-card-lead). */}
       <div className="toh-grid">
-        {stories.map((a, i) => {
-          const badge = catBadge(a);
-          const card = (
-            <article key={i} className={`toh-card${i===0?' toh-card-lead':''}${i===0 && !a.img?' toh-card-noimg':''}`} onClick={() => onRead(a)}>
-              {/* Placeholder sits underneath; the real image loads on top and hides
-                  itself if the URL fails, so a broken image never leaves a grey slot. */}
-              <div className="toh-img-ph"><span className="ph-label">{a.source}</span></div>
-              {a.img && <img className="toh-img" src={a.img} alt="" loading="lazy"
-                onError={e => { e.currentTarget.style.display = 'none'; }}/>}
-              <div className="toh-grad"/>
-              <div className="toh-body">
-                <span className="toh-cat">{badge.label}</span>
-                <h3 className="toh-title">{a.title}</h3>
-                <div className="toh-meta">{a.source} · {fmtDate(a.pubDate)}</div>
-              </div>
-            </article>
-          );
-          return i === 0 ? card : null;
-        })}
-        {stories.length > 1 && (
+        <div className="toh-lead-col">
+          <article className={`toh-card toh-card-lead${!hero.img ? ' toh-card-noimg' : ''}`} onClick={() => onRead(hero)}>
+            <div className="toh-img-ph"><span className="ph-label">{hero.source}</span></div>
+            {hero.img && <img className="toh-img" src={hero.img} alt="" loading="lazy" onError={e => { e.currentTarget.style.display = 'none'; }}/>}
+            <div className="toh-grad"/>
+            <div className="toh-body">
+              <span className="toh-cat">{heroBadge.label}</span>
+              <h3 className="toh-title">{hero.title}</h3>
+              <div className="toh-meta">{hero.source} · {fmtDate(hero.pubDate)}</div>
+            </div>
+          </article>
+          {textHeads.length > 0 && (
+            <div className="toh-textlist">
+              {textHeads.map((a, i) => (
+                <button key={i} className="toh-text-row" onClick={() => onRead(a)}>
+                  <span className="toh-text-title">{a.title}</span>
+                  <span className="toh-text-meta">{a.source} · {fmtDate(a.pubDate)}</span>
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+        {compact.length > 0 && (
           <div className="toh-side">
-            {stories.slice(1).map((a, i) => {
-              const badge = catBadge(a);
-              return (
-                <article key={i} className="toh-card" onClick={() => onRead(a)}>
-                  <div className="toh-img-ph"><span className="ph-label">{a.source}</span></div>
-                  {a.img && <img className="toh-img" src={a.img} alt="" loading="lazy"
-                    onError={e => { e.currentTarget.style.display = 'none'; }}/>}
-                  <div className="toh-grad"/>
-                  <div className="toh-body">
-                    <span className="toh-cat">{badge.label}</span>
-                    <h3 className="toh-title">{a.title}</h3>
-                    <div className="toh-meta">{a.source} · {fmtDate(a.pubDate)}</div>
-                  </div>
-                </article>
-              );
-            })}
+            {compact.map((a, i) => (
+              <button key={i} className="toh-compact-row" onClick={() => onRead(a)}>
+                {a.img && <img className="toh-compact-thumb" src={a.img} loading="lazy" decoding="async" alt="" onError={e => { e.currentTarget.style.visibility = 'hidden'; }}/>}
+                <span className="toh-compact-body">
+                  <span className="toh-compact-cat" style={{ color: catBadge(a).color }}>{catBadge(a).label}</span>
+                  <span className="toh-compact-title">{a.title}</span>
+                  <span className="toh-compact-meta">{a.source} · {fmtDate(a.pubDate)}</span>
+                </span>
+              </button>
+            ))}
           </div>
         )}
       </div>
@@ -8534,26 +8584,27 @@ function FeedPage({ cat, ctx }) {
         // Home Top Stories = TopOfHourStrip picks (catLead + cross-category images).
         // Mirror its selection exactly so State of Play + the feed exclude what it
         // actually shows — otherwise the hero repeats as State of Play #1.
+        // L2: Top Stories = hero (image) + up to 6 more (2-3 text headlines + 3 compact
+        // rows). The hero needs an image; the rest may be text-only.
         const picks = catLead && catLead.img ? [catLead] : [];
         const used = new Set(catLead ? [catLead.link] : []);
         const catOrder = ['sports','business','finance','bloom','popculture','general','tech'];
         for (const c of catOrder) {
-          if (picks.length >= 4) break;
+          if (picks.length >= 6) break;
           const item = (arts[c]||[]).find(a => a.img && !used.has(a.link));
           if (item) { picks.push({ ...item, cat: item.cat || c }); used.add(item.link); }
         }
         for (const c of catOrder) {
-          if (picks.length >= 4) break;
+          if (picks.length >= 6) break;
           for (const a of (arts[c]||[])) {
-            if (picks.length >= 4) break;
-            if (a.img && !used.has(a.link)) { picks.push({ ...a, cat: a.cat || c }); used.add(a.link); }
+            if (picks.length >= 6) break;
+            if (!used.has(a.link)) { picks.push({ ...a, cat: a.cat || c }); used.add(a.link); }
           }
         }
-        return picks.slice(0, 4);
+        return picks.slice(0, 6);
       }
-      if (!catLead) return [];   // category Top Stories = the gn-grid (hero + 3)
-      const secondaries = feedItems.slice(0, 6).filter(a => a.img).slice(0, 3)
-        .concat(feedItems.slice(0, 6).filter(a => !a.img)).slice(0, 3);
+      if (!catLead) return [];   // category Top Stories = hero + 5 secondaries (6 shown total)
+      const secondaries = feedItems.slice(0, 10).filter(a => a.link !== catLead.link).slice(0, 5);
       return [catLead, ...secondaries];
     }, [isHome, catLead, feedItems, arts]);
     const topStoryKeys = useMemo(() => new Set(topStoryItems.map(storyKey)), [topStoryItems]);
@@ -8629,26 +8680,34 @@ function FeedPage({ cat, ctx }) {
       // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [gapCat, gapKwKey, gapSrcKey, gapOn]);
 
-    // K5: keys of every story already on this page (Top Stories + State of Play + Houston
-    // + the numbered feed), so Across can dedupe against everything else on screen.
-    const shownKeysForAcross = useMemo(() => {
-      const s = new Set();
-      topStoryKeys.forEach(k => s.add(k)); sopShownKeys.forEach(k => s.add(k)); houstonKeys.forEach(k => s.add(k));
-      dedupedFeed.forEach(a => s.add(storyKey(a)));
-      return s;
-    }, [topStoryKeys, sopShownKeys, houstonKeys, dedupedFeed]);
-    // K5: "Across MyNewsHub" is REMOVED from General (General already spans every
-    // category) and shown on CATEGORY pages instead — the OTHER categories, promo-clean
-    // and deduped against this page's own stories (shownKeysForAcross).
-    const otherCatSections = useMemo(() => {
-      if (isHome) return [];
-      const otherCats = ['general','business','finance','bloom','sports','popculture','tech'].filter(c => c !== cat);
-      return otherCats.map(c => ({
-        cat: c,
-        cc: CATS[c],
-        items: (arts[c] || []).filter(a => !isPromoItem(a) && !shownKeysForAcross.has(storyKey(a))).slice(0, 3),
-      })).filter(s => s.items.length > 0).slice(0, 4);
-    }, [isHome, arts, cat, shownKeysForAcross]);
+    // L3: cross-category Connections bridges for the rail, computed HERE (not inside the
+    // Sidebar) so the one-story-once used-keys set is built ONCE and shared across every
+    // module. Home shows the top bridges overall; a category page shows bridges involving
+    // that category. Promo-filtered (K3).
+    const railConnCandidates = useMemo(() => {
+      const flat = Object.entries(arts).flatMap(([c, list]) => (list || []).map(a => ({ ...a, cat: a.cat || c }))).filter(a => !isPromoItem(a));
+      const all = findConnections(flat, { kw: DEFAULT_KW, max: 12, catLabel: c => (CATS[c]?.label) || c });
+      return isHome ? all : all.filter(x => x.categories.includes(cat));
+    }, [arts, cat, isHome]);
+    // L3 one-story-once: fill ONE shared used-keys set in priority order — the feed column
+    // (Top Stories → State of Play → Houston → the numbered feed) first, then the rail
+    // (Connections → Across). A story that qualifies for several lands in the top-priority
+    // one and is suppressed below it. (railDedup.js is unit-tested in railDedup.test.mjs.)
+    const { railConnections, otherCatSections } = useMemo(() => {
+      const used = new Set();
+      topStoryKeys.forEach(k => used.add(k)); sopShownKeys.forEach(k => used.add(k)); houstonKeys.forEach(k => used.add(k));
+      dedupedFeed.forEach(a => used.add(storyKey(a)));
+      // Connections claim their member stories before Across is computed.
+      const railConnections = claimConnections(railConnCandidates, used, storyKey).slice(0, 3);
+      // "Across MyNewsHub" — CATEGORY pages only (General already spans every category):
+      // the OTHER categories, promo-clean and deduped against everything already placed.
+      const acrossCandidates = isHome ? []
+        : ['general','business','finance','bloom','sports','popculture','tech'].filter(c => c !== cat)
+            .map(c => ({ cat: c, cc: CATS[c], items: (arts[c] || []).filter(a => !isPromoItem(a)).slice(0, 6) }));
+      const otherCatSections = claimAcrossSections(acrossCandidates, used, storyKey)
+        .map(s => ({ ...s, items: s.items.slice(0, 3) })).filter(s => s.items.length > 0).slice(0, 4);
+      return { railConnections, otherCatSections };
+    }, [topStoryKeys, sopShownKeys, houstonKeys, dedupedFeed, railConnCandidates, isHome, arts, cat]);
 
     // K5: Following — sidebar module on General. It now shows FOLLOWED TOPICS only;
     // followed TEAMS live as pinned chips on the Sports page (the my-teams ribbon) and
@@ -9007,6 +9066,7 @@ function FeedPage({ cat, ctx }) {
             sopGapItems={gapItems} sopBreakingItems={!activeKw && !activeSrc && !search ? catBreaking : []} sopMeta={CATS[cat]||CATS.general}
             sopCollapsed={sopCollapsed} onToggleSop={toggleSop} formatDate={fmtDate}
             acrossSections={!isHome && !activeKw && !activeSrc && !search ? otherCatSections : null}
+            connItems={!activeKw && !activeSrc && !search ? railConnections : null}
             onAcrossSeeAll={handleTabChange}
             followingModule={followingModule}
             feeds={feeds} onToggleFeed={(c,name)=>setFeeds(prev=>{const next=JSON.parse(JSON.stringify(prev));const f=(next[c]||[]).find(x=>x.name===name);if(f){f.on=!f.on;sv('feeds',next);}return next;})}

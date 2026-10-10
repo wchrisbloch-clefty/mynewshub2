@@ -47,7 +47,10 @@
 /* F6: SoP anchors the top of the rail — tighter header, a touch more label weight/ink
    (text3 -> text2) and a thin accent rule so it reads as the lead module, not a peer. */
 .sop-sidebar .sop-head{padding-bottom:7px;border-bottom:2px solid var(--border);margin-bottom:9px;gap:8px;align-items:center;}
-.sop-sidebar .sop-label{border-left:none;padding-left:0;font-family:var(--font-sans);font-size:10px;font-weight:800;color:var(--text2);letter-spacing:0.14em;}
+/* L4: the State of Play rail header resolves to the SAME eyebrow spec as every other
+   rail module header (.sidebar-sec-label): Inter, --fs-eyebrow, weight 700, --text3,
+   0.08em tracking. Was weight 800 / --text2 / 0.14em / a hardcoded 10px. */
+.sop-sidebar .sop-label{border-left:none;padding-left:0;font-family:var(--font-sans);font-size:var(--fs-eyebrow);font-weight:700;color:var(--text3);letter-spacing:0.08em;}
 .sop-sidebar .sop-collapse{margin-left:auto;}
 .sop-sidebar .sop-item{flex-wrap:wrap;align-items:flex-start;padding:7px 0;gap:3px 8px;}
 /* D4: tokenized (was 13px) — sidebar rows track the main body scale. */
