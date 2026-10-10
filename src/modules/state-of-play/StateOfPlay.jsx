@@ -21,8 +21,8 @@
 // co-located StateOfPlay.css + design tokens (src/styles/tokens.css).
 
 import { useMemo } from 'react';
-import { rankClusters } from '../clustering';
 import { FollowSourceChip } from '../follow-source';
+import { selectStateOfPlay } from './select';
 import './StateOfPlay.css';
 
 const defaultFormatDate = d => { try { return new Date(d).toLocaleString(); } catch { return ''; } };
@@ -44,12 +44,12 @@ export function StateOfPlay({ items, meta = {}, onRead, onAsk, formatDate = defa
   const color = meta.color;
   const label = meta.label || '';
   const sidebar = variant === 'sidebar';
-  // Ranked by heat, capped at 2 per publisher (no single-source flood).
-  const top = useMemo(() => rankClusters(items, { max: 2, limit: 5 }), [items]);
-  // Coverage-Gap rows fold into the same list (top 3), continuing the count.
-  const gaps = (gapItems || []).slice(0, 3);
-  // Breaking rows fold in at the TOP (top 3), tagged with a red pulse.
-  const breaking = (breakingItems || []).slice(0, 3);
+  // I0.7: breaking / numbered / gap rows, deduped against each other by cluster id so a
+  // Breaking story never repeats in the numbered list below. All the rules live in the
+  // pure selectStateOfPlay helper (unit-tested in select.test.mjs).
+  const { breaking, top, gaps } = useMemo(
+    () => selectStateOfPlay({ items, breakingItems, gapItems }),
+    [items, breakingItems, gapItems]);
 
   // Need a real ranked list OR something breaking to hang the module on.
   if (top.length < 3 && !breaking.length) return null;

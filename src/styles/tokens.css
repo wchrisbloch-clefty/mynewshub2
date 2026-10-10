@@ -43,6 +43,15 @@
   /* Market direction (identical in both themes by design) */
   --pos:#0f9d58;--neg:#d02f2f;
 
+  /* I0.5: ONE consistent missing-image placeholder — a neutral surface field with
+     the source name in the brand accent. --ph-ink on --ph-field is 6.8:1 (light)
+     and 6.3:1 (dark), both well over 4.5:1. --ph-overlay-ink is the white label for
+     the single exception (the Home hero lead, whose placeholder sits under the white
+     headline overlay and so must stay a dark field); it is 4.8:1 on --navy-light. */
+  --ph-field:var(--surface2);
+  --ph-ink:var(--accent);
+  --ph-overlay-ink:rgba(255,255,255,0.62);
+
   /* One spacing scale — 4 / 8 / 16 / 24 / 32 */
   --s1:4px;--s2:8px;--s3:16px;--s4:24px;--s5:32px;
 
@@ -119,7 +128,7 @@
 .media-img{width:100%;aspect-ratio:16/9;object-fit:cover;background:var(--surface2);border-radius:var(--img-radius);display:block;}
 .media-img.square{aspect-ratio:1/1;}
 .media-img.wide{aspect-ratio:21/9;}
-.media-img-ph{width:100%;aspect-ratio:16/9;border-radius:var(--img-radius);display:flex;align-items:center;justify-content:center;background:linear-gradient(135deg,var(--navy-light) 0%,var(--navy) 100%);color:rgba(255,255,255,0.18);font-weight:800;}
+.media-img-ph{width:100%;aspect-ratio:16/9;border-radius:var(--img-radius);display:flex;align-items:center;justify-content:center;background:var(--ph-field);color:var(--ph-ink);font-weight:800;}
 
 /* Numbers read as data everywhere — tickers, scores, prices, timestamps. */
 .tnum,time,[data-num]{font-variant-numeric:tabular-nums;font-feature-settings:"tnum" 1;}

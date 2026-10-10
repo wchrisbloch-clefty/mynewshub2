@@ -15,7 +15,7 @@
 // Promos (sportsbook / sponsored / "bet now") are excluded from Breaking AND from State
 // of Play ranking. Cap, 6h window and newest-first ordering are applied by qualifyBreaking.
 
-import { clusterStories } from '../clustering';
+import { clusterStories } from '../clustering/index.js';
 
 export const BREAKING_STRONG_TERMS = [
   'death', 'killed', 'dies', 'died', 'resigns', 'resign', 'fired', 'arrested', 'indicted',

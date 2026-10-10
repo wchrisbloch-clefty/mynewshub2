@@ -15,6 +15,8 @@ export const CONNECTION_STOPLIST = new Set([
   'year', 'week', 'day', 'story', 'video', 'photo', 'live', 'breaking', 'america',
 ]);
 
+import { isSatire } from '../satire/index.js';
+
 const norm = s => (s || '').toLowerCase().replace(/[’']/g, "'").replace(/\s+/g, ' ').trim();
 
 // Build the entity set for one article from: (1) known multi-word keyword phrases present,
@@ -44,7 +46,8 @@ export function findConnections(items, { kw = {}, max = 3, catLabel = (c) => c }
   const kwMulti = flatKw.filter(k => k.includes(' '));
   const kwSingle = flatKw.filter(k => !k.includes(' ') && k.length >= 2);
 
-  const arts = (items || []).filter(a => a && a.link && a.cat).map(a => ({ ...a, _ents: articleEntities(a, { kwMulti, kwSingle }) }));
+  // Satire (The Onion, Babylon Bee, …) never bridges — excluded by rule (I0.8).
+  const arts = (items || []).filter(a => a && a.link && a.cat && !isSatire(a)).map(a => ({ ...a, _ents: articleEntities(a, { kwMulti, kwSingle }) }));
 
   // Index articles by each unordered entity PAIR that co-occurs in an article. A shared
   // pair across articles guarantees the >= 2 shared-entities rule by construction.
@@ -84,13 +87,31 @@ export function findConnections(items, { kw = {}, max = 3, catLabel = (c) => c }
     });
   }
 
-  // Rank by recency then outlet count. Drop connections fully subsumed by a kept one.
+  // Rank by recency then outlet count, then keep greedily so EACH story appears in at
+  // most ONE bridge (I0.8). When a higher-ranked bridge already claimed some of a
+  // connection's members, strip those and re-validate: the trimmed bridge must still span
+  // >=2 categories AND >=2 outlets AND keep the shared entity pair present in >=2 members.
+  // This prevents one story fanning out across several overlapping bridges.
   connections.sort((a, b) => (b.recency - a.recency) || (b.outlets - a.outlets));
   const kept = [];
+  const usedLinks = new Set();
   for (const c of connections) {
-    const cLinks = new Set(c.members.map(m => m.link));
-    const subsumed = kept.some(k => { const kl = new Set(k.members.map(m => m.link)); return [...cLinks].every(x => kl.has(x)); });
-    if (!subsumed) kept.push(c);
+    const freeMembers = c.members.filter(m => !usedLinks.has(m.link));
+    const cats = [...new Set(freeMembers.map(m => m.cat))];
+    const outlets = [...new Set(freeMembers.map(m => m.source).filter(Boolean))];
+    if (freeMembers.length < 2 || cats.length < 2 || outlets.length < 2) continue;
+    const lead = freeMembers.slice().sort((x, y) => new Date(y.pubDate) - new Date(x.pubDate))[0];
+    const catsByCount = cats.slice().sort((c1, c2) => freeMembers.filter(m => m.cat === c2).length - freeMembers.filter(m => m.cat === c1).length);
+    kept.push({
+      ...c,
+      bridge: `${catLabel(catsByCount[0])} ↔ ${catLabel(catsByCount[1])}`,
+      categories: catsByCount,
+      outlets: outlets.length,
+      members: freeMembers,
+      lead,
+      recency: new Date(lead.pubDate).getTime() || 0,
+    });
+    for (const m of freeMembers) usedLinks.add(m.link);
     if (kept.length >= max) break;
   }
   return kept;
