@@ -45,7 +45,7 @@ import { ConnectionsStrip, findConnections } from './modules/connections';
 import { qualifyBreaking, isPromoItem } from './modules/breaking';
 import { partitionSatire } from './modules/satire';
 import { rankByVelocity, signalFor } from '../lib/voices/velocity';
-import { DEBUG, dbgRender, dbgPoll, DebugOverlay } from './modules/debug';
+import { DEBUG, dbgRender, dbgPoll, dbgMount, DebugOverlay } from './modules/debug';
 import { useScores, configureScores, loadScores as loadScoresStore, anyLiveGame } from './state';
 import { makeVoice, upsertVoice, removeVoice as removeVoiceModel, mergeVoices, clearTombstone, voiceId, VOICE_PLATFORMS } from './modules/voices/model';
 import { SEED_VOICES } from './modules/voices/seeds';
@@ -72,7 +72,8 @@ const PodcastsPage = lazy(() => import('./modules/podcasts/PodcastsPage').then(m
 const SourcesPage = lazy(() => import('./modules/sources/SourcesPage').then(m => ({ default: m.SourcesPage })));
 const CustomizePanel = lazy(() => import('./modules/customize/CustomizePanel').then(m => ({ default: m.CustomizePanel })));
 const BriefingPage = lazy(() => import('./modules/briefing/BriefingPage').then(m => ({ default: m.BriefingPage })));
-const PAGE_IMPORTERS = { podcasts: () => import('./modules/podcasts/PodcastsPage'), sources: () => import('./modules/sources/SourcesPage'), briefing: () => import('./modules/briefing/BriefingPage') };
+const SportsPage = lazy(() => import('./modules/sports/SportsPage').then(m => ({ default: m.SportsPage })));
+const PAGE_IMPORTERS = { podcasts: () => import('./modules/podcasts/PodcastsPage'), sources: () => import('./modules/sources/SourcesPage'), briefing: () => import('./modules/briefing/BriefingPage'), sports: () => import('./modules/sports/SportsPage') };
 export const prefetchPage = (name) => { const f = PAGE_IMPORTERS[name]; if (f) f(); };
 const prefetchCustomize = () => import('./modules/customize/CustomizePanel');
 const prefetchLazy = () => { import('./modules/concierge'); import('./modules/voices/ResolveModal'); import('./modules/analyze/AnalyzePanel'); import('./modules/reader/ArticleReader'); prefetchCustomize(); Object.values(PAGE_IMPORTERS).forEach(f => f()); };
@@ -918,36 +919,8 @@ function useIsMobile() {
   return isMobile;
 }
 
-// Auto-hide header on scroll-down / reveal on scroll-up. The Medium/Yahoo
-// pattern: content gets max screen real estate while scrolling, header
-// reappears the instant the user shows intent to navigate (scroll up).
-// 6px threshold ignores jitter; 80px start threshold prevents hide when
-// barely below the fold.
-function useScrollDirection(enabled) {
-  const [hidden, setHidden] = useState(false);
-  const lastY = useRef(0);
-  const ticking = useRef(false);
-  useEffect(() => {
-    if (!enabled) { setHidden(false); return; }
-    const onScroll = () => {
-      if (ticking.current) return;
-      ticking.current = true;
-      requestAnimationFrame(() => {
-        const y = window.scrollY;
-        const delta = y - lastY.current;
-        if (Math.abs(delta) > 6) {
-          if (delta > 0 && y > 80) setHidden(true);
-          else if (delta < 0) setHidden(false);
-          lastY.current = y;
-        }
-        ticking.current = false;
-      });
-    };
-    window.addEventListener('scroll', onScroll, { passive: true });
-    return () => window.removeEventListener('scroll', onScroll);
-  }, [enabled]);
-  return hidden;
-}
+// J2: useScrollDirection removed — the header shrink/hide is now a ref-based class
+// toggle inside TopBar (no React state, so scrolling re-renders nothing).
 
 // Horizontal swipe detection — returns touch handlers to spread onto an
 // element. Fires onSwipe('left'|'right') when user completes a decisive
@@ -7524,6 +7497,32 @@ function HeroBand({ heroStories, heroIdx, setHeroIdx, paused, setPaused, onRead 
 
 // I2: G5 skeleton shown as the Suspense fallback while the lazy Podcasts chunk loads —
 // the same pod-card shimmer the page shows for an empty feed, so there is no visual pop.
+// J-bundle: Suspense fallback while the lazy Sports chunk loads — score-strip +
+// league-pill + card shimmer, so the page does not pop in.
+function SportsSkeleton() {
+  return (
+    <div className="page sports-page">
+      <div className="sports-score-strip" aria-busy="true">
+        <div className="pod-skel-line" style={{ width: '100%', height: '64px' }}/>
+      </div>
+      <div className="sport-tabs" style={{ margin: '14px 0' }}>
+        {Array.from({ length: 6 }).map((_, i) => <div key={i} className="pod-skel-line" style={{ width: '64px', height: '30px', borderRadius: '16px', flexShrink: 0 }}/>)}
+      </div>
+      <div className="page-grid"><div className="feed-col">
+        {Array.from({ length: 4 }).map((_, i) => (
+          <div key={i} className="ba-item" style={{ display: 'flex', gap: '12px', marginBottom: '16px' }}>
+            <div className="pod-skel-line" style={{ width: '120px', height: '80px', flexShrink: 0 }}/>
+            <div style={{ flex: 1 }}>
+              <div className="pod-skel-line" style={{ width: '92%', height: '14px', marginBottom: '6px' }}/>
+              <div className="pod-skel-line" style={{ width: '60%', height: '11px' }}/>
+            </div>
+          </div>
+        ))}
+      </div></div>
+    </div>
+  );
+}
+
 function PodPageSkeleton() {
   return (
     <div className="page"><div className="pod-page"><div className="pod-col">
@@ -7738,10 +7737,48 @@ function Wordmark({ height = 24 }) {
 // the auto-hide-on-scroll-down behavior (mobile only — drives translate).
 function TopBar({tab, setTab, search, setSearch, dark, setDark,
                  onCustomize, onRefresh, breakingItems, onTickerClick,
-                 hidden, shrunk, mobileSearchOpen, onMobileSearchToggle, weatherCities, hiddenIndices,
+                 isMobile, mobileSearchOpen, onMobileSearchToggle, weatherCities, hiddenIndices,
                  onAnalyze, searchHistory, trendingTopics, onAccount, signedIn,
                  favTeams, onGoToSports}) {
+  dbgRender('TopBar'); // J2: confirm scroll re-renders ONLY TopBar, not App/pages
   const [searchFocused, setSearchFocused] = useState(false);
+  // J2: the smart-sticky header (shrink >60px; hide on scroll-down on mobile, show on up)
+  // used to live in APP state, so every scroll re-rendered App and REMOUNTED the page.
+  // The state + the single rAF-throttled passive scroll listener now live HERE, so a
+  // scroll re-renders only TopBar — App and the pages are untouched (no remount). The
+  // React-batched class application is byte-for-byte the original behavior (same
+  // thresholds, same CLS), unlike a raw ref toggle which fed back into scroll-anchoring.
+  const [shrunk, setShrunk] = useState(false);
+  const [hidden, setHidden] = useState(false);
+  useEffect(() => {
+    let raf = 0, lastY = 0, settleUntil = 0;
+    // When the header shrinks/hides on mobile it collapses in height; the browser's scroll
+    // anchoring then bumps scrollY to keep the view steady, which re-crosses the 60/80px
+    // thresholds and re-toggles the header — a feedback loop that made the header flicker
+    // ~7x per down-scroll (the phone twitch). We LATCH each change for 250ms so the single
+    // anchoring bump can't re-fire it. Thresholds + behavior are otherwise unchanged.
+    const now = () => (typeof performance !== 'undefined' ? performance.now() : Date.now());
+    const apply = () => {
+      raf = 0;
+      const y = window.scrollY;
+      if (now() < settleUntil) { lastY = y; return; } // ignore the anchoring rebound
+      let changed = false;
+      setShrunk(prev => { const v = y > 60; if (v !== prev) changed = true; return v; });
+      if (isMobile) {
+        const delta = y - lastY;
+        if (Math.abs(delta) > 6) {
+          if (delta > 0 && y > 80) setHidden(prev => { if (!prev) changed = true; return true; });
+          else if (delta < 0) setHidden(prev => { if (prev) changed = true; return false; });
+          lastY = y;
+        }
+      } else setHidden(prev => { if (prev) changed = true; return false; }); // desktop never hides
+      if (changed) settleUntil = now() + 250;
+    };
+    const onScroll = () => { if (!raf) raf = requestAnimationFrame(apply); };
+    apply();
+    window.addEventListener('scroll', onScroll, { passive: true });
+    return () => { window.removeEventListener('scroll', onScroll); if (raf) cancelAnimationFrame(raf); };
+  }, [isMobile]);
   const [quotes, setQuotes] = useState({});
   // F7: mobile market ticker is collapsible and DEFAULT-COLLAPSED (reclaims the ~34px
   // strip at the top of a phone screen). Persisted; desktop always shows the ticker.
@@ -8322,1407 +8359,15 @@ function AuthModal({ onClose, onSend, status, email, setEmail, userId, onSignOut
   );
 }
 
-export default function App() {
-  dbgRender('App'); // D8: ?debug=1 render counter (no-op when the flag is off)
-  const [tab, setTab]           = useState(()=>parseRoute().category);
-  const [subcat, setSubcat]     = useState(()=>parseRoute().subcategory); // URL-driven subcategory
-  const [tertiary, setTertiary] = useState(()=>parseRoute().tertiary);    // URL-driven team (Tier 3)
-  const [myTeams, setMyTeams]   = useState(()=>normalizeMyTeams(ld('myTeams', [])));  // followed teams {name,league,slug}
-  // Persist the one-time normalization (migration) of any pre-existing duplicates.
-  useEffect(() => { sv('myTeams', normalizeMyTeams(ld('myTeams', []))); }, []); // eslint-disable-line react-hooks/exhaustive-deps
-  const toggleMyTeam = (t) => setMyTeams(prev => {
-    // Key on teamSlug(name)+league, recomputed from the name — never a passed-in slug.
-    const slug = teamSlug(t.name || ''); const league = t.league || '';
-    const exists = prev.some(x => x.slug === slug && x.league === league);
-    const next = exists
-      ? prev.filter(x => !(x.slug === slug && x.league === league))
-      : [...prev, { ...t, slug }];
-    sv('myTeams', next); return next;
-  });
-  // My Topics — the same follow pattern generalized to ANY entity (ticker, company,
-  // topic, trending pill). Stored as lowercase-keyed labels in localStorage.
-  const [myTopics, setMyTopics] = useState(()=>ld('myTopics', []));       // ['nvidia','fed rate cuts', …]
-  const isTopicFollowed = (label) => myTopics.some(x => x.toLowerCase() === String(label).toLowerCase());
-  const toggleTopic = (label) => setMyTopics(prev => {
-    const l = String(label).trim(); if (!l) return prev;
-    const exists = prev.some(x => x.toLowerCase() === l.toLowerCase());
-    const next = exists ? prev.filter(x => x.toLowerCase() !== l.toLowerCase()) : [...prev, l];
-    sv('myTopics', next); return next;
-  });
-  const [search, setSearch]     = useState('');
-  const [dark, setDark]         = useState(()=>{
-    // Respect the OS preference on first load (no saved choice yet); once the user
-    // toggles, the saved value persists and overrides system (Pass L item 6).
-    const saved = ld('dark', null);
-    if (saved === true || saved === false) return saved;
-    try { return !!(window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches); } catch { return false; }
-  });
-  const [saved, setSaved]       = useState(()=>ld('saved',[]));
-  const [clicks, setClicks]     = useState(()=>ld('clicks',{}));
-  const [readLinks, setReadLinks] = useState(()=>new Set(ld('readLinks',[])));
-  const [readerArticle, setReaderArticle] = useState(null);
-  const [chatContext, setChatContext] = useState(null);
-  const [perspArticle, setPerspArticle] = useState(null);
-  const [showAnalyze, setShowAnalyze] = useState(false);
-  const [webResults, setWebResults] = useState([]);
-  const [webLoading, setWebLoading] = useState(false);
-  const [sourceRecs, setSourceRecs] = useState([]);
-  const [kw, setKw]             = useState(()=>ld('kw',DEFAULT_KW));
-  const [alerts, setAlerts]     = useState(()=>ld('alerts',['Texans','Astros','Kentucky','Clemson','ERCOT','Bloom Energy','fuel cell','hurricane','earthquake','breaking']));
-  const [feeds, setFeeds]       = useState(()=>ld('feeds',DEFAULT_FEEDS));
-  // ── FOLLOW-A-SOURCE-FROM-FEED (Pass G item 7) ───────────────────────────────
-  // "Followed" = present and enabled in any category's feed list (the same list
-  // Customize manages). followSource enables an existing entry or, if the source
-  // is new (e.g. a Coverage Gap outlet), appends it to the active tab's list.
-  const isSourceFollowed = useCallback((name) => {
-    if (!name) return true;
-    const n = name.trim().toLowerCase();
-    return Object.values(feeds || {}).some(list =>
-      (list || []).some(f => f.on && (f.name || '').trim().toLowerCase() === n));
-  }, [feeds]);
-  const followSource = useCallback((name, url = '') => {
-    if (!name) return;
-    const n = name.trim().toLowerCase();
-    setFeeds(prev => {
-      const next = JSON.parse(JSON.stringify(prev || {}));
-      let found = false;
-      for (const c of Object.keys(next)) {
-        for (const f of (next[c] || [])) {
-          if ((f.name || '').trim().toLowerCase() === n) { f.on = true; found = true; }
-        }
-      }
-      if (!found) {
-        const cat = tab || 'general';
-        if (!next[cat]) next[cat] = [];
-        next[cat].push({ name, url: url || SOURCE_URLS[name] || '', on: true, tier: 'reported' });
-      }
-      sv('feeds', next);
-      return next;
-    });
-  }, [tab]);
-  const [urgent, setUrgent]     = useState(()=>ld('urgent',DEFAULT_URGENT));
-  const [watchlist, setWatchlist]= useState(()=>ld('watchlist',DEFAULT_WATCHLIST));
-  // v23: customizable favorite teams. Defaults to DEFAULT_TEAMS; user can add/remove via Customize.
-  const [teams, setTeams]       = useState(()=>ld('teams', DEFAULT_TEAMS));
-  // Removal tombstones: canonical keys (slug|league) of teams the user explicitly
-  // unfollowed. They persist AND sync, and are subtracted from any pulled cloud
-  // profile, so an old cloud copy that still holds a removed default can never
-  // resurrect it on sign-in. Re-following a team clears its tombstone.
-  const [removedTeams, setRemovedTeams] = useState(()=>ld('removedTeams', []));
-  const tombstone = useMemo(() => new Set(removedTeams || []), [removedTeams]);
-  // ONE source of truth for "followed teams" (the pill ribbon + Home Following row):
-  // union of the seeded favorites (teams) and explicit follows (myTeams), deduped on
-  // teamSlug(name)+leagueKey, seeded-defaults first then myTeams-only appended, minus
-  // any tombstoned (removed) teams. The 7 seeded defaults read as "followed".
-  const followedTeams = useMemo(() => {
-    const seen = new Set(), out = [];
-    const push = (name, lg, extra) => {
-      if (!name) return;
-      const lk = leagueKey(lg), slug = teamSlug(name), key = `${slug}|${lk}`;
-      if (seen.has(key) || tombstone.has(key)) return; seen.add(key);
-      out.push({ name, team: name, league: lk, slug, match: (extra && extra.match) || name, emoji: (extra && extra.emoji) || '', espnUrl: extra && extra.espnUrl, teamUrl: extra && extra.teamUrl });
-    };
-    (teams || []).forEach(t => push(t.team || t.name, t.league, t));
-    (myTeams || []).forEach(t => push(t.name, t.league));
-    return out;
-  }, [teams, myTeams, tombstone]);
-  const isTeamFollowed = (name, lg) => { const lk = leagueKey(lg), s = teamSlug(name || ''); return followedTeams.some(t => t.slug === s && t.league === lk); };
-  // Follow adds to the explicit myTeams store and clears any tombstone; unfollow removes
-  // from BOTH stores and ADDS a tombstone so it cannot re-appear (local seed or cloud).
-  const followTeam = (name, lg) => {
-    const key = teamKeyOf(name, lg);
-    setRemovedTeams(prev => { const n = prev.filter(k => k !== key); sv('removedTeams', n); return n; });
-    toggleMyTeam({ name, league: leagueKey(lg) });
-  };
-  const unfollowTeam = (entry) => {
-    const lk = leagueKey(entry.league), slug = teamSlug(entry.name || entry.team || ''), key = `${slug}|${lk}`;
-    setRemovedTeams(prev => prev.includes(key) ? prev : (() => { const n = [...prev, key]; sv('removedTeams', n); return n; })());
-    setMyTeams(prev => { const n = prev.filter(x => !(teamSlug(x.name) === slug && leagueKey(x.league) === lk)); sv('myTeams', n); return n; });
-    setTeams(prev => { const n = prev.filter(x => !(teamSlug(x.team || x.name) === slug && leagueKey(x.league) === lk)); sv('teams', n); return n; });
-  };
-  // E1: Voices — people/orgs/teams whose cross-platform posts we flag. Persisted +
-  // synced; voiceTombstones mirror removedTeams so a removed voice can't be resurrected
-  // by an older cloud profile. A voice of type 'team' LINKS to the followedTeams entity
-  // (by name/slug) — we never keep a second team list here.
-  const [voices, setVoices] = useState(() => ld('voices', []));
-  const [voiceTombstones, setVoiceTombstones] = useState(() => ld('voiceTombstones', []));
-  const addOrUpdateVoice = useCallback((partial) => {
-    const v = partial.id && partial.handles !== undefined && partial.name ? partial : makeVoice(partial);
-    setVoiceTombstones(prev => { const n = clearTombstone(prev, v.id); sv('voiceTombstones', n); return n; });
-    setVoices(prev => { const n = upsertVoice(prev, v); sv('voices', n); return n; });
-  }, []);
-  const removeVoiceById = useCallback((id) => {
-    setVoices(prev => { const n = prev.filter(v => v.id !== id); sv('voices', n); return n; });
-    setVoiceTombstones(prev => prev.includes(id) ? prev : (() => { const n = [...prev, id]; sv('voiceTombstones', n); return n; })());
-  }, []);
-  const reorderVoice = useCallback((id, dir) => {
-    setVoices(prev => {
-      const i = prev.findIndex(v => v.id === id); if (i < 0) return prev;
-      const j = i + dir; if (j < 0 || j >= prev.length) return prev;
-      const n = prev.slice(); const [m] = n.splice(i, 1); n.splice(j, 0, m);
-      sv('voices', n); return n;
-    });
-  }, []);
-  // E2: add+confirm discovery. resolveVoice ensures the voice exists (as unconfirmed) and
-  // opens the modal; the server /api/voices-resolve returns per-platform candidates; the
-  // user accepts per platform — only then is a handle stored (never a guess).
-  const [voiceResolve, setVoiceResolve] = useState(null); // { voice, loading, data }
-  const resolveVoiceFlow = useCallback(async (partial) => {
-    const v = partial.id ? partial : makeVoice({ ...partial, status: partial.status || 'unconfirmed' });
-    addOrUpdateVoice(v);
-    setVoiceResolve({ voice: v, loading: true, data: null });
-    try {
-      const r = await fetchWithTimeout(`/api/signals?kind=voice-resolve&name=${encodeURIComponent(v.name)}&type=${encodeURIComponent(v.type)}`, 9000);
-      const data = r.ok ? await r.json() : { enabled: false, note: `Discovery unavailable (HTTP ${r.status}).`, platforms: {} };
-      setVoiceResolve(cur => cur && cur.voice.id === v.id ? { ...cur, loading: false, data } : cur);
-    } catch (e) {
-      setVoiceResolve(cur => cur && cur.voice.id === v.id ? { ...cur, loading: false, data: { enabled: false, note: 'Discovery unreachable — add handles manually.', platforms: {} } } : cur);
-    }
-  }, [addOrUpdateVoice]);
-  // E3: per-category Voices signals (tiles). Loads ONCE per category open (cached), and
-  // only reloads when the page refresh runs (loadCat clears the cache entry). No polling.
-  const [voiceSignals, setVoiceSignals] = useState({}); // { [cat]: {tiles,failures,loading,loaded} }
-  const loadVoiceSignals = useCallback(async (cat, opts = {}) => {
-    // Top-3 cap (E5 cost): only the first 3 confirmed voices per category (user's order)
-    // drive the lanes. E3/E6: server lanes (search/YouTube/RSSHub) + the EXISTING Reddit
-    // lane (/api/signals?kind=discussions) are auto; the EXISTING X lane (x-pulse) is
-    // click-to-load only (opts.includeX). All tiles are ranked together and promo-filtered
-    // (reusing isPromoItem from the breaking module). No AI, no polling.
-    const relevant = (voices || [])
-      .filter(v => v.category === cat && v.status === 'confirmed' && v.handles && Object.keys(v.handles).length)
-      .slice(0, 3);
-    if (!relevant.length) { setVoiceSignals(s => ({ ...s, [cat]: { tiles: [], failures: [], loading: false, loaded: true } })); return; }
-    setVoiceSignals(s => ({ ...s, [cat]: { ...(s[cat] || {}), loading: true, loaded: true, xLoaded: opts.includeX || (s[cat] && s[cat].xLoaded) } }));
-    const failures = [];
-    const tiles = [];
-    // Free server lanes (YouTube + RSSHub). Lane 1 search is a separate GET below.
-    try {
-      const r = await fetchWithTimeout('/api/signals?kind=voice-signals', 10000, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ voices: relevant, category: cat, limit: 8 }) });
-      const d = r.ok ? await r.json() : { tiles: [], failures: [{ source: 'voices', reason: `HTTP ${r.status}` }] };
-      (d.tiles || []).forEach(t => tiles.push(t));
-      (d.failures || []).forEach(f => failures.push(f));
-    } catch { failures.push({ source: 'voices', reason: 'unreachable' }); }
-    // item 1: Lane 1 (search) via the edge-cacheable GET /api/voice-search, with a 24h
-    // per-voice localStorage cache — a repeat load within 24h makes ZERO search calls.
-    await Promise.all(relevant.map(async v => {
-      const ck = `vsearch_${v.id}`;
-      const cached = ld(ck, null);
-      if (cached && cached.t && (Date.now() - cached.t) < 86400000) { if (cached.tile) tiles.push(cached.tile); return; }
-      try {
-        const pk = Object.keys(v.handles)[0] || 'x';
-        const r = await fetchWithTimeout(`/api/signals?kind=voice-search&q=${encodeURIComponent(v.name)}&handle=${encodeURIComponent(v.handles[pk] || '')}&platform=${encodeURIComponent(pk)}`, 9000);
-        if (r.ok) { const d = await r.json(); if (d.tile) tiles.push(d.tile); sv(ck, { t: Date.now(), tile: d.tile || null }); }
-        else failures.push({ source: `${v.name} · search`, reason: `HTTP ${r.status}` });
-      } catch { failures.push({ source: `${v.name} · search`, reason: 'unreachable' }); }
-    }));
-    // E6 Reddit lane (auto, free) — the EXISTING /api/signals?kind=discussions endpoint.
-    await Promise.all(relevant.filter(v => v.handles.reddit || true).map(async v => {
-      try {
-        const r = await fetchWithTimeout(`/api/signals?kind=discussions&q=${encodeURIComponent(v.name)}`, 8000);
-        if (r.ok) { const d = await r.json(); (d.reddit || []).slice(0, 2).forEach(p => tiles.push({ platform: 'reddit', who: v.name, url: p.url || p.link, title: p.title, ageHours: p.ageHours ?? 18, tier: 'inferred', source_class: 'social' })); }
-        else failures.push({ source: `${v.name} · reddit`, reason: `HTTP ${r.status}` });
-      } catch { failures.push({ source: `${v.name} · reddit`, reason: 'unreachable' }); }
-    }));
-    // E6 X lane — click-to-load ONLY (x-pulse costs money). Fetched only when requested.
-    if (opts.includeX) {
-      await Promise.all(relevant.filter(v => v.handles.x).map(async v => {
-        try {
-          const r = await fetchWithTimeout(`/api/signals?kind=xpulse&topic=${encodeURIComponent(v.name)}`, 9000);
-          if (r.ok) { const d = await r.json(); const arr = Array.isArray(d) ? d : (d.posts || d.items || []); arr.slice(0, 2).forEach(p => tiles.push({ platform: 'x', who: v.name, url: p.url || p.link, title: p.text || p.title || '', ageHours: p.ageHours ?? 12, tier: 'inferred', source_class: 'social' })); }
-          else failures.push({ source: `${v.name} · x`, reason: `HTTP ${r.status}` });
-        } catch { failures.push({ source: `${v.name} · x`, reason: 'unreachable' }); }
-      }));
-    }
-    // Item 8: strip promos/sportsbook; rank all lanes together; cap 4.
-    const clean = tiles.filter(t => t && t.title && !isPromoItem({ title: t.title, source: t.who, link: t.url }));
-    const ranked = rankByVelocity(clean.map(t => ({ ...t, signal: t.signal || signalFor(t) })), { limit: 4 });
-    setVoiceSignals(s => ({ ...s, [cat]: { tiles: ranked, failures, loading: false, loaded: true, xLoaded: opts.includeX || (s[cat] && s[cat].xLoaded), hasX: relevant.some(v => v.handles.x) } }));
-  }, [voices]);
-  // Load-once per category open (no polling). A ref guards against re-firing when the
-  // voices list changes identity; the page refresh button clears the entry to reload.
-  const voicesLoadedRef = useRef(new Set());
-  useEffect(() => {
-    if (voicesLoadedRef.current.has(tab)) return;
-    voicesLoadedRef.current.add(tab);
-    loadVoiceSignals(tab);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tab]);
-  const refreshVoiceSignals = useCallback((cat) => { voicesLoadedRef.current.delete(cat); loadVoiceSignals(cat); }, [loadVoiceSignals]);
-  const voicesStripFor = (cat) => { const s = voiceSignals[cat] || {}; return <VoicesStrip tiles={s.tiles || []} failures={s.failures || []} loading={!!s.loading} hasX={!!s.hasX} xLoaded={!!s.xLoaded} onLoadX={() => loadVoiceSignals(cat, { includeX: true })}/>; };
-  // E4: migrate existing DEFAULT_SOCIAL handles into seed voices (status 'seed'), not
-  // silently dropped — they surface in the seed review queue carrying their known handle.
-  const SOCIAL_PLAT = { twitter: 'x', linkedin: 'linkedin', instagram: 'instagram', youtube: 'youtube' };
-  const migratedSocialSeeds = useMemo(() => {
-    const out = [], byId = new Map();
-    for (const [cat, plats] of Object.entries(DEFAULT_SOCIAL || {})) {
-      for (const [plat, list] of Object.entries(plats || {})) {
-        const pk = SOCIAL_PLAT[plat]; if (!pk) continue;
-        for (const h of (list || [])) {
-          const v = makeVoice({ type: 'org', name: String(h).replace(/^@/, ''), category: cat, handles: { [pk]: h }, status: 'seed' });
-          if (byId.has(v.id)) { byId.get(v.id).handles[pk] = h; continue; }
-          byId.set(v.id, v); out.push(v);
-        }
-      }
-    }
-    return out;
-  }, []);
-  // The review queue: name-only suggestions (E4 list) + migrated social, minus anything
-  // already added or tombstoned (Skip tombstones so it won't re-suggest).
-  const seedQueue = useMemo(() => {
-    const added = new Set((voices || []).map(v => v.id));
-    const tomb = new Set(voiceTombstones || []);
-    const all = [...SEED_VOICES.map(s => ({ ...makeVoice(s), _parkedFrom: s._parkedFrom })), ...migratedSocialSeeds];
-    const seen = new Set(), out = [];
-    for (const v of all) { if (seen.has(v.id) || added.has(v.id) || tomb.has(v.id)) continue; seen.add(v.id); out.push(v); }
-    return out;
-  }, [voices, voiceTombstones, migratedSocialSeeds]);
-  const skipSeed = useCallback((id) => {
-    setVoiceTombstones(prev => prev.includes(id) ? prev : (() => { const n = [...prev, id]; sv('voiceTombstones', n); return n; })());
-  }, []);
-  // E5: "Test voices" — per voice/platform reachability (makes NO search-API calls).
-  const [voicesTest, setVoicesTest] = useState(null); // { loading, summary, results }
-  const testVoices = useCallback(async () => {
-    const confirmed = (voices || []).filter(v => v.status === 'confirmed' && v.handles && Object.keys(v.handles).length);
-    if (!confirmed.length) { setVoicesTest({ loading: false, summary: 'No confirmed voices to test.', results: [] }); return; }
-    setVoicesTest({ loading: true, summary: 'Testing…', results: [] });
-    try {
-      const r = await fetchWithTimeout('/api/signals?kind=voice-test', 20000, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ voices: confirmed }) });
-      const d = r.ok ? await r.json() : { results: [], summary: { total: 0, ok: 0, failed: 0 } };
-      const s = d.summary || {};
-      setVoicesTest({ loading: false, summary: `${s.ok || 0} ok · ${s.failed || 0} failed · ${s.unverifiable || 0} unverifiable`, results: d.results || [] });
-    } catch {
-      setVoicesTest({ loading: false, summary: 'Test unreachable from here.', results: [] });
-    }
-  }, [voices]);
-  const acceptCandidate = useCallback((pk, cand) => {
-    setVoiceResolve(cur => {
-      if (!cur) return cur;
-      const v = cur.voice;
-      const handles = { ...(v.handles || {}), [pk]: cand.handle };
-      const updated = { ...v, handles, status: 'confirmed', confirmedAt: Date.now() };
-      addOrUpdateVoice(updated);
-      return { ...cur, voice: updated };
-    });
-  }, [addOrUpdateVoice]);
-  const [weatherCities, setWeatherCities] = useState(()=>ld('weatherCities', DEFAULT_WEATHER_CITIES));
-  const [hiddenIndices, setHiddenIndices] = useState(()=>ld('hiddenIndices',[]));
-  const [briefingExclude, setBriefingExclude] = useState(()=>ld('briefingExclude',['comedy']));
-  const [briefingSources, setBriefingSources] = useState(()=>ld('briefingSources',[]));
-  const [marketData, setMarketData] = useState({});
-  const [marketLoading, setMarketLoading] = useState(false);
-  const [social, setSocial]     = useState(()=>ld('social',DEFAULT_SOCIAL));
-  const [arts, setArts]         = useState({general:[],sports:[],business:[],finance:[],bloom:[],tech:[],popculture:[],comedy:[]});
-  const artsRef = useRef(arts); artsRef.current = arts;               // live mirror for background poll
-  const [pendingNew, setPendingNew] = useState({});                    // v46: staged fresh articles for "N new stories" pill
-  const [loading, setLoading]   = useState({general:false,sports:false,business:false,finance:false,bloom:false,tech:false,popculture:false,comedy:false});
-  const [health, setHealth]     = useState({});
-  const [feedHealth, setFeedHealth] = useState({}); // source -> { code, ok, reason } for the degradation indicator/report
-  const [podEps, setPodEps]     = useState({});
-  const [podLoading, setPodLoading] = useState({});
-  const [activePod, setActivePod]   = useState(null);
-  const [podLimit, setPodLimit]     = useState(20); // episodes shown; "Load more" adds 20. App-level so it survives PodcastsPage remounts.
-  const [showPanel, setShowPanel]   = useState(false);
-  const [panelInitial, setPanelInitial] = useState({tab:'keywords',cat:'general'});
-  const [activeKw, setActiveKw]     = useState(null);
-  const [activeSrc, setActiveSrc]   = useState(null);
-  // I1: live scores moved OUT of App into the external scores store (src/state). App no
-  // longer holds them, so a score tick does not re-render App or the feed pages — only
-  // the components that call useScores() (ActiveScoresBar, Scoreboard, SportsPage).
-  // Sports team-hub filter. Lifted to App (from inside SportsPage) so it survives
-  // SportsPage remounts — SportsPage is defined inline in App and remounts on any
-  // App re-render (scroll/header/poll), which previously wiped a locally-held value.
-  const [activeTeam, setActiveTeam] = useState(null);
-  const [searchHistory, setSearchHistory] = useState(()=>ld('searchHistory',[]));
-  const [srcWebResults, setSrcWebResults] = useState([]);
-  const [srcWebLoading, setSrcWebLoading] = useState(false);
-
-  // ── v16 mobile + editorial state ──
-  const [menuOpen, setMenuOpen]         = useState(false);
-  const [mobileSearchOpen, setMobileSearchOpen] = useState(false);
-  const [refreshing, setRefreshing]     = useState(false);
-  const [lastUpdated, setLastUpdated]   = useState({}); // per-cat timestamp
-  const [lastFeedTab, setLastFeedTab]   = useState('general');
-  const isMobile                        = useIsMobile();
-  const headerHidden                    = useScrollDirection(isMobile);
-  const [headerShrunk, setHeaderShrunk] = useState(false);
-
-  // v46: Smart sticky header — collapses the pill/ticker rail past 60px scroll.
-  useEffect(()=>{
-    let raf = 0;
-    const onScroll = () => {
-      if (raf) return;
-      raf = requestAnimationFrame(() => { setHeaderShrunk(window.scrollY > 60); raf = 0; });
-    };
-    window.addEventListener('scroll', onScroll, {passive:true});
-    return () => { window.removeEventListener('scroll', onScroll); if (raf) cancelAnimationFrame(raf); };
-  },[]);
-
-  useEffect(()=>{sv('dark',dark);document.body.className=dark?'dark':'';},[dark]);
-  useEffect(()=>{sv('saved',saved);},[saved]);
-  useEffect(()=>{sv('clicks',clicks);},[clicks]);
-  useEffect(()=>{sv('readLinks',[...readLinks]);},[readLinks]);
-
-  // v36: Interest profile derived from reading history + saves + searches
-  const interestProfile = useMemo(() => {
-    const freq = {};
-    const STOP = new Set(['the','and','for','a','an','to','in','of','on','is','it','at','by','or','be','as','with','this','that','from','are','was','were','has','have','had','but','not','can','will','their','they','we','you','all','said']);
-    const addWords = (text, weight=1) => {
-      if (!text) return;
-      text.toLowerCase().replace(/[^a-z0-9\s]/g,'').split(/\s+/).forEach(w => {
-        if (w.length > 3 && !STOP.has(w)) freq[w] = (freq[w] || 0) + weight;
-      });
-    };
-    saved.forEach(a => { addWords(a.title, 3); addWords(a.desc, 1); });
-    [...readLinks].forEach(link => {
-      const all = Object.values(arts).flat();
-      const a = all.find(x => x.link === link);
-      if (a) { addWords(a.title, 2); addWords(a.desc, 1); }
-    });
-    searchHistory.forEach(q => addWords(q, 4));
-    return Object.entries(freq).sort((a,b)=>b[1]-a[1]).slice(0,30).map(([w])=>w);
-  }, [saved, readLinks, searchHistory, arts]);
-
-  // v36: Recommended articles — score all unread/unsaved articles by interest profile
-  const recommended = useMemo(() => {
-    if (interestProfile.length === 0) return [];
-    const all = Object.values(arts).flat();
-    const scored = all.map(a => {
-      if ((a.link && readLinks.has(a.link)) || saved.some(s=>s.link===a.link)) return null;
-      const text = (a.title + ' ' + (a.desc||'')).toLowerCase();
-      const score = interestProfile.reduce((s,w) => text.includes(w) ? s+1 : s, 0);
-      return score > 0 ? { ...a, _recScore: score } : null;
-    }).filter(Boolean);
-    scored.sort((a,b) => b._recScore - a._recScore || new Date(b.pubDate) - new Date(a.pubDate));
-    return scored.slice(0, 8);
-  }, [arts, interestProfile, readLinks, saved]);
-
-  // v20: whole-word urgent match + 6h recency window + cap 8.
-  // Whole-word prevents "killed" matching "killed it" or "killing" substrings.
-  // 6h window keeps breaking feeling live (was: any time).
-  // D2: Breaking is now a SIGNIFICANCE test, not a bare keyword match — a story
-  // qualifies only via >=3 distinct outlets within 2h (clusters) or a strong event
-  // term in the TITLE. Promos are excluded. This global pool is filtered to each
-  // page by relevance (see catBreaking) and capped at 3. Previews/interviews/promos
-  // never qualify because they are neither multi-outlet nor title-strong.
-  const breakingItems = useMemo(
-    () => {
-      // I0.8: strip satire (The Onion, Babylon Bee, …) BEFORE breaking qualification, by
-      // rule, so a joke "Hurricane…" headline can never surface as Breaking. Under
-      // ?debug=1, log the before/after and name each held-back source — this is how we
-      // tell which source a flagged headline (e.g. the hurricane one) came from.
-      const all = Object.values(arts).flat();
-      const { satire, rest } = partitionSatire(all);
-      if (DEBUG && satire.length) {
-        // eslint-disable-next-line no-console
-        console.log(`[satire] before ${all.length} → after ${rest.length} (held back ${satire.length}):`);
-        for (const s of satire) console.log(`[satire]   "${s.title}" — source: ${s.source || 'unknown'} (${s.link || ''})`);
-      }
-      return qualifyBreaking(rest, { now: Date.now() });
-    },
-    [arts]
-  );
-
-  // D7: the page the chat is grounded on. ChatBot answers from THIS page's headlines
-  // first, names the page in the model prompt, and shows a context chip. Category-level
-  // headlines (<=25) + State of Play (<=8) — the sizes are capped to hold the
-  // per-turn prompt growth within budget.
-  const pageContext = useMemo(() => {
-    const category = tab;
-    const cc = CATS[category] || CATS.general;
-    const subcategory = activeKw || activeSrc || null;
-    const entity = (activeTeam && (activeTeam.team || activeTeam.match)) || null;
-    const pool = arts[category] || [];
-    const ageOf = d => { const m = d ? Math.round((Date.now() - new Date(d)) / 60000) : null; return m == null ? '' : m < 60 ? `${m}m` : `${Math.round(m / 60)}h`; };
-    const visibleHeadlines = pool.slice(0, 25).map(a => ({ title: a.title, source: a.source, age: ageOf(a.pubDate) }));
-    const stateOfPlay = rankClusters(pool, { max: 2, limit: 8 }).map(a => a.title);
-    const label = entity ? `${cc.label} › ${entity}` : subcategory ? `${cc.label} › ${subcategory}` : cc.label;
-    return { tab, category, subcategory, entity, label, visibleHeadlines, stateOfPlay };
-  }, [tab, activeKw, activeSrc, activeTeam, arts]);
-
-  const kwMatch = useCallback(
-    (a,cat)=>(kw[cat]||[]).filter(k=>(a.title+(a.desc||'')).toLowerCase().includes(k.toLowerCase())),
-    [kw]
-  );
-  const dedupe = arr=>{const seen=new Set();return arr.filter(a=>{const k=a.title.slice(0,60).toLowerCase().replace(/\s+/g,'');if(seen.has(k))return false;seen.add(k);return true;});};
-
-  const specificCatKeys = useMemo(()=>{
-    const keys=new Set();
-    ['sports','business','finance','bloom','popculture','comedy'].forEach(c=>{
-      (arts[c]||[]).forEach(a=>{if(a.link)keys.add(a.link);if(a.title)keys.add(a.title.slice(0,60).toLowerCase().replace(/\s+/g,''));});
-    });
-    return keys;
-  },[arts]);
-
-  const sorted = useCallback((cat)=>{
-    let arr=arts[cat]||[];
-    if(search) arr=arr.filter(a=>(a.title+' '+(a.desc||'')+' '+(a.source||'')).toLowerCase().includes(search));
-    if(activeKw) arr=arr.filter(a=>(a.title+(a.desc||'')).toLowerCase().includes(activeKw.toLowerCase()));
-    if(activeSrc) arr=arr.filter(a=>a.source===activeSrc);
-    arr=dedupe(arr);
-    if(cat==='general') {
-      arr=arr.filter(a=>{
-        if(a.link&&specificCatKeys.has(a.link))return false;
-        const k=a.title.slice(0,60).toLowerCase().replace(/\s+/g,'');
-        return !specificCatKeys.has(k);
-      });
-    }
-    arr.sort((a,b)=>{const ka=kwMatch(a,cat).length,kb=kwMatch(b,cat).length;if(kb!==ka)return kb-ka;return new Date(b.pubDate)-new Date(a.pubDate);});
-    return arr.map(a=>({...a,matchedKw:kwMatch(a,cat)}));
-  // D8: dropped the stale `urgent` dep — after D2 `sorted` no longer reads it, so
-  // keeping it only forced needless recomputes (new array identity) whenever urgent changed.
-  },[arts,search,activeKw,activeSrc,kwMatch,specificCatKeys]);
-
-  const loadCat = useCallback(async (cat)=>{
-    setLoading(l=>({...l,[cat]:true}));
-    const results=[],hUpdates={},fhUpdates={};
-    await Promise.allSettled((feeds[cat]||[]).filter(f=>f.on).map(async f=>{
-      const t0=Date.now();const{items,status,reason}=await fetchRSS(f.url);const ms=Date.now()-t0;
-      const ok=items.length>0;
-      hUpdates[f.name]=ok?(ms<4000?'green':'yellow'):'red';
-      fhUpdates[f.name]={code:status||0, ok, reason:reason||''};
-      items.forEach(i=>{if(i.title&&i.link)results.push({...i,source:f.name,cat,_tier:f.tier||'reported'});});
-    }));
-    setHealth(h=>({...h,...hUpdates}));
-    setFeedHealth(h=>({...h,...fhUpdates}));
-    results.sort((a,b)=>new Date(b.pubDate)-new Date(a.pubDate));
-    setArts(a=>({...a,[cat]:results}));
-    setPendingNew(p=>({...p,[cat]:[]}));   // fresh load supersedes any staged items
-    setLastUpdated(prev => ({...prev, [cat]: Date.now()}));
-    setLoading(l=>({...l,[cat]:false}));
-  },[feeds]);
-
-  // v46: Lean read-only fetch used by the background poll — same feed logic as
-  // loadCat but does NOT touch arts/health; returns a sorted article array.
-  const fetchCatArticles = useCallback(async (cat)=>{
-    const results=[];
-    await Promise.allSettled((feeds[cat]||[]).filter(f=>f.on).map(async f=>{
-      const {items}=await fetchRSS(f.url);
-      items.forEach(i=>{if(i.title&&i.link)results.push({...i,source:f.name,cat,_tier:f.tier||'reported'});});
-    }));
-    results.sort((a,b)=>new Date(b.pubDate)-new Date(a.pubDate));
-    return results;
-  },[feeds]);
-
-  // v46: "N new stories" — prepend staged articles for a category and jump to top.
-  const applyPending = useCallback((cat)=>{
-    setArts(a=>{
-      const add=pendingNew[cat]||[];
-      if(!add.length) return a;
-      const existing=new Set((a[cat]||[]).map(x=>x.link));
-      const merged=[...add.filter(x=>!existing.has(x.link)),...(a[cat]||[])];
-      merged.sort((x,y)=>new Date(y.pubDate)-new Date(x.pubDate));
-      return {...a,[cat]:merged};
-    });
-    setPendingNew(p=>({...p,[cat]:[]}));
-    window.scrollTo({top:0,behavior:'smooth'});
-  },[pendingNew]);
-
-  const loadPod = useCallback(async (pod)=>{
-    setPodLoading(l=>({...l,[pod.name]:true}));
-    const{items}=await fetchRSS(pod.url);
-    setPodEps(p=>({...p,[pod.name]:items.map(e=>({...e,show:pod.name,host:pod.host,emoji:pod.emoji}))}));
-    setPodLoading(l=>({...l,[pod.name]:false}));
-  },[]);
-
-  // I1: loadScores now drives the external store (configured with fetchAllScores at mount).
-  const loadScores = loadScoresStore;
-  // I1 measurement hook: under ?debug=1 only, expose a way to trigger a scores update so
-  // the App/feed-page render count on a "score tick" can be measured headlessly (no 120s
-  // wait). Zero cost when the flag is off.
-  useEffect(() => { if (DEBUG && typeof window !== 'undefined') window.__loadScores = loadScoresStore; }, []);
-
-  const loadMarketData = useCallback(async ()=>{
-    setMarketLoading(true);
-    const allSyms=[...INDICES.map(i=>i.sym),...watchlist.map(w=>w.sym)];
-    const results={};
-    await Promise.allSettled(allSyms.map(async sym=>{const q=await fetchQuote(sym);if(q)results[sym]=q;}));
-    setMarketData(prev=>({...prev,...results}));
-    setMarketLoading(false);
-  },[watchlist]);
-
-  const refreshAll = useCallback(async ()=>{
-    setPendingNew({});
-    setArts({general:[],sports:[],business:[],finance:[],bloom:[],popculture:[],comedy:[]});
-    setLoading({general:false,sports:false,business:false,finance:false,bloom:false,popculture:false,comedy:false});
-    setHealth({});setPodEps({});setPodLoading({});
-    // Small delay to let the UI render the cleared state, then fan out
-    await new Promise(r => setTimeout(r, 80));
-    await Promise.allSettled([
-      ...Object.keys(DEFAULT_FEEDS).map(c=>loadCat(c)),
-      ...PODCAST_FEEDS.map(p=>loadPod(p)),
-      loadScores(),
-      loadMarketData(),
-    ]);
-  }, [loadCat, loadPod, loadScores, loadMarketData]);
-
-  useEffect(()=>{
-    // D6: fetch everything once on load. No 120s scores poll, no 3-min category
-    // poll — the only auto-refresh is the gated live-scores exception below, and
-    // every page has a manual "Updated Nm ago" refresh control.
-    Object.keys(DEFAULT_FEEDS).forEach(c=>loadCat(c));
-    PODCAST_FEEDS.forEach(p=>loadPod(p));
-    configureScores(fetchAllScores); // I1: wire the store's fetcher, then load once
-    loadScores();
-    loadMarketData(); // preload so RightNowStrip + watchlist widgets have ticker data
-    // G4: warm the lazy chunks on idle so they open instantly after first paint (no poll).
-    const ric = window.requestIdleCallback || (fn => setTimeout(fn, 1200));
-    ric(() => prefetchLazy());
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  },[]);
-
-  // D6: the ONE opt-in polling exception — live scores refresh every 120s, but ONLY on a
-  // Sports page, while a game is live, and the tab is visible. I1: this effect moved INTO
-  // SportsPage (it only matters there, and it reads scores via the store), so App no
-  // longer subscribes to scores and never re-renders on a score tick.
-
-  const onRead  = a=>{
-    setClicks(c=>({...c,[a.source]:(c[a.source]||0)+1}));
-    if (a.link) setReadLinks(s=>{const n=new Set(s);n.add(a.link);return n;});
-    setReaderArticle(a);
-  };
-  const onSave  = a=>{
-    const wasSaved = saved.some(x=>x.link===a.link);
-    // Stamp the trust tier + source_class on save (2b) so the saved record carries its
-    // provenance — this is the value the newshub_saved.tier column is meant to hold.
-    const prov = tagProvenance(a);
-    setSaved(s=>wasSaved?s.filter(x=>x.link!==a.link):[...s,{...a,tier:a._tier||a.tier||prov.tier,source_class:prov.source_class,savedAt:Date.now()}]);
-  };
-  const isSavedFn = a=>saved.some(s=>s.link===a.link);
-  const isReadFn = a=>a.link&&readLinks.has(a.link);
-
-  const handleTickerClick = t=>{
-    setSearch(t.label.toLowerCase());
-    const catMap={'Bloom Energy':'bloom','Crude Oil':'business','Bitcoin':'finance'};
-    if(catMap[t.label])setTab(catMap[t.label]);
-  };
-
-  // v23: persist teams whenever they change
-  useEffect(()=>{sv('teams',teams);},[teams]);
-  useEffect(()=>{sv('weatherCities',weatherCities);},[weatherCities]);
-
-  // v36: Global search — always fetch web results alongside internal articles
-  useEffect(() => {
-    if (!search || search.length < 3) {
-      setWebResults([]); setSourceRecs([]); return;
-    }
-    setSourceRecs(suggestSourcesForQuery(search));
-    setWebLoading(true);
-    fetchWebSearch(search).then(r => { setWebResults(r); setWebLoading(false); });
-    // Track search history (last 10 unique queries)
-    setSearchHistory(prev => {
-      const trimmed = search.trim().toLowerCase();
-      if (!trimmed) return prev;
-      const next = [trimmed, ...prev.filter(s => s !== trimmed)].slice(0, 10);
-      sv('searchHistory', next);
-      return next;
-    });
-  }, [search]);
-
-  // v38: When a source is active, fetch web results for more coverage from that outlet
-  useEffect(() => {
-    if (!activeSrc) { setSrcWebResults([]); return; }
-    setSrcWebLoading(true);
-    fetchWebSearch(`${activeSrc} news latest`).then(r => { setSrcWebResults(r); setSrcWebLoading(false); });
-  }, [activeSrc]);
-
-  // Keyboard shortcuts: J/K navigate articles, B bookmark, / focus search, Escape clear
-  useEffect(() => {
-    const handler = (e) => {
-      const tag = document.activeElement?.tagName?.toLowerCase();
-      if (tag === 'input' || tag === 'textarea') return;
-      if (e.key === '/') {
-        e.preventDefault();
-        const inp = document.querySelector('.search-input, .mobile-search-input');
-        if (inp) inp.focus();
-      }
-      if (e.key === 'Escape') {
-        if (showAnalyze) { setShowAnalyze(false); return; }
-        if (perspArticle) { setPerspArticle(null); return; }
-        if (readerArticle) { setReaderArticle(null); return; }
-        setSearch(''); setActiveKw(null); setActiveSrc(null);
-      }
-    };
-    window.addEventListener('keydown', handler);
-    return () => window.removeEventListener('keydown', handler);
-  }, [readerArticle, showAnalyze, perspArticle]);
-
-  // ─── v26b: CLOUD SYNC (Supabase) ──────────────────────────────────────────
-  // userId is null until the user signs in via the magic-link flow; once set,
-  // saveProfileToCloud/emitEvent receive a real id. Config sync is symmetric:
-  // applyCloudConfig pulls the profile down, a debounced effect pushes it up.
-  const [userId, setUserId]         = useState(null);
-  const [showAuth, setShowAuth]     = useState(false);
-  const [authEmail, setAuthEmail]   = useState('');
-  const [authStatus, setAuthStatus] = useState(''); // '' | 'sending' | 'sent' | 'error'
-  const cloudLoadedRef = useRef(false); // gate saves until the first pull completes
-
-  // The slice of local state that mirrors to newshub_profiles.config.
-  const cloudConfig = useMemo(() => ({
-    kw, teams, feeds, alerts, urgent, social, watchlist,
-    weatherCities, hiddenIndices, briefingExclude, briefingSources,
-    myTeams, myTopics, removedTeams,
-    voices, voiceTombstones, // E1
-  }), [kw, teams, feeds, alerts, urgent, social, watchlist,
-       weatherCities, hiddenIndices, briefingExclude, briefingSources, myTeams, myTopics, removedTeams,
-       voices, voiceTombstones]);
-
-  // Apply a downloaded profile onto local state (+ localStorage), keying defensively.
-  const applyCloudConfig = useCallback((cfg) => {
-    if (!cfg || typeof cfg !== 'object') return;
-    const put = (key, val, setter) => { if (val !== undefined && val !== null) { setter(val); sv(key, val); } };
-    // Removal tombstones are UNIONed (never clobbered) with the local set, then the
-    // pulled teams/myTeams are filtered through them. This is what stops an old cloud
-    // profile that still holds a removed default from resurrecting it on sign-in.
-    const mergedRemoved = Array.from(new Set([...(removedTeams || []), ...((Array.isArray(cfg.removedTeams) ? cfg.removedTeams : []))]));
-    put('removedTeams', mergedRemoved, setRemovedTeams);
-    const tomb = new Set(mergedRemoved);
-    const dropTomb = (list, nameOf) => (Array.isArray(list) ? list.filter(t => !tomb.has(teamKeyOf(nameOf(t), t.league))) : list);
-    put('kw', cfg.kw, setKw);
-    put('teams', dropTomb(cfg.teams, t => t.team || t.name), setTeams);
-    put('feeds', cfg.feeds, setFeeds);
-    put('alerts', cfg.alerts, setAlerts);
-    put('urgent', cfg.urgent, setUrgent);
-    put('social', cfg.social, setSocial);
-    put('watchlist', cfg.watchlist, setWatchlist);
-    put('weatherCities', cfg.weatherCities, setWeatherCities);
-    put('hiddenIndices', cfg.hiddenIndices, setHiddenIndices);
-    put('briefingExclude', cfg.briefingExclude, setBriefingExclude);
-    put('briefingSources', cfg.briefingSources, setBriefingSources);
-    put('myTeams', cfg.myTeams ? dropTomb(normalizeMyTeams(cfg.myTeams), t => t.name) : cfg.myTeams, setMyTeams);
-    put('myTopics', cfg.myTopics, setMyTopics);
-    // E1: voices — same union-merge + tombstone contract as teams, via the model.
-    const mergedVoiceTombs = Array.from(new Set([...(voiceTombstones || []), ...(Array.isArray(cfg.voiceTombstones) ? cfg.voiceTombstones : [])]));
-    put('voiceTombstones', mergedVoiceTombs, setVoiceTombstones);
-    if (cfg.voices !== undefined) {
-      const mergedVoices = mergeVoices(voices, Array.isArray(cfg.voices) ? cfg.voices : [], mergedVoiceTombs);
-      put('voices', mergedVoices, setVoices);
-    }
-  }, [removedTeams, voices, voiceTombstones]);
-
-  const pullCloudProfile = useCallback(async (uid) => {
-    if (!uid) return;
-    const cfg = await loadProfileFromCloud(uid);
-    applyCloudConfig(cfg);
-    cloudLoadedRef.current = true;
-  }, [applyCloudConfig]);
-
-  // On load: adopt an existing session and pull its profile; then react to sign-in/out.
-  useEffect(() => {
-    if (!isCloudSyncEnabled()) return;
-    // H4: only auto-load the Supabase client when a session is already present (stored or
-    // in a magic-link return). Fresh/logged-out visitors defer it until they sign in.
-    if (!hasCloudSession()) return;
-    getUserId().then(uid => { if (uid) { setUserId(uid); pullCloudProfile(uid); } });
-    const unsub = onAuthStateChange((user) => {
-      const id = user?.id || null;
-      setUserId(id);
-      cloudLoadedRef.current = false;
-      if (id) pullCloudProfile(id);
-    });
-    return unsub;
-  }, [pullCloudProfile]);
-
-  // Push config up whenever it changes (debounced), once signed in and pulled.
-  useEffect(() => {
-    if (!userId || !cloudLoadedRef.current) return;
-    const t = setTimeout(() => {
-      saveProfileToCloud(userId, cloudConfig);
-      emitEvent('config_changed', { keys: Object.keys(cloudConfig) }, userId);
-    }, 800);
-    return () => clearTimeout(t);
-  }, [userId, cloudConfig]);
-
-  const handleSendMagicLink = async () => {
-    const email = authEmail.trim();
-    if (!email) return;
-    setAuthStatus('sending');
-    const { error } = await signInWithEmail(email);
-    setAuthStatus(error ? 'error' : 'sent');
-  };
-  const handleSignOut = async () => { await signOut(); setUserId(null); setShowAuth(false); };
-
-  const handleCustomizeSave = ({feeds:nf,kw:nk,alerts:na,urgent:nu,social:ns,watchlist:nw,teams:nt,weatherCities:nwx,hiddenIndices:ni,briefingExclude:nbe,briefingSources:nbs})=>{
-    setFeeds(nf);sv('feeds',nf);
-    setKw(nk);sv('kw',nk);
-    setAlerts(na);sv('alerts',na);
-    if(nu){setUrgent(nu);sv('urgent',nu);}
-    setSocial(ns);sv('social',ns);
-    if(nw){setWatchlist(nw);sv('watchlist',nw);}
-    if(nt){
-      setTeams(nt);sv('teams',nt);
-      // Keep tombstones in sync with the Customize edit: un-tombstone every team kept
-      // in the saved list, and tombstone any seeded team the edit removed — so both
-      // Customize removes and the Following-row × stay removed across a cloud sync.
-      const keptKeys = new Set(nt.map(t => teamKeyOf(t.team || t.name, t.league)));
-      const removedByEdit = (teams || []).map(t => teamKeyOf(t.team || t.name, t.league)).filter(k => !keptKeys.has(k));
-      setRemovedTeams(prev => {
-        const next = Array.from(new Set([...prev.filter(k => !keptKeys.has(k)), ...removedByEdit]));
-        sv('removedTeams', next); return next;
-      });
-    }
-    if(nwx){setWeatherCities(nwx);sv('weatherCities',nwx);}
-    if(ni!=null){setHiddenIndices(ni);sv('hiddenIndices',ni);}
-    if(nbe!=null){setBriefingExclude(nbe);sv('briefingExclude',nbe);}
-    if(nbs!=null){setBriefingSources(nbs);sv('briefingSources',nbs);}
-    setShowPanel(false);refreshAll();
-  };
-
-  const openCustomize = (initialTab='keywords',initialCat='general')=>{
-    setPanelInitial({tab:initialTab,cat:initialCat});setShowPanel(true);
-  };
-
-  // Phase 2: apply a route (category + optional subcategory) to app state and
-  // refetch the feed. Called both by navigate() (user clicks) and popstate (back).
-  const applyRoute = (category, subcategory, tertiary) => {
-    setTab(category); setSubcat(subcategory || null); setTertiary(tertiary || null);
-    setSearch('');setActiveKw(null);setActiveSrc(null);
-    setMobileSearchOpen(false);
-    window.scrollTo({top:0, behavior:'instant'});
-    const CAT_TABS = ['general','sports','business','finance','popculture','comedy','tech'];
-    if (CAT_TABS.includes(category)) setLastFeedTab(category);
-    // Refetch feed whenever the category changes (or first visit).
-    if(!['saved','podcasts','social','sources'].includes(category)&&!(arts[category]||[]).length)loadCat(category);
-    if(category==='business'&&!(arts.finance||[]).length)loadCat('finance'); // Markets news powers the merged Business+Markets "All" view
-    if(category==='finance')loadMarketData();
-  };
-
-  // Phase 2/5: the URL is the single source of truth. navigate() writes the path
-  // (/:category/:subcategory?/:team?), then applies it. Chips call this, never local state.
-  const navigate = (category, subcategory=null, tertiary=null) => {
-    const path = buildPath(category, subcategory, tertiary);
-    if (typeof window!=='undefined' && window.location.pathname !== path) {
-      window.history.pushState({category,subcategory,tertiary}, '', path);
-    }
-    applyRoute(category, subcategory, tertiary);
-  };
-
-  const handleTabChange = t => navigate(t, null, null);
-
-  // I2 test hook: under ?debug=1 only, expose navigate() so headless before/after proofs
-  // can reach any page deterministically at any width (the More-overflow menu is width-
-  // dependent and brittle to drive by click). Zero cost when the flag is off.
-  useEffect(() => { if (DEBUG && typeof window !== 'undefined') { window.__nav = navigate; window.__openCustomize = openCustomize; } });
-
-  // Phase 2: back/forward buttons re-apply the URL as source of truth.
-  useEffect(()=>{
-    const onPop = () => { const r = parseRoute(); applyRoute(r.category, r.subcategory, r.tertiary); };
-    window.addEventListener('popstate', onPop);
-    return () => window.removeEventListener('popstate', onPop);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  },[]);
-
-  // Pull-to-refresh wiring (mobile only — hook gates itself by scrollY=0 too)
-  const { distance: ptrDistance } = usePullToRefresh(
-    async () => {
-      setRefreshing(true);
-      try { await refreshAll(); } finally { setRefreshing(false); }
-    },
-    { enabled: isMobile, threshold: 110 }
-  );
-
-  // Swipe left/right between categories on mobile. Only active on news-ish
-  // pages where changing category makes sense (not on Customize, podcasts, etc.)
-  const swipeHandlers = useSwipe(
-    (dir) => {
-      const idx = SWIPE_ORDER.indexOf(tab);
-      if (idx === -1) return;
-      const next = dir === 'left' ? idx + 1 : idx - 1;
-      if (next >= 0 && next < SWIPE_ORDER.length) handleTabChange(SWIPE_ORDER[next]);
-    },
-    { enabled: isMobile && SWIPE_ORDER.includes(tab) }
-  );
-
-  const getRelated = (a,cat)=>{
-    const matched=kwMatch(a,cat);if(!matched.length)return[];
-    return(arts[cat]||[]).filter(x=>x.link!==a.link&&matched.some(k=>(x.title+(x.desc||'')).toLowerCase().includes(k.toLowerCase()))).slice(0,4);
-  };
-  // F9: related stories for the reader — EXISTING data only, no network fetch.
-  // (1) the story's own cluster members (from clusterStories' _clusterMembers), then
-  // (2) same-category siblings that share significant title words. Dedup, cap at 4.
-  const getReaderRelated = (a)=>{
-    if(!a) return [];
-    const self=a.link;
-    const members=(a._clusterMembers||[]).filter(x=>x&&x.link&&x.link!==self);
-    const cat=a.cat||tab||'general';
-    const pool=arts[cat]||[];
-    const words=(a.title||'').toLowerCase().split(/\W+/).filter(w=>w.length>4);
-    const sibs=pool
-      .filter(x=>x.link&&x.link!==self&&!members.some(m=>m.link===x.link))
-      .map(x=>{const t=(x.title+' '+(x.desc||'')).toLowerCase();return{x,n:words.reduce((s,w)=>s+(t.includes(w)?1:0),0)};})
-      .filter(o=>o.n>0).sort((p,q)=>q.n-p.n).map(o=>o.x);
-    const seen=new Set();const out=[];
-    for(const x of [...members,...sibs]){ if(!seen.has(x.link)){seen.add(x.link);out.push(x);} if(out.length>=4)break; }
-    return out;
-  };
-
-  // Reading stats derived from clicks + readLinks
-  const readingStats = useMemo(() => {
-    const total = readLinks.size;
-    const topSources = Object.entries(clicks)
-      .sort((a,b) => b[1]-a[1]).slice(0, 5)
-      .map(([src, cnt]) => ({ src, cnt }));
-    const catCounts = {};
-    Object.values(arts).flat().forEach(a => {
-      if (a.link && readLinks.has(a.link)) {
-        catCounts[a.cat] = (catCounts[a.cat]||0) + 1;
-      }
-    });
-    const topCats = Object.entries(catCounts).sort((a,b)=>b[1]-a[1]).slice(0,3);
-    return { total, topSources, topCats };
-  }, [clicks, readLinks, arts]);
-
-  const NEWS_CATS = ['general','sports','business','bloom','tech','popculture','comedy','health'];
-  const homeTrendingTopics = useMemo(() => getTrendingTopics(arts), [arts]);
-
-  // ─── FEED PAGE ─────────────────────────────────────────────────────────
-  // ─── SPORTS PAGE (v23) — Yahoo Sports rebuild ──────────────────────────
-  // News-first sports vertical: dark scoreboard strip top, sport tabs (All/NFL/
-  // NBA/MLB/CFB/CBB), favorite team pills with external links, then prioritized
-  // stories feed. Yahoo Sports' actual layout pattern.
-  const SportsPage = () => {
-    dbgRender('SportsPage'); // D8: ?debug=1 render counter (no-op when off)
-    // I3: SportsPage no longer subscribes to the scores store — the live-score tile strip
-    // (SportsScoreStrip) subscribes itself and hosts the poll. So a score tick re-renders
-    // ONLY the strip, not this whole page (feed, team rails, State of Play). This is the
-    // Sports-twitch fix: App +0 (I1) AND SportsPage +0 on a tick.
-    // Phase 2: subcategory comes from the URL (never local state). Chips navigate.
-    const sportTab = subcat || 'all'; // 'all' | 'nfl' | 'nba' | 'mlb' | 'cfb' | 'cbb' | 'cbase' | 'racing' | 'golf'
-    const setSportTab = (key) => navigate('sports', key === 'all' ? null : key);
-    // Tier 3: team page driven by the URL's 3rd segment (/sports/:league/:team).
-    const teamName = (sportTab !== 'all' && tertiary)
-      ? ((TEAM_CHIPS[sportTab] || []).find(n => teamSlug(n) === tertiary)
-         || tertiary.replace(/-/g, ' ').replace(/\b\w/g, c => c.toUpperCase()))
-      : null;
-    const teamFollowed = !!(teamName && isTeamFollowed(teamName, sportTab));
-    // activeTeam/setActiveTeam now live in App state (survives SportsPage remounts).
-    const [teamMenuSym, setTeamMenuSym] = useState(null); // team with open popup menu
-    // Collapsible State of Play — shared shell behavior, per-category memory ('sports').
-    const [sopCollapsed, setSopCollapsed] = useState(()=>ld('sopCollapsed_sports', false));
-    const toggleSop = () => setSopCollapsed(v => { const nx = !v; sv('sopCollapsed_sports', nx); return nx; });
-    const [sportWebResults, setSportWebResults] = useState([]);
-    const [sportWebLoading, setSportWebLoading] = useState(false);
-    // Coverage-Gap stories for the active team, folded into the team's State of
-    // Play list as tagged rows (Pass G item 9) — no standalone panel.
-    const [teamGapItems, setTeamGapItems] = useState([]);
-    // Wide multi-source scan for the active team (Pass K item 1). The team story feed
-    // must not be scoped to ESPN's sports feed alone — it runs the same wide scan as
-    // Coverage Gap (any outlet that mentions the team), so niche/local teams (e.g. the
-    // Rockets) surface real stories instead of an empty state. Covers BOTH the URL-driven
-    // Tier-3 team page (teamName) and the My-Teams hub (activeTeam).
-    const [teamWideItems, setTeamWideItems] = useState([]);
-    // Resolve the active team entity for the wide scan. Two entry points with DIFFERENT
-    // field shapes, so we normalize:
-    //   • Tier-3 team page: teamName is a clean chip name ("Clemson"), league = URL tab
-    //     key ("cfb").
-    //   • My-Teams hub: activeTeam.match is the search term ("Clemson", "Houston Texans"),
-    //     activeTeam.team is a DISPLAY label ("Clemson FB", "UK Basketball"), and
-    //     activeTeam.league is an ESPN slug ("college-football").
-    // We search on the MATCH term (never the display label) and keep a set of filter
-    // "needles" — the match phrase, its mascot/last word, and the display label — so a
-    // suffixed label like "Clemson FB" or a city-prefixed "Houston Texans" still matches
-    // real headlines ("Clemson beats…", "Texans sign…").
-    const teamEntity = useMemo(() => {
-      if (teamName) return { name: teamName, league: sportTab, needles: [teamName] };
-      if (activeTeam) {
-        const match = activeTeam.match || activeTeam.team || '';
-        const last = match.split(/\s+/).filter(Boolean).pop();
-        return { name: match, league: activeTeam.league, needles: [match, last, activeTeam.team].filter(Boolean) };
-      }
-      return null;
-    }, [teamName, sportTab, activeTeam]);
-    const teamEntityName = teamEntity && teamEntity.name;
-    const teamEntityLeague = teamEntity && teamEntity.league;
-    useEffect(() => {
-      let alive = true;
-      if (!teamEntityName) { setTeamWideItems([]); return () => { alive = false; }; }
-      const kw = teamScanKeyword(teamEntityName, teamEntityLeague);
-      fetchDiscover('sports', [kw], [], 'feed').then(r => { if (alive) setTeamWideItems((r && r.items) || []); });
-      return () => { alive = false; };
-      // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [teamEntityName, teamEntityLeague]);
-    // Keep only wide-scan rows that name the team — match ANY needle (the scoped query
-    // already narrows the search; this just drops an adjacent headline clustering merged).
-    const teamWideFiltered = useMemo(() => {
-      if (!teamEntity) return [];
-      const needles = teamEntity.needles.map(n => (n || '').toLowerCase()).filter(Boolean);
-      return teamWideItems.filter(a => { const t = (a.title || '').toLowerCase(); return needles.some(n => t.includes(n)); });
-    }, [teamWideItems, teamEntity]);
-
-    // v36: Fetch web results when a specific league tab is active
-    useEffect(() => {
-      if (sportTab === 'all') { setSportWebResults([]); return; }
-      const SPORT_TAB_QUERIES = {
-        nfl: 'NFL football news today', nba: 'NBA basketball news today',
-        mlb: 'MLB baseball news today', cfb: 'college football news today',
-        cbb: 'college basketball news today', cbase: 'college baseball news today',
-        racing: 'horse racing news today', golf: 'PGA Tour golf news today',
-      };
-      const q = SPORT_TAB_QUERIES[sportTab] || `${sportTab} sports news`;
-      setSportWebLoading(true);
-      fetchWebSearch(q).then(r => { setSportWebResults(r); setSportWebLoading(false); });
-    }, [sportTab]);
-
-    const cc = CATS.sports;
-    // D8: memoize — `sorted('sports')` returns a NEW array of NEW objects every call,
-    // so calling it raw gave `allItems` a fresh identity each render, which made the
-    // `sportItems` and `teamItems` memos (that depend on it) recompute on EVERY render
-    // and never cache. `sorted` is a stable useCallback, so this recomputes only when
-    // its inputs actually change.
-    const allItems = useMemo(() => sorted('sports'), [sorted]);
-    const isLoading = loading.sports;
-
-    // Filter teams by sport tab — pill rail respects tab
-    const visibleTeams = useMemo(() => {
-      if (sportTab === 'all') return teams;
-      const leagueKey = sportTab;
-      const L = LEAGUES.find(x => x.key === leagueKey);
-      if (!L) return []; // golf/racing/cbase have no LEAGUE entry — use keyword filter only
-      return teams.filter(t => t.sport === L.sport && t.league === L.league);
-    }, [teams, sportTab]);
-
-    // Filter+sort stories: optionally team-locked, optionally sport-locked.
-    // Favorites float to top: any item mentioning ANY team in `teams` gets
-    // boosted unless a specific team filter is active.
-    const sportItems = useMemo(() => {
-      let items = allItems;
-      if (activeTeam) {
-        const m = (activeTeam.match || '').toLowerCase();
-        const teamShort = (activeTeam.team || '').toLowerCase();
-        items = items.filter(a => {
-          const text = (a.title + ' ' + (a.desc||'')).toLowerCase();
-          return text.includes(m) || (teamShort.length > 3 && text.includes(teamShort));
-        });
-        // Fold in the wide multi-source scan (Pass K item 1) so the team feed isn't
-        // limited to ESPN/CBS — any outlet that covers this team surfaces here.
-        const have = new Set(items.map(storyKey));
-        items = [...items, ...teamWideFiltered.filter(a => !have.has(storyKey(a)))];
-      } else if (sportTab !== 'all') {
-        // Sport-tab filter: keep articles mentioning any team in this sport,
-        // OR keep any article from sport-specific kw (broad fallback).
-        const teamsInSport = visibleTeams.map(t => (t.match||'').toLowerCase());
-        const sportKws = sportTab === 'nfl'    ? ['nfl','football','quarterback','touchdown','super bowl','running back','wide receiver','defensive end','nfc','afc','nfl draft']
-                       : sportTab === 'nba'    ? ['nba','basketball','lakers','celtics','warriors','knicks','heat','bulls','playoffs','nba draft','three-pointer','slam dunk']
-                       : sportTab === 'mlb'    ? ['mlb','baseball','world series','yankees','dodgers','cubs','home run','pitcher','bullpen','batting average','mlb draft']
-                       : sportTab === 'cfb'    ? ['cfb','college football','ncaa football','sec','big ten','acc','pac-12','big 12','cfp','bowl game','heisman']
-                       : sportTab === 'cbb'    ? ['cbb','college basketball','ncaa','march madness','final four','ncaa tournament','big east','sweet 16']
-                       : sportTab === 'cbase'  ? ['college baseball','ncaa baseball','cws','college world series','super regional','sec baseball','acc baseball','big 12 baseball','d1baseball','college world']
-                       : sportTab === 'racing' ? ['horse racing','thoroughbred','derby','stakes','jockey','paddock','furlong','harness racing','horse race','breeders cup','kentucky derby','preakness','belmont']
-                       : sportTab === 'golf'   ? ['golf','pga tour','masters','us open golf','british open','ryder cup','tiger woods','golfer','birdie','bogey','fairway','tee shot','pga championship','lpga']
-                       : [];
-        items = items.filter(a => {
-          const t = (a.title + ' ' + (a.desc||'')).toLowerCase();
-          return teamsInSport.some(m => m && t.includes(m)) || sportKws.some(k => t.includes(k));
-        });
-      }
-      // Favorite-team prioritization: bubble articles mentioning user's teams to top
-      const favMatches = teams.map(t => (t.match||'').toLowerCase()).filter(Boolean);
-      const scored = items.map(a => {
-        const t = (a.title + ' ' + (a.desc||'')).toLowerCase();
-        const favHits = favMatches.filter(m => t.includes(m)).length;
-        return { ...a, _favScore: favHits };
-      });
-      scored.sort((a, b) => {
-        if (b._favScore !== a._favScore) return b._favScore - a._favScore;
-        return new Date(b.pubDate) - new Date(a.pubDate);
-      });
-      return scored;
-    }, [allItems, activeTeam, sportTab, teams, visibleTeams, teamWideFiltered]);
-
-    // Hero = first article with image
-    // Tier 3: team feed reuses the Phase 2 engine (narrower query) + clusterStories.
-    const teamItems = useMemo(() => {
-      if (!teamName) return [];
-      const q = teamName.toLowerCase();
-      const local = clusterStories(allItems.filter(a => (a.title + ' ' + (a.desc||'')).toLowerCase().includes(q)));
-      // Merge the wide multi-source scan (Pass K item 1) — stories from ANY outlet that
-      // mention the team, not just the reader's ESPN/CBS sports feeds. Local (richer:
-      // images, descriptions) first, then wide-scan rows not already present.
-      const have = new Set(local.map(storyKey));
-      const merged = [...local, ...teamWideFiltered.filter(a => !have.has(storyKey(a)))];
-      return merged.sort((a, b) => new Date(b.pubDate || 0) - new Date(a.pubDate || 0));
-    }, [teamName, allItems, teamWideFiltered]);
-    const teamHero = teamItems.find(a => a.img) || null;
-
-    // Fetch the team's Coverage-Gap items (widely-covered team news the reader's
-    // own sports sources missed) to fold into the team State of Play list.
-    useEffect(() => {
-      let alive = true;
-      if (!teamName) { setTeamGapItems([]); return () => { alive = false; }; }
-      const srcs = (feeds.sports || []).filter(f => f.on).map(f => f.name);
-      fetchDiscover('sports', [teamName], srcs).then(r => { if (alive) setTeamGapItems((r && r.items) || []); });
-      return () => { alive = false; };
-      // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [teamName]);
-
-    const heroItems = sportItems.filter(a => a.img);
-    const lead = heroItems[0] || null;
-    // Exclude the hero by object identity (not link equality): in sparse/out-of-
-    // season sets like NCAAF the lead's link can collide with or duplicate other
-    // entries, which previously collapsed the whole feed while the count stayed high.
-    let feedItems = lead ? sportItems.filter(a => a !== lead) : sportItems;
-    if (feedItems.length === 0 && sportItems.length > 0) feedItems = sportItems; // never blank when stories exist
-
-    // League pills are text-only (Pass J item 7): lucide-react has no per-league
-    // glyphs and emoji rendered inconsistently. Team pills below carry real icons
-    // (TeamLogo). "All" gets a lucide Trophy so the leading pill still reads as sports.
-    const SPORT_TABS = [
-      { key:'all',    label:'All',             icon:Trophy },
-      { key:'nfl',    label:'NFL' },
-      { key:'nba',    label:'NBA' },
-      { key:'mlb',    label:'MLB' },
-      { key:'cfb',    label:'NCAAF' },
-      { key:'cbb',    label:'NCAAB' },
-      { key:'cbase',  label:'College Baseball' },
-      { key:'racing', label:'Horse Racing' },
-      { key:'golf',   label:'Golf' },
-    ];
-
-    // Keep the active subcategory chip scrolled into view (on load + on change).
-    const sportTabsRef = useRef(null);
-    useEffect(() => {
-      const el = sportTabsRef.current?.querySelector('.sport-tab.active');
-      if (el?.scrollIntoView) el.scrollIntoView({ inline:'center', block:'nearest', behavior:'smooth' });
-    }, [sportTab]);
-
-    const feedRef = useRef(null);
-    const scrollToFeed = () => {
-      const el = feedRef.current;
-      if (!el) return;
-      const top = el.getBoundingClientRect().top + window.scrollY - 72;
-      window.scrollTo({ top: Math.max(0, top), behavior: 'smooth' });
-    };
-
-    return (
-      <div className="page sports-page">
-
-        {/* v46: "N new stories" pill */}
-        {(pendingNew.sports||[]).length > 0 && (
-          <button className="new-stories-pill" onClick={()=>applyPending('sports')}>
-            <span className="nsp-dot"/> ↑ {pendingNew.sports.length} new {pendingNew.sports.length===1?'story':'stories'}
-          </button>
-        )}
-
-        {/* ── SCORES — live scoreboard, anchored at the very top of the ribbon ── */}
-        {!teamName && <SportsScoreStrip sportTab={sportTab} teams={[...teams, ...myTeams.map(t=>({match:t.name, league:t.league}))]}/>}
-
-        {/* ── LEAGUES — ESPN pill-style tab row ── */}
-        <div className="sport-tabs" ref={sportTabsRef}>
-          {SPORT_TABS.map(t => (
-            <button key={t.key}
-              className={`sport-tab ${sportTab===t.key?'active':''}`}
-              onClick={()=>{setSportTab(t.key); setActiveTeam(null); setTimeout(scrollToFeed,80);}}>
-              {t.icon && <t.icon size={14} strokeWidth={2.2}/>}
-              {t.label}
-            </button>
-          ))}
-        </div>
-
-        {/* ── MY TEAMS — followed teams as a pill ribbon (Yahoo Sports style). A pill
-            click routes into the existing team-hub (setActiveTeam → filtered feed +
-            ESPN/Team links). Order follows the user's My Teams (favorites) config. ── */}
-        {!teamName && !activeSrc && !search && followedTeams.length > 0 && (
-          <div className="sport-tabs my-teams-ribbon">
-            {followedTeams.map((t, i) => (
-              <button key={`${t.slug}-${t.league}-${i}`}
-                className={`sport-tab ${activeTeam && activeTeam.team===t.team && activeTeam.league===t.league ? 'active' : ''}`}
-                onClick={()=>{ setActiveTeam(activeTeam && activeTeam.team===t.team ? null : t); setTimeout(scrollToFeed,80); }}>
-                <TeamLogo name={t.team} league={t.league} size={16}/>
-                {t.team}
-              </button>
-            ))}
-          </div>
-        )}
-
-        {/* ── TEAM CHIP RAIL (Tier 3) — reuses sport-tabs styling ── */}
-        {TEAM_CHIPS[sportTab] && (
-          <div className="sport-tabs" style={{marginTop:'-4px'}}>
-            <button className={`sport-tab ${!teamName?'active':''}`} onClick={()=>navigate('sports', sportTab)}>
-              All {SPORT_TABS.find(s=>s.key===sportTab)?.label||''}
-            </button>
-            {TEAM_CHIPS[sportTab].map(n => {
-              const s = teamSlug(n);
-              return (
-                <button key={s} className={`sport-tab ${tertiary===s?'active':''}`} onClick={()=>navigate('sports', sportTab, s)}>
-                  <TeamLogo name={n} league={sportTab} size={16}/>
-                  {n}
-                </button>
-              );
-            })}
-          </div>
-        )}
-
-        {/* ── TEAM PAGE (Tier 3) — StateOfPlay + SnapshotCards + XPulse, follow star ── */}
-        {teamName && (
-          <>
-            <div className="sport-league-header">
-              <div className="sport-league-header-left">
-                <TeamLogo name={teamName} league={sportTab} size={40}/>
-                <div>
-                  <h2 className="sport-league-title">{teamName}</h2>
-                  <div className="sport-league-count">{teamItems.length} {teamItems.length===1?'story':'stories'} · {sportTab.toUpperCase()}</div>
-                </div>
-              </div>
-              <div style={{display:'flex',gap:'8px',alignItems:'center'}}>
-                <button className="sport-league-all-btn" onClick={()=> teamFollowed ? unfollowTeam({name:teamName, league:sportTab}) : followTeam(teamName, sportTab)}>
-                  {teamFollowed ? <><Star size={11} fill="currentColor" aria-hidden="true"/> Following</> : <><Star size={11} aria-hidden="true"/> Follow</>}
-                </button>
-                <button className="sport-league-all-btn" onClick={()=>navigate('sports', sportTab)}>← All {SPORT_TABS.find(s=>s.key===sportTab)?.label}</button>
-              </div>
-            </div>
-            <div className="page-grid">
-              <div className="feed-col">
-                {/* Coverage Gap is folded into this list as "Not in your sources" rows
-                    (Pass G item 9) — no standalone "You may be missing this" panel. */}
-                {/* D2: wire Breaking into the Sports team/league page SoP (sports-relevant only). */}
-                <StateOfPlay items={teamItems} meta={CATS.sports} onRead={onRead} onAsk={setChatContext} formatDate={fmtDate}
-                  collapsed={sopCollapsed} onToggleCollapse={toggleSop} gapItems={teamGapItems}
-                  breakingItems={(breakingItems||[]).filter(b=>b.cat==='sports').slice(0,3)}/>
-                <TrendingPills label={`Trending · ${teamName}`} items={teamItems} onOpen={t=>setSearch(t.toLowerCase())} isTopicFollowed={isTopicFollowed} toggleTopic={toggleTopic}/>
-                <SourcesDisagree topic={teamName} items={teamItems}/>
-                {teamItems.length === 0
-                  ? <EmptyState message={`No recent stories for .`} actionLabel="Refresh" onAction={()=>loadCat('sports')}/>
-                  : <div className="snap-feed">
-                      {teamItems.slice(0,20).map((a,i)=>(
-                        <Fragment key={a.link||i}>
-                          <SnapshotCard a={a} meta={CATS.sports} isSaved={isSavedFn(a)} onSave={onSave} onRead={onRead} onPerspectives={setPerspArticle} onAsk={setChatContext} formatDate={fmtDate} opinionLabel={opinionLabel(a)} hideImage={i>=3}/>
-                          {i===2 && <XPulse topic={teamName} variant="feed"/>}
-                        </Fragment>
-                      ))}
-                    </div>}
-              </div>
-              <Sidebar cat="sports" voicesNode={voicesStripFor('sports')} arts={arts} kw={kw} health={health} onAsk={setChatContext}
-                activeKw={activeKw} setActiveKw={k=>{setActiveKw(k);setActiveSrc(null);}}
-                activeSource={activeSrc} setActiveSource={s=>{setActiveSrc(s);setActiveKw(null);}}
-                onRead={onRead} showScoreboard={false}
-                isTopicFollowed={isTopicFollowed} toggleTopic={toggleTopic}/>
-            </div>
-          </>
-        )}
-
-        {/* My Teams photo-thumbnail cards removed from the hero area — replaced by the
-            My Teams pill ribbon under the league tabs (routes into the team-hub via
-            setActiveTeam). Scores now sit at the very top of the page. */}
-
-        {/* ── LEAGUE HEADER — ESPN hero banner (only when league tab active) ── */}
-        {sportTab !== 'all' && !teamName && !activeTeam && (() => {
-          const lt = SPORT_TABS.find(st => st.key === sportTab);
-          return (
-            <div className="sport-league-header">
-              <div className="sport-league-header-left">
-                {lt?.emoji && <span className="sport-league-emoji">{lt.emoji}</span>}
-                <div>
-                  <h2 className="sport-league-title">{lt?.label}</h2>
-                  <div className="sport-league-count">
-                    {sportItems.length > 0 ? `${sportItems.length} stories` : 'No stories yet — refresh to load'}
-                  </div>
-                  <div className="sport-league-sub">Top Stories · Trending News</div>
-                </div>
-              </div>
-              <button className="sport-league-all-btn" onClick={()=>setSportTab('all')}>← All Sports</button>
-            </div>
-          );
-        })()}
-
-        {/* ── TEAM HUB — ESPN team page header when team is active ── */}
-        {activeTeam && (
-          <div className="team-hub">
-            <div className="team-hub-header">
-              <div>
-                <div className="team-hub-title">{activeTeam.emoji} {activeTeam.team}</div>
-                <div className="team-hub-count">{sportItems.length} stories found · {activeTeam.league?.toUpperCase()}</div>
-              </div>
-              <div style={{display:'flex',alignItems:'center',gap:'8px'}}>
-                {activeTeam.espnUrl && <a className="team-hub-link" href={activeTeam.espnUrl} target="_blank" rel="noreferrer"><span>ESPN</span> <ExternalLink size={12} aria-hidden="true" style={{verticalAlign:"-1px"}}/></a>}
-                {activeTeam.teamUrl && <a className="team-hub-link" href={activeTeam.teamUrl} target="_blank" rel="noreferrer"><span>Team Site</span> <ExternalLink size={12} aria-hidden="true" style={{verticalAlign:"-1px"}}/></a>}
-                <button className="team-hub-clear" onClick={()=>setActiveTeam(null)}><XIcon size={12} aria-hidden="true"/> Clear</button>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* State of Play moved into the sidebar (Pass J item 2). */}
-
-        {/* ── HERO + FEED ── */}
-        {!teamName && <div className="page-grid" ref={feedRef}>
-          <div className="feed-col">
-            {/* Hero lead article */}
-            {lead && (
-              <article className="sports-hero" onClick={()=>onRead(lead)}>
-                <div className="sports-hero-img">
-                  <CoverImg src={lead.img} label={lead.source}/>
-                  {lead._favScore > 0 && <span className="sports-hero-fav">★ MY TEAMS</span>}
-                </div>
-                <div className="sports-hero-text">
-                  <h1 className="sports-hero-title">{lead.title}</h1>
-                  {lead.desc && <p className="sports-hero-desc">{lead.desc}</p>}
-                  <div className="sports-hero-meta">
-                    <span className="sports-hero-source">{lead.source}</span>
-                    <span>·</span>
-                    <span>{fmtDate(lead.pubDate)}</span>
-                  </div>
-                </div>
-              </article>
-            )}
-
-            {/* 3-column story grid — ESPN visual punch for top stories */}
-            {feedItems.length > 0 && !activeTeam && (
-              <div className="gn-row" style={{marginBottom:'24px'}}>
-                {feedItems.slice(0, 6).filter(a=>a.img).slice(0, 3).concat(
-                  feedItems.slice(0, 6).filter(a=>!a.img)
-                ).slice(0, 3).map((a, i) => (
-                  <article key={i} className="gn-card" onClick={()=>onRead(a)}>
-                    <div className="gn-card-img"><CoverImg src={a.img} label={a.source}/></div>
-                    <h3 className="gn-card-title">{a.title}</h3>
-                    <div className="gn-card-meta">
-                      <span className="gn-card-source" style={{color:cc.color}}>{a.source}</span>
-                      <span>·</span><span>{fmtDate(a.pubDate)}</span>
-                      {a._favScore > 0 && <Star size={11} aria-hidden="true" style={{marginLeft:'4px',color:'var(--amber)'}} fill="currentColor"/>}
-                    </div>
-                  </article>
-                ))}
-              </div>
-            )}
-
-            {isLoading && !feedItems.length
-              ? <div aria-busy="true" aria-label="Loading sports">{Array.from({length:5}).map((_,i)=>(
-                  <div key={i} className="fc-skeleton"><div className="fc-skeleton-title"/><div className="fc-skeleton-line"/><div className="fc-skeleton-line" style={{width:'60%'}}/></div>
-                ))}</div>
-              : feedItems.length === 0
-                ? <EmptyState
-                    message={activeTeam ? `No stories for ${activeTeam.team} yet.` : `Couldn't load Sports. Try refresh.`}
-                    actionLabel="Refresh" onAction={refreshAll}/>
-                : feedItems.slice(activeTeam?0:3, 30).map((a, i) => (
-                    <FeedCard key={i} a={a} cat="sports" isSaved={isSavedFn(a)} onSave={onSave} onRead={onRead} relatedSources={getRelated(a,'sports')} isRead={isReadFn(a)} userKw={kw} userTeams={teams}/>
-                  ))
-            }
-
-            {/* v36: Web results for active league tab */}
-            {sportTab !== 'all' && (sportWebResults.length > 0 || sportWebLoading) && (
-              <div className="web-fallback">
-                <div className="rail-label" style={{margin:'24px 0 12px'}}>From the Web</div>
-                {sportWebLoading && <div style={{fontSize:'12px',color:'var(--text3)',fontStyle:'italic',padding:'10px 0'}}>Searching the web…</div>}
-                {sportWebResults.map((r,i) => (
-                  <a key={i} className="web-result" href={r.link} target="_blank" rel="noreferrer">
-                    <div className="web-result-title">{r.title}</div>
-                    {r.desc && <div className="web-result-desc">{r.desc.slice(0,160)}</div>}
-                    <div className="web-result-src">{r.source}{r.pubDate && <span className="web-result-date"> · {fmtDate(r.pubDate)}</span>}</div>
-                  </a>
-                ))}
-              </div>
-            )}
-
-            {lastUpdated.sports && (
-              <div style={{display:'flex',justifyContent:'flex-end',padding:'8px 0'}}>
-                <LastUpdated timestamp={lastUpdated.sports} onRefresh={() => loadCat('sports')}/>
-              </div>
-            )}
-            {/* ── MY TEAMS SHELF — sleek card grid at bottom of sports feed ── */}
-            {teams.length > 0 && (
-              <div className="teams-shelf">
-                <div className="teams-shelf-head">
-                  <span className="teams-shelf-label">My Teams</span>
-                  <button className="teams-shelf-edit" onClick={()=>openCustomize('teams','sports')}><IconGear/> Edit</button>
-                </div>
-                <div className="teams-shelf-grid">
-                  {teams.map(t => {
-                    const isFiltered = activeTeam?.team === t.team;
-                    const menuOpen = teamMenuSym === t.team;
-                    return (
-                      <div key={t.team} className={`team-card${isFiltered?' filtered':''}`}>
-                        <button className="team-card-btn"
-                          onClick={()=>setTeamMenuSym(menuOpen ? null : t.team)}>
-                          <span className="team-card-emoji">{t.emoji}</span>
-                          <div className="team-card-info">
-                            <span className="team-card-name">{t.team}</span>
-                            <span className="team-card-league">{t.league?.toUpperCase()}</span>
-                          </div>
-                          <span className="team-card-arrow"><ChevronDown size={11} aria-hidden="true" style={{transform:menuOpen?'rotate(180deg)':'none',transition:"transform .15s"}}/></span>
-                        </button>
-                        {menuOpen && (
-                          <div className="team-card-menu">
-                            <button className="team-menu-item" onClick={()=>{
-                              setActiveTeam(isFiltered ? null : t); setSportTab('all');
-                              setTeamMenuSym(null); setTimeout(scrollToFeed, 80);
-                            }}>
-                              {isFiltered ? <><XIcon size={12} aria-hidden="true"/> Clear filter</> : 'Filter News'}
-                            </button>
-                            {t.espnUrl && <a className="team-menu-item" href={t.espnUrl} target="_blank" rel="noreferrer"><span>ESPN</span> <ExternalLink size={12} aria-hidden="true" style={{verticalAlign:"-1px"}}/></a>}
-                            {t.teamUrl && <a className="team-menu-item" href={t.teamUrl} target="_blank" rel="noreferrer"><span>Team Site</span> <ExternalLink size={12} aria-hidden="true" style={{verticalAlign:"-1px"}}/></a>}
-                          </div>
-                        )}
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-            )}
-
-            <SourceFooter cat="sports" feeds={feeds} arts={arts}/>
-          </div>
-
-          {/* State of Play scoping across Sports (three cases, three answers):
-              • "All" overview (sportTab==='all', no team) → SHOW (top-level category).
-              • League view (a specific league, no team) → HIDE — league-wide trending
-                is noise unless you follow every team; sopItems is null.
-              • Team hub (activeTeam set) → SHOW, scoped to that team (sportItems is
-                already team-filtered). The Tier-3 team page renders its own in-column
-                StateOfPlay in the teamName block above. */}
-          <Sidebar cat="sports" voicesNode={voicesStripFor('sports')} arts={arts} kw={kw} health={health} onAsk={setChatContext}
-            activeKw={activeKw} setActiveKw={k=>{setActiveKw(k);setActiveSrc(null);}}
-            activeSource={activeSrc} setActiveSource={s=>{setActiveSrc(s);setActiveKw(null);}}
-            onRead={onRead}
-            showScoreboard={false} recommended={recommended}
-            isTopicFollowed={isTopicFollowed} toggleTopic={toggleTopic}
-            sopItems={(sportTab === 'all' || activeTeam) && !activeSrc && !search ? sportItems : null}
-            sopMeta={CATS.sports} sopCollapsed={sopCollapsed} onToggleSop={toggleSop} formatDate={fmtDate}/>
-        </div>}
-      </div>
-    );
-  };
-
-  // Generic entity mini-hub — Markets/Energy/etc. topics (no dedicated page before).
-  // Scoped StateOfPlay + "Trending for [entity]" + the entity's deduped feed. Text
-  // header only (no logo — sports teams keep their own Tier-3 page with a logo).
-  const EntityHub = ({ cat, entity }) => {
-    const cc = CATS[cat] || CATS.general;
-    const q = entity.toLowerCase();
-    const entityItems = useMemo(
-      () => clusterStories(Object.values(arts).flat().filter(a => (a.title + ' ' + (a.desc || '')).toLowerCase().includes(q))),
-      [arts, q]
-    );
-    const followed = isTopicFollowed(entity);
-    return (
-      <div className="page">
-        <div className="entity-hub-header">
-          <div className="entity-hub-title-wrap">
-            <h1 className="entity-hub-title">{entity}</h1>
-            <div className="entity-hub-sub">{entityItems.length} {entityItems.length === 1 ? 'story' : 'stories'} · {cc.label}</div>
-          </div>
-          <div className="entity-hub-actions">
-            <button className={`entity-hub-btn ${followed ? 'on' : ''}`} onClick={() => toggleTopic(entity)}>{followed ? '★ Following' : '☆ Follow'}</button>
-            <button className="entity-hub-btn" onClick={() => navigate(cat)}>← {cc.label}</button>
-          </div>
-        </div>
-        {/* D2: wire Breaking into the entity hub SoP (this entity's category only). */}
-        <StateOfPlay items={entityItems} meta={cc} onRead={onRead} onAsk={setChatContext} formatDate={fmtDate}
-          breakingItems={(breakingItems||[]).filter(b=>b.cat===cat).slice(0,3)}/>
-        <TrendingPills label={`Trending · ${entity}`} items={entityItems} onOpen={t => navigate(cat, 'topic', teamSlug(t))} isTopicFollowed={isTopicFollowed} toggleTopic={toggleTopic}/>
-        <SourcesDisagree topic={entity} items={entityItems}/>
-        {entityItems.length === 0
-          ? <EmptyState message={`No recent stories mentioning “${entity}”.`} actionLabel="Refresh" onAction={() => loadCat(cat)}/>
-          : <div className="snap-feed">
-              {entityItems.slice(0, 20).map((a, i) => (
-                <Fragment key={a.link || i}>
-                  <SnapshotCard a={a} meta={cc} isSaved={isSavedFn(a)} onSave={onSave} onRead={onRead} onPerspectives={setPerspArticle} onAsk={setChatContext} formatDate={fmtDate} opinionLabel={opinionLabel(a)} hideImage={i>=3}/>
-                  {i === 2 && <XPulse topic={entity} variant="feed"/>}
-                </Fragment>
-              ))}
-            </div>}
-      </div>
-    );
-  };
-
-  const FeedPage = ({cat}) => {
+// J3/J-bundle: SportsPage hoisted AND extracted to src/modules/sports (lazy). It
+// receives everything via one ctx object; rendered in App under <Suspense>.
+
+function FeedPage({ cat, ctx }) {
+  // J3: hoisted to module scope (stable identity) so App re-renders re-render this
+  // page instead of remounting it. App-internal values arrive via one ctx object.
+  const { activeKw, activeSrc, applyPending, arts, breakingItems, briefingExclude, feedHealth, feeds, followTeam, followedTeams, handleTabChange, health, isSavedFn, isTeamFollowed, isTopicFollowed, kw, kwMatch, lastUpdated, loadCat, loading, myTeams, myTopics, navigate, onRead, onSave, openCustomize, pendingNew, recommended, refreshAll, refreshVoiceSignals, search, setActiveKw, setActiveSrc, setChatContext, setFeeds, setPerspArticle, setSearch, social, sorted, sourceRecs, srcWebLoading, srcWebResults, subcat, tab, teams, toggleTopic, unfollowTeam, urgent, voicesStripFor, webLoading, webResults } = ctx;
+    dbgRender('FeedPage'); // J1: render counter
+    useEffect(() => dbgMount('FeedPage'), []); // J1: remount counter
     const cc=CATS[cat];
     const [showFollowAdd, setShowFollowAdd] = useState(false);
     const [onboardingDismissed, setOnboardingDismissed] = useState(()=>ld('onboarded',false));
@@ -10364,7 +9009,903 @@ export default function App() {
         </div>{/* /page-grid */}
       </div>
     );
+}
+
+export default function App() {
+  dbgRender('App'); // D8: ?debug=1 render counter (no-op when the flag is off)
+  const [tab, setTab]           = useState(()=>parseRoute().category);
+  const [subcat, setSubcat]     = useState(()=>parseRoute().subcategory); // URL-driven subcategory
+  const [tertiary, setTertiary] = useState(()=>parseRoute().tertiary);    // URL-driven team (Tier 3)
+  const [myTeams, setMyTeams]   = useState(()=>normalizeMyTeams(ld('myTeams', [])));  // followed teams {name,league,slug}
+  // Persist the one-time normalization (migration) of any pre-existing duplicates.
+  useEffect(() => { sv('myTeams', normalizeMyTeams(ld('myTeams', []))); }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  const toggleMyTeam = (t) => setMyTeams(prev => {
+    // Key on teamSlug(name)+league, recomputed from the name — never a passed-in slug.
+    const slug = teamSlug(t.name || ''); const league = t.league || '';
+    const exists = prev.some(x => x.slug === slug && x.league === league);
+    const next = exists
+      ? prev.filter(x => !(x.slug === slug && x.league === league))
+      : [...prev, { ...t, slug }];
+    sv('myTeams', next); return next;
+  });
+  // My Topics — the same follow pattern generalized to ANY entity (ticker, company,
+  // topic, trending pill). Stored as lowercase-keyed labels in localStorage.
+  const [myTopics, setMyTopics] = useState(()=>ld('myTopics', []));       // ['nvidia','fed rate cuts', …]
+  const isTopicFollowed = (label) => myTopics.some(x => x.toLowerCase() === String(label).toLowerCase());
+  const toggleTopic = (label) => setMyTopics(prev => {
+    const l = String(label).trim(); if (!l) return prev;
+    const exists = prev.some(x => x.toLowerCase() === l.toLowerCase());
+    const next = exists ? prev.filter(x => x.toLowerCase() !== l.toLowerCase()) : [...prev, l];
+    sv('myTopics', next); return next;
+  });
+  const [search, setSearch]     = useState('');
+  const [dark, setDark]         = useState(()=>{
+    // Respect the OS preference on first load (no saved choice yet); once the user
+    // toggles, the saved value persists and overrides system (Pass L item 6).
+    const saved = ld('dark', null);
+    if (saved === true || saved === false) return saved;
+    try { return !!(window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches); } catch { return false; }
+  });
+  const [saved, setSaved]       = useState(()=>ld('saved',[]));
+  const [clicks, setClicks]     = useState(()=>ld('clicks',{}));
+  const [readLinks, setReadLinks] = useState(()=>new Set(ld('readLinks',[])));
+  const [readerArticle, setReaderArticle] = useState(null);
+  const [chatContext, setChatContext] = useState(null);
+  const [perspArticle, setPerspArticle] = useState(null);
+  const [showAnalyze, setShowAnalyze] = useState(false);
+  const [webResults, setWebResults] = useState([]);
+  const [webLoading, setWebLoading] = useState(false);
+  const [sourceRecs, setSourceRecs] = useState([]);
+  const [kw, setKw]             = useState(()=>ld('kw',DEFAULT_KW));
+  const [alerts, setAlerts]     = useState(()=>ld('alerts',['Texans','Astros','Kentucky','Clemson','ERCOT','Bloom Energy','fuel cell','hurricane','earthquake','breaking']));
+  const [feeds, setFeeds]       = useState(()=>ld('feeds',DEFAULT_FEEDS));
+  // ── FOLLOW-A-SOURCE-FROM-FEED (Pass G item 7) ───────────────────────────────
+  // "Followed" = present and enabled in any category's feed list (the same list
+  // Customize manages). followSource enables an existing entry or, if the source
+  // is new (e.g. a Coverage Gap outlet), appends it to the active tab's list.
+  const isSourceFollowed = useCallback((name) => {
+    if (!name) return true;
+    const n = name.trim().toLowerCase();
+    return Object.values(feeds || {}).some(list =>
+      (list || []).some(f => f.on && (f.name || '').trim().toLowerCase() === n));
+  }, [feeds]);
+  const followSource = useCallback((name, url = '') => {
+    if (!name) return;
+    const n = name.trim().toLowerCase();
+    setFeeds(prev => {
+      const next = JSON.parse(JSON.stringify(prev || {}));
+      let found = false;
+      for (const c of Object.keys(next)) {
+        for (const f of (next[c] || [])) {
+          if ((f.name || '').trim().toLowerCase() === n) { f.on = true; found = true; }
+        }
+      }
+      if (!found) {
+        const cat = tab || 'general';
+        if (!next[cat]) next[cat] = [];
+        next[cat].push({ name, url: url || SOURCE_URLS[name] || '', on: true, tier: 'reported' });
+      }
+      sv('feeds', next);
+      return next;
+    });
+  }, [tab]);
+  const [urgent, setUrgent]     = useState(()=>ld('urgent',DEFAULT_URGENT));
+  const [watchlist, setWatchlist]= useState(()=>ld('watchlist',DEFAULT_WATCHLIST));
+  // v23: customizable favorite teams. Defaults to DEFAULT_TEAMS; user can add/remove via Customize.
+  const [teams, setTeams]       = useState(()=>ld('teams', DEFAULT_TEAMS));
+  // Removal tombstones: canonical keys (slug|league) of teams the user explicitly
+  // unfollowed. They persist AND sync, and are subtracted from any pulled cloud
+  // profile, so an old cloud copy that still holds a removed default can never
+  // resurrect it on sign-in. Re-following a team clears its tombstone.
+  const [removedTeams, setRemovedTeams] = useState(()=>ld('removedTeams', []));
+  const tombstone = useMemo(() => new Set(removedTeams || []), [removedTeams]);
+  // ONE source of truth for "followed teams" (the pill ribbon + Home Following row):
+  // union of the seeded favorites (teams) and explicit follows (myTeams), deduped on
+  // teamSlug(name)+leagueKey, seeded-defaults first then myTeams-only appended, minus
+  // any tombstoned (removed) teams. The 7 seeded defaults read as "followed".
+  const followedTeams = useMemo(() => {
+    const seen = new Set(), out = [];
+    const push = (name, lg, extra) => {
+      if (!name) return;
+      const lk = leagueKey(lg), slug = teamSlug(name), key = `${slug}|${lk}`;
+      if (seen.has(key) || tombstone.has(key)) return; seen.add(key);
+      out.push({ name, team: name, league: lk, slug, match: (extra && extra.match) || name, emoji: (extra && extra.emoji) || '', espnUrl: extra && extra.espnUrl, teamUrl: extra && extra.teamUrl });
+    };
+    (teams || []).forEach(t => push(t.team || t.name, t.league, t));
+    (myTeams || []).forEach(t => push(t.name, t.league));
+    return out;
+  }, [teams, myTeams, tombstone]);
+  const isTeamFollowed = (name, lg) => { const lk = leagueKey(lg), s = teamSlug(name || ''); return followedTeams.some(t => t.slug === s && t.league === lk); };
+  // Follow adds to the explicit myTeams store and clears any tombstone; unfollow removes
+  // from BOTH stores and ADDS a tombstone so it cannot re-appear (local seed or cloud).
+  const followTeam = (name, lg) => {
+    const key = teamKeyOf(name, lg);
+    setRemovedTeams(prev => { const n = prev.filter(k => k !== key); sv('removedTeams', n); return n; });
+    toggleMyTeam({ name, league: leagueKey(lg) });
   };
+  const unfollowTeam = (entry) => {
+    const lk = leagueKey(entry.league), slug = teamSlug(entry.name || entry.team || ''), key = `${slug}|${lk}`;
+    setRemovedTeams(prev => prev.includes(key) ? prev : (() => { const n = [...prev, key]; sv('removedTeams', n); return n; })());
+    setMyTeams(prev => { const n = prev.filter(x => !(teamSlug(x.name) === slug && leagueKey(x.league) === lk)); sv('myTeams', n); return n; });
+    setTeams(prev => { const n = prev.filter(x => !(teamSlug(x.team || x.name) === slug && leagueKey(x.league) === lk)); sv('teams', n); return n; });
+  };
+  // E1: Voices — people/orgs/teams whose cross-platform posts we flag. Persisted +
+  // synced; voiceTombstones mirror removedTeams so a removed voice can't be resurrected
+  // by an older cloud profile. A voice of type 'team' LINKS to the followedTeams entity
+  // (by name/slug) — we never keep a second team list here.
+  const [voices, setVoices] = useState(() => ld('voices', []));
+  const [voiceTombstones, setVoiceTombstones] = useState(() => ld('voiceTombstones', []));
+  const addOrUpdateVoice = useCallback((partial) => {
+    const v = partial.id && partial.handles !== undefined && partial.name ? partial : makeVoice(partial);
+    setVoiceTombstones(prev => { const n = clearTombstone(prev, v.id); sv('voiceTombstones', n); return n; });
+    setVoices(prev => { const n = upsertVoice(prev, v); sv('voices', n); return n; });
+  }, []);
+  const removeVoiceById = useCallback((id) => {
+    setVoices(prev => { const n = prev.filter(v => v.id !== id); sv('voices', n); return n; });
+    setVoiceTombstones(prev => prev.includes(id) ? prev : (() => { const n = [...prev, id]; sv('voiceTombstones', n); return n; })());
+  }, []);
+  const reorderVoice = useCallback((id, dir) => {
+    setVoices(prev => {
+      const i = prev.findIndex(v => v.id === id); if (i < 0) return prev;
+      const j = i + dir; if (j < 0 || j >= prev.length) return prev;
+      const n = prev.slice(); const [m] = n.splice(i, 1); n.splice(j, 0, m);
+      sv('voices', n); return n;
+    });
+  }, []);
+  // E2: add+confirm discovery. resolveVoice ensures the voice exists (as unconfirmed) and
+  // opens the modal; the server /api/voices-resolve returns per-platform candidates; the
+  // user accepts per platform — only then is a handle stored (never a guess).
+  const [voiceResolve, setVoiceResolve] = useState(null); // { voice, loading, data }
+  const resolveVoiceFlow = useCallback(async (partial) => {
+    const v = partial.id ? partial : makeVoice({ ...partial, status: partial.status || 'unconfirmed' });
+    addOrUpdateVoice(v);
+    setVoiceResolve({ voice: v, loading: true, data: null });
+    try {
+      const r = await fetchWithTimeout(`/api/signals?kind=voice-resolve&name=${encodeURIComponent(v.name)}&type=${encodeURIComponent(v.type)}`, 9000);
+      const data = r.ok ? await r.json() : { enabled: false, note: `Discovery unavailable (HTTP ${r.status}).`, platforms: {} };
+      setVoiceResolve(cur => cur && cur.voice.id === v.id ? { ...cur, loading: false, data } : cur);
+    } catch (e) {
+      setVoiceResolve(cur => cur && cur.voice.id === v.id ? { ...cur, loading: false, data: { enabled: false, note: 'Discovery unreachable — add handles manually.', platforms: {} } } : cur);
+    }
+  }, [addOrUpdateVoice]);
+  // E3: per-category Voices signals (tiles). Loads ONCE per category open (cached), and
+  // only reloads when the page refresh runs (loadCat clears the cache entry). No polling.
+  const [voiceSignals, setVoiceSignals] = useState({}); // { [cat]: {tiles,failures,loading,loaded} }
+  const loadVoiceSignals = useCallback(async (cat, opts = {}) => {
+    // Top-3 cap (E5 cost): only the first 3 confirmed voices per category (user's order)
+    // drive the lanes. E3/E6: server lanes (search/YouTube/RSSHub) + the EXISTING Reddit
+    // lane (/api/signals?kind=discussions) are auto; the EXISTING X lane (x-pulse) is
+    // click-to-load only (opts.includeX). All tiles are ranked together and promo-filtered
+    // (reusing isPromoItem from the breaking module). No AI, no polling.
+    const relevant = (voices || [])
+      .filter(v => v.category === cat && v.status === 'confirmed' && v.handles && Object.keys(v.handles).length)
+      .slice(0, 3);
+    if (!relevant.length) { setVoiceSignals(s => ({ ...s, [cat]: { tiles: [], failures: [], loading: false, loaded: true } })); return; }
+    setVoiceSignals(s => ({ ...s, [cat]: { ...(s[cat] || {}), loading: true, loaded: true, xLoaded: opts.includeX || (s[cat] && s[cat].xLoaded) } }));
+    const failures = [];
+    const tiles = [];
+    // Free server lanes (YouTube + RSSHub). Lane 1 search is a separate GET below.
+    try {
+      const r = await fetchWithTimeout('/api/signals?kind=voice-signals', 10000, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ voices: relevant, category: cat, limit: 8 }) });
+      const d = r.ok ? await r.json() : { tiles: [], failures: [{ source: 'voices', reason: `HTTP ${r.status}` }] };
+      (d.tiles || []).forEach(t => tiles.push(t));
+      (d.failures || []).forEach(f => failures.push(f));
+    } catch { failures.push({ source: 'voices', reason: 'unreachable' }); }
+    // item 1: Lane 1 (search) via the edge-cacheable GET /api/voice-search, with a 24h
+    // per-voice localStorage cache — a repeat load within 24h makes ZERO search calls.
+    await Promise.all(relevant.map(async v => {
+      const ck = `vsearch_${v.id}`;
+      const cached = ld(ck, null);
+      if (cached && cached.t && (Date.now() - cached.t) < 86400000) { if (cached.tile) tiles.push(cached.tile); return; }
+      try {
+        const pk = Object.keys(v.handles)[0] || 'x';
+        const r = await fetchWithTimeout(`/api/signals?kind=voice-search&q=${encodeURIComponent(v.name)}&handle=${encodeURIComponent(v.handles[pk] || '')}&platform=${encodeURIComponent(pk)}`, 9000);
+        if (r.ok) { const d = await r.json(); if (d.tile) tiles.push(d.tile); sv(ck, { t: Date.now(), tile: d.tile || null }); }
+        else failures.push({ source: `${v.name} · search`, reason: `HTTP ${r.status}` });
+      } catch { failures.push({ source: `${v.name} · search`, reason: 'unreachable' }); }
+    }));
+    // E6 Reddit lane (auto, free) — the EXISTING /api/signals?kind=discussions endpoint.
+    await Promise.all(relevant.filter(v => v.handles.reddit || true).map(async v => {
+      try {
+        const r = await fetchWithTimeout(`/api/signals?kind=discussions&q=${encodeURIComponent(v.name)}`, 8000);
+        if (r.ok) { const d = await r.json(); (d.reddit || []).slice(0, 2).forEach(p => tiles.push({ platform: 'reddit', who: v.name, url: p.url || p.link, title: p.title, ageHours: p.ageHours ?? 18, tier: 'inferred', source_class: 'social' })); }
+        else failures.push({ source: `${v.name} · reddit`, reason: `HTTP ${r.status}` });
+      } catch { failures.push({ source: `${v.name} · reddit`, reason: 'unreachable' }); }
+    }));
+    // E6 X lane — click-to-load ONLY (x-pulse costs money). Fetched only when requested.
+    if (opts.includeX) {
+      await Promise.all(relevant.filter(v => v.handles.x).map(async v => {
+        try {
+          const r = await fetchWithTimeout(`/api/signals?kind=xpulse&topic=${encodeURIComponent(v.name)}`, 9000);
+          if (r.ok) { const d = await r.json(); const arr = Array.isArray(d) ? d : (d.posts || d.items || []); arr.slice(0, 2).forEach(p => tiles.push({ platform: 'x', who: v.name, url: p.url || p.link, title: p.text || p.title || '', ageHours: p.ageHours ?? 12, tier: 'inferred', source_class: 'social' })); }
+          else failures.push({ source: `${v.name} · x`, reason: `HTTP ${r.status}` });
+        } catch { failures.push({ source: `${v.name} · x`, reason: 'unreachable' }); }
+      }));
+    }
+    // Item 8: strip promos/sportsbook; rank all lanes together; cap 4.
+    const clean = tiles.filter(t => t && t.title && !isPromoItem({ title: t.title, source: t.who, link: t.url }));
+    const ranked = rankByVelocity(clean.map(t => ({ ...t, signal: t.signal || signalFor(t) })), { limit: 4 });
+    setVoiceSignals(s => ({ ...s, [cat]: { tiles: ranked, failures, loading: false, loaded: true, xLoaded: opts.includeX || (s[cat] && s[cat].xLoaded), hasX: relevant.some(v => v.handles.x) } }));
+  }, [voices]);
+  // Load-once per category open (no polling). A ref guards against re-firing when the
+  // voices list changes identity; the page refresh button clears the entry to reload.
+  const voicesLoadedRef = useRef(new Set());
+  useEffect(() => {
+    if (voicesLoadedRef.current.has(tab)) return;
+    voicesLoadedRef.current.add(tab);
+    loadVoiceSignals(tab);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tab]);
+  const refreshVoiceSignals = useCallback((cat) => { voicesLoadedRef.current.delete(cat); loadVoiceSignals(cat); }, [loadVoiceSignals]);
+  const voicesStripFor = (cat) => { const s = voiceSignals[cat] || {}; return <VoicesStrip tiles={s.tiles || []} failures={s.failures || []} loading={!!s.loading} hasX={!!s.hasX} xLoaded={!!s.xLoaded} onLoadX={() => loadVoiceSignals(cat, { includeX: true })}/>; };
+  // E4: migrate existing DEFAULT_SOCIAL handles into seed voices (status 'seed'), not
+  // silently dropped — they surface in the seed review queue carrying their known handle.
+  const SOCIAL_PLAT = { twitter: 'x', linkedin: 'linkedin', instagram: 'instagram', youtube: 'youtube' };
+  const migratedSocialSeeds = useMemo(() => {
+    const out = [], byId = new Map();
+    for (const [cat, plats] of Object.entries(DEFAULT_SOCIAL || {})) {
+      for (const [plat, list] of Object.entries(plats || {})) {
+        const pk = SOCIAL_PLAT[plat]; if (!pk) continue;
+        for (const h of (list || [])) {
+          const v = makeVoice({ type: 'org', name: String(h).replace(/^@/, ''), category: cat, handles: { [pk]: h }, status: 'seed' });
+          if (byId.has(v.id)) { byId.get(v.id).handles[pk] = h; continue; }
+          byId.set(v.id, v); out.push(v);
+        }
+      }
+    }
+    return out;
+  }, []);
+  // The review queue: name-only suggestions (E4 list) + migrated social, minus anything
+  // already added or tombstoned (Skip tombstones so it won't re-suggest).
+  const seedQueue = useMemo(() => {
+    const added = new Set((voices || []).map(v => v.id));
+    const tomb = new Set(voiceTombstones || []);
+    const all = [...SEED_VOICES.map(s => ({ ...makeVoice(s), _parkedFrom: s._parkedFrom })), ...migratedSocialSeeds];
+    const seen = new Set(), out = [];
+    for (const v of all) { if (seen.has(v.id) || added.has(v.id) || tomb.has(v.id)) continue; seen.add(v.id); out.push(v); }
+    return out;
+  }, [voices, voiceTombstones, migratedSocialSeeds]);
+  const skipSeed = useCallback((id) => {
+    setVoiceTombstones(prev => prev.includes(id) ? prev : (() => { const n = [...prev, id]; sv('voiceTombstones', n); return n; })());
+  }, []);
+  // E5: "Test voices" — per voice/platform reachability (makes NO search-API calls).
+  const [voicesTest, setVoicesTest] = useState(null); // { loading, summary, results }
+  const testVoices = useCallback(async () => {
+    const confirmed = (voices || []).filter(v => v.status === 'confirmed' && v.handles && Object.keys(v.handles).length);
+    if (!confirmed.length) { setVoicesTest({ loading: false, summary: 'No confirmed voices to test.', results: [] }); return; }
+    setVoicesTest({ loading: true, summary: 'Testing…', results: [] });
+    try {
+      const r = await fetchWithTimeout('/api/signals?kind=voice-test', 20000, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ voices: confirmed }) });
+      const d = r.ok ? await r.json() : { results: [], summary: { total: 0, ok: 0, failed: 0 } };
+      const s = d.summary || {};
+      setVoicesTest({ loading: false, summary: `${s.ok || 0} ok · ${s.failed || 0} failed · ${s.unverifiable || 0} unverifiable`, results: d.results || [] });
+    } catch {
+      setVoicesTest({ loading: false, summary: 'Test unreachable from here.', results: [] });
+    }
+  }, [voices]);
+  const acceptCandidate = useCallback((pk, cand) => {
+    setVoiceResolve(cur => {
+      if (!cur) return cur;
+      const v = cur.voice;
+      const handles = { ...(v.handles || {}), [pk]: cand.handle };
+      const updated = { ...v, handles, status: 'confirmed', confirmedAt: Date.now() };
+      addOrUpdateVoice(updated);
+      return { ...cur, voice: updated };
+    });
+  }, [addOrUpdateVoice]);
+  const [weatherCities, setWeatherCities] = useState(()=>ld('weatherCities', DEFAULT_WEATHER_CITIES));
+  const [hiddenIndices, setHiddenIndices] = useState(()=>ld('hiddenIndices',[]));
+  const [briefingExclude, setBriefingExclude] = useState(()=>ld('briefingExclude',['comedy']));
+  const [briefingSources, setBriefingSources] = useState(()=>ld('briefingSources',[]));
+  const [marketData, setMarketData] = useState({});
+  const [marketLoading, setMarketLoading] = useState(false);
+  const [social, setSocial]     = useState(()=>ld('social',DEFAULT_SOCIAL));
+  const [arts, setArts]         = useState({general:[],sports:[],business:[],finance:[],bloom:[],tech:[],popculture:[],comedy:[]});
+  const artsRef = useRef(arts); artsRef.current = arts;               // live mirror for background poll
+  const [pendingNew, setPendingNew] = useState({});                    // v46: staged fresh articles for "N new stories" pill
+  const [loading, setLoading]   = useState({general:false,sports:false,business:false,finance:false,bloom:false,tech:false,popculture:false,comedy:false});
+  const [health, setHealth]     = useState({});
+  const [feedHealth, setFeedHealth] = useState({}); // source -> { code, ok, reason } for the degradation indicator/report
+  const [podEps, setPodEps]     = useState({});
+  const [podLoading, setPodLoading] = useState({});
+  const [activePod, setActivePod]   = useState(null);
+  const [podLimit, setPodLimit]     = useState(20); // episodes shown; "Load more" adds 20. App-level so it survives PodcastsPage remounts.
+  const [showPanel, setShowPanel]   = useState(false);
+  const [panelInitial, setPanelInitial] = useState({tab:'keywords',cat:'general'});
+  const [activeKw, setActiveKw]     = useState(null);
+  const [activeSrc, setActiveSrc]   = useState(null);
+  // I1: live scores moved OUT of App into the external scores store (src/state). App no
+  // longer holds them, so a score tick does not re-render App or the feed pages — only
+  // the components that call useScores() (ActiveScoresBar, Scoreboard, SportsPage).
+  // Sports team-hub filter. Lifted to App (from inside SportsPage) so it survives
+  // SportsPage remounts — SportsPage is defined inline in App and remounts on any
+  // App re-render (scroll/header/poll), which previously wiped a locally-held value.
+  const [activeTeam, setActiveTeam] = useState(null);
+  const [searchHistory, setSearchHistory] = useState(()=>ld('searchHistory',[]));
+  const [srcWebResults, setSrcWebResults] = useState([]);
+  const [srcWebLoading, setSrcWebLoading] = useState(false);
+
+  // ── v16 mobile + editorial state ──
+  const [menuOpen, setMenuOpen]         = useState(false);
+  const [mobileSearchOpen, setMobileSearchOpen] = useState(false);
+  const [refreshing, setRefreshing]     = useState(false);
+  const [lastUpdated, setLastUpdated]   = useState({}); // per-cat timestamp
+  const [lastFeedTab, setLastFeedTab]   = useState('general');
+  const isMobile                        = useIsMobile();
+  // J2: the smart-sticky header (shrink >60px / hide on mobile scroll-down) moved INTO
+  // TopBar, where it toggles classes on the header element via a ref — no App state, so
+  // scrolling no longer re-renders App (and so no longer remounts the page).
+
+  useEffect(()=>{sv('dark',dark);document.body.className=dark?'dark':'';},[dark]);
+  useEffect(()=>{sv('saved',saved);},[saved]);
+  useEffect(()=>{sv('clicks',clicks);},[clicks]);
+  useEffect(()=>{sv('readLinks',[...readLinks]);},[readLinks]);
+
+  // v36: Interest profile derived from reading history + saves + searches
+  const interestProfile = useMemo(() => {
+    const freq = {};
+    const STOP = new Set(['the','and','for','a','an','to','in','of','on','is','it','at','by','or','be','as','with','this','that','from','are','was','were','has','have','had','but','not','can','will','their','they','we','you','all','said']);
+    const addWords = (text, weight=1) => {
+      if (!text) return;
+      text.toLowerCase().replace(/[^a-z0-9\s]/g,'').split(/\s+/).forEach(w => {
+        if (w.length > 3 && !STOP.has(w)) freq[w] = (freq[w] || 0) + weight;
+      });
+    };
+    saved.forEach(a => { addWords(a.title, 3); addWords(a.desc, 1); });
+    [...readLinks].forEach(link => {
+      const all = Object.values(arts).flat();
+      const a = all.find(x => x.link === link);
+      if (a) { addWords(a.title, 2); addWords(a.desc, 1); }
+    });
+    searchHistory.forEach(q => addWords(q, 4));
+    return Object.entries(freq).sort((a,b)=>b[1]-a[1]).slice(0,30).map(([w])=>w);
+  }, [saved, readLinks, searchHistory, arts]);
+
+  // v36: Recommended articles — score all unread/unsaved articles by interest profile
+  const recommended = useMemo(() => {
+    if (interestProfile.length === 0) return [];
+    const all = Object.values(arts).flat();
+    const scored = all.map(a => {
+      if ((a.link && readLinks.has(a.link)) || saved.some(s=>s.link===a.link)) return null;
+      const text = (a.title + ' ' + (a.desc||'')).toLowerCase();
+      const score = interestProfile.reduce((s,w) => text.includes(w) ? s+1 : s, 0);
+      return score > 0 ? { ...a, _recScore: score } : null;
+    }).filter(Boolean);
+    scored.sort((a,b) => b._recScore - a._recScore || new Date(b.pubDate) - new Date(a.pubDate));
+    return scored.slice(0, 8);
+  }, [arts, interestProfile, readLinks, saved]);
+
+  // v20: whole-word urgent match + 6h recency window + cap 8.
+  // Whole-word prevents "killed" matching "killed it" or "killing" substrings.
+  // 6h window keeps breaking feeling live (was: any time).
+  // D2: Breaking is now a SIGNIFICANCE test, not a bare keyword match — a story
+  // qualifies only via >=3 distinct outlets within 2h (clusters) or a strong event
+  // term in the TITLE. Promos are excluded. This global pool is filtered to each
+  // page by relevance (see catBreaking) and capped at 3. Previews/interviews/promos
+  // never qualify because they are neither multi-outlet nor title-strong.
+  const breakingItems = useMemo(
+    () => {
+      // I0.8: strip satire (The Onion, Babylon Bee, …) BEFORE breaking qualification, by
+      // rule, so a joke "Hurricane…" headline can never surface as Breaking. Under
+      // ?debug=1, log the before/after and name each held-back source — this is how we
+      // tell which source a flagged headline (e.g. the hurricane one) came from.
+      const all = Object.values(arts).flat();
+      const { satire, rest } = partitionSatire(all);
+      if (DEBUG && satire.length) {
+        // eslint-disable-next-line no-console
+        console.log(`[satire] before ${all.length} → after ${rest.length} (held back ${satire.length}):`);
+        for (const s of satire) console.log(`[satire]   "${s.title}" — source: ${s.source || 'unknown'} (${s.link || ''})`);
+      }
+      return qualifyBreaking(rest, { now: Date.now() });
+    },
+    [arts]
+  );
+
+  // D7: the page the chat is grounded on. ChatBot answers from THIS page's headlines
+  // first, names the page in the model prompt, and shows a context chip. Category-level
+  // headlines (<=25) + State of Play (<=8) — the sizes are capped to hold the
+  // per-turn prompt growth within budget.
+  const pageContext = useMemo(() => {
+    const category = tab;
+    const cc = CATS[category] || CATS.general;
+    const subcategory = activeKw || activeSrc || null;
+    const entity = (activeTeam && (activeTeam.team || activeTeam.match)) || null;
+    const pool = arts[category] || [];
+    const ageOf = d => { const m = d ? Math.round((Date.now() - new Date(d)) / 60000) : null; return m == null ? '' : m < 60 ? `${m}m` : `${Math.round(m / 60)}h`; };
+    const visibleHeadlines = pool.slice(0, 25).map(a => ({ title: a.title, source: a.source, age: ageOf(a.pubDate) }));
+    const stateOfPlay = rankClusters(pool, { max: 2, limit: 8 }).map(a => a.title);
+    const label = entity ? `${cc.label} › ${entity}` : subcategory ? `${cc.label} › ${subcategory}` : cc.label;
+    return { tab, category, subcategory, entity, label, visibleHeadlines, stateOfPlay };
+  }, [tab, activeKw, activeSrc, activeTeam, arts]);
+
+  const kwMatch = useCallback(
+    (a,cat)=>(kw[cat]||[]).filter(k=>(a.title+(a.desc||'')).toLowerCase().includes(k.toLowerCase())),
+    [kw]
+  );
+  const dedupe = arr=>{const seen=new Set();return arr.filter(a=>{const k=a.title.slice(0,60).toLowerCase().replace(/\s+/g,'');if(seen.has(k))return false;seen.add(k);return true;});};
+
+  const specificCatKeys = useMemo(()=>{
+    const keys=new Set();
+    ['sports','business','finance','bloom','popculture','comedy'].forEach(c=>{
+      (arts[c]||[]).forEach(a=>{if(a.link)keys.add(a.link);if(a.title)keys.add(a.title.slice(0,60).toLowerCase().replace(/\s+/g,''));});
+    });
+    return keys;
+  },[arts]);
+
+  const sorted = useCallback((cat)=>{
+    let arr=arts[cat]||[];
+    if(search) arr=arr.filter(a=>(a.title+' '+(a.desc||'')+' '+(a.source||'')).toLowerCase().includes(search));
+    if(activeKw) arr=arr.filter(a=>(a.title+(a.desc||'')).toLowerCase().includes(activeKw.toLowerCase()));
+    if(activeSrc) arr=arr.filter(a=>a.source===activeSrc);
+    arr=dedupe(arr);
+    if(cat==='general') {
+      arr=arr.filter(a=>{
+        if(a.link&&specificCatKeys.has(a.link))return false;
+        const k=a.title.slice(0,60).toLowerCase().replace(/\s+/g,'');
+        return !specificCatKeys.has(k);
+      });
+    }
+    arr.sort((a,b)=>{const ka=kwMatch(a,cat).length,kb=kwMatch(b,cat).length;if(kb!==ka)return kb-ka;return new Date(b.pubDate)-new Date(a.pubDate);});
+    return arr.map(a=>({...a,matchedKw:kwMatch(a,cat)}));
+  // D8: dropped the stale `urgent` dep — after D2 `sorted` no longer reads it, so
+  // keeping it only forced needless recomputes (new array identity) whenever urgent changed.
+  },[arts,search,activeKw,activeSrc,kwMatch,specificCatKeys]);
+
+  const loadCat = useCallback(async (cat)=>{
+    setLoading(l=>({...l,[cat]:true}));
+    const results=[],hUpdates={},fhUpdates={};
+    await Promise.allSettled((feeds[cat]||[]).filter(f=>f.on).map(async f=>{
+      const t0=Date.now();const{items,status,reason}=await fetchRSS(f.url);const ms=Date.now()-t0;
+      const ok=items.length>0;
+      hUpdates[f.name]=ok?(ms<4000?'green':'yellow'):'red';
+      fhUpdates[f.name]={code:status||0, ok, reason:reason||''};
+      items.forEach(i=>{if(i.title&&i.link)results.push({...i,source:f.name,cat,_tier:f.tier||'reported'});});
+    }));
+    setHealth(h=>({...h,...hUpdates}));
+    setFeedHealth(h=>({...h,...fhUpdates}));
+    results.sort((a,b)=>new Date(b.pubDate)-new Date(a.pubDate));
+    setArts(a=>({...a,[cat]:results}));
+    setPendingNew(p=>({...p,[cat]:[]}));   // fresh load supersedes any staged items
+    setLastUpdated(prev => ({...prev, [cat]: Date.now()}));
+    setLoading(l=>({...l,[cat]:false}));
+  },[feeds]);
+
+  // v46: Lean read-only fetch used by the background poll — same feed logic as
+  // loadCat but does NOT touch arts/health; returns a sorted article array.
+  const fetchCatArticles = useCallback(async (cat)=>{
+    const results=[];
+    await Promise.allSettled((feeds[cat]||[]).filter(f=>f.on).map(async f=>{
+      const {items}=await fetchRSS(f.url);
+      items.forEach(i=>{if(i.title&&i.link)results.push({...i,source:f.name,cat,_tier:f.tier||'reported'});});
+    }));
+    results.sort((a,b)=>new Date(b.pubDate)-new Date(a.pubDate));
+    return results;
+  },[feeds]);
+
+  // v46: "N new stories" — prepend staged articles for a category and jump to top.
+  const applyPending = useCallback((cat)=>{
+    setArts(a=>{
+      const add=pendingNew[cat]||[];
+      if(!add.length) return a;
+      const existing=new Set((a[cat]||[]).map(x=>x.link));
+      const merged=[...add.filter(x=>!existing.has(x.link)),...(a[cat]||[])];
+      merged.sort((x,y)=>new Date(y.pubDate)-new Date(x.pubDate));
+      return {...a,[cat]:merged};
+    });
+    setPendingNew(p=>({...p,[cat]:[]}));
+    window.scrollTo({top:0,behavior:'smooth'});
+  },[pendingNew]);
+
+  const loadPod = useCallback(async (pod)=>{
+    setPodLoading(l=>({...l,[pod.name]:true}));
+    const{items}=await fetchRSS(pod.url);
+    setPodEps(p=>({...p,[pod.name]:items.map(e=>({...e,show:pod.name,host:pod.host,emoji:pod.emoji}))}));
+    setPodLoading(l=>({...l,[pod.name]:false}));
+  },[]);
+
+  // I1: loadScores now drives the external store (configured with fetchAllScores at mount).
+  const loadScores = loadScoresStore;
+  // I1 measurement hook: under ?debug=1 only, expose a way to trigger a scores update so
+  // the App/feed-page render count on a "score tick" can be measured headlessly (no 120s
+  // wait). Zero cost when the flag is off.
+  useEffect(() => { if (DEBUG && typeof window !== 'undefined') window.__loadScores = loadScoresStore; }, []);
+
+  const loadMarketData = useCallback(async ()=>{
+    setMarketLoading(true);
+    const allSyms=[...INDICES.map(i=>i.sym),...watchlist.map(w=>w.sym)];
+    const results={};
+    await Promise.allSettled(allSyms.map(async sym=>{const q=await fetchQuote(sym);if(q)results[sym]=q;}));
+    setMarketData(prev=>({...prev,...results}));
+    setMarketLoading(false);
+  },[watchlist]);
+
+  const refreshAll = useCallback(async ()=>{
+    setPendingNew({});
+    setArts({general:[],sports:[],business:[],finance:[],bloom:[],popculture:[],comedy:[]});
+    setLoading({general:false,sports:false,business:false,finance:false,bloom:false,popculture:false,comedy:false});
+    setHealth({});setPodEps({});setPodLoading({});
+    // Small delay to let the UI render the cleared state, then fan out
+    await new Promise(r => setTimeout(r, 80));
+    await Promise.allSettled([
+      ...Object.keys(DEFAULT_FEEDS).map(c=>loadCat(c)),
+      ...PODCAST_FEEDS.map(p=>loadPod(p)),
+      loadScores(),
+      loadMarketData(),
+    ]);
+  }, [loadCat, loadPod, loadScores, loadMarketData]);
+
+  useEffect(()=>{
+    // D6: fetch everything once on load. No 120s scores poll, no 3-min category
+    // poll — the only auto-refresh is the gated live-scores exception below, and
+    // every page has a manual "Updated Nm ago" refresh control.
+    Object.keys(DEFAULT_FEEDS).forEach(c=>loadCat(c));
+    PODCAST_FEEDS.forEach(p=>loadPod(p));
+    configureScores(fetchAllScores); // I1: wire the store's fetcher, then load once
+    loadScores();
+    loadMarketData(); // preload so RightNowStrip + watchlist widgets have ticker data
+    // G4: warm the lazy chunks on idle so they open instantly after first paint (no poll).
+    const ric = window.requestIdleCallback || (fn => setTimeout(fn, 1200));
+    ric(() => prefetchLazy());
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  },[]);
+
+  // D6: the ONE opt-in polling exception — live scores refresh every 120s, but ONLY on a
+  // Sports page, while a game is live, and the tab is visible. I1: this effect moved INTO
+  // SportsPage (it only matters there, and it reads scores via the store), so App no
+  // longer subscribes to scores and never re-renders on a score tick.
+
+  const onRead  = a=>{
+    setClicks(c=>({...c,[a.source]:(c[a.source]||0)+1}));
+    if (a.link) setReadLinks(s=>{const n=new Set(s);n.add(a.link);return n;});
+    setReaderArticle(a);
+  };
+  const onSave  = a=>{
+    const wasSaved = saved.some(x=>x.link===a.link);
+    // Stamp the trust tier + source_class on save (2b) so the saved record carries its
+    // provenance — this is the value the newshub_saved.tier column is meant to hold.
+    const prov = tagProvenance(a);
+    setSaved(s=>wasSaved?s.filter(x=>x.link!==a.link):[...s,{...a,tier:a._tier||a.tier||prov.tier,source_class:prov.source_class,savedAt:Date.now()}]);
+  };
+  const isSavedFn = a=>saved.some(s=>s.link===a.link);
+  const isReadFn = a=>a.link&&readLinks.has(a.link);
+
+  const handleTickerClick = t=>{
+    setSearch(t.label.toLowerCase());
+    const catMap={'Bloom Energy':'bloom','Crude Oil':'business','Bitcoin':'finance'};
+    if(catMap[t.label])setTab(catMap[t.label]);
+  };
+
+  // v23: persist teams whenever they change
+  useEffect(()=>{sv('teams',teams);},[teams]);
+  useEffect(()=>{sv('weatherCities',weatherCities);},[weatherCities]);
+
+  // v36: Global search — always fetch web results alongside internal articles
+  useEffect(() => {
+    if (!search || search.length < 3) {
+      setWebResults([]); setSourceRecs([]); return;
+    }
+    setSourceRecs(suggestSourcesForQuery(search));
+    setWebLoading(true);
+    fetchWebSearch(search).then(r => { setWebResults(r); setWebLoading(false); });
+    // Track search history (last 10 unique queries)
+    setSearchHistory(prev => {
+      const trimmed = search.trim().toLowerCase();
+      if (!trimmed) return prev;
+      const next = [trimmed, ...prev.filter(s => s !== trimmed)].slice(0, 10);
+      sv('searchHistory', next);
+      return next;
+    });
+  }, [search]);
+
+  // v38: When a source is active, fetch web results for more coverage from that outlet
+  useEffect(() => {
+    if (!activeSrc) { setSrcWebResults([]); return; }
+    setSrcWebLoading(true);
+    fetchWebSearch(`${activeSrc} news latest`).then(r => { setSrcWebResults(r); setSrcWebLoading(false); });
+  }, [activeSrc]);
+
+  // Keyboard shortcuts: J/K navigate articles, B bookmark, / focus search, Escape clear
+  useEffect(() => {
+    const handler = (e) => {
+      const tag = document.activeElement?.tagName?.toLowerCase();
+      if (tag === 'input' || tag === 'textarea') return;
+      if (e.key === '/') {
+        e.preventDefault();
+        const inp = document.querySelector('.search-input, .mobile-search-input');
+        if (inp) inp.focus();
+      }
+      if (e.key === 'Escape') {
+        if (showAnalyze) { setShowAnalyze(false); return; }
+        if (perspArticle) { setPerspArticle(null); return; }
+        if (readerArticle) { setReaderArticle(null); return; }
+        setSearch(''); setActiveKw(null); setActiveSrc(null);
+      }
+    };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, [readerArticle, showAnalyze, perspArticle]);
+
+  // ─── v26b: CLOUD SYNC (Supabase) ──────────────────────────────────────────
+  // userId is null until the user signs in via the magic-link flow; once set,
+  // saveProfileToCloud/emitEvent receive a real id. Config sync is symmetric:
+  // applyCloudConfig pulls the profile down, a debounced effect pushes it up.
+  const [userId, setUserId]         = useState(null);
+  const [showAuth, setShowAuth]     = useState(false);
+  const [authEmail, setAuthEmail]   = useState('');
+  const [authStatus, setAuthStatus] = useState(''); // '' | 'sending' | 'sent' | 'error'
+  const cloudLoadedRef = useRef(false); // gate saves until the first pull completes
+
+  // The slice of local state that mirrors to newshub_profiles.config.
+  const cloudConfig = useMemo(() => ({
+    kw, teams, feeds, alerts, urgent, social, watchlist,
+    weatherCities, hiddenIndices, briefingExclude, briefingSources,
+    myTeams, myTopics, removedTeams,
+    voices, voiceTombstones, // E1
+  }), [kw, teams, feeds, alerts, urgent, social, watchlist,
+       weatherCities, hiddenIndices, briefingExclude, briefingSources, myTeams, myTopics, removedTeams,
+       voices, voiceTombstones]);
+
+  // Apply a downloaded profile onto local state (+ localStorage), keying defensively.
+  const applyCloudConfig = useCallback((cfg) => {
+    if (!cfg || typeof cfg !== 'object') return;
+    const put = (key, val, setter) => { if (val !== undefined && val !== null) { setter(val); sv(key, val); } };
+    // Removal tombstones are UNIONed (never clobbered) with the local set, then the
+    // pulled teams/myTeams are filtered through them. This is what stops an old cloud
+    // profile that still holds a removed default from resurrecting it on sign-in.
+    const mergedRemoved = Array.from(new Set([...(removedTeams || []), ...((Array.isArray(cfg.removedTeams) ? cfg.removedTeams : []))]));
+    put('removedTeams', mergedRemoved, setRemovedTeams);
+    const tomb = new Set(mergedRemoved);
+    const dropTomb = (list, nameOf) => (Array.isArray(list) ? list.filter(t => !tomb.has(teamKeyOf(nameOf(t), t.league))) : list);
+    put('kw', cfg.kw, setKw);
+    put('teams', dropTomb(cfg.teams, t => t.team || t.name), setTeams);
+    put('feeds', cfg.feeds, setFeeds);
+    put('alerts', cfg.alerts, setAlerts);
+    put('urgent', cfg.urgent, setUrgent);
+    put('social', cfg.social, setSocial);
+    put('watchlist', cfg.watchlist, setWatchlist);
+    put('weatherCities', cfg.weatherCities, setWeatherCities);
+    put('hiddenIndices', cfg.hiddenIndices, setHiddenIndices);
+    put('briefingExclude', cfg.briefingExclude, setBriefingExclude);
+    put('briefingSources', cfg.briefingSources, setBriefingSources);
+    put('myTeams', cfg.myTeams ? dropTomb(normalizeMyTeams(cfg.myTeams), t => t.name) : cfg.myTeams, setMyTeams);
+    put('myTopics', cfg.myTopics, setMyTopics);
+    // E1: voices — same union-merge + tombstone contract as teams, via the model.
+    const mergedVoiceTombs = Array.from(new Set([...(voiceTombstones || []), ...(Array.isArray(cfg.voiceTombstones) ? cfg.voiceTombstones : [])]));
+    put('voiceTombstones', mergedVoiceTombs, setVoiceTombstones);
+    if (cfg.voices !== undefined) {
+      const mergedVoices = mergeVoices(voices, Array.isArray(cfg.voices) ? cfg.voices : [], mergedVoiceTombs);
+      put('voices', mergedVoices, setVoices);
+    }
+  }, [removedTeams, voices, voiceTombstones]);
+
+  const pullCloudProfile = useCallback(async (uid) => {
+    if (!uid) return;
+    const cfg = await loadProfileFromCloud(uid);
+    applyCloudConfig(cfg);
+    cloudLoadedRef.current = true;
+  }, [applyCloudConfig]);
+
+  // On load: adopt an existing session and pull its profile; then react to sign-in/out.
+  useEffect(() => {
+    if (!isCloudSyncEnabled()) return;
+    // H4: only auto-load the Supabase client when a session is already present (stored or
+    // in a magic-link return). Fresh/logged-out visitors defer it until they sign in.
+    if (!hasCloudSession()) return;
+    getUserId().then(uid => { if (uid) { setUserId(uid); pullCloudProfile(uid); } });
+    const unsub = onAuthStateChange((user) => {
+      const id = user?.id || null;
+      setUserId(id);
+      cloudLoadedRef.current = false;
+      if (id) pullCloudProfile(id);
+    });
+    return unsub;
+  }, [pullCloudProfile]);
+
+  // Push config up whenever it changes (debounced), once signed in and pulled.
+  useEffect(() => {
+    if (!userId || !cloudLoadedRef.current) return;
+    const t = setTimeout(() => {
+      saveProfileToCloud(userId, cloudConfig);
+      emitEvent('config_changed', { keys: Object.keys(cloudConfig) }, userId);
+    }, 800);
+    return () => clearTimeout(t);
+  }, [userId, cloudConfig]);
+
+  const handleSendMagicLink = async () => {
+    const email = authEmail.trim();
+    if (!email) return;
+    setAuthStatus('sending');
+    const { error } = await signInWithEmail(email);
+    setAuthStatus(error ? 'error' : 'sent');
+  };
+  const handleSignOut = async () => { await signOut(); setUserId(null); setShowAuth(false); };
+
+  const handleCustomizeSave = ({feeds:nf,kw:nk,alerts:na,urgent:nu,social:ns,watchlist:nw,teams:nt,weatherCities:nwx,hiddenIndices:ni,briefingExclude:nbe,briefingSources:nbs})=>{
+    setFeeds(nf);sv('feeds',nf);
+    setKw(nk);sv('kw',nk);
+    setAlerts(na);sv('alerts',na);
+    if(nu){setUrgent(nu);sv('urgent',nu);}
+    setSocial(ns);sv('social',ns);
+    if(nw){setWatchlist(nw);sv('watchlist',nw);}
+    if(nt){
+      setTeams(nt);sv('teams',nt);
+      // Keep tombstones in sync with the Customize edit: un-tombstone every team kept
+      // in the saved list, and tombstone any seeded team the edit removed — so both
+      // Customize removes and the Following-row × stay removed across a cloud sync.
+      const keptKeys = new Set(nt.map(t => teamKeyOf(t.team || t.name, t.league)));
+      const removedByEdit = (teams || []).map(t => teamKeyOf(t.team || t.name, t.league)).filter(k => !keptKeys.has(k));
+      setRemovedTeams(prev => {
+        const next = Array.from(new Set([...prev.filter(k => !keptKeys.has(k)), ...removedByEdit]));
+        sv('removedTeams', next); return next;
+      });
+    }
+    if(nwx){setWeatherCities(nwx);sv('weatherCities',nwx);}
+    if(ni!=null){setHiddenIndices(ni);sv('hiddenIndices',ni);}
+    if(nbe!=null){setBriefingExclude(nbe);sv('briefingExclude',nbe);}
+    if(nbs!=null){setBriefingSources(nbs);sv('briefingSources',nbs);}
+    setShowPanel(false);refreshAll();
+  };
+
+  const openCustomize = (initialTab='keywords',initialCat='general')=>{
+    setPanelInitial({tab:initialTab,cat:initialCat});setShowPanel(true);
+  };
+
+  // Phase 2: apply a route (category + optional subcategory) to app state and
+  // refetch the feed. Called both by navigate() (user clicks) and popstate (back).
+  const applyRoute = (category, subcategory, tertiary) => {
+    setTab(category); setSubcat(subcategory || null); setTertiary(tertiary || null);
+    setSearch('');setActiveKw(null);setActiveSrc(null);
+    setMobileSearchOpen(false);
+    window.scrollTo({top:0, behavior:'instant'});
+    const CAT_TABS = ['general','sports','business','finance','popculture','comedy','tech'];
+    if (CAT_TABS.includes(category)) setLastFeedTab(category);
+    // Refetch feed whenever the category changes (or first visit).
+    if(!['saved','podcasts','social','sources'].includes(category)&&!(arts[category]||[]).length)loadCat(category);
+    if(category==='business'&&!(arts.finance||[]).length)loadCat('finance'); // Markets news powers the merged Business+Markets "All" view
+    if(category==='finance')loadMarketData();
+  };
+
+  // Phase 2/5: the URL is the single source of truth. navigate() writes the path
+  // (/:category/:subcategory?/:team?), then applies it. Chips call this, never local state.
+  const navigate = (category, subcategory=null, tertiary=null) => {
+    const path = buildPath(category, subcategory, tertiary);
+    if (typeof window!=='undefined' && window.location.pathname !== path) {
+      window.history.pushState({category,subcategory,tertiary}, '', path);
+    }
+    applyRoute(category, subcategory, tertiary);
+  };
+
+  const handleTabChange = t => navigate(t, null, null);
+
+  // I2 test hook: under ?debug=1 only, expose navigate() so headless before/after proofs
+  // can reach any page deterministically at any width (the More-overflow menu is width-
+  // dependent and brittle to drive by click). Zero cost when the flag is off.
+  const [, __forceTick] = useState(0);
+  useEffect(() => { if (DEBUG && typeof window !== 'undefined') { window.__nav = navigate; window.__openCustomize = openCustomize; window.__forceRender = () => __forceTick(n => n + 1); } });
+
+  // Phase 2: back/forward buttons re-apply the URL as source of truth.
+  useEffect(()=>{
+    const onPop = () => { const r = parseRoute(); applyRoute(r.category, r.subcategory, r.tertiary); };
+    window.addEventListener('popstate', onPop);
+    return () => window.removeEventListener('popstate', onPop);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  },[]);
+
+  // Pull-to-refresh wiring (mobile only — hook gates itself by scrollY=0 too)
+  const { distance: ptrDistance } = usePullToRefresh(
+    async () => {
+      setRefreshing(true);
+      try { await refreshAll(); } finally { setRefreshing(false); }
+    },
+    { enabled: isMobile, threshold: 110 }
+  );
+
+  // Swipe left/right between categories on mobile. Only active on news-ish
+  // pages where changing category makes sense (not on Customize, podcasts, etc.)
+  const swipeHandlers = useSwipe(
+    (dir) => {
+      const idx = SWIPE_ORDER.indexOf(tab);
+      if (idx === -1) return;
+      const next = dir === 'left' ? idx + 1 : idx - 1;
+      if (next >= 0 && next < SWIPE_ORDER.length) handleTabChange(SWIPE_ORDER[next]);
+    },
+    { enabled: isMobile && SWIPE_ORDER.includes(tab) }
+  );
+
+  const getRelated = (a,cat)=>{
+    const matched=kwMatch(a,cat);if(!matched.length)return[];
+    return(arts[cat]||[]).filter(x=>x.link!==a.link&&matched.some(k=>(x.title+(x.desc||'')).toLowerCase().includes(k.toLowerCase()))).slice(0,4);
+  };
+  // F9: related stories for the reader — EXISTING data only, no network fetch.
+  // (1) the story's own cluster members (from clusterStories' _clusterMembers), then
+  // (2) same-category siblings that share significant title words. Dedup, cap at 4.
+  const getReaderRelated = (a)=>{
+    if(!a) return [];
+    const self=a.link;
+    const members=(a._clusterMembers||[]).filter(x=>x&&x.link&&x.link!==self);
+    const cat=a.cat||tab||'general';
+    const pool=arts[cat]||[];
+    const words=(a.title||'').toLowerCase().split(/\W+/).filter(w=>w.length>4);
+    const sibs=pool
+      .filter(x=>x.link&&x.link!==self&&!members.some(m=>m.link===x.link))
+      .map(x=>{const t=(x.title+' '+(x.desc||'')).toLowerCase();return{x,n:words.reduce((s,w)=>s+(t.includes(w)?1:0),0)};})
+      .filter(o=>o.n>0).sort((p,q)=>q.n-p.n).map(o=>o.x);
+    const seen=new Set();const out=[];
+    for(const x of [...members,...sibs]){ if(!seen.has(x.link)){seen.add(x.link);out.push(x);} if(out.length>=4)break; }
+    return out;
+  };
+
+  // Reading stats derived from clicks + readLinks
+  const readingStats = useMemo(() => {
+    const total = readLinks.size;
+    const topSources = Object.entries(clicks)
+      .sort((a,b) => b[1]-a[1]).slice(0, 5)
+      .map(([src, cnt]) => ({ src, cnt }));
+    const catCounts = {};
+    Object.values(arts).flat().forEach(a => {
+      if (a.link && readLinks.has(a.link)) {
+        catCounts[a.cat] = (catCounts[a.cat]||0) + 1;
+      }
+    });
+    const topCats = Object.entries(catCounts).sort((a,b)=>b[1]-a[1]).slice(0,3);
+    return { total, topSources, topCats };
+  }, [clicks, readLinks, arts]);
+
+  const NEWS_CATS = ['general','sports','business','bloom','tech','popculture','comedy','health'];
+  const homeTrendingTopics = useMemo(() => getTrendingTopics(arts), [arts]);
+
+  // ─── FEED PAGE ─────────────────────────────────────────────────────────
+  // ─── SPORTS PAGE (v23) — Yahoo Sports rebuild ──────────────────────────
+  // News-first sports vertical: dark scoreboard strip top, sport tabs (All/NFL/
+  // NBA/MLB/CFB/CBB), favorite team pills with external links, then prioritized
+  // stories feed. Yahoo Sports' actual layout pattern.
+  // J3: SportsPage hoisted to a module-level component (see above); rendered below
+  // as <SportsPage ctx={sportsCtx}/> so App re-renders do not remount it.
+
+  // Generic entity mini-hub — Markets/Energy/etc. topics (no dedicated page before).
+  // Scoped StateOfPlay + "Trending for [entity]" + the entity's deduped feed. Text
+  // header only (no logo — sports teams keep their own Tier-3 page with a logo).
+  const EntityHub = ({ cat, entity }) => {
+    const cc = CATS[cat] || CATS.general;
+    const q = entity.toLowerCase();
+    const entityItems = useMemo(
+      () => clusterStories(Object.values(arts).flat().filter(a => (a.title + ' ' + (a.desc || '')).toLowerCase().includes(q))),
+      [arts, q]
+    );
+    const followed = isTopicFollowed(entity);
+    return (
+      <div className="page">
+        <div className="entity-hub-header">
+          <div className="entity-hub-title-wrap">
+            <h1 className="entity-hub-title">{entity}</h1>
+            <div className="entity-hub-sub">{entityItems.length} {entityItems.length === 1 ? 'story' : 'stories'} · {cc.label}</div>
+          </div>
+          <div className="entity-hub-actions">
+            <button className={`entity-hub-btn ${followed ? 'on' : ''}`} onClick={() => toggleTopic(entity)}>{followed ? '★ Following' : '☆ Follow'}</button>
+            <button className="entity-hub-btn" onClick={() => navigate(cat)}>← {cc.label}</button>
+          </div>
+        </div>
+        {/* D2: wire Breaking into the entity hub SoP (this entity's category only). */}
+        <StateOfPlay items={entityItems} meta={cc} onRead={onRead} onAsk={setChatContext} formatDate={fmtDate}
+          breakingItems={(breakingItems||[]).filter(b=>b.cat===cat).slice(0,3)}/>
+        <TrendingPills label={`Trending · ${entity}`} items={entityItems} onOpen={t => navigate(cat, 'topic', teamSlug(t))} isTopicFollowed={isTopicFollowed} toggleTopic={toggleTopic}/>
+        <SourcesDisagree topic={entity} items={entityItems}/>
+        {entityItems.length === 0
+          ? <EmptyState message={`No recent stories mentioning “${entity}”.`} actionLabel="Refresh" onAction={() => loadCat(cat)}/>
+          : <div className="snap-feed">
+              {entityItems.slice(0, 20).map((a, i) => (
+                <Fragment key={a.link || i}>
+                  <SnapshotCard a={a} meta={cc} isSaved={isSavedFn(a)} onSave={onSave} onRead={onRead} onPerspectives={setPerspArticle} onAsk={setChatContext} formatDate={fmtDate} opinionLabel={opinionLabel(a)} hideImage={i>=3}/>
+                  {i === 2 && <XPulse topic={entity} variant="feed"/>}
+                </Fragment>
+              ))}
+            </div>}
+      </div>
+    );
+  };
+
+  // J3: FeedPage hoisted to a module-level component (see above); rendered below as
+  // <FeedPage cat={tab} ctx={feedCtx}/> so App re-renders do not remount it.
 
   // ─── BRIEFING PAGE (v20) ───────────────────────────────────────────────
   // Full-page dedicated digest. Uses the same enhanced MorningBriefingInline
@@ -10644,7 +10185,7 @@ export default function App() {
           dark={dark} setDark={setDark}
           onCustomize={()=>openCustomize('keywords','general')} onRefresh={refreshAll}
           breakingItems={breakingItems} onTickerClick={handleTickerClick}
-          hidden={headerHidden} shrunk={headerShrunk}
+          isMobile={isMobile}
           mobileSearchOpen={mobileSearchOpen}
           onMobileSearchToggle={() => setMobileSearchOpen(o => !o)}
           weatherCities={weatherCities}
@@ -10678,8 +10219,28 @@ export default function App() {
                     PREVIEW_LABEL={PREVIEW_LABEL} LastUpdated={LastUpdated}/>
                 </Suspense>
               )}
-              {tab==='sports'&&<SportsPage/>}
-              {NEWS_CATS.filter(c=>c!=='sports').includes(tab)&&<FeedPage cat={tab}/>}
+              {tab==='sports'&&<Suspense fallback={<SportsSkeleton/>}><SportsPage ctx={{
+                tab, subcat, tertiary, arts, loading, kw, teams, myTeams, followedTeams,
+                activeTeam, activeKw, activeSrc, breakingItems, feeds, health, lastUpdated,
+                pendingNew, recommended, search, sorted,
+                setActiveTeam, setActiveKw, setActiveSrc, setChatContext, setPerspArticle, setSearch,
+                navigate, onRead, onSave, isSavedFn, isReadFn, isTeamFollowed, isTopicFollowed,
+                followTeam, unfollowTeam, toggleTopic, loadCat, applyPending, refreshAll,
+                openCustomize, getRelated, voicesStripFor,
+                CATS, CoverImg, EmptyState, FeedCard, IconGear, LEAGUES, LastUpdated, Sidebar,
+                SourceFooter, SourcesDisagree, SportsScoreStrip, TEAM_CHIPS, TeamLogo, TrendingPills,
+                storyKey, fmtDate, teamSlug, teamScanKeyword, fetchDiscover, fetchWebSearch,
+                ld, sv, opinionLabel,
+              }}/></Suspense>}
+              {NEWS_CATS.filter(c=>c!=='sports').includes(tab)&&<FeedPage cat={tab} ctx={{
+                activeKw, activeSrc, applyPending, arts, breakingItems, briefingExclude, feedHealth,
+                feeds, followTeam, followedTeams, handleTabChange, health, isSavedFn, isTeamFollowed,
+                isTopicFollowed, kw, kwMatch, lastUpdated, loadCat, loading, myTeams, myTopics, navigate, onRead,
+                onSave, openCustomize, pendingNew, recommended, refreshAll, refreshVoiceSignals, search,
+                setActiveKw, setActiveSrc, setChatContext, setFeeds, setPerspArticle, setSearch, social,
+                sorted, sourceRecs, srcWebLoading, srcWebResults, subcat, tab, teams, toggleTopic,
+                unfollowTeam, urgent, voicesStripFor, webLoading, webResults,
+              }}/>}
               {tab==='finance'&&<FinancePage/>}
               {tab==='podcasts'&&(
                 <Suspense fallback={<PodPageSkeleton/>}>
