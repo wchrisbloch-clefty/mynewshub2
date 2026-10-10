@@ -45,7 +45,7 @@ import { ConnectionsStrip, findConnections } from './modules/connections';
 import { qualifyBreaking, isPromoItem } from './modules/breaking';
 import { partitionSatire } from './modules/satire';
 import { rankByVelocity, signalFor } from '../lib/voices/velocity';
-import { DEBUG, dbgRender, dbgPoll, DebugOverlay } from './modules/debug';
+import { DEBUG, dbgRender, dbgPoll, dbgMount, DebugOverlay } from './modules/debug';
 import { useScores, configureScores, loadScores as loadScoresStore, anyLiveGame } from './state';
 import { makeVoice, upsertVoice, removeVoice as removeVoiceModel, mergeVoices, clearTombstone, voiceId, VOICE_PLATFORMS } from './modules/voices/model';
 import { SEED_VOICES } from './modules/voices/seeds';
@@ -9181,6 +9181,7 @@ export default function App() {
   // stories feed. Yahoo Sports' actual layout pattern.
   const SportsPage = () => {
     dbgRender('SportsPage'); // D8: ?debug=1 render counter (no-op when off)
+    useEffect(() => dbgMount('SportsPage'), []); // J1: remount counter (no-op when off)
     // I3: SportsPage no longer subscribes to the scores store — the live-score tile strip
     // (SportsScoreStrip) subscribes itself and hosts the poll. So a score tick re-renders
     // ONLY the strip, not this whole page (feed, team rails, State of Play). This is the
@@ -9723,6 +9724,8 @@ export default function App() {
   };
 
   const FeedPage = ({cat}) => {
+    dbgRender('FeedPage'); // J1: render counter
+    useEffect(() => dbgMount('FeedPage'), []); // J1: remount counter
     const cc=CATS[cat];
     const [showFollowAdd, setShowFollowAdd] = useState(false);
     const [onboardingDismissed, setOnboardingDismissed] = useState(()=>ld('onboarded',false));

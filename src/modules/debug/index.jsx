@@ -16,12 +16,22 @@ export const DEBUG = typeof window !== 'undefined'
   && new URLSearchParams(window.location.search).get('debug') === '1';
 
 // Mutable counters. Cheap plain object; only the overlay reads them.
-export const dbg = { renders: {}, pollFires: 0, cls: 0, scrollJumps: 0, lastJump: 0 };
+// J1: `mounts`/`unmounts` track page-component MOUNT/UNMOUNT (a remount = +1 each),
+// so the scroll test can prove a page is NOT being remounted on every App render.
+export const dbg = { renders: {}, mounts: {}, unmounts: {}, pollFires: 0, cls: 0, scrollJumps: 0, lastJump: 0 };
 // H5: expose the debug counters on window under ?debug=1 so the Sports-twitch
 // measurement (App/SportsPage renders/s, CLS, scroll jumps) can read them headlessly.
 if (DEBUG && typeof window !== 'undefined') window.__dbg = dbg;
 
 export function dbgRender(name) { if (!DEBUG) return; dbg.renders[name] = (dbg.renders[name] || 0) + 1; }
+// J1: call from a page's mount effect: useEffect(() => dbgMount('SportsPage'), []).
+// Increments mounts now and unmounts on cleanup — a stable component mounts once per
+// visit; a remount-on-every-render shows mounts climbing with App renders.
+export function dbgMount(name) {
+  if (!DEBUG) return () => {};
+  dbg.mounts[name] = (dbg.mounts[name] || 0) + 1;
+  return () => { dbg.unmounts[name] = (dbg.unmounts[name] || 0) + 1; };
+}
 export function dbgPoll(name) {
   if (!DEBUG) return;
   dbg.pollFires++;
@@ -105,6 +115,7 @@ function DebugOverlayInner() {
       <div style={{ color: '#fff', fontWeight: 700, marginBottom: 4 }}>?debug — scroll/render</div>
       {row('App renders', `${dbg.renders.App || 0} (${perSec.current.App || 0}/s)`)}
       {row('SportsPage', `${dbg.renders.SportsPage || 0} (${perSec.current.SportsPage || 0}/s)`)}
+      {row('SportsPage mounts', `${dbg.mounts.SportsPage || 0}`)}
       {row('poll fires', dbg.pollFires)}
       {row('CLS', dbg.cls.toFixed(4))}
       {row('scroll jumps', `${dbg.scrollJumps}${dbg.lastJump ? ` (last ${dbg.lastJump}px)` : ''}`)}
