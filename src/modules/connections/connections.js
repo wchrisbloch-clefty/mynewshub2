@@ -19,6 +19,23 @@ import { isSatire } from '../satire/index.js';
 
 const norm = s => (s || '').toLowerCase().replace(/[’']/g, "'").replace(/\s+/g, ' ').trim();
 
+// K5: collapse entity ALIASES to one canonical form BEFORE the >=2-shared-entities rule,
+// so "president trump" and "trump" are ONE entity (not two) and can't fake a bridge.
+// Strip a leading honorific/title, then — for a 2-word "First Last" — key on the last name
+// (surname), which is how the same person is referred to across outlets. Single tokens and
+// multi-word org/place names are left as-is.
+const TITLE_PREFIX = /^(president|vice president|vp|senator|sen|representative|rep|congress(man|woman)|governor|gov|mayor|secretary|sec|attorney general|justice|judge|chief|ceo|cfo|coach|dr|mr|mrs|ms|prof|professor|former|ex|prime minister|pm|king|queen|pope|chairman|chairwoman|chair)\s+/;
+const SURNAME_STOP = new Set(['white house','new york','los angeles','san francisco','united states','wall street','supreme court','world cup','super bowl']);
+export function canonEntity(e) {
+  let s = norm(e);
+  if (SURNAME_STOP.has(s)) return s;
+  const stripped = s.replace(TITLE_PREFIX, '');
+  const words = stripped.split(' ').filter(Boolean);
+  // "First Last" person name -> surname (shared across "trump" / "president trump" / "donald trump")
+  if (words.length === 2 && /^[a-z]+$/.test(words[0]) && /^[a-z]+$/.test(words[1])) return words[1];
+  return stripped || s;
+}
+
 // Build the entity set for one article from: (1) known multi-word keyword phrases present,
 // (2) distinctive single-word keywords present, (3) multi-word Capitalised phrases (orgs/
 // places). Generic/stoplisted terms are dropped; bare generic single words never qualify.
@@ -36,7 +53,14 @@ export function articleEntities(a, { kwMulti, kwSingle }) {
   while ((m = re2.exec(text))) { const p = norm(m[1]); if (p && !CONNECTION_STOPLIST.has(p)) ents.add(p); }
   // drop anything stoplisted
   for (const e of [...ents]) if (CONNECTION_STOPLIST.has(e)) ents.delete(e);
-  return ents;
+  // K5: canonicalize so aliases collapse to ONE entity, both within and across articles.
+  // Known keyword phrases (kwMulti, e.g. "data center") are protected and never collapsed;
+  // only free proper-noun names are reduced (president trump / donald trump / trump -> trump).
+  const kwSet = new Set(kwMulti);
+  const canonOf = e => kwSet.has(e) ? e : canonEntity(e);
+  const out = new Set();
+  for (const e of ents) { const c = canonOf(e); if (c && !CONNECTION_STOPLIST.has(c)) out.add(c); }
+  return out;
 }
 
 // items: flat array of articles, each { title, desc, source, pubDate, cat, link, _clusterSize? }.
