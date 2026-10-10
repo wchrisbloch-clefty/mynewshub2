@@ -8370,6 +8370,7 @@ function FeedPage({ cat, ctx }) {
     useEffect(() => dbgMount('FeedPage'), []); // J1: remount counter
     const cc=CATS[cat];
     const [showFollowAdd, setShowFollowAdd] = useState(false);
+    const [followingOpen, setFollowingOpen] = useState(() => ld('followingOpen', false)); // K5: Following collapsed by default
     const [onboardingDismissed, setOnboardingDismissed] = useState(()=>ld('onboarded',false));
     const dismissOnboarding = () => { sv('onboarded',true); setOnboardingDismissed(true); };
     // Collapsible State of Play — expanded on first visit, choice remembered per category.
@@ -8625,62 +8626,62 @@ function FeedPage({ cat, ctx }) {
       // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [gapCat, gapKwKey, gapSrcKey, gapOn]);
 
+    // K5: keys of every story already on this page (Top Stories + State of Play + Houston
+    // + the numbered feed), so Across can dedupe against everything else on screen.
+    const shownKeysForAcross = useMemo(() => {
+      const s = new Set();
+      topStoryKeys.forEach(k => s.add(k)); sopShownKeys.forEach(k => s.add(k)); houstonKeys.forEach(k => s.add(k));
+      dedupedFeed.forEach(a => s.add(storyKey(a)));
+      return s;
+    }, [topStoryKeys, sopShownKeys, houstonKeys, dedupedFeed]);
+    // K5: "Across MyNewsHub" is REMOVED from General (General already spans every
+    // category) and shown on CATEGORY pages instead — the OTHER categories, promo-clean
+    // and deduped against this page's own stories (shownKeysForAcross).
     const otherCatSections = useMemo(() => {
-      if (!isHome) return [];
-      const otherCats = ['business','finance','bloom','sports','popculture'];
+      if (isHome) return [];
+      const otherCats = ['general','business','finance','bloom','sports','popculture','tech'].filter(c => c !== cat);
       return otherCats.map(c => ({
         cat: c,
         cc: CATS[c],
-        items: (arts[c] || []).filter(a => !isPromoItem(a)).slice(0, 3), // K3
-      })).filter(s => s.items.length > 0);
-    }, [isHome, arts]);
+        items: (arts[c] || []).filter(a => !isPromoItem(a) && !shownKeysForAcross.has(storyKey(a))).slice(0, 3),
+      })).filter(s => s.items.length > 0).slice(0, 4);
+    }, [isHome, arts, cat, shownKeysForAcross]);
 
-    // Following module — relocated from the General-page full-width banner into the
-    // sidebar (Pass K item 3), rendered as a standard sidebar section with the existing
-    // follow-chip pills + "+ Add". General page only; injected into <Sidebar/> as a prop.
-    const followingModule = isHome ? (
+    // K5: Following — sidebar module on General. It now shows FOLLOWED TOPICS only;
+    // followed TEAMS live as pinned chips on the Sports page (the my-teams ribbon) and
+    // are no longer duplicated here. Collapsed by default to "Following · N" (state
+    // remembered), and the whole module is HIDDEN when N = 0. Add still adds teams or
+    // topics (teams route to Sports). Topic follow also works from Customize.
+    const followingCount = myTopics.length;
+    const followingModule = (isHome && followingCount > 0) ? (
       <div className="sidebar-section sb-following">
-        <div className="sidebar-sec-head"><span className="sidebar-sec-label">Following</span></div>
-        <div className="following-chips">
-          {(() => {
-            const nameCounts = {};
-            followedTeams.forEach(t => { const k = (t.name||'').toLowerCase(); nameCounts[k] = (nameCounts[k]||0) + 1; });
-            return followedTeams.map((t, i) => {
-              const dup = nameCounts[(t.name||'').toLowerCase()] > 1;
-              return (
-                <span key={`tm-${t.slug}-${t.league}-${i}`} className="following-chip following-chip-team">
-                  <button type="button" className="following-chip-main" onClick={()=>navigate('sports', t.league, t.slug)}>
-                    <TeamLogo name={t.name} league={t.league} size={18}/>
-                    <span className="following-chip-name">{t.name}{dup ? ` · ${(t.league||'').toUpperCase()}` : ''}</span>
-                  </button>
-                  <button type="button" className="following-chip-x" onClick={()=>unfollowTeam(t)} aria-label={`Unfollow ${t.name}`}><XIcon size={16} aria-hidden="true"/></button>
-                </span>
-              );
-            });
-          })()}
-          {myTopics.map((t, i) => (
-            <span key={`tp-${i}`} className="following-chip">
-              <button type="button" className="following-chip-main" onClick={()=>navigate('general','topic',teamSlug(t))}>
-                <span className="following-chip-name">{t}</span>
-              </button>
-              <button type="button" className="following-chip-x" onClick={()=>toggleTopic(t)} aria-label={`Unfollow ${t}`}><XIcon size={16} aria-hidden="true"/></button>
-            </span>
-          ))}
-          {followedTeams.length === 0 && myTopics.length === 0 && (
-            <span className="following-empty">Follow teams &amp; topics to build your row</span>
-          )}
-          <div className="follow-add-wrap">
-            <button className="following-add-btn" onClick={()=>setShowFollowAdd(v=>!v)} aria-expanded={showFollowAdd}>+ Add</button>
-            {showFollowAdd && (
-              <FollowAdd
-                isFollowingTeam={t => isTeamFollowed(t.name, t.league)}
-                isTopicFollowed={isTopicFollowed}
-                onAddTeam={t => followTeam(t.name, t.league)}
-                onAddTopic={topic => toggleTopic(topic)}
-                onClose={() => setShowFollowAdd(false)}/>
-            )}
+        <button className="sidebar-sec-collapse" onClick={()=>setFollowingOpen(o=>{const n=!o;sv('followingOpen',n);return n;})} aria-expanded={followingOpen}>
+          <span className="sidebar-sec-label">Following · {followingCount}</span>
+          <ChevronDown size={13} aria-hidden="true" style={{transform:followingOpen?'none':'rotate(-90deg)',transition:'transform .15s',color:'var(--text4)'}}/>
+        </button>
+        {followingOpen && (
+          <div className="following-chips">
+            {myTopics.map((t, i) => (
+              <span key={`tp-${i}`} className="following-chip">
+                <button type="button" className="following-chip-main" onClick={()=>navigate('general','topic',teamSlug(t))}>
+                  <span className="following-chip-name">{t}</span>
+                </button>
+                <button type="button" className="following-chip-x" onClick={()=>toggleTopic(t)} aria-label={`Unfollow ${t}`}><XIcon size={16} aria-hidden="true"/></button>
+              </span>
+            ))}
+            <div className="follow-add-wrap">
+              <button className="following-add-btn" onClick={()=>setShowFollowAdd(v=>!v)} aria-expanded={showFollowAdd}>+ Add</button>
+              {showFollowAdd && (
+                <FollowAdd
+                  isFollowingTeam={t => isTeamFollowed(t.name, t.league)}
+                  isTopicFollowed={isTopicFollowed}
+                  onAddTeam={t => followTeam(t.name, t.league)}
+                  onAddTopic={topic => toggleTopic(topic)}
+                  onClose={() => setShowFollowAdd(false)}/>
+              )}
+            </div>
           </div>
-        </div>
+        )}
       </div>
     ) : null;
 
@@ -9002,7 +9003,7 @@ function FeedPage({ cat, ctx }) {
             sopItems={!activeKw && !activeSrc && !search ? sopSourceItems : null}
             sopGapItems={gapItems} sopBreakingItems={!activeKw && !activeSrc && !search ? catBreaking : []} sopMeta={CATS[cat]||CATS.general}
             sopCollapsed={sopCollapsed} onToggleSop={toggleSop} formatDate={fmtDate}
-            acrossSections={isHome && !activeKw && !activeSrc && !search ? otherCatSections : null}
+            acrossSections={!isHome && !activeKw && !activeSrc && !search ? otherCatSections : null}
             onAcrossSeeAll={handleTabChange}
             followingModule={followingModule}
             feeds={feeds} onToggleFeed={(c,name)=>setFeeds(prev=>{const next=JSON.parse(JSON.stringify(prev));const f=(next[c]||[]).find(x=>x.name===name);if(f){f.on=!f.on;sv('feeds',next);}return next;})}
