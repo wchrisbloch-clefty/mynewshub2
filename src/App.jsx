@@ -5375,14 +5375,22 @@ kbd{display:inline-block;padding:1px 5px;border:1px solid var(--border);border-r
   font-family:var(--font-sans);font-size:var(--fs-eyebrow);font-weight:700;text-transform:uppercase;letter-spacing:0.08em;
   color:var(--text3);
 }
-/* ONE ROW (Pass G item 4): a tall hero (~53%) on the left + a rail of up to three
-   compact secondaries stacked on the right — never a second row of picture-cards.
-   The hero spans all three rail rows so the module is one band, not a grid of
-   equal boxes. One column on mobile (see media query). */
-/* G7f item 1: lead (overlay) LEFT, an independent column of secondaries RIGHT. Flex,
-   not a spanning grid, so the lead's height is no longer coupled to the rail. */
-.toh-grid{display:grid;grid-template-columns:53% 1fr;gap:14px;align-items:stretch;}
-.toh-side{display:flex;flex-direction:column;gap:14px;min-width:0;}
+/* L2 — BALANCED TOP STORIES. Left column: one 16:9 overlay hero + 2–3 text-only
+   headlines under it (divided list, no boxes). Right column: 3 compact K6-style rows
+   (left thumbnail 112x84 if an image exists, else text-only). Two equal-weight columns
+   (not 53/47 picture boxes) so their heights stay within ~40px of each other, and
+   exactly ONE hero-weight element (.toh-card-lead). One column on mobile. */
+.toh-grid{display:grid;grid-template-columns:1.35fr 1fr;gap:24px;align-items:start;}
+.toh-lead-col{display:flex;flex-direction:column;min-width:0;}
+/* The hero opted out of GRID stretch (I0.4) with align-self:start; now it lives in a
+   FLEX column, where that same value would shrink its width to content and collapse the
+   16:9 box — so stretch it back to the column's full width here. It is a 16:9 cover at
+   narrow widths and caps its HEIGHT at wide ones (crop stays landscape): that keeps the
+   left column's total height nearly width-independent, so it lands within ~40px of the
+   fixed-height compact column (L2) across 1024–1440 instead of ballooning past it. */
+.toh-lead-col .toh-card-lead{align-self:stretch;width:100%;max-height:210px;}
+.toh-lead-col .toh-card-lead .toh-img{object-fit:cover;}
+.toh-side{display:flex;flex-direction:column;min-width:0;}
 .toh-card{
   border-radius:var(--radius);overflow:hidden;cursor:pointer;
   transition:transform 0.2s,box-shadow 0.2s;
@@ -5427,45 +5435,64 @@ kbd{display:inline-block;padding:1px 5px;border:1px solid var(--border);border-r
 .toh-card-noimg .toh-title{color:var(--text);text-shadow:none;font-size:clamp(24px,3.2vw,34px);line-height:1.1;-webkit-line-clamp:5;}
 .toh-card-noimg .toh-meta{color:var(--text3);}
 
-/* ── SECONDARIES — image on TOP, text BELOW on a surface card (NYT/Axios). No text over
-   the image, so nothing clips. Compact image height keeps the rail tidy. ── */
-.toh-side .toh-card{
-  position:relative;display:flex;flex-direction:column;background:var(--surface);
-  border:1px solid var(--border);border-radius:var(--radius);flex:1;min-height:0;
-}
-/* The placeholder sizes the image slot (in flow); the real image absolutely covers it,
-   so a missing image shows the branded field instead of leaving a gap. */
-.toh-side .toh-img-ph{position:relative;inset:auto;width:100%;height:96px;flex-shrink:0;}
-.toh-side .toh-img{position:absolute;top:0;left:0;width:100%;height:96px;}
-.toh-side .toh-grad{display:none;}
-.toh-side .toh-body{position:static;padding:8px 11px 10px;display:flex;flex-direction:column;flex:1;}
 .toh-cat{
   font-family:var(--font-sans);font-size:var(--fs-eyebrow);font-weight:700;text-transform:uppercase;letter-spacing:0.08em;
   color:var(--text3);margin-bottom:5px;align-self:flex-start;background:none;padding:0;
 }
-.toh-side .toh-title{
-  font-family:var(--font-serif);font-size:var(--fs-subhead);font-weight:700;color:var(--text);
-  line-height:1.22;margin:0 0 4px;
-  display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;text-overflow:ellipsis;
-}
 .toh-meta{font-size:var(--fs-meta);color:var(--text3);font-weight:500;font-family:var(--font-sans);}
-/* Tablet/iPad: single column — hero on top, then the secondaries stacked. Cap at
-   hero + 2 secondaries so it never becomes a tall wall of picture-cards. */
-@media(max-width:1024px){
-  /* Lead on top (full width), the 3 secondaries in a row beneath it. */
-  .toh-grid{grid-template-columns:1fr;gap:14px;}
+
+/* ── LEFT: text-only headlines under the hero. A divided list (no boxes), matching the
+   K6 row rhythm: one bottom divider, one serif headline + one meta line. ── */
+.toh-textlist{display:flex;flex-direction:column;margin-top:4px;}
+.toh-text-row{
+  display:flex;flex-direction:column;gap:3px;text-align:left;cursor:pointer;
+  background:none;border:none;border-top:1px solid var(--border2);
+  padding:12px 0;font-family:inherit;transition:background 0.12s;
+}
+.toh-text-row:hover{background:var(--surface2);}
+.toh-text-title{
+  font-family:var(--font-serif);font-size:var(--fs-subhead);font-weight:700;color:var(--text);
+  line-height:1.24;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;
+}
+.toh-text-meta{font-family:var(--font-sans);font-size:var(--fs-meta);color:var(--text3);font-weight:500;}
+
+/* ── RIGHT: 3 compact K6-style rows — a fixed 112x84 (4:3) thumbnail on the LEFT when an
+   image exists (else the body fills the row), a single bottom divider, one vertical
+   padding token. No boxed cards. ── */
+.toh-compact-row{
+  display:flex;align-items:flex-start;gap:14px;text-align:left;cursor:pointer;
+  background:none;border:none;border-bottom:1px solid var(--border2);
+  padding:12px 0;font-family:inherit;transition:background 0.12s;min-height:84px;
+}
+.toh-compact-row:first-child{border-top:1px solid var(--border2);}
+.toh-compact-row:hover{background:var(--surface2);}
+.toh-compact-thumb{
+  width:112px;height:84px;aspect-ratio:4/3;flex-shrink:0;object-fit:cover;
+  border-radius:8px;background:var(--ph-field);
+}
+.toh-compact-body{display:flex;flex-direction:column;gap:4px;min-width:0;flex:1;}
+.toh-compact-cat{
+  font-family:var(--font-sans);font-size:var(--fs-eyebrow);font-weight:700;text-transform:uppercase;letter-spacing:0.06em;
+}
+.toh-compact-title{
+  font-family:var(--font-serif);font-size:var(--fs-subhead);font-weight:700;color:var(--text);
+  line-height:1.24;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden;
+}
+.toh-compact-meta{font-family:var(--font-sans);font-size:var(--fs-meta);color:var(--text3);font-weight:500;}
+
+/* Below 900 (iPad portrait / phones): hero + text headlines on top (full width), compact
+   rows beneath. The two columns (1024/1180/1280/1440) stay side-by-side above this. */
+@media(max-width:899px){
+  .toh-grid{grid-template-columns:1fr;gap:16px;}
   .toh-card-lead{min-height:0;aspect-ratio:16/9;}
   .toh-card-lead .toh-title{font-size:20px;}
-  .toh-side{flex-direction:row;}
-  .toh-side .toh-card{flex:1;min-width:0;}
 }
 @media(max-width:640px){
   .toh-strip{margin-bottom:22px;}
   .toh-card-lead{aspect-ratio:4/3;}
   .toh-card-lead .toh-title{font-size:27px;font-weight:800;line-height:1.15;-webkit-line-clamp:3;}
-  /* Secondaries: keep one per row for comfortable thumb targets. */
-  .toh-side{flex-direction:column;}
-  .toh-side .toh-img,.toh-side .toh-img-ph{height:160px;}
+  .toh-compact-thumb{width:88px;height:66px;}
+  .toh-compact-row{min-height:66px;}
 }
 
 /* ── BRIEFING TEASER — editorial dark card ─────────────────────── */
@@ -8207,66 +8234,70 @@ function TopOfHourStrip({ catLead, arts, onRead, stories: storiesProp }) {
     const picks = catLead && catLead.img ? [catLead] : (catLead ? [] : []);
     const used = new Set(catLead ? [catLead.link] : []);
     const catOrder = ['sports','business','finance','bloom','popculture','general','tech'];
-    // One row: hero + up to 3 secondaries (4 total). Two passes — one per category
-    // first (variety), then top up from any category if some feeds were empty.
+    // L2: hero (image) + up to 6 more (2-3 text headlines + 3 compact rows). Two passes
+    // — one image-bearing per category first (variety), then top up from any category
+    // (text-only allowed) if some feeds were empty.
     for (const c of catOrder) {
-      if (picks.length >= 4) break;
+      if (picks.length >= 6) break;
       const item = (arts[c]||[]).find(a => a.img && !used.has(a.link));
       if (item) { picks.push({...item, cat: item.cat||c}); used.add(item.link); }
     }
     for (const c of catOrder) {
-      if (picks.length >= 4) break;
+      if (picks.length >= 6) break;
       for (const a of (arts[c]||[])) {
-        if (picks.length >= 4) break;
-        if (a.img && !used.has(a.link)) { picks.push({...a, cat: a.cat||c}); used.add(a.link); }
+        if (picks.length >= 6) break;
+        if (!used.has(a.link)) { picks.push({...a, cat: a.cat||c}); used.add(a.link); }
       }
     }
-    return picks.slice(0,4);
+    return picks.slice(0,6);
   }, [catLead, arts, storiesProp]);
   if (stories.length < 1) return null;
+  const hero = stories[0];
+  const heroBadge = catBadge(hero);
+  const textHeads = stories.slice(1, 3);   // L2 left: 2 text-only headlines under the hero
+  const compact = stories.slice(3, 6);     // L2 right: 3 compact rows (image left or text)
   return (
     <div className="toh-strip">
       <div className="toh-strip-head">
         <span className="toh-strip-label">Top Stories</span>
       </div>
+      {/* L2: balanced — LEFT a 16:9 hero + text headlines, RIGHT compact rows (K6 style).
+          No boxed grid; exactly one hero-weight element (.toh-card-lead). */}
       <div className="toh-grid">
-        {stories.map((a, i) => {
-          const badge = catBadge(a);
-          const card = (
-            <article key={i} className={`toh-card${i===0?' toh-card-lead':''}${i===0 && !a.img?' toh-card-noimg':''}`} onClick={() => onRead(a)}>
-              {/* Placeholder sits underneath; the real image loads on top and hides
-                  itself if the URL fails, so a broken image never leaves a grey slot. */}
-              <div className="toh-img-ph"><span className="ph-label">{a.source}</span></div>
-              {a.img && <img className="toh-img" src={a.img} alt="" loading="lazy"
-                onError={e => { e.currentTarget.style.display = 'none'; }}/>}
-              <div className="toh-grad"/>
-              <div className="toh-body">
-                <span className="toh-cat">{badge.label}</span>
-                <h3 className="toh-title">{a.title}</h3>
-                <div className="toh-meta">{a.source} · {fmtDate(a.pubDate)}</div>
-              </div>
-            </article>
-          );
-          return i === 0 ? card : null;
-        })}
-        {stories.length > 1 && (
+        <div className="toh-lead-col">
+          <article className={`toh-card toh-card-lead${!hero.img ? ' toh-card-noimg' : ''}`} onClick={() => onRead(hero)}>
+            <div className="toh-img-ph"><span className="ph-label">{hero.source}</span></div>
+            {hero.img && <img className="toh-img" src={hero.img} alt="" loading="lazy" onError={e => { e.currentTarget.style.display = 'none'; }}/>}
+            <div className="toh-grad"/>
+            <div className="toh-body">
+              <span className="toh-cat">{heroBadge.label}</span>
+              <h3 className="toh-title">{hero.title}</h3>
+              <div className="toh-meta">{hero.source} · {fmtDate(hero.pubDate)}</div>
+            </div>
+          </article>
+          {textHeads.length > 0 && (
+            <div className="toh-textlist">
+              {textHeads.map((a, i) => (
+                <button key={i} className="toh-text-row" onClick={() => onRead(a)}>
+                  <span className="toh-text-title">{a.title}</span>
+                  <span className="toh-text-meta">{a.source} · {fmtDate(a.pubDate)}</span>
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+        {compact.length > 0 && (
           <div className="toh-side">
-            {stories.slice(1).map((a, i) => {
-              const badge = catBadge(a);
-              return (
-                <article key={i} className="toh-card" onClick={() => onRead(a)}>
-                  <div className="toh-img-ph"><span className="ph-label">{a.source}</span></div>
-                  {a.img && <img className="toh-img" src={a.img} alt="" loading="lazy"
-                    onError={e => { e.currentTarget.style.display = 'none'; }}/>}
-                  <div className="toh-grad"/>
-                  <div className="toh-body">
-                    <span className="toh-cat">{badge.label}</span>
-                    <h3 className="toh-title">{a.title}</h3>
-                    <div className="toh-meta">{a.source} · {fmtDate(a.pubDate)}</div>
-                  </div>
-                </article>
-              );
-            })}
+            {compact.map((a, i) => (
+              <button key={i} className="toh-compact-row" onClick={() => onRead(a)}>
+                {a.img && <img className="toh-compact-thumb" src={a.img} loading="lazy" decoding="async" alt="" onError={e => { e.currentTarget.style.visibility = 'hidden'; }}/>}
+                <span className="toh-compact-body">
+                  <span className="toh-compact-cat" style={{ color: catBadge(a).color }}>{catBadge(a).label}</span>
+                  <span className="toh-compact-title">{a.title}</span>
+                  <span className="toh-compact-meta">{a.source} · {fmtDate(a.pubDate)}</span>
+                </span>
+              </button>
+            ))}
           </div>
         )}
       </div>
@@ -8543,26 +8574,27 @@ function FeedPage({ cat, ctx }) {
         // Home Top Stories = TopOfHourStrip picks (catLead + cross-category images).
         // Mirror its selection exactly so State of Play + the feed exclude what it
         // actually shows — otherwise the hero repeats as State of Play #1.
+        // L2: Top Stories = hero (image) + up to 6 more (2-3 text headlines + 3 compact
+        // rows). The hero needs an image; the rest may be text-only.
         const picks = catLead && catLead.img ? [catLead] : [];
         const used = new Set(catLead ? [catLead.link] : []);
         const catOrder = ['sports','business','finance','bloom','popculture','general','tech'];
         for (const c of catOrder) {
-          if (picks.length >= 4) break;
+          if (picks.length >= 6) break;
           const item = (arts[c]||[]).find(a => a.img && !used.has(a.link));
           if (item) { picks.push({ ...item, cat: item.cat || c }); used.add(item.link); }
         }
         for (const c of catOrder) {
-          if (picks.length >= 4) break;
+          if (picks.length >= 6) break;
           for (const a of (arts[c]||[])) {
-            if (picks.length >= 4) break;
-            if (a.img && !used.has(a.link)) { picks.push({ ...a, cat: a.cat || c }); used.add(a.link); }
+            if (picks.length >= 6) break;
+            if (!used.has(a.link)) { picks.push({ ...a, cat: a.cat || c }); used.add(a.link); }
           }
         }
-        return picks.slice(0, 4);
+        return picks.slice(0, 6);
       }
-      if (!catLead) return [];   // category Top Stories = the gn-grid (hero + 3)
-      const secondaries = feedItems.slice(0, 6).filter(a => a.img).slice(0, 3)
-        .concat(feedItems.slice(0, 6).filter(a => !a.img)).slice(0, 3);
+      if (!catLead) return [];   // category Top Stories = hero + 5 secondaries (6 shown total)
+      const secondaries = feedItems.slice(0, 10).filter(a => a.link !== catLead.link).slice(0, 5);
       return [catLead, ...secondaries];
     }, [isHome, catLead, feedItems, arts]);
     const topStoryKeys = useMemo(() => new Set(topStoryItems.map(storyKey)), [topStoryItems]);
