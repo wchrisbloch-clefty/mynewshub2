@@ -918,36 +918,8 @@ function useIsMobile() {
   return isMobile;
 }
 
-// Auto-hide header on scroll-down / reveal on scroll-up. The Medium/Yahoo
-// pattern: content gets max screen real estate while scrolling, header
-// reappears the instant the user shows intent to navigate (scroll up).
-// 6px threshold ignores jitter; 80px start threshold prevents hide when
-// barely below the fold.
-function useScrollDirection(enabled) {
-  const [hidden, setHidden] = useState(false);
-  const lastY = useRef(0);
-  const ticking = useRef(false);
-  useEffect(() => {
-    if (!enabled) { setHidden(false); return; }
-    const onScroll = () => {
-      if (ticking.current) return;
-      ticking.current = true;
-      requestAnimationFrame(() => {
-        const y = window.scrollY;
-        const delta = y - lastY.current;
-        if (Math.abs(delta) > 6) {
-          if (delta > 0 && y > 80) setHidden(true);
-          else if (delta < 0) setHidden(false);
-          lastY.current = y;
-        }
-        ticking.current = false;
-      });
-    };
-    window.addEventListener('scroll', onScroll, { passive: true });
-    return () => window.removeEventListener('scroll', onScroll);
-  }, [enabled]);
-  return hidden;
-}
+// J2: useScrollDirection removed — the header shrink/hide is now a ref-based class
+// toggle inside TopBar (no React state, so scrolling re-renders nothing).
 
 // Horizontal swipe detection — returns touch handlers to spread onto an
 // element. Fires onSwipe('left'|'right') when user completes a decisive
@@ -7738,10 +7710,48 @@ function Wordmark({ height = 24 }) {
 // the auto-hide-on-scroll-down behavior (mobile only — drives translate).
 function TopBar({tab, setTab, search, setSearch, dark, setDark,
                  onCustomize, onRefresh, breakingItems, onTickerClick,
-                 hidden, shrunk, mobileSearchOpen, onMobileSearchToggle, weatherCities, hiddenIndices,
+                 isMobile, mobileSearchOpen, onMobileSearchToggle, weatherCities, hiddenIndices,
                  onAnalyze, searchHistory, trendingTopics, onAccount, signedIn,
                  favTeams, onGoToSports}) {
+  dbgRender('TopBar'); // J2: confirm scroll re-renders ONLY TopBar, not App/pages
   const [searchFocused, setSearchFocused] = useState(false);
+  // J2: the smart-sticky header (shrink >60px; hide on scroll-down on mobile, show on up)
+  // used to live in APP state, so every scroll re-rendered App and REMOUNTED the page.
+  // The state + the single rAF-throttled passive scroll listener now live HERE, so a
+  // scroll re-renders only TopBar — App and the pages are untouched (no remount). The
+  // React-batched class application is byte-for-byte the original behavior (same
+  // thresholds, same CLS), unlike a raw ref toggle which fed back into scroll-anchoring.
+  const [shrunk, setShrunk] = useState(false);
+  const [hidden, setHidden] = useState(false);
+  useEffect(() => {
+    let raf = 0, lastY = 0, settleUntil = 0;
+    // When the header shrinks/hides on mobile it collapses in height; the browser's scroll
+    // anchoring then bumps scrollY to keep the view steady, which re-crosses the 60/80px
+    // thresholds and re-toggles the header — a feedback loop that made the header flicker
+    // ~7x per down-scroll (the phone twitch). We LATCH each change for 250ms so the single
+    // anchoring bump can't re-fire it. Thresholds + behavior are otherwise unchanged.
+    const now = () => (typeof performance !== 'undefined' ? performance.now() : Date.now());
+    const apply = () => {
+      raf = 0;
+      const y = window.scrollY;
+      if (now() < settleUntil) { lastY = y; return; } // ignore the anchoring rebound
+      let changed = false;
+      setShrunk(prev => { const v = y > 60; if (v !== prev) changed = true; return v; });
+      if (isMobile) {
+        const delta = y - lastY;
+        if (Math.abs(delta) > 6) {
+          if (delta > 0 && y > 80) setHidden(prev => { if (!prev) changed = true; return true; });
+          else if (delta < 0) setHidden(prev => { if (prev) changed = true; return false; });
+          lastY = y;
+        }
+      } else setHidden(prev => { if (prev) changed = true; return false; }); // desktop never hides
+      if (changed) settleUntil = now() + 250;
+    };
+    const onScroll = () => { if (!raf) raf = requestAnimationFrame(apply); };
+    apply();
+    window.addEventListener('scroll', onScroll, { passive: true });
+    return () => { window.removeEventListener('scroll', onScroll); if (raf) cancelAnimationFrame(raf); };
+  }, [isMobile]);
   const [quotes, setQuotes] = useState({});
   // F7: mobile market ticker is collapsible and DEFAULT-COLLAPSED (reclaims the ~34px
   // strip at the top of a phone screen). Persisted; desktop always shows the ticker.
@@ -8643,19 +8653,9 @@ export default function App() {
   const [lastUpdated, setLastUpdated]   = useState({}); // per-cat timestamp
   const [lastFeedTab, setLastFeedTab]   = useState('general');
   const isMobile                        = useIsMobile();
-  const headerHidden                    = useScrollDirection(isMobile);
-  const [headerShrunk, setHeaderShrunk] = useState(false);
-
-  // v46: Smart sticky header — collapses the pill/ticker rail past 60px scroll.
-  useEffect(()=>{
-    let raf = 0;
-    const onScroll = () => {
-      if (raf) return;
-      raf = requestAnimationFrame(() => { setHeaderShrunk(window.scrollY > 60); raf = 0; });
-    };
-    window.addEventListener('scroll', onScroll, {passive:true});
-    return () => { window.removeEventListener('scroll', onScroll); if (raf) cancelAnimationFrame(raf); };
-  },[]);
+  // J2: the smart-sticky header (shrink >60px / hide on mobile scroll-down) moved INTO
+  // TopBar, where it toggles classes on the header element via a ref — no App state, so
+  // scrolling no longer re-renders App (and so no longer remounts the page).
 
   useEffect(()=>{sv('dark',dark);document.body.className=dark?'dark':'';},[dark]);
   useEffect(()=>{sv('saved',saved);},[saved]);
@@ -10647,7 +10647,7 @@ export default function App() {
           dark={dark} setDark={setDark}
           onCustomize={()=>openCustomize('keywords','general')} onRefresh={refreshAll}
           breakingItems={breakingItems} onTickerClick={handleTickerClick}
-          hidden={headerHidden} shrunk={headerShrunk}
+          isMobile={isMobile}
           mobileSearchOpen={mobileSearchOpen}
           onMobileSearchToggle={() => setMobileSearchOpen(o => !o)}
           weatherCities={weatherCities}
