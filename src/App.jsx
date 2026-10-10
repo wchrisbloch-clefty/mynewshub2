@@ -1524,10 +1524,13 @@ body{
 @keyframes ss-pulse{0%{box-shadow:0 0 0 0 rgba(200,16,46,0.5);}70%{box-shadow:0 0 0 6px rgba(200,16,46,0);}100%{box-shadow:0 0 0 0 rgba(200,16,46,0);}}
 .ss-ticker{flex:1;min-width:0;overflow:hidden;
   /* G7f item 5: no left fade — the first symbol (S&P) is fully visible at scroll 0.
-     Only the right edge fades as a "more →" cue. */
-  -webkit-mask-image:linear-gradient(90deg,#000 0,#000 calc(100% - 24px),transparent);
-          mask-image:linear-gradient(90deg,#000 0,#000 calc(100% - 24px),transparent);}
-.ss-ticker-inner{display:flex;align-items:center;gap:var(--s4);overflow-x:auto;scrollbar-width:none;}
+     K1: a WIDER right fade (56px) so a partially-scrolled item (e.g. "BLOOM $280.50
+     +2…") fades out instead of being hard-cut by the weather divider at ~1180 — the
+     last FULLY visible item reads whole, and the fade is the "more →" cue. The ticker
+     clips only inside its own box (overflow:hidden), never under the weather. */
+  -webkit-mask-image:linear-gradient(90deg,#000 0,#000 calc(100% - 56px),transparent);
+          mask-image:linear-gradient(90deg,#000 0,#000 calc(100% - 56px),transparent);}
+.ss-ticker-inner{display:flex;align-items:center;gap:var(--s4);overflow-x:auto;scrollbar-width:none;padding-right:12px;}
 .ss-ticker-inner::-webkit-scrollbar{display:none;}
 .ss-tk{display:inline-flex;align-items:baseline;gap:6px;flex-shrink:0;
   background:none;border:none;cursor:pointer;font-family:inherit;padding:0;white-space:nowrap;}
