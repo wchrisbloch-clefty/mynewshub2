@@ -6235,7 +6235,7 @@ function MorningBriefingInline({arts, excludeCats}) {
     // ── TIER 1: Priority briefing sources (Axios, Morning Brew, Morning Wire, Bloomberg) ──
     // Pull the latest 1-2 articles from each priority source. These are
     // labeled as "anchor" content for the AI synthesis.
-    const allArts = Object.values(arts).flat();
+    const allArts = Object.values(arts).flat().filter(a => !isPromoItem(a)); // K3
     const tier1 = [];
     const tier1Keys = new Set(); // dedup keys for Tier 2 to filter against
     briefingSourceList().forEach(srcName => {
@@ -6814,7 +6814,7 @@ function Sidebar({cat, arts, kw, health, activeKw, setActiveKw, activeSource, se
   // G6: cross-category connections over all loaded articles (AI-free). Home shows the top
   // 3 overall; a category page shows bridges that involve that category. Max 3.
   const connItems = useMemo(() => {
-    const flat = Object.entries(arts).flatMap(([c, list]) => (list || []).map(a => ({ ...a, cat: a.cat || c })));
+    const flat = Object.entries(arts).flatMap(([c, list]) => (list || []).map(a => ({ ...a, cat: a.cat || c }))).filter(a => !isPromoItem(a)); // K3
     const all = findConnections(flat, { kw: DEFAULT_KW, max: 12, catLabel: c => (CATS[c]?.label) || c });
     const scoped = cat === 'general' ? all : all.filter(c => c.categories.includes(cat));
     return scoped.slice(0, 3);
@@ -8471,7 +8471,7 @@ function FeedPage({ cat, ctx }) {
       if (!kws.length) { setCatWideItems([]); return () => { alive = false; }; }
       fetchDiscover(cat, kws, [], 'feed').then(r => {
         if (!alive) return;
-        const rows = ((r && r.items) || []).map(x => ({ ...x, cat, _tier: 'reported', _wide: true }));
+        const rows = ((r && r.items) || []).map(x => ({ ...x, cat, _tier: 'reported', _wide: true })).filter(a => !isPromoItem(a)); // K3
         setCatWideItems(rows);
       });
       return () => { alive = false; };
@@ -8631,7 +8631,7 @@ function FeedPage({ cat, ctx }) {
       return otherCats.map(c => ({
         cat: c,
         cc: CATS[c],
-        items: (arts[c] || []).slice(0, 3),
+        items: (arts[c] || []).filter(a => !isPromoItem(a)).slice(0, 3), // K3
       })).filter(s => s.items.length > 0);
     }, [isHome, arts]);
 
@@ -8915,7 +8915,7 @@ function FeedPage({ cat, ctx }) {
               <div className="web-fallback">
                 <div className="rail-label" style={{margin:'24px 0 12px'}}>From the Web</div>
                 {webLoading && <div style={{fontSize:'12px',color:'var(--text3)',fontStyle:'italic',padding:'10px 0'}}>Searching the web…</div>}
-                {webResults.map((r,i) => (
+                {webResults.filter(r => !isPromoItem(r)).map((r,i) => ( /* K3 */
                   <a key={i} className="web-result" href={r.link} target="_blank" rel="noreferrer">
                     <div className="web-result-title">{r.title}</div>
                     {r.desc && <div className="web-result-desc">{r.desc.slice(0, 160)}</div>}
@@ -9438,6 +9438,7 @@ export default function App() {
     if(activeKw) arr=arr.filter(a=>(a.title+(a.desc||'')).toLowerCase().includes(activeKw.toLowerCase()));
     if(activeSrc) arr=arr.filter(a=>a.source===activeSrc);
     arr=dedupe(arr);
+    arr = arr.filter(a => !isPromoItem(a)); // K3 defense-in-depth (arts is already promo-clean at load)
     if(cat==='general') {
       arr=arr.filter(a=>{
         if(a.link&&specificCatKeys.has(a.link))return false;
@@ -9464,7 +9465,11 @@ export default function App() {
     setHealth(h=>({...h,...hUpdates}));
     setFeedHealth(h=>({...h,...fhUpdates}));
     results.sort((a,b)=>new Date(b.pubDate)-new Date(a.pubDate));
-    setArts(a=>({...a,[cat]:results}));
+    // K3: strip promo/sponsored at the SOURCE so no surface (Top Stories, feed, Houston,
+    // State of Play, Across, Briefing, Connections) can ever show them. ?debug=1 tallies.
+    const clean = results.filter(a=>!isPromoItem(a));
+    if (DEBUG && typeof window !== 'undefined' && window.__dbg) window.__dbg.promo = (window.__dbg.promo||0) + (results.length - clean.length);
+    setArts(a=>({...a,[cat]:clean}));
     setPendingNew(p=>({...p,[cat]:[]}));   // fresh load supersedes any staged items
     setLastUpdated(prev => ({...prev, [cat]: Date.now()}));
     setLoading(l=>({...l,[cat]:false}));
@@ -9479,7 +9484,7 @@ export default function App() {
       items.forEach(i=>{if(i.title&&i.link)results.push({...i,source:f.name,cat,_tier:f.tier||'reported'});});
     }));
     results.sort((a,b)=>new Date(b.pubDate)-new Date(a.pubDate));
-    return results;
+    return results.filter(a=>!isPromoItem(a)); // K3: background poll is promo-clean too
   },[feeds]);
 
   // v46: "N new stories" — prepend staged articles for a category and jump to top.

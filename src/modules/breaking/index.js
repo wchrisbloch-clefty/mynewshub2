@@ -26,22 +26,46 @@ export const BREAKING_STRONG_TERMS = [
 // sports-category items; 'traded' is strong everywhere (already in the list above).
 export const BREAKING_STRONG_SPORTS = ['trade', 'traded'];
 
-export const PROMO_TERMS = [
-  'bet now', 'promo code', 'sportsbook promo', 'parlay', 'sign-up bonus', 'signup bonus',
-  'bonus code', 'free bets', 'best bets', 'how to bet', 'picks and odds', 'odds and picks',
-  'betting promo', 'sponsored', 'promoted post', 'use code',
-];
-export const PROMO_DOMAINS = [
-  'draftkings', 'fanduel', 'betmgm', 'caesars', 'bet365', 'pointsbet', 'actionnetwork',
-  'oddschecker', 'covers.com', 'sportsbook',
-];
+// K3: ONE editable constant covering every promo/sponsored signal. Rules only, no AI.
+//   title  — regexes tested against title + desc (promo PHRASES, never a bare brand name,
+//            so "FanDuel parent stock falls" is NOT promo).
+//   host   — bare sportsbook/affiliate DOMAINS, matched against the link's HOSTNAME only
+//            (so a CNBC url that merely contains "fanduel" in its path is not promo).
+//   url    — regexes tested against the whole link (sponsored/affiliate URL shapes).
+//   source — regexes tested against the source NAME.
+export const PROMO_PATTERNS = {
+  title: [
+    /\bsponsored\b/, /\bpromo code\b/, /\bbonus (bet|code)\b/, /\bbet\s*\$?\d[\d,]*\s*,?\s*get\s*\$?\d/,
+    /\bsportsbook (promo|bonus)\b/, /\bsign-?up bonus\b/, /\buse code\b/, /\bpartner content\b/,
+    /\bfree bets?\b/, /\bbest bets\b/, /\bhow to bet\b/, /\bpicks and odds\b/, /\bodds and picks\b/,
+    /\bparlay\b/, /\bpromoted post\b/, /\bbetting promo\b/, /\bbet now\b/, /\bno-?sweat bet\b/,
+    /\bfirst bet\b.*\b(safe|insurance|offer)\b/, /\bodds boost\b/,
+  ],
+  host: [
+    'draftkings', 'fanduel', 'betmgm', 'caesars', 'bet365', 'pointsbet', 'fanatics',
+    'actionnetwork', 'oddschecker', 'covers.com', 'sportsbook', 'betrivers', 'espnbet',
+  ],
+  url: [/\bsponsored\b/, /\/promo(s|-code)?\b/, /\/betting\/promo/, /\/sportsbook-promo/, /partner-content/],
+  source: [/\bsponsored\b/, /\bpartner\b/, /sportsbook/, /\bbetmgm|draftkings|fanduel|caesars|fanatics\b/],
+};
+
+function hostOf(link) {
+  try { return new URL(link).hostname.toLowerCase(); } catch { return (link || '').toLowerCase(); }
+}
 
 export function isPromoItem(a) {
   if (!a) return false;
   const txt = ((a.title || '') + ' ' + (a.desc || '')).toLowerCase();
-  if (PROMO_TERMS.some(t => txt.includes(t))) return true;
-  const src = ((a.source || '') + ' ' + (a.link || '')).toLowerCase();
-  return PROMO_DOMAINS.some(d => src.includes(d));
+  if (PROMO_PATTERNS.title.some(re => re.test(txt))) return true;
+  const link = (a.link || a.url || '').toLowerCase();
+  if (link) {
+    const host = hostOf(link);
+    if (PROMO_PATTERNS.host.some(d => host.includes(d))) return true;
+    if (PROMO_PATTERNS.url.some(re => re.test(link))) return true;
+  }
+  const src = (a.source || '').toLowerCase();
+  if (src && PROMO_PATTERNS.source.some(re => re.test(src))) return true;
+  return false;
 }
 
 const keyOf = a => ((a && a.title) || '').slice(0, 60).toLowerCase().replace(/\s+/g, '');
