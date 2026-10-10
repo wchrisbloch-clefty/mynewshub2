@@ -2081,7 +2081,7 @@ body:not(.dark) .pill-bar{
    Scoreboard keeps its box (it's a widget).
 ═══════════════════════════════════════════ */
 .sidebar{
-  display:flex;flex-direction:column;gap:18px;min-width:0; /* F6: tighter secondary rhythm (was 24px) */
+  display:flex;flex-direction:column;gap:var(--rail-gap);min-width:0; /* L4: one gap token between modules (was 18px / F6 was 24px) */
   border-left:1px solid var(--border2);padding-left:28px;
   /* I0.6: reserve clearance so the fixed chat button (bottom-right, ~52px + 70px offset)
      never covers the last sidebar items (State of Play / Connections). */

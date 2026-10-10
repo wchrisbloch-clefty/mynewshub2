@@ -60,7 +60,9 @@ export function StateOfPlay({ items, meta = {}, onRead, onAsk, formatDate = defa
   return (
     <section className={`sop-strip${sidebar ? ' sop-sidebar' : ''}`}>
       <div className="sop-head">
-        <span className="sop-label" style={{ borderColor: color, color }}>State of Play</span>
+        {/* L4: in the rail, the header matches every other module header (no accent
+            colour); the main-column strip keeps its accent border + ink. */}
+        <span className="sop-label" style={sidebar ? undefined : { borderColor: color, color }}>State of Play</span>
         {!sidebar && <span className="sop-sub">{label} — what’s driving the day</span>}
         {onToggleCollapse && (
           <button className="sop-collapse" onClick={onToggleCollapse}
