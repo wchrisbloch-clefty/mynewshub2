@@ -43,6 +43,7 @@ import { opinionLabel } from './modules/opinion';
 import { ShareControl, buildBriefingExcerpt } from './modules/share';
 import { ConnectionsStrip, findConnections } from './modules/connections';
 import { qualifyBreaking, isPromoItem } from './modules/breaking';
+import { claimConnections, claimAcrossSections } from './modules/dedup/railDedup';
 import { partitionSatire } from './modules/satire';
 import { rankByVelocity, signalFor } from '../lib/voices/velocity';
 import { DEBUG, dbgRender, dbgPoll, dbgMount, DebugOverlay } from './modules/debug';
@@ -6440,6 +6441,11 @@ function BriefingTeaser({arts, excludeCats, onOpenFull, compact}) {
   }, [ts]);
 
   if (compact) {
+    // L3: "Today's Briefing (only when one exists)" — the sidebar module renders ONLY
+    // when there's a cached briefing (or one is actively loading). When none exists it
+    // renders nothing, instead of a standing "No briefing yet" placeholder row.
+    const hasContent = bullets.length > 0 || !!body;
+    if (!hasContent && !loading && !error) return null;
     return (
       <div className="sidebar-section">
         <div className="sidebar-sec-head">
@@ -6462,9 +6468,6 @@ function BriefingTeaser({arts, excludeCats, onOpenFull, compact}) {
                 dangerouslySetInnerHTML={{__html: body.replace(/\*\*([^*]+)\*\*/g,'<strong>$1</strong>').slice(0,220)+'…'}}/>
             )
         }
-        {!loading && !body && !error && bullets.length === 0 && (
-          <button className="briefing-sb-gen" onClick={onOpenFull}>No briefing yet — open to generate →</button>
-        )}
       </div>
     );
   }
@@ -6804,7 +6807,7 @@ function GithubSignal() {
 
 // ─── GHOST SIDEBAR ────────────────────────────────────────────────────────────
 function Sidebar({cat, arts, kw, health, activeKw, setActiveKw, activeSource, setActiveSource, onRead, showScoreboard, recommended, showBriefing, onOpenBriefing, briefingExcludeCats, onTopicOpen, trendingItems, isTopicFollowed, toggleTopic, onTrendingOpen,
-  sopItems, sopGapItems, sopMeta, sopCollapsed, onToggleSop, formatDate, acrossSections, onAcrossSeeAll, followingModule, sopBreakingItems, feeds, onToggleFeed, favTeams, onAsk, hideSopMobile, voicesNode}) {
+  sopItems, sopGapItems, sopMeta, sopCollapsed, onToggleSop, formatDate, acrossSections, onAcrossSeeAll, followingModule, sopBreakingItems, feeds, onToggleFeed, favTeams, onAsk, hideSopMobile, voicesNode, connItems: connItemsProp}) {
   const cc = CATS[cat]||CATS.general;
   const catKws = kw[cat]||[];
   const catArts = arts[cat]||[];
@@ -6812,8 +6815,11 @@ function Sidebar({cat, arts, kw, health, activeKw, setActiveKw, activeSource, se
   catArts.forEach(a=>{srcCounts[a.source]=(srcCounts[a.source]||0)+1;});
   const sources = [...new Set(catArts.map(a=>a.source))];
 
-  const [showSources, setShowSources] = useState(false);
+  // L3: Sources collapsed by default AND remembered (persisted), like Trending / Following
+  // / Prediction Markets. Still force-opens when a source filter is active.
+  const [showSources, setShowSources] = useState(() => ld('sourcesOpen', false));
   const [showAllSrcs, setShowAllSrcs] = useState(false);
+  useEffect(() => { sv('sourcesOpen', showSources); }, [showSources]);
   useEffect(() => { if (activeSource) setShowSources(true); }, [activeSource]);
   // F6: Trending is a secondary module — collapsed by default, state persisted.
   const [trendOpen, setTrendOpen] = useState(() => ld('trendOpen', false));
@@ -6847,12 +6853,16 @@ function Sidebar({cat, arts, kw, health, activeKw, setActiveKw, activeSource, se
 
   // G6: cross-category connections over all loaded articles (AI-free). Home shows the top
   // 3 overall; a category page shows bridges that involve that category. Max 3.
+  // L3: FeedPage computes these with the shared one-story-once used-keys set and passes
+  // them in as `connItemsProp`; other callers (Finance, entity hub) fall back to computing
+  // here (no feed-column dedup needed there).
   const connItems = useMemo(() => {
+    if (connItemsProp) return connItemsProp;
     const flat = Object.entries(arts).flatMap(([c, list]) => (list || []).map(a => ({ ...a, cat: a.cat || c }))).filter(a => !isPromoItem(a)); // K3
     const all = findConnections(flat, { kw: DEFAULT_KW, max: 12, catLabel: c => (CATS[c]?.label) || c });
     const scoped = cat === 'general' ? all : all.filter(c => c.categories.includes(cat));
     return scoped.slice(0, 3);
-  }, [arts, cat]);
+  }, [connItemsProp, arts, cat]);
 
   const visibleSrcs = showAllSrcs ? sources : sources.slice(0, 10);
 
@@ -8670,26 +8680,34 @@ function FeedPage({ cat, ctx }) {
       // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [gapCat, gapKwKey, gapSrcKey, gapOn]);
 
-    // K5: keys of every story already on this page (Top Stories + State of Play + Houston
-    // + the numbered feed), so Across can dedupe against everything else on screen.
-    const shownKeysForAcross = useMemo(() => {
-      const s = new Set();
-      topStoryKeys.forEach(k => s.add(k)); sopShownKeys.forEach(k => s.add(k)); houstonKeys.forEach(k => s.add(k));
-      dedupedFeed.forEach(a => s.add(storyKey(a)));
-      return s;
-    }, [topStoryKeys, sopShownKeys, houstonKeys, dedupedFeed]);
-    // K5: "Across MyNewsHub" is REMOVED from General (General already spans every
-    // category) and shown on CATEGORY pages instead — the OTHER categories, promo-clean
-    // and deduped against this page's own stories (shownKeysForAcross).
-    const otherCatSections = useMemo(() => {
-      if (isHome) return [];
-      const otherCats = ['general','business','finance','bloom','sports','popculture','tech'].filter(c => c !== cat);
-      return otherCats.map(c => ({
-        cat: c,
-        cc: CATS[c],
-        items: (arts[c] || []).filter(a => !isPromoItem(a) && !shownKeysForAcross.has(storyKey(a))).slice(0, 3),
-      })).filter(s => s.items.length > 0).slice(0, 4);
-    }, [isHome, arts, cat, shownKeysForAcross]);
+    // L3: cross-category Connections bridges for the rail, computed HERE (not inside the
+    // Sidebar) so the one-story-once used-keys set is built ONCE and shared across every
+    // module. Home shows the top bridges overall; a category page shows bridges involving
+    // that category. Promo-filtered (K3).
+    const railConnCandidates = useMemo(() => {
+      const flat = Object.entries(arts).flatMap(([c, list]) => (list || []).map(a => ({ ...a, cat: a.cat || c }))).filter(a => !isPromoItem(a));
+      const all = findConnections(flat, { kw: DEFAULT_KW, max: 12, catLabel: c => (CATS[c]?.label) || c });
+      return isHome ? all : all.filter(x => x.categories.includes(cat));
+    }, [arts, cat, isHome]);
+    // L3 one-story-once: fill ONE shared used-keys set in priority order — the feed column
+    // (Top Stories → State of Play → Houston → the numbered feed) first, then the rail
+    // (Connections → Across). A story that qualifies for several lands in the top-priority
+    // one and is suppressed below it. (railDedup.js is unit-tested in railDedup.test.mjs.)
+    const { railConnections, otherCatSections } = useMemo(() => {
+      const used = new Set();
+      topStoryKeys.forEach(k => used.add(k)); sopShownKeys.forEach(k => used.add(k)); houstonKeys.forEach(k => used.add(k));
+      dedupedFeed.forEach(a => used.add(storyKey(a)));
+      // Connections claim their member stories before Across is computed.
+      const railConnections = claimConnections(railConnCandidates, used, storyKey).slice(0, 3);
+      // "Across MyNewsHub" — CATEGORY pages only (General already spans every category):
+      // the OTHER categories, promo-clean and deduped against everything already placed.
+      const acrossCandidates = isHome ? []
+        : ['general','business','finance','bloom','sports','popculture','tech'].filter(c => c !== cat)
+            .map(c => ({ cat: c, cc: CATS[c], items: (arts[c] || []).filter(a => !isPromoItem(a)).slice(0, 6) }));
+      const otherCatSections = claimAcrossSections(acrossCandidates, used, storyKey)
+        .map(s => ({ ...s, items: s.items.slice(0, 3) })).filter(s => s.items.length > 0).slice(0, 4);
+      return { railConnections, otherCatSections };
+    }, [topStoryKeys, sopShownKeys, houstonKeys, dedupedFeed, railConnCandidates, isHome, arts, cat]);
 
     // K5: Following — sidebar module on General. It now shows FOLLOWED TOPICS only;
     // followed TEAMS live as pinned chips on the Sports page (the my-teams ribbon) and
@@ -9048,6 +9066,7 @@ function FeedPage({ cat, ctx }) {
             sopGapItems={gapItems} sopBreakingItems={!activeKw && !activeSrc && !search ? catBreaking : []} sopMeta={CATS[cat]||CATS.general}
             sopCollapsed={sopCollapsed} onToggleSop={toggleSop} formatDate={fmtDate}
             acrossSections={!isHome && !activeKw && !activeSrc && !search ? otherCatSections : null}
+            connItems={!activeKw && !activeSrc && !search ? railConnections : null}
             onAcrossSeeAll={handleTabChange}
             followingModule={followingModule}
             feeds={feeds} onToggleFeed={(c,name)=>setFeeds(prev=>{const next=JSON.parse(JSON.stringify(prev));const f=(next[c]||[]).find(x=>x.name===name);if(f){f.on=!f.on;sv('feeds',next);}return next;})}
