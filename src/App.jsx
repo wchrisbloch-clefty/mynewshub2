@@ -8838,6 +8838,655 @@ function SportsPage({ ctx }) {
     );
 }
 
+function FeedPage({ cat, ctx }) {
+  // J3: hoisted to module scope (stable identity) so App re-renders re-render this
+  // page instead of remounting it. App-internal values arrive via one ctx object.
+  const { activeKw, activeSrc, applyPending, arts, breakingItems, briefingExclude, feedHealth, feeds, followTeam, followedTeams, handleTabChange, health, isSavedFn, isTeamFollowed, isTopicFollowed, kw, kwMatch, lastUpdated, loadCat, loading, myTeams, myTopics, navigate, onRead, onSave, openCustomize, pendingNew, recommended, refreshAll, refreshVoiceSignals, search, setActiveKw, setActiveSrc, setChatContext, setFeeds, setPerspArticle, setSearch, social, sorted, sourceRecs, srcWebLoading, srcWebResults, subcat, tab, teams, toggleTopic, unfollowTeam, urgent, voicesStripFor, webLoading, webResults } = ctx;
+    dbgRender('FeedPage'); // J1: render counter
+    useEffect(() => dbgMount('FeedPage'), []); // J1: remount counter
+    const cc=CATS[cat];
+    const [showFollowAdd, setShowFollowAdd] = useState(false);
+    const [onboardingDismissed, setOnboardingDismissed] = useState(()=>ld('onboarded',false));
+    const dismissOnboarding = () => { sv('onboarded',true); setOnboardingDismissed(true); };
+    // Collapsible State of Play — expanded on first visit, choice remembered per category.
+    const [sopCollapsed, setSopCollapsed] = useState(()=>ld('sopCollapsed_'+cat, false));
+    const toggleSop = () => setSopCollapsed(v => { const nx = !v; sv('sopCollapsed_'+cat, nx); return nx; });
+    // Business + Energy merged into one category with All / Business / Energy filter pills.
+    const isMergedBiz = cat === 'business';
+    // Business + Markets merged: 'all' shows business + markets NEWS combined; 'business'
+    // shows business only; the 'Markets' pill navigates to the full Markets page (FinancePage).
+    const bizFilter = isMergedBiz ? (subcat || 'all') : 'all';
+    useEffect(() => {
+      if (cat === 'business' && !(arts.finance||[]).length && !loading.finance) loadCat('finance');
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [cat]);
+    // Apply story clustering before sorting so cluster metadata is available
+    const rawItems = isMergedBiz
+      ? (bizFilter === 'business' ? sorted('business')
+         : [...sorted('business'), ...sorted('finance')].sort((a,b)=>new Date(b.pubDate)-new Date(a.pubDate)))
+      : sorted(cat);
+    const items=useMemo(()=>clusterStories(rawItems),[rawItems]);
+    const isLoading = isMergedBiz ? (loading.business || loading.finance) : loading[cat];
+
+    // Phase 2: subcategory is URL-driven (never local state). Chips navigate.
+    const pcSubTab = cat === 'popculture' ? (subcat || 'all') : 'all';
+    const setPcSubTab = (key) => navigate('popculture', key === 'all' ? null : key);
+    const enSubTab = cat === 'bloom' ? (subcat || 'all') : 'all';
+    const setEnSubTab = (key) => navigate('bloom', key === 'all' ? null : key);
+    const [pcWebResults, setPcWebResults] = useState([]);
+    const [pcWebLoading, setPcWebLoading] = useState(false);
+    const [enWebResults, setEnWebResults] = useState([]);
+    const [enWebLoading, setEnWebLoading] = useState(false);
+    // Coverage-Gap stories, folded into the State of Play list as tagged rows
+    // (Home + merged Business/Markets only). No standalone "You may be missing this" panel.
+    const [gapItems, setGapItems] = useState([]);
+
+    const PC_SUBTABS = [
+      { key:'all',         label:'All',          icon:LayoutGrid },
+      { key:'shows',       label:'Shows/Movies', icon:Film },
+      { key:'music',       label:'Music',        icon:Music },
+      { key:'books',       label:'Books',        icon:BookOpen },
+      { key:'comedy',      label:'Comedy',       icon:Laugh },
+    ];
+    const PC_KWS = {
+      shows:  ['movie','film','tv','streaming','netflix','hbo','disney','show','series','premiere','season','episode','cinema','trailer','oscar','emmy','golden globe'],
+      music:  ['album','music','song','artist','chart','grammy','billboard','concert','tour','release','single','rapper','singer','playlist','spotify','pop star'],
+      books:  ['book','novel','author','bestseller','fiction','reading','publisher','memoir','nonfiction','literary','penguin','bestselling','new book'],
+      comedy: ['comedy','comedian','stand-up','funny','humor','joke','sketch','snl','sitcom','comic','parody','satire'],
+    };
+
+    const EN_SUBTABS = [
+      { key:'all',     label:'All',           icon:LayoutGrid },
+      { key:'power',   label:'Power',         icon:Zap },
+      { key:'oilgas',  label:'Oil & Gas',     icon:Droplet },
+      { key:'clean',   label:'Clean Energy',  icon:Leaf },
+      { key:'markets', label:'Markets',       icon:TrendingUp },
+      { key:'policy',  label:'Policy',        icon:Scale },
+    ];
+    const EN_KWS = {
+      power:   ['power','electric','grid','utility','electricity','megawatt','kilowatt','nuclear','coal','natural gas','transmission','substation','generation','powerplant','baseload'],
+      oilgas:  ['oil','gas','petroleum','crude','refinery','pipeline','opec','brent','wti','shale','drilling','rig','barrel','lng','upstream','downstream','midstream','gasoline'],
+      clean:   ['solar','wind','renewable','clean energy','green','battery','storage','ev','electric vehicle','hydrogen','carbon','emissions','climate','sustainability','net zero','offshore wind'],
+      markets: ['commodity','commodities','futures','spot price','energy prices','gas prices','oil prices','supply','demand','export','import','petrochemical','inflation energy'],
+      policy:  ['policy','regulation','epa','federal','congress','legislation','tariff','subsidy','permit','department of energy','doe','ferc','administration','executive order','climate bill'],
+    };
+
+    // Filter items by pop culture sub-tab
+    const pcFilteredItems = useMemo(() => {
+      if (cat !== 'popculture' || pcSubTab === 'all') return items;
+      const kws = PC_KWS[pcSubTab] || [];
+      return items.filter(a => {
+        const t = (a.title + ' ' + (a.desc||'')).toLowerCase();
+        return kws.some(k => t.includes(k));
+      });
+    }, [items, cat, pcSubTab]);
+
+    const enFilteredItems = useMemo(() => {
+      if (cat !== 'bloom' || enSubTab === 'all') return items;
+      const kws = EN_KWS[enSubTab] || [];
+      return items.filter(a => {
+        const t = (a.title + ' ' + (a.desc||'')).toLowerCase();
+        return kws.some(k => t.includes(k));
+      });
+    }, [items, cat, enSubTab]);
+
+    // ── WIDE DISCOVERY (Pass L item 2) ──────────────────────────────────────────
+    // Every category/sub-category gets the SAME unrestricted "scan everything, ignore
+    // my followed sources" net that Sports already uses for teams (fetchDiscover feed
+    // mode). Results are merged into the feed by storyKey (same dedup as teams) and are
+    // capped at 'reported' tier (_tier:'reported', _wide:true) so breadth never borrows
+    // a verified source's authority — the tier-aware cluster rep keeps verified locals.
+    const [catWideItems, setCatWideItems] = useState([]);
+    useEffect(() => {
+      let alive = true;
+      const subKws = cat === 'bloom' && enSubTab !== 'all' ? (EN_KWS[enSubTab] || [])
+                   : cat === 'popculture' && pcSubTab !== 'all' ? (PC_KWS[pcSubTab] || [])
+                   : [];
+      const base = DEFAULT_KW[cat] || [];
+      const kws = (subKws.length ? [...subKws.slice(0, 3), base[0]] : base.slice(0, 4)).filter(Boolean);
+      if (!kws.length) { setCatWideItems([]); return () => { alive = false; }; }
+      fetchDiscover(cat, kws, [], 'feed').then(r => {
+        if (!alive) return;
+        const rows = ((r && r.items) || []).map(x => ({ ...x, cat, _tier: 'reported', _wide: true }));
+        setCatWideItems(rows);
+      });
+      return () => { alive = false; };
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [cat, enSubTab, pcSubTab]);
+
+    // v36: Web results for pop culture sub-tab
+    useEffect(() => {
+      if (cat !== 'popculture' || pcSubTab === 'all') { setPcWebResults([]); return; }
+      const queries = {
+        shows:'movies TV shows streaming news today', music:'music news trending albums today',
+        books:'best books reading news today', comedy:'comedy entertainment news today',
+      };
+      const q = queries[pcSubTab] || `${pcSubTab} pop culture news today`;
+      setPcWebLoading(true);
+      fetchWebSearch(q).then(r => { setPcWebResults(r); setPcWebLoading(false); });
+    }, [cat, pcSubTab]);
+
+    // v40: Web results for energy sub-tab
+    useEffect(() => {
+      if (cat !== 'bloom' || enSubTab === 'all') { setEnWebResults([]); return; }
+      const queries = {
+        power:'power grid electricity utility news today', oilgas:'oil gas petroleum crude news today',
+        clean:'clean energy solar wind renewable news today', markets:'energy commodity markets prices today',
+        policy:'energy policy regulation government news today',
+      };
+      const q = queries[enSubTab] || `${enSubTab} energy news today`;
+      setEnWebLoading(true);
+      fetchWebSearch(q).then(r => { setEnWebResults(r); setEnWebLoading(false); });
+    }, [cat, enSubTab]);
+
+    const baseFilteredItems = cat === 'bloom' ? enFilteredItems : pcFilteredItems;
+    // Fold the wide-discovery rows into the active feed (deduped by storyKey, then
+    // re-sorted by recency), so every category shows headlines from ANY outlet — not
+    // just the reader's toggled-on feeds (Pass L item 2).
+    const activeFilteredItems = useMemo(() => {
+      if (!catWideItems.length) return baseFilteredItems;
+      const have = new Set(baseFilteredItems.map(storyKey));
+      const extra = catWideItems.filter(a => a.title && !have.has(storyKey(a)));
+      if (!extra.length) return baseFilteredItems;
+      return [...baseFilteredItems, ...extra].sort((a, b) => new Date(b.pubDate || 0) - new Date(a.pubDate || 0));
+    }, [baseFilteredItems, catWideItems]);
+    const heroItems=activeFilteredItems.filter(a=>a.img);
+    const catLead=heroItems[0]||null;
+    const feedItems=catLead?activeFilteredItems.filter(a=>a.link!==catLead.link):activeFilteredItems;
+
+    const isHome = cat === 'general';
+    const catKws = kw[cat] || [];
+
+    // ── CROSS-MODULE DEDUP (Pass I item 1) ──────────────────────────────────────
+    // A story placed in a top-of-page module is excluded from every other module
+    // on the SAME page — on every category, not just General. Priority order:
+    // Top Stories → State of Play → Houston → main feed.
+    const topStoryItems = useMemo(() => {
+      if (isHome) {
+        // Home Top Stories = TopOfHourStrip picks (catLead + cross-category images).
+        // Mirror its selection exactly so State of Play + the feed exclude what it
+        // actually shows — otherwise the hero repeats as State of Play #1.
+        const picks = catLead && catLead.img ? [catLead] : [];
+        const used = new Set(catLead ? [catLead.link] : []);
+        const catOrder = ['sports','business','finance','bloom','popculture','general','tech'];
+        for (const c of catOrder) {
+          if (picks.length >= 4) break;
+          const item = (arts[c]||[]).find(a => a.img && !used.has(a.link));
+          if (item) { picks.push({ ...item, cat: item.cat || c }); used.add(item.link); }
+        }
+        for (const c of catOrder) {
+          if (picks.length >= 4) break;
+          for (const a of (arts[c]||[])) {
+            if (picks.length >= 4) break;
+            if (a.img && !used.has(a.link)) { picks.push({ ...a, cat: a.cat || c }); used.add(a.link); }
+          }
+        }
+        return picks.slice(0, 4);
+      }
+      if (!catLead) return [];   // category Top Stories = the gn-grid (hero + 3)
+      const secondaries = feedItems.slice(0, 6).filter(a => a.img).slice(0, 3)
+        .concat(feedItems.slice(0, 6).filter(a => !a.img)).slice(0, 3);
+      return [catLead, ...secondaries];
+    }, [isHome, catLead, feedItems, arts]);
+    const topStoryKeys = useMemo(() => new Set(topStoryItems.map(storyKey)), [topStoryItems]);
+    // Breaking stories for THIS category's State of Play (Pass L item 3) — the urgent
+    // items relevant to the page, deduped against what Top Stories already shows. Home
+    // sees cross-category breaking; a category page sees only its own.
+    // D2 relevance (gate a): a story shows on a page only if it belongs to that page.
+    // Category page = its own feed-category OR a DEFAULT_KW match for that category.
+    // General = general/world-US top-news OR a match on ANY category's keywords.
+    const catBreaking = useMemo(() => {
+      if (!breakingItems || !breakingItems.length) return [];
+      const anyKw = (b) => {
+        const txt = (b.title + ' ' + (b.desc || '')).toLowerCase();
+        return Object.keys(DEFAULT_KW).some(c =>
+          (kw[c] || DEFAULT_KW[c] || []).some(k => txt.includes(String(k).toLowerCase())));
+      };
+      const relevant = (b) => {
+        if (isHome) return b.cat === 'general' || anyKw(b);
+        if (b.cat === cat) return true;
+        if (isMergedBiz && (b.cat === 'business' || b.cat === 'finance')) return true;
+        return kwMatch(b, cat).length > 0;
+      };
+      return breakingItems.filter(relevant).filter(b => !topStoryKeys.has(storyKey(b))).slice(0, 3);
+    }, [breakingItems, cat, isHome, isMergedBiz, topStoryKeys, kw, kwMatch]);
+    // State of Play ranks only from what Top Stories didn't already take.
+    // D2: promos/sportsbook content are excluded from SoP ranking too, not just Breaking.
+    const sopSourceItems = useMemo(
+      () => activeFilteredItems.filter(a => !topStoryKeys.has(storyKey(a)) && !isPromoItem(a)),
+      [activeFilteredItems, topStoryKeys]);
+    const sopShownKeys = useMemo(() => {
+      const ranked = rankClusters(sopSourceItems, { max: 2, limit: 5 });
+      return new Set(ranked.length >= 3 ? ranked.map(storyKey) : []);
+    }, [sopSourceItems]);
+    // Houston Local (General) claims its stories too.
+    const houstonItems = useMemo(() => {
+      if (!isHome) return [];
+      const seen = new Set();
+      return Object.values(arts || {}).flat()
+        .filter(a => HOUSTON_SOURCES.includes(a.source))
+        .filter(a => !topStoryKeys.has(storyKey(a)) && !sopShownKeys.has(storyKey(a)))
+        .filter(a => { const k = storyKey(a); if (seen.has(k)) return false; seen.add(k); return true; })
+        .sort((a, b) => new Date(b.pubDate) - new Date(a.pubDate))
+        .slice(0, 6);
+    }, [isHome, arts, topStoryKeys, sopShownKeys]);
+    const houstonKeys = useMemo(() => new Set(houstonItems.map(storyKey)), [houstonItems]);
+    // The main feed excludes everything already placed above it (by title key, so
+    // the same story from a different source can't slip back in).
+    const dedupedFeed = useMemo(
+      () => feedItems.filter(a => !topStoryKeys.has(storyKey(a)) && !sopShownKeys.has(storyKey(a)) && !houstonKeys.has(storyKey(a))),
+      [feedItems, topStoryKeys, sopShownKeys, houstonKeys]);
+
+    // ── COVERAGE GAP (folded into State of Play) — widely-covered stories none of the
+    //    reader's own sources carried. Home keys off this category; the merged
+    //    Business+Markets page keys off both business + markets keywords/sources;
+    //    Energy (bloom) keys off its keywords + the active sub-tab so the gap
+    //    re-ranks with the State of Play list per Power / Oil & Gas / etc. ──
+    const isEnergy = cat === 'bloom';
+    const gapCat = isMergedBiz ? 'business' : cat;
+    const gapKws = isMergedBiz ? [...(kw.business||[]), ...(kw.finance||[])]
+      : isEnergy ? (enSubTab !== 'all' ? [...catKws, ...(EN_KWS[enSubTab] || [])] : catKws)
+      : catKws;
+    const gapSrcs = isMergedBiz
+      ? [...(feeds.business||[]), ...(feeds.finance||[])].filter(f=>f.on).map(f=>f.name)
+      : (feeds[cat]||[]).filter(f=>f.on).map(f=>f.name);
+    const gapOn = (isHome || isMergedBiz || isEnergy) && !activeKw && !activeSrc && !search;
+    const gapKwKey = gapKws.join('|');
+    const gapSrcKey = gapSrcs.join('|');
+    useEffect(() => {
+      let alive = true;
+      if (!gapOn || !gapKws.length) { setGapItems([]); return () => { alive = false; }; }
+      fetchDiscover(gapCat, gapKws, gapSrcs).then(r => { if (alive) setGapItems((r && r.items) || []); });
+      return () => { alive = false; };
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [gapCat, gapKwKey, gapSrcKey, gapOn]);
+
+    const otherCatSections = useMemo(() => {
+      if (!isHome) return [];
+      const otherCats = ['business','finance','bloom','sports','popculture'];
+      return otherCats.map(c => ({
+        cat: c,
+        cc: CATS[c],
+        items: (arts[c] || []).slice(0, 3),
+      })).filter(s => s.items.length > 0);
+    }, [isHome, arts]);
+
+    // Following module — relocated from the General-page full-width banner into the
+    // sidebar (Pass K item 3), rendered as a standard sidebar section with the existing
+    // follow-chip pills + "+ Add". General page only; injected into <Sidebar/> as a prop.
+    const followingModule = isHome ? (
+      <div className="sidebar-section sb-following">
+        <div className="sidebar-sec-head"><span className="sidebar-sec-label">Following</span></div>
+        <div className="following-chips">
+          {(() => {
+            const nameCounts = {};
+            followedTeams.forEach(t => { const k = (t.name||'').toLowerCase(); nameCounts[k] = (nameCounts[k]||0) + 1; });
+            return followedTeams.map((t, i) => {
+              const dup = nameCounts[(t.name||'').toLowerCase()] > 1;
+              return (
+                <span key={`tm-${t.slug}-${t.league}-${i}`} className="following-chip following-chip-team">
+                  <button type="button" className="following-chip-main" onClick={()=>navigate('sports', t.league, t.slug)}>
+                    <TeamLogo name={t.name} league={t.league} size={18}/>
+                    <span className="following-chip-name">{t.name}{dup ? ` · ${(t.league||'').toUpperCase()}` : ''}</span>
+                  </button>
+                  <button type="button" className="following-chip-x" onClick={()=>unfollowTeam(t)} aria-label={`Unfollow ${t.name}`}><XIcon size={16} aria-hidden="true"/></button>
+                </span>
+              );
+            });
+          })()}
+          {myTopics.map((t, i) => (
+            <span key={`tp-${i}`} className="following-chip">
+              <button type="button" className="following-chip-main" onClick={()=>navigate('general','topic',teamSlug(t))}>
+                <span className="following-chip-name">{t}</span>
+              </button>
+              <button type="button" className="following-chip-x" onClick={()=>toggleTopic(t)} aria-label={`Unfollow ${t}`}><XIcon size={16} aria-hidden="true"/></button>
+            </span>
+          ))}
+          {followedTeams.length === 0 && myTopics.length === 0 && (
+            <span className="following-empty">Follow teams &amp; topics to build your row</span>
+          )}
+          <div className="follow-add-wrap">
+            <button className="following-add-btn" onClick={()=>setShowFollowAdd(v=>!v)} aria-expanded={showFollowAdd}>+ Add</button>
+            {showFollowAdd && (
+              <FollowAdd
+                isFollowingTeam={t => isTeamFollowed(t.name, t.league)}
+                isTopicFollowed={isTopicFollowed}
+                onAddTeam={t => followTeam(t.name, t.league)}
+                onAddTopic={topic => toggleTopic(topic)}
+                onClose={() => setShowFollowAdd(false)}/>
+            )}
+          </div>
+        </div>
+      </div>
+    ) : null;
+
+    return (
+      <div className="page">
+        {/* v46: "N new stories" pill — background poll staged fresh articles */}
+        {(pendingNew[cat]||[]).length > 0 && (
+          <button className="new-stories-pill" onClick={()=>applyPending(cat)}>
+            <span className="nsp-dot"/> ↑ {pendingNew[cat].length} new {pendingNew[cat].length===1?'story':'stories'}
+          </button>
+        )}
+        {/* Live Scores moved to the top bar (below weather, above the category nav —
+            Pass G item 3). Rendered by <TopBar>; no longer here in the feed column. */}
+        {/* Following row relocated into the sidebar (Pass K item 3) — see
+            `followingModule` passed to <Sidebar/> below. */}
+        {/* Welcome/onboarding banner removed (Pass H item 1): it wasn't driving
+            meaningful onboarding value and kept reappearing. */}
+
+        {/* Desktop: main column + sidebar run together from the very top of the
+            content (68/32), so Top Stories sits inside the 68% column, not full-width. */}
+        <div className="page-grid has-sop-hoist">
+          <div className="feed-col">
+
+        {/* ── BUSINESS + MARKETS filter pills — reuses the Sports league-pill component.
+            Markets routes to the full Markets page (FinancePage). ── */}
+        {isMergedBiz && !activeKw && !activeSrc && !search && (
+          <div className="sport-tabs" style={{marginBottom:'12px'}}>
+            <button className={`sport-tab ${bizFilter==='all'?'active':''}`} onClick={()=>navigate('business')}>All</button>
+            <button className={`sport-tab ${bizFilter==='business'?'active':''}`} onClick={()=>navigate('business','business')}>Business</button>
+            <button className="sport-tab" onClick={()=>navigate('finance')}>Markets</button>
+          </div>
+        )}
+
+        {/* ── ENERGY sub-category pills — at the top of the page, matching the Sports
+            league/team pill position + format (Pass J item 8). ── */}
+        {cat === 'bloom' && !activeKw && !activeSrc && !search && (
+          <div className="pc-subtabs en-subtabs" style={{marginBottom:'12px'}}>
+            {EN_SUBTABS.map(t => (
+              <button key={t.key} className={`pc-subtab ${enSubTab===t.key?'active':''}`}
+                onClick={()=>{setEnSubTab(t.key);window.scrollTo({top:0,behavior:'instant'});}}>
+                <t.icon size={14} strokeWidth={2.2}/>{t.label}
+              </button>
+            ))}
+          </div>
+        )}
+
+        {/* ── HOME: Top Stories (image cards) — sits first; the text-only State of Play
+            module below it provides a breathing-room break before the next image block
+            (Pass H item 3). ── */}
+        {isHome && !activeKw && !activeSrc && !search && (
+          <TopOfHourStrip catLead={catLead} arts={arts} onRead={onRead} stories={topStoryItems}/>
+        )}
+
+        {/* State of Play moved into the sidebar (Pass J item 2). Across MyNewsHub also
+            moved into the sidebar (Pass J item 4). The main column is now just
+            Top Stories → Houston Local (General) → main feed (Pass J item 6). */}
+
+        {/* Category pages: Top Stories — same TopOfHourStrip treatment as General
+            (category tag overlaid on the image), so every category's hero is identical
+            instead of the old headline-floating-below-a-plain-image grid (Pass: card
+            consistency). Business, Energy, AI & Tech, Health, Pop Culture all route
+            through here, so they unify together. */}
+        {!activeKw && !activeSrc && catLead && !isHome && (
+          <TopOfHourStrip stories={topStoryItems} catLead={catLead} arts={arts} onRead={onRead}/>
+        )}
+
+        {/* State of Play hoisted into the main column right after Top Stories — shown
+            only on mobile/tablet (≤1100px), where the sidebar stacks below the feed and
+            would otherwise bury it. On desktop this copy is display:none and the sidebar
+            copy renders instead (see .sop-hoist CSS). */}
+        {!activeKw && !activeSrc && !search && (
+          <div className="sop-hoist">
+            <StateOfPlay variant="sidebar" items={sopSourceItems} gapItems={gapItems} breakingItems={catBreaking}
+              meta={CATS[cat]||CATS.general} onRead={onRead} onAsk={setChatContext} formatDate={fmtDate}
+              collapsed={sopCollapsed} onToggleCollapse={toggleSop}/>
+          </div>
+        )}
+
+        {/* Pop Culture sub-tabs */}
+        {cat === 'popculture' && !activeKw && !activeSrc && !search && (
+          <div className="pc-subtabs">
+            {PC_SUBTABS.map(t => (
+              <button key={t.key} className={`pc-subtab ${pcSubTab===t.key?'active':''}`}
+                onClick={()=>{setPcSubTab(t.key);window.scrollTo({top:0,behavior:'instant'});}}>
+                <t.icon size={14} strokeWidth={2.2}/>{t.label}
+              </button>
+            ))}
+          </div>
+        )}
+
+        {/* Main column continues in the grid alongside the (now tall) sidebar, which
+            holds State of Play + Trending + Briefing + Across + Sources (Pass J). ── */}
+
+        {/* Across MyNewsHub moved into the sidebar (Pass J item 4). */}
+
+        {/* ── HOME: Houston local row ── */}
+        {isHome && !activeKw && !activeSrc && !search && (
+          <HoustonRow items={houstonItems} onRead={onRead} onAsk={setChatContext} formatDate={fmtDate}/>
+        )}
+
+            <div className="page-header-row phr-desktop">
+              <span className="page-header" style={{fontFamily:'var(--font-sans)'}}>
+                {cc.label}{feedItems.length>0?` — ${feedItems.length} articles`:''}
+                {/* D6: per-page refresh — always present (shows "Refresh" before the first stamp). */}
+                <span style={{marginLeft:'10px'}}><LastUpdated timestamp={lastUpdated[cat]} onRefresh={() => { loadCat(cat); refreshVoiceSignals(cat); }}/></span>
+              </span>
+              <div style={{display:'flex',alignItems:'center',gap:'10px'}}>
+                {(() => {
+                  const down = (feeds[cat]||[]).filter(f=>f.on && feedHealth[f.name] && !feedHealth[f.name].ok).length;
+                  return down>0 ? <button className="feed-degraded" title="Some sources failed to load — open Customize to review" onClick={()=>openCustomize('sources',cat)}>{down} source{down===1?'':'s'} unavailable</button> : null;
+                })()}
+                <button className="page-customize-btn" onClick={()=>openCustomize('sources',cat)}><IconGear/> Customize</button>
+              </div>
+            </div>
+            {/* Energy sub-category pills moved to the top of the page (Pass J item 8) —
+                see the block at the start of the feed column. */}
+            {cat === 'bloom' && enSubTab !== 'all' && !activeKw && !activeSrc && !search && (
+              <div className="sport-hub-banner" style={{background:'linear-gradient(135deg,#0369a1 0%,#0284c7 100%)'}}>
+                <div className="sport-hub-inner">
+                  <div>
+                    <div className="team-hub-title">{EN_SUBTABS.find(t=>t.key===enSubTab)?.label || enSubTab}</div>
+                    <div className="team-hub-count">{enFilteredItems.length} stories · Energy</div>
+                  </div>
+                  <button className="team-hub-back" onClick={()=>setEnSubTab('all')}>← All Energy</button>
+                </div>
+              </div>
+            )}
+            {/* Active search banner — shows result count + clear button */}
+            {search && (
+              <div className="search-results-banner">
+                <span className="search-results-text">
+                  {feedItems.length > 0
+                    ? <><strong>{feedItems.length} articles</strong> matching <em style={{fontStyle:'normal',fontWeight:700}}>"{search}"</em> — including web sources below</>
+                    : <>No results for "<strong>{search}</strong>" — showing web results below</>}
+                </span>
+                <button className="search-results-clear" onClick={()=>setSearch('')}><XIcon size={12} aria-hidden="true"/> Clear</button>
+              </div>
+            )}
+            {(activeKw||activeSrc)&&(
+              <div className="sticky-filter" style={{display:'flex',gap:'6px',flexWrap:'wrap',marginBottom:'12px'}}>
+                {activeKw&&<span style={{background:cc.bg,color:cc.color,borderRadius:'20px',padding:'3px 10px',fontSize:'10px',fontWeight:'600',display:'inline-flex',alignItems:'center',gap:'5px'}}>{activeKw}<button onClick={()=>setActiveKw(null)} style={{background:'none',border:'none',cursor:'pointer',color:'inherit',fontSize:'12px',padding:0}}><XIcon size={13} aria-hidden="true"/></button></span>}
+                {activeSrc&&<span style={{background:'var(--surface2)',color:'var(--text2)',borderRadius:'20px',padding:'3px 10px',fontSize:'10px',fontWeight:'600',border:'1px solid var(--border)',display:'inline-flex',alignItems:'center',gap:'5px'}}>{activeSrc}<button onClick={()=>setActiveSrc(null)} style={{background:'none',border:'none',cursor:'pointer',color:'inherit',fontSize:'12px',padding:0}}><XIcon size={13} aria-hidden="true"/></button></span>}
+              </div>
+            )}
+            {isLoading&&!feedItems.length
+              ?<div className="snap-feed" aria-busy="true" aria-label={`Loading ${cc.label}`}>
+                  {Array.from({length:6}).map((_,i)=>(
+                    <div key={i} className="snap-card snap-skel">
+                      <div className="snap-accent"/>
+                      <div className="snap-skel-main">
+                        <div className="snap-skel-line" style={{width:'30%',height:'11px'}}/>
+                        <div className="snap-skel-line" style={{width:'96%',height:'17px',marginTop:'10px'}}/>
+                        <div className="snap-skel-line" style={{width:'78%',height:'17px'}}/>
+                        <div className="snap-skel-line" style={{width:'100%',height:'12px',marginTop:'12px'}}/>
+                        <div className="snap-skel-line" style={{width:'55%',height:'12px'}}/>
+                      </div>
+                      <div className="snap-skel-thumb"/>
+                    </div>
+                  ))}
+                 </div>
+              :feedItems.length===0
+                ?<EmptyState
+                   message={activeKw||activeSrc?'No stories match this filter.':search?`No results for "${search}".`:`Couldn't load ${cc.label}. Try refresh.`}
+                   actionLabel={activeKw?'Clear filter':activeSrc?'Clear filter':search?null:'Refresh'}
+                   onAction={activeKw?()=>setActiveKw(null):activeSrc?()=>setActiveSrc(null):search?null:refreshAll}/>
+                :<div className={`snap-feed${['business','bloom','tech','popculture'].includes(cat)?' snap-feed-divided':''}`}>
+                  {/* D5 fix 3: Business/Energy/AI&Tech/Pop Culture carry the divided-list
+                      treatment on desktop secondary rows; the lead stays a prominent card. */}
+                  {/* AI & Tech only: optional GitHub street signal, click-to-load (3c). */}
+                  {cat==='tech' && !activeKw && !activeSrc && !search && <GithubSignal/>}
+                  {(activeKw||activeSrc||search ? feedItems.slice(0,20) : dedupedFeed.slice(0,20)).map((a,i)=>(
+                    <Fragment key={a.link||i}>
+                      <SnapshotCard a={a} meta={CATS[cat]||CATS.general} isSaved={isSavedFn(a)} onSave={onSave} onRead={onRead} onPerspectives={setPerspArticle} onAsk={setChatContext} formatDate={fmtDate} opinionLabel={opinionLabel(a)} hideImage={i>=3} lead={i===0 && !activeKw && !activeSrc && !search}/>
+                      {/* Review item 5: on mobile the category header moves BELOW the lead so
+                          the lead is the first element in the body (desktop copy is hidden). */}
+                      {i===0 && !activeKw && !activeSrc && !search && (
+                        <div className="page-header-row phr-mobile">
+                          <span className="page-header" style={{fontFamily:'var(--font-sans)'}}>
+                            {cc.label}{feedItems.length>0?` — ${feedItems.length} articles`:''}
+                            <span style={{marginLeft:'10px'}}><LastUpdated timestamp={lastUpdated[cat]} onRefresh={() => loadCat(cat)}/></span>
+                          </span>
+                          <button className="page-customize-btn" onClick={()=>openCustomize('sources',cat)}><IconGear/> Customize</button>
+                        </div>
+                      )}
+                      {/* D5 fix 1: on mobile, State of Play sits directly under the lead (the
+                          sidebar copy is hidden on mobile via hideSopMobile). Mobile-only. */}
+                      {i===0 && !activeKw && !activeSrc && !search && (
+                        <div className="sop-mobile">
+                          <StateOfPlay variant="sidebar" items={sopSourceItems} gapItems={gapItems} breakingItems={catBreaking}
+                            meta={CATS[cat]||CATS.general} onRead={onRead} onAsk={setChatContext} formatDate={fmtDate}
+                            collapsed={sopCollapsed} onToggleCollapse={toggleSop}/>
+                        </div>
+                      )}
+                      {i===2 && <XPulse topic={cc?.label||cat} variant="feed"/>}
+                    </Fragment>
+                  ))}
+                 </div>
+            }
+
+            {/* Pop culture sub-tab web results */}
+            {cat === 'popculture' && pcSubTab !== 'all' && (pcWebResults.length > 0 || pcWebLoading) && (
+              <div className="web-fallback">
+                <div className="rail-label" style={{margin:'24px 0 12px'}}>From the Web</div>
+                {pcWebLoading && <div style={{fontSize:'12px',color:'var(--text3)',fontStyle:'italic',padding:'10px 0'}}>Searching the web…</div>}
+                {pcWebResults.map((r,i) => (
+                  <a key={i} className="web-result" href={r.link} target="_blank" rel="noreferrer">
+                    <div className="web-result-title">{r.title}</div>
+                    {r.desc && <div className="web-result-desc">{r.desc.slice(0,160)}</div>}
+                    <div className="web-result-src">{r.source}{r.pubDate && <span className="web-result-date"> · {fmtDate(r.pubDate)}</span>}</div>
+                  </a>
+                ))}
+              </div>
+            )}
+
+            {/* Energy sub-tab web results */}
+            {cat === 'bloom' && enSubTab !== 'all' && (enWebResults.length > 0 || enWebLoading) && (
+              <div className="web-fallback">
+                <div className="rail-label" style={{margin:'24px 0 12px'}}>From the Web</div>
+                {enWebLoading && <div style={{fontSize:'12px',color:'var(--text3)',fontStyle:'italic',padding:'10px 0'}}>Searching the web…</div>}
+                {enWebResults.map((r,i) => (
+                  <a key={i} className="web-result" href={r.link} target="_blank" rel="noreferrer">
+                    <div className="web-result-title">{r.title}</div>
+                    {r.desc && <div className="web-result-desc">{r.desc.slice(0,160)}</div>}
+                    <div className="web-result-src">{r.source}{r.pubDate && <span className="web-result-date"> · {fmtDate(r.pubDate)}</span>}</div>
+                  </a>
+                ))}
+              </div>
+            )}
+
+            {/* v26: Web search fallback when searching with thin internal results */}
+            {search && (webResults.length > 0 || webLoading) && (
+              <div className="web-fallback">
+                <div className="rail-label" style={{margin:'24px 0 12px'}}>From the Web</div>
+                {webLoading && <div style={{fontSize:'12px',color:'var(--text3)',fontStyle:'italic',padding:'10px 0'}}>Searching the web…</div>}
+                {webResults.map((r,i) => (
+                  <a key={i} className="web-result" href={r.link} target="_blank" rel="noreferrer">
+                    <div className="web-result-title">{r.title}</div>
+                    {r.desc && <div className="web-result-desc">{r.desc.slice(0, 160)}</div>}
+                    <div className="web-result-src">
+                      {r.source}
+                      {r.pubDate && <span className="web-result-date"> · {fmtDate(r.pubDate)}</span>}
+                    </div>
+                  </a>
+                ))}
+              </div>
+            )}
+
+            {/* v26: Source recommendations when searching */}
+            {search && sourceRecs.length > 0 && (
+              <div className="source-recs">
+                <div className="rail-label" style={{margin:'20px 0 10px'}}>Add a source for "{search}"</div>
+                <div className="source-rec-list">
+                  {sourceRecs.map((s,i) => (
+                    <button key={i} className="source-rec-btn" onClick={()=>{
+                      setFeeds(prev => {
+                        const next = JSON.parse(JSON.stringify(prev));
+                        if (!next[s.cat]) next[s.cat] = [];
+                        if (!next[s.cat].some(f => f.url === s.url)) {
+                          next[s.cat].push({name: s.name, url: s.url, on: true});
+                        }
+                        sv('feeds', next);
+                        return next;
+                      });
+                    }}>
+                      + Add {s.name}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* v38: More from this source — web results when source filter is active */}
+            {activeSrc && (srcWebResults.length > 0 || srcWebLoading) && (
+              <div className="web-fallback">
+                <div className="rail-label" style={{margin:'24px 0 12px'}}>More from {activeSrc}</div>
+                {srcWebLoading && <div style={{fontSize:'12px',color:'var(--text3)',fontStyle:'italic',padding:'10px 0'}}>Searching the web…</div>}
+                {srcWebResults.map((r,i) => (
+                  <a key={i} className="web-result" href={r.link} target="_blank" rel="noreferrer">
+                    <div className="web-result-title">{r.title}</div>
+                    {r.desc && <div className="web-result-desc">{r.desc.slice(0,160)}</div>}
+                    <div className="web-result-src">{r.source}{r.pubDate && <span className="web-result-date"> · {fmtDate(r.pubDate)}</span>}</div>
+                  </a>
+                ))}
+              </div>
+            )}
+
+            {/* v20: Topics chips mirrored at bottom of feed — mid-scroll filter access */}
+            {catKws.length > 0 && !activeKw && (
+              <div className="bottom-topics">
+                <div className="bottom-topics-label">Filter by topic</div>
+                <div className="bottom-topics-chips">
+                  {catKws.map((k, i) => (
+                    <span key={i}
+                      className="kw-chip"
+                      style={{background:cc.bg,color:cc.color}}
+                      onClick={()=>{setActiveKw(k); window.scrollTo({top:0, behavior:'smooth'});}}>
+                      {k}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Across MyNewsHub moved up — it now renders right after State of Play
+                (Pass H item 6, see <AcrossHub> above), not at the page bottom. */}
+
+            <SocialFollows cat={cat} social={social}/>
+            <SourceFooter cat={cat} feeds={feeds} arts={arts}/>
+          </div>{/* /feed-col */}
+          <Sidebar cat={cat} hideSopMobile voicesNode={voicesStripFor(cat)} arts={arts} kw={kw} health={health} onAsk={setChatContext}
+            activeKw={activeKw} setActiveKw={k=>{setActiveKw(k);setActiveSrc(null);}}
+            activeSource={activeSrc} setActiveSource={s=>{setActiveSrc(s);setActiveKw(null);}}
+            onRead={onRead}
+            showScoreboard={cat==='sports'} recommended={recommended}
+            favTeams={[...teams, ...myTeams.map(t=>({match:t.name, league:t.league}))]}
+            onTopicOpen={label => navigate(cat, 'topic', teamSlug(label))}
+            isTopicFollowed={isTopicFollowed} toggleTopic={toggleTopic}
+            sopItems={!activeKw && !activeSrc && !search ? sopSourceItems : null}
+            sopGapItems={gapItems} sopBreakingItems={!activeKw && !activeSrc && !search ? catBreaking : []} sopMeta={CATS[cat]||CATS.general}
+            sopCollapsed={sopCollapsed} onToggleSop={toggleSop} formatDate={fmtDate}
+            acrossSections={isHome && !activeKw && !activeSrc && !search ? otherCatSections : null}
+            onAcrossSeeAll={handleTabChange}
+            followingModule={followingModule}
+            feeds={feeds} onToggleFeed={(c,name)=>setFeeds(prev=>{const next=JSON.parse(JSON.stringify(prev));const f=(next[c]||[]).find(x=>x.name===name);if(f){f.on=!f.on;sv('feeds',next);}return next;})}
+            showBriefing={isHome} onOpenBriefing={() => handleTabChange('briefing')} briefingExcludeCats={briefingExclude}/>
+        </div>{/* /page-grid */}
+      </div>
+    );
+}
+
 export default function App() {
   dbgRender('App'); // D8: ?debug=1 render counter (no-op when the flag is off)
   const [tab, setTab]           = useState(()=>parseRoute().category);
@@ -9731,651 +10380,8 @@ export default function App() {
     );
   };
 
-  const FeedPage = ({cat}) => {
-    dbgRender('FeedPage'); // J1: render counter
-    useEffect(() => dbgMount('FeedPage'), []); // J1: remount counter
-    const cc=CATS[cat];
-    const [showFollowAdd, setShowFollowAdd] = useState(false);
-    const [onboardingDismissed, setOnboardingDismissed] = useState(()=>ld('onboarded',false));
-    const dismissOnboarding = () => { sv('onboarded',true); setOnboardingDismissed(true); };
-    // Collapsible State of Play — expanded on first visit, choice remembered per category.
-    const [sopCollapsed, setSopCollapsed] = useState(()=>ld('sopCollapsed_'+cat, false));
-    const toggleSop = () => setSopCollapsed(v => { const nx = !v; sv('sopCollapsed_'+cat, nx); return nx; });
-    // Business + Energy merged into one category with All / Business / Energy filter pills.
-    const isMergedBiz = cat === 'business';
-    // Business + Markets merged: 'all' shows business + markets NEWS combined; 'business'
-    // shows business only; the 'Markets' pill navigates to the full Markets page (FinancePage).
-    const bizFilter = isMergedBiz ? (subcat || 'all') : 'all';
-    useEffect(() => {
-      if (cat === 'business' && !(arts.finance||[]).length && !loading.finance) loadCat('finance');
-      // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [cat]);
-    // Apply story clustering before sorting so cluster metadata is available
-    const rawItems = isMergedBiz
-      ? (bizFilter === 'business' ? sorted('business')
-         : [...sorted('business'), ...sorted('finance')].sort((a,b)=>new Date(b.pubDate)-new Date(a.pubDate)))
-      : sorted(cat);
-    const items=useMemo(()=>clusterStories(rawItems),[rawItems]);
-    const isLoading = isMergedBiz ? (loading.business || loading.finance) : loading[cat];
-
-    // Phase 2: subcategory is URL-driven (never local state). Chips navigate.
-    const pcSubTab = cat === 'popculture' ? (subcat || 'all') : 'all';
-    const setPcSubTab = (key) => navigate('popculture', key === 'all' ? null : key);
-    const enSubTab = cat === 'bloom' ? (subcat || 'all') : 'all';
-    const setEnSubTab = (key) => navigate('bloom', key === 'all' ? null : key);
-    const [pcWebResults, setPcWebResults] = useState([]);
-    const [pcWebLoading, setPcWebLoading] = useState(false);
-    const [enWebResults, setEnWebResults] = useState([]);
-    const [enWebLoading, setEnWebLoading] = useState(false);
-    // Coverage-Gap stories, folded into the State of Play list as tagged rows
-    // (Home + merged Business/Markets only). No standalone "You may be missing this" panel.
-    const [gapItems, setGapItems] = useState([]);
-
-    const PC_SUBTABS = [
-      { key:'all',         label:'All',          icon:LayoutGrid },
-      { key:'shows',       label:'Shows/Movies', icon:Film },
-      { key:'music',       label:'Music',        icon:Music },
-      { key:'books',       label:'Books',        icon:BookOpen },
-      { key:'comedy',      label:'Comedy',       icon:Laugh },
-    ];
-    const PC_KWS = {
-      shows:  ['movie','film','tv','streaming','netflix','hbo','disney','show','series','premiere','season','episode','cinema','trailer','oscar','emmy','golden globe'],
-      music:  ['album','music','song','artist','chart','grammy','billboard','concert','tour','release','single','rapper','singer','playlist','spotify','pop star'],
-      books:  ['book','novel','author','bestseller','fiction','reading','publisher','memoir','nonfiction','literary','penguin','bestselling','new book'],
-      comedy: ['comedy','comedian','stand-up','funny','humor','joke','sketch','snl','sitcom','comic','parody','satire'],
-    };
-
-    const EN_SUBTABS = [
-      { key:'all',     label:'All',           icon:LayoutGrid },
-      { key:'power',   label:'Power',         icon:Zap },
-      { key:'oilgas',  label:'Oil & Gas',     icon:Droplet },
-      { key:'clean',   label:'Clean Energy',  icon:Leaf },
-      { key:'markets', label:'Markets',       icon:TrendingUp },
-      { key:'policy',  label:'Policy',        icon:Scale },
-    ];
-    const EN_KWS = {
-      power:   ['power','electric','grid','utility','electricity','megawatt','kilowatt','nuclear','coal','natural gas','transmission','substation','generation','powerplant','baseload'],
-      oilgas:  ['oil','gas','petroleum','crude','refinery','pipeline','opec','brent','wti','shale','drilling','rig','barrel','lng','upstream','downstream','midstream','gasoline'],
-      clean:   ['solar','wind','renewable','clean energy','green','battery','storage','ev','electric vehicle','hydrogen','carbon','emissions','climate','sustainability','net zero','offshore wind'],
-      markets: ['commodity','commodities','futures','spot price','energy prices','gas prices','oil prices','supply','demand','export','import','petrochemical','inflation energy'],
-      policy:  ['policy','regulation','epa','federal','congress','legislation','tariff','subsidy','permit','department of energy','doe','ferc','administration','executive order','climate bill'],
-    };
-
-    // Filter items by pop culture sub-tab
-    const pcFilteredItems = useMemo(() => {
-      if (cat !== 'popculture' || pcSubTab === 'all') return items;
-      const kws = PC_KWS[pcSubTab] || [];
-      return items.filter(a => {
-        const t = (a.title + ' ' + (a.desc||'')).toLowerCase();
-        return kws.some(k => t.includes(k));
-      });
-    }, [items, cat, pcSubTab]);
-
-    const enFilteredItems = useMemo(() => {
-      if (cat !== 'bloom' || enSubTab === 'all') return items;
-      const kws = EN_KWS[enSubTab] || [];
-      return items.filter(a => {
-        const t = (a.title + ' ' + (a.desc||'')).toLowerCase();
-        return kws.some(k => t.includes(k));
-      });
-    }, [items, cat, enSubTab]);
-
-    // ── WIDE DISCOVERY (Pass L item 2) ──────────────────────────────────────────
-    // Every category/sub-category gets the SAME unrestricted "scan everything, ignore
-    // my followed sources" net that Sports already uses for teams (fetchDiscover feed
-    // mode). Results are merged into the feed by storyKey (same dedup as teams) and are
-    // capped at 'reported' tier (_tier:'reported', _wide:true) so breadth never borrows
-    // a verified source's authority — the tier-aware cluster rep keeps verified locals.
-    const [catWideItems, setCatWideItems] = useState([]);
-    useEffect(() => {
-      let alive = true;
-      const subKws = cat === 'bloom' && enSubTab !== 'all' ? (EN_KWS[enSubTab] || [])
-                   : cat === 'popculture' && pcSubTab !== 'all' ? (PC_KWS[pcSubTab] || [])
-                   : [];
-      const base = DEFAULT_KW[cat] || [];
-      const kws = (subKws.length ? [...subKws.slice(0, 3), base[0]] : base.slice(0, 4)).filter(Boolean);
-      if (!kws.length) { setCatWideItems([]); return () => { alive = false; }; }
-      fetchDiscover(cat, kws, [], 'feed').then(r => {
-        if (!alive) return;
-        const rows = ((r && r.items) || []).map(x => ({ ...x, cat, _tier: 'reported', _wide: true }));
-        setCatWideItems(rows);
-      });
-      return () => { alive = false; };
-      // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [cat, enSubTab, pcSubTab]);
-
-    // v36: Web results for pop culture sub-tab
-    useEffect(() => {
-      if (cat !== 'popculture' || pcSubTab === 'all') { setPcWebResults([]); return; }
-      const queries = {
-        shows:'movies TV shows streaming news today', music:'music news trending albums today',
-        books:'best books reading news today', comedy:'comedy entertainment news today',
-      };
-      const q = queries[pcSubTab] || `${pcSubTab} pop culture news today`;
-      setPcWebLoading(true);
-      fetchWebSearch(q).then(r => { setPcWebResults(r); setPcWebLoading(false); });
-    }, [cat, pcSubTab]);
-
-    // v40: Web results for energy sub-tab
-    useEffect(() => {
-      if (cat !== 'bloom' || enSubTab === 'all') { setEnWebResults([]); return; }
-      const queries = {
-        power:'power grid electricity utility news today', oilgas:'oil gas petroleum crude news today',
-        clean:'clean energy solar wind renewable news today', markets:'energy commodity markets prices today',
-        policy:'energy policy regulation government news today',
-      };
-      const q = queries[enSubTab] || `${enSubTab} energy news today`;
-      setEnWebLoading(true);
-      fetchWebSearch(q).then(r => { setEnWebResults(r); setEnWebLoading(false); });
-    }, [cat, enSubTab]);
-
-    const baseFilteredItems = cat === 'bloom' ? enFilteredItems : pcFilteredItems;
-    // Fold the wide-discovery rows into the active feed (deduped by storyKey, then
-    // re-sorted by recency), so every category shows headlines from ANY outlet — not
-    // just the reader's toggled-on feeds (Pass L item 2).
-    const activeFilteredItems = useMemo(() => {
-      if (!catWideItems.length) return baseFilteredItems;
-      const have = new Set(baseFilteredItems.map(storyKey));
-      const extra = catWideItems.filter(a => a.title && !have.has(storyKey(a)));
-      if (!extra.length) return baseFilteredItems;
-      return [...baseFilteredItems, ...extra].sort((a, b) => new Date(b.pubDate || 0) - new Date(a.pubDate || 0));
-    }, [baseFilteredItems, catWideItems]);
-    const heroItems=activeFilteredItems.filter(a=>a.img);
-    const catLead=heroItems[0]||null;
-    const feedItems=catLead?activeFilteredItems.filter(a=>a.link!==catLead.link):activeFilteredItems;
-
-    const isHome = cat === 'general';
-    const catKws = kw[cat] || [];
-
-    // ── CROSS-MODULE DEDUP (Pass I item 1) ──────────────────────────────────────
-    // A story placed in a top-of-page module is excluded from every other module
-    // on the SAME page — on every category, not just General. Priority order:
-    // Top Stories → State of Play → Houston → main feed.
-    const topStoryItems = useMemo(() => {
-      if (isHome) {
-        // Home Top Stories = TopOfHourStrip picks (catLead + cross-category images).
-        // Mirror its selection exactly so State of Play + the feed exclude what it
-        // actually shows — otherwise the hero repeats as State of Play #1.
-        const picks = catLead && catLead.img ? [catLead] : [];
-        const used = new Set(catLead ? [catLead.link] : []);
-        const catOrder = ['sports','business','finance','bloom','popculture','general','tech'];
-        for (const c of catOrder) {
-          if (picks.length >= 4) break;
-          const item = (arts[c]||[]).find(a => a.img && !used.has(a.link));
-          if (item) { picks.push({ ...item, cat: item.cat || c }); used.add(item.link); }
-        }
-        for (const c of catOrder) {
-          if (picks.length >= 4) break;
-          for (const a of (arts[c]||[])) {
-            if (picks.length >= 4) break;
-            if (a.img && !used.has(a.link)) { picks.push({ ...a, cat: a.cat || c }); used.add(a.link); }
-          }
-        }
-        return picks.slice(0, 4);
-      }
-      if (!catLead) return [];   // category Top Stories = the gn-grid (hero + 3)
-      const secondaries = feedItems.slice(0, 6).filter(a => a.img).slice(0, 3)
-        .concat(feedItems.slice(0, 6).filter(a => !a.img)).slice(0, 3);
-      return [catLead, ...secondaries];
-    }, [isHome, catLead, feedItems, arts]);
-    const topStoryKeys = useMemo(() => new Set(topStoryItems.map(storyKey)), [topStoryItems]);
-    // Breaking stories for THIS category's State of Play (Pass L item 3) — the urgent
-    // items relevant to the page, deduped against what Top Stories already shows. Home
-    // sees cross-category breaking; a category page sees only its own.
-    // D2 relevance (gate a): a story shows on a page only if it belongs to that page.
-    // Category page = its own feed-category OR a DEFAULT_KW match for that category.
-    // General = general/world-US top-news OR a match on ANY category's keywords.
-    const catBreaking = useMemo(() => {
-      if (!breakingItems || !breakingItems.length) return [];
-      const anyKw = (b) => {
-        const txt = (b.title + ' ' + (b.desc || '')).toLowerCase();
-        return Object.keys(DEFAULT_KW).some(c =>
-          (kw[c] || DEFAULT_KW[c] || []).some(k => txt.includes(String(k).toLowerCase())));
-      };
-      const relevant = (b) => {
-        if (isHome) return b.cat === 'general' || anyKw(b);
-        if (b.cat === cat) return true;
-        if (isMergedBiz && (b.cat === 'business' || b.cat === 'finance')) return true;
-        return kwMatch(b, cat).length > 0;
-      };
-      return breakingItems.filter(relevant).filter(b => !topStoryKeys.has(storyKey(b))).slice(0, 3);
-    }, [breakingItems, cat, isHome, isMergedBiz, topStoryKeys, kw, kwMatch]);
-    // State of Play ranks only from what Top Stories didn't already take.
-    // D2: promos/sportsbook content are excluded from SoP ranking too, not just Breaking.
-    const sopSourceItems = useMemo(
-      () => activeFilteredItems.filter(a => !topStoryKeys.has(storyKey(a)) && !isPromoItem(a)),
-      [activeFilteredItems, topStoryKeys]);
-    const sopShownKeys = useMemo(() => {
-      const ranked = rankClusters(sopSourceItems, { max: 2, limit: 5 });
-      return new Set(ranked.length >= 3 ? ranked.map(storyKey) : []);
-    }, [sopSourceItems]);
-    // Houston Local (General) claims its stories too.
-    const houstonItems = useMemo(() => {
-      if (!isHome) return [];
-      const seen = new Set();
-      return Object.values(arts || {}).flat()
-        .filter(a => HOUSTON_SOURCES.includes(a.source))
-        .filter(a => !topStoryKeys.has(storyKey(a)) && !sopShownKeys.has(storyKey(a)))
-        .filter(a => { const k = storyKey(a); if (seen.has(k)) return false; seen.add(k); return true; })
-        .sort((a, b) => new Date(b.pubDate) - new Date(a.pubDate))
-        .slice(0, 6);
-    }, [isHome, arts, topStoryKeys, sopShownKeys]);
-    const houstonKeys = useMemo(() => new Set(houstonItems.map(storyKey)), [houstonItems]);
-    // The main feed excludes everything already placed above it (by title key, so
-    // the same story from a different source can't slip back in).
-    const dedupedFeed = useMemo(
-      () => feedItems.filter(a => !topStoryKeys.has(storyKey(a)) && !sopShownKeys.has(storyKey(a)) && !houstonKeys.has(storyKey(a))),
-      [feedItems, topStoryKeys, sopShownKeys, houstonKeys]);
-
-    // ── COVERAGE GAP (folded into State of Play) — widely-covered stories none of the
-    //    reader's own sources carried. Home keys off this category; the merged
-    //    Business+Markets page keys off both business + markets keywords/sources;
-    //    Energy (bloom) keys off its keywords + the active sub-tab so the gap
-    //    re-ranks with the State of Play list per Power / Oil & Gas / etc. ──
-    const isEnergy = cat === 'bloom';
-    const gapCat = isMergedBiz ? 'business' : cat;
-    const gapKws = isMergedBiz ? [...(kw.business||[]), ...(kw.finance||[])]
-      : isEnergy ? (enSubTab !== 'all' ? [...catKws, ...(EN_KWS[enSubTab] || [])] : catKws)
-      : catKws;
-    const gapSrcs = isMergedBiz
-      ? [...(feeds.business||[]), ...(feeds.finance||[])].filter(f=>f.on).map(f=>f.name)
-      : (feeds[cat]||[]).filter(f=>f.on).map(f=>f.name);
-    const gapOn = (isHome || isMergedBiz || isEnergy) && !activeKw && !activeSrc && !search;
-    const gapKwKey = gapKws.join('|');
-    const gapSrcKey = gapSrcs.join('|');
-    useEffect(() => {
-      let alive = true;
-      if (!gapOn || !gapKws.length) { setGapItems([]); return () => { alive = false; }; }
-      fetchDiscover(gapCat, gapKws, gapSrcs).then(r => { if (alive) setGapItems((r && r.items) || []); });
-      return () => { alive = false; };
-      // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [gapCat, gapKwKey, gapSrcKey, gapOn]);
-
-    const otherCatSections = useMemo(() => {
-      if (!isHome) return [];
-      const otherCats = ['business','finance','bloom','sports','popculture'];
-      return otherCats.map(c => ({
-        cat: c,
-        cc: CATS[c],
-        items: (arts[c] || []).slice(0, 3),
-      })).filter(s => s.items.length > 0);
-    }, [isHome, arts]);
-
-    // Following module — relocated from the General-page full-width banner into the
-    // sidebar (Pass K item 3), rendered as a standard sidebar section with the existing
-    // follow-chip pills + "+ Add". General page only; injected into <Sidebar/> as a prop.
-    const followingModule = isHome ? (
-      <div className="sidebar-section sb-following">
-        <div className="sidebar-sec-head"><span className="sidebar-sec-label">Following</span></div>
-        <div className="following-chips">
-          {(() => {
-            const nameCounts = {};
-            followedTeams.forEach(t => { const k = (t.name||'').toLowerCase(); nameCounts[k] = (nameCounts[k]||0) + 1; });
-            return followedTeams.map((t, i) => {
-              const dup = nameCounts[(t.name||'').toLowerCase()] > 1;
-              return (
-                <span key={`tm-${t.slug}-${t.league}-${i}`} className="following-chip following-chip-team">
-                  <button type="button" className="following-chip-main" onClick={()=>navigate('sports', t.league, t.slug)}>
-                    <TeamLogo name={t.name} league={t.league} size={18}/>
-                    <span className="following-chip-name">{t.name}{dup ? ` · ${(t.league||'').toUpperCase()}` : ''}</span>
-                  </button>
-                  <button type="button" className="following-chip-x" onClick={()=>unfollowTeam(t)} aria-label={`Unfollow ${t.name}`}><XIcon size={16} aria-hidden="true"/></button>
-                </span>
-              );
-            });
-          })()}
-          {myTopics.map((t, i) => (
-            <span key={`tp-${i}`} className="following-chip">
-              <button type="button" className="following-chip-main" onClick={()=>navigate('general','topic',teamSlug(t))}>
-                <span className="following-chip-name">{t}</span>
-              </button>
-              <button type="button" className="following-chip-x" onClick={()=>toggleTopic(t)} aria-label={`Unfollow ${t}`}><XIcon size={16} aria-hidden="true"/></button>
-            </span>
-          ))}
-          {followedTeams.length === 0 && myTopics.length === 0 && (
-            <span className="following-empty">Follow teams &amp; topics to build your row</span>
-          )}
-          <div className="follow-add-wrap">
-            <button className="following-add-btn" onClick={()=>setShowFollowAdd(v=>!v)} aria-expanded={showFollowAdd}>+ Add</button>
-            {showFollowAdd && (
-              <FollowAdd
-                isFollowingTeam={t => isTeamFollowed(t.name, t.league)}
-                isTopicFollowed={isTopicFollowed}
-                onAddTeam={t => followTeam(t.name, t.league)}
-                onAddTopic={topic => toggleTopic(topic)}
-                onClose={() => setShowFollowAdd(false)}/>
-            )}
-          </div>
-        </div>
-      </div>
-    ) : null;
-
-    return (
-      <div className="page">
-        {/* v46: "N new stories" pill — background poll staged fresh articles */}
-        {(pendingNew[cat]||[]).length > 0 && (
-          <button className="new-stories-pill" onClick={()=>applyPending(cat)}>
-            <span className="nsp-dot"/> ↑ {pendingNew[cat].length} new {pendingNew[cat].length===1?'story':'stories'}
-          </button>
-        )}
-        {/* Live Scores moved to the top bar (below weather, above the category nav —
-            Pass G item 3). Rendered by <TopBar>; no longer here in the feed column. */}
-        {/* Following row relocated into the sidebar (Pass K item 3) — see
-            `followingModule` passed to <Sidebar/> below. */}
-        {/* Welcome/onboarding banner removed (Pass H item 1): it wasn't driving
-            meaningful onboarding value and kept reappearing. */}
-
-        {/* Desktop: main column + sidebar run together from the very top of the
-            content (68/32), so Top Stories sits inside the 68% column, not full-width. */}
-        <div className="page-grid has-sop-hoist">
-          <div className="feed-col">
-
-        {/* ── BUSINESS + MARKETS filter pills — reuses the Sports league-pill component.
-            Markets routes to the full Markets page (FinancePage). ── */}
-        {isMergedBiz && !activeKw && !activeSrc && !search && (
-          <div className="sport-tabs" style={{marginBottom:'12px'}}>
-            <button className={`sport-tab ${bizFilter==='all'?'active':''}`} onClick={()=>navigate('business')}>All</button>
-            <button className={`sport-tab ${bizFilter==='business'?'active':''}`} onClick={()=>navigate('business','business')}>Business</button>
-            <button className="sport-tab" onClick={()=>navigate('finance')}>Markets</button>
-          </div>
-        )}
-
-        {/* ── ENERGY sub-category pills — at the top of the page, matching the Sports
-            league/team pill position + format (Pass J item 8). ── */}
-        {cat === 'bloom' && !activeKw && !activeSrc && !search && (
-          <div className="pc-subtabs en-subtabs" style={{marginBottom:'12px'}}>
-            {EN_SUBTABS.map(t => (
-              <button key={t.key} className={`pc-subtab ${enSubTab===t.key?'active':''}`}
-                onClick={()=>{setEnSubTab(t.key);window.scrollTo({top:0,behavior:'instant'});}}>
-                <t.icon size={14} strokeWidth={2.2}/>{t.label}
-              </button>
-            ))}
-          </div>
-        )}
-
-        {/* ── HOME: Top Stories (image cards) — sits first; the text-only State of Play
-            module below it provides a breathing-room break before the next image block
-            (Pass H item 3). ── */}
-        {isHome && !activeKw && !activeSrc && !search && (
-          <TopOfHourStrip catLead={catLead} arts={arts} onRead={onRead} stories={topStoryItems}/>
-        )}
-
-        {/* State of Play moved into the sidebar (Pass J item 2). Across MyNewsHub also
-            moved into the sidebar (Pass J item 4). The main column is now just
-            Top Stories → Houston Local (General) → main feed (Pass J item 6). */}
-
-        {/* Category pages: Top Stories — same TopOfHourStrip treatment as General
-            (category tag overlaid on the image), so every category's hero is identical
-            instead of the old headline-floating-below-a-plain-image grid (Pass: card
-            consistency). Business, Energy, AI & Tech, Health, Pop Culture all route
-            through here, so they unify together. */}
-        {!activeKw && !activeSrc && catLead && !isHome && (
-          <TopOfHourStrip stories={topStoryItems} catLead={catLead} arts={arts} onRead={onRead}/>
-        )}
-
-        {/* State of Play hoisted into the main column right after Top Stories — shown
-            only on mobile/tablet (≤1100px), where the sidebar stacks below the feed and
-            would otherwise bury it. On desktop this copy is display:none and the sidebar
-            copy renders instead (see .sop-hoist CSS). */}
-        {!activeKw && !activeSrc && !search && (
-          <div className="sop-hoist">
-            <StateOfPlay variant="sidebar" items={sopSourceItems} gapItems={gapItems} breakingItems={catBreaking}
-              meta={CATS[cat]||CATS.general} onRead={onRead} onAsk={setChatContext} formatDate={fmtDate}
-              collapsed={sopCollapsed} onToggleCollapse={toggleSop}/>
-          </div>
-        )}
-
-        {/* Pop Culture sub-tabs */}
-        {cat === 'popculture' && !activeKw && !activeSrc && !search && (
-          <div className="pc-subtabs">
-            {PC_SUBTABS.map(t => (
-              <button key={t.key} className={`pc-subtab ${pcSubTab===t.key?'active':''}`}
-                onClick={()=>{setPcSubTab(t.key);window.scrollTo({top:0,behavior:'instant'});}}>
-                <t.icon size={14} strokeWidth={2.2}/>{t.label}
-              </button>
-            ))}
-          </div>
-        )}
-
-        {/* Main column continues in the grid alongside the (now tall) sidebar, which
-            holds State of Play + Trending + Briefing + Across + Sources (Pass J). ── */}
-
-        {/* Across MyNewsHub moved into the sidebar (Pass J item 4). */}
-
-        {/* ── HOME: Houston local row ── */}
-        {isHome && !activeKw && !activeSrc && !search && (
-          <HoustonRow items={houstonItems} onRead={onRead} onAsk={setChatContext} formatDate={fmtDate}/>
-        )}
-
-            <div className="page-header-row phr-desktop">
-              <span className="page-header" style={{fontFamily:'var(--font-sans)'}}>
-                {cc.label}{feedItems.length>0?` — ${feedItems.length} articles`:''}
-                {/* D6: per-page refresh — always present (shows "Refresh" before the first stamp). */}
-                <span style={{marginLeft:'10px'}}><LastUpdated timestamp={lastUpdated[cat]} onRefresh={() => { loadCat(cat); refreshVoiceSignals(cat); }}/></span>
-              </span>
-              <div style={{display:'flex',alignItems:'center',gap:'10px'}}>
-                {(() => {
-                  const down = (feeds[cat]||[]).filter(f=>f.on && feedHealth[f.name] && !feedHealth[f.name].ok).length;
-                  return down>0 ? <button className="feed-degraded" title="Some sources failed to load — open Customize to review" onClick={()=>openCustomize('sources',cat)}>{down} source{down===1?'':'s'} unavailable</button> : null;
-                })()}
-                <button className="page-customize-btn" onClick={()=>openCustomize('sources',cat)}><IconGear/> Customize</button>
-              </div>
-            </div>
-            {/* Energy sub-category pills moved to the top of the page (Pass J item 8) —
-                see the block at the start of the feed column. */}
-            {cat === 'bloom' && enSubTab !== 'all' && !activeKw && !activeSrc && !search && (
-              <div className="sport-hub-banner" style={{background:'linear-gradient(135deg,#0369a1 0%,#0284c7 100%)'}}>
-                <div className="sport-hub-inner">
-                  <div>
-                    <div className="team-hub-title">{EN_SUBTABS.find(t=>t.key===enSubTab)?.label || enSubTab}</div>
-                    <div className="team-hub-count">{enFilteredItems.length} stories · Energy</div>
-                  </div>
-                  <button className="team-hub-back" onClick={()=>setEnSubTab('all')}>← All Energy</button>
-                </div>
-              </div>
-            )}
-            {/* Active search banner — shows result count + clear button */}
-            {search && (
-              <div className="search-results-banner">
-                <span className="search-results-text">
-                  {feedItems.length > 0
-                    ? <><strong>{feedItems.length} articles</strong> matching <em style={{fontStyle:'normal',fontWeight:700}}>"{search}"</em> — including web sources below</>
-                    : <>No results for "<strong>{search}</strong>" — showing web results below</>}
-                </span>
-                <button className="search-results-clear" onClick={()=>setSearch('')}><XIcon size={12} aria-hidden="true"/> Clear</button>
-              </div>
-            )}
-            {(activeKw||activeSrc)&&(
-              <div className="sticky-filter" style={{display:'flex',gap:'6px',flexWrap:'wrap',marginBottom:'12px'}}>
-                {activeKw&&<span style={{background:cc.bg,color:cc.color,borderRadius:'20px',padding:'3px 10px',fontSize:'10px',fontWeight:'600',display:'inline-flex',alignItems:'center',gap:'5px'}}>{activeKw}<button onClick={()=>setActiveKw(null)} style={{background:'none',border:'none',cursor:'pointer',color:'inherit',fontSize:'12px',padding:0}}><XIcon size={13} aria-hidden="true"/></button></span>}
-                {activeSrc&&<span style={{background:'var(--surface2)',color:'var(--text2)',borderRadius:'20px',padding:'3px 10px',fontSize:'10px',fontWeight:'600',border:'1px solid var(--border)',display:'inline-flex',alignItems:'center',gap:'5px'}}>{activeSrc}<button onClick={()=>setActiveSrc(null)} style={{background:'none',border:'none',cursor:'pointer',color:'inherit',fontSize:'12px',padding:0}}><XIcon size={13} aria-hidden="true"/></button></span>}
-              </div>
-            )}
-            {isLoading&&!feedItems.length
-              ?<div className="snap-feed" aria-busy="true" aria-label={`Loading ${cc.label}`}>
-                  {Array.from({length:6}).map((_,i)=>(
-                    <div key={i} className="snap-card snap-skel">
-                      <div className="snap-accent"/>
-                      <div className="snap-skel-main">
-                        <div className="snap-skel-line" style={{width:'30%',height:'11px'}}/>
-                        <div className="snap-skel-line" style={{width:'96%',height:'17px',marginTop:'10px'}}/>
-                        <div className="snap-skel-line" style={{width:'78%',height:'17px'}}/>
-                        <div className="snap-skel-line" style={{width:'100%',height:'12px',marginTop:'12px'}}/>
-                        <div className="snap-skel-line" style={{width:'55%',height:'12px'}}/>
-                      </div>
-                      <div className="snap-skel-thumb"/>
-                    </div>
-                  ))}
-                 </div>
-              :feedItems.length===0
-                ?<EmptyState
-                   message={activeKw||activeSrc?'No stories match this filter.':search?`No results for "${search}".`:`Couldn't load ${cc.label}. Try refresh.`}
-                   actionLabel={activeKw?'Clear filter':activeSrc?'Clear filter':search?null:'Refresh'}
-                   onAction={activeKw?()=>setActiveKw(null):activeSrc?()=>setActiveSrc(null):search?null:refreshAll}/>
-                :<div className={`snap-feed${['business','bloom','tech','popculture'].includes(cat)?' snap-feed-divided':''}`}>
-                  {/* D5 fix 3: Business/Energy/AI&Tech/Pop Culture carry the divided-list
-                      treatment on desktop secondary rows; the lead stays a prominent card. */}
-                  {/* AI & Tech only: optional GitHub street signal, click-to-load (3c). */}
-                  {cat==='tech' && !activeKw && !activeSrc && !search && <GithubSignal/>}
-                  {(activeKw||activeSrc||search ? feedItems.slice(0,20) : dedupedFeed.slice(0,20)).map((a,i)=>(
-                    <Fragment key={a.link||i}>
-                      <SnapshotCard a={a} meta={CATS[cat]||CATS.general} isSaved={isSavedFn(a)} onSave={onSave} onRead={onRead} onPerspectives={setPerspArticle} onAsk={setChatContext} formatDate={fmtDate} opinionLabel={opinionLabel(a)} hideImage={i>=3} lead={i===0 && !activeKw && !activeSrc && !search}/>
-                      {/* Review item 5: on mobile the category header moves BELOW the lead so
-                          the lead is the first element in the body (desktop copy is hidden). */}
-                      {i===0 && !activeKw && !activeSrc && !search && (
-                        <div className="page-header-row phr-mobile">
-                          <span className="page-header" style={{fontFamily:'var(--font-sans)'}}>
-                            {cc.label}{feedItems.length>0?` — ${feedItems.length} articles`:''}
-                            <span style={{marginLeft:'10px'}}><LastUpdated timestamp={lastUpdated[cat]} onRefresh={() => loadCat(cat)}/></span>
-                          </span>
-                          <button className="page-customize-btn" onClick={()=>openCustomize('sources',cat)}><IconGear/> Customize</button>
-                        </div>
-                      )}
-                      {/* D5 fix 1: on mobile, State of Play sits directly under the lead (the
-                          sidebar copy is hidden on mobile via hideSopMobile). Mobile-only. */}
-                      {i===0 && !activeKw && !activeSrc && !search && (
-                        <div className="sop-mobile">
-                          <StateOfPlay variant="sidebar" items={sopSourceItems} gapItems={gapItems} breakingItems={catBreaking}
-                            meta={CATS[cat]||CATS.general} onRead={onRead} onAsk={setChatContext} formatDate={fmtDate}
-                            collapsed={sopCollapsed} onToggleCollapse={toggleSop}/>
-                        </div>
-                      )}
-                      {i===2 && <XPulse topic={cc?.label||cat} variant="feed"/>}
-                    </Fragment>
-                  ))}
-                 </div>
-            }
-
-            {/* Pop culture sub-tab web results */}
-            {cat === 'popculture' && pcSubTab !== 'all' && (pcWebResults.length > 0 || pcWebLoading) && (
-              <div className="web-fallback">
-                <div className="rail-label" style={{margin:'24px 0 12px'}}>From the Web</div>
-                {pcWebLoading && <div style={{fontSize:'12px',color:'var(--text3)',fontStyle:'italic',padding:'10px 0'}}>Searching the web…</div>}
-                {pcWebResults.map((r,i) => (
-                  <a key={i} className="web-result" href={r.link} target="_blank" rel="noreferrer">
-                    <div className="web-result-title">{r.title}</div>
-                    {r.desc && <div className="web-result-desc">{r.desc.slice(0,160)}</div>}
-                    <div className="web-result-src">{r.source}{r.pubDate && <span className="web-result-date"> · {fmtDate(r.pubDate)}</span>}</div>
-                  </a>
-                ))}
-              </div>
-            )}
-
-            {/* Energy sub-tab web results */}
-            {cat === 'bloom' && enSubTab !== 'all' && (enWebResults.length > 0 || enWebLoading) && (
-              <div className="web-fallback">
-                <div className="rail-label" style={{margin:'24px 0 12px'}}>From the Web</div>
-                {enWebLoading && <div style={{fontSize:'12px',color:'var(--text3)',fontStyle:'italic',padding:'10px 0'}}>Searching the web…</div>}
-                {enWebResults.map((r,i) => (
-                  <a key={i} className="web-result" href={r.link} target="_blank" rel="noreferrer">
-                    <div className="web-result-title">{r.title}</div>
-                    {r.desc && <div className="web-result-desc">{r.desc.slice(0,160)}</div>}
-                    <div className="web-result-src">{r.source}{r.pubDate && <span className="web-result-date"> · {fmtDate(r.pubDate)}</span>}</div>
-                  </a>
-                ))}
-              </div>
-            )}
-
-            {/* v26: Web search fallback when searching with thin internal results */}
-            {search && (webResults.length > 0 || webLoading) && (
-              <div className="web-fallback">
-                <div className="rail-label" style={{margin:'24px 0 12px'}}>From the Web</div>
-                {webLoading && <div style={{fontSize:'12px',color:'var(--text3)',fontStyle:'italic',padding:'10px 0'}}>Searching the web…</div>}
-                {webResults.map((r,i) => (
-                  <a key={i} className="web-result" href={r.link} target="_blank" rel="noreferrer">
-                    <div className="web-result-title">{r.title}</div>
-                    {r.desc && <div className="web-result-desc">{r.desc.slice(0, 160)}</div>}
-                    <div className="web-result-src">
-                      {r.source}
-                      {r.pubDate && <span className="web-result-date"> · {fmtDate(r.pubDate)}</span>}
-                    </div>
-                  </a>
-                ))}
-              </div>
-            )}
-
-            {/* v26: Source recommendations when searching */}
-            {search && sourceRecs.length > 0 && (
-              <div className="source-recs">
-                <div className="rail-label" style={{margin:'20px 0 10px'}}>Add a source for "{search}"</div>
-                <div className="source-rec-list">
-                  {sourceRecs.map((s,i) => (
-                    <button key={i} className="source-rec-btn" onClick={()=>{
-                      setFeeds(prev => {
-                        const next = JSON.parse(JSON.stringify(prev));
-                        if (!next[s.cat]) next[s.cat] = [];
-                        if (!next[s.cat].some(f => f.url === s.url)) {
-                          next[s.cat].push({name: s.name, url: s.url, on: true});
-                        }
-                        sv('feeds', next);
-                        return next;
-                      });
-                    }}>
-                      + Add {s.name}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {/* v38: More from this source — web results when source filter is active */}
-            {activeSrc && (srcWebResults.length > 0 || srcWebLoading) && (
-              <div className="web-fallback">
-                <div className="rail-label" style={{margin:'24px 0 12px'}}>More from {activeSrc}</div>
-                {srcWebLoading && <div style={{fontSize:'12px',color:'var(--text3)',fontStyle:'italic',padding:'10px 0'}}>Searching the web…</div>}
-                {srcWebResults.map((r,i) => (
-                  <a key={i} className="web-result" href={r.link} target="_blank" rel="noreferrer">
-                    <div className="web-result-title">{r.title}</div>
-                    {r.desc && <div className="web-result-desc">{r.desc.slice(0,160)}</div>}
-                    <div className="web-result-src">{r.source}{r.pubDate && <span className="web-result-date"> · {fmtDate(r.pubDate)}</span>}</div>
-                  </a>
-                ))}
-              </div>
-            )}
-
-            {/* v20: Topics chips mirrored at bottom of feed — mid-scroll filter access */}
-            {catKws.length > 0 && !activeKw && (
-              <div className="bottom-topics">
-                <div className="bottom-topics-label">Filter by topic</div>
-                <div className="bottom-topics-chips">
-                  {catKws.map((k, i) => (
-                    <span key={i}
-                      className="kw-chip"
-                      style={{background:cc.bg,color:cc.color}}
-                      onClick={()=>{setActiveKw(k); window.scrollTo({top:0, behavior:'smooth'});}}>
-                      {k}
-                    </span>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {/* Across MyNewsHub moved up — it now renders right after State of Play
-                (Pass H item 6, see <AcrossHub> above), not at the page bottom. */}
-
-            <SocialFollows cat={cat} social={social}/>
-            <SourceFooter cat={cat} feeds={feeds} arts={arts}/>
-          </div>{/* /feed-col */}
-          <Sidebar cat={cat} hideSopMobile voicesNode={voicesStripFor(cat)} arts={arts} kw={kw} health={health} onAsk={setChatContext}
-            activeKw={activeKw} setActiveKw={k=>{setActiveKw(k);setActiveSrc(null);}}
-            activeSource={activeSrc} setActiveSource={s=>{setActiveSrc(s);setActiveKw(null);}}
-            onRead={onRead}
-            showScoreboard={cat==='sports'} recommended={recommended}
-            favTeams={[...teams, ...myTeams.map(t=>({match:t.name, league:t.league}))]}
-            onTopicOpen={label => navigate(cat, 'topic', teamSlug(label))}
-            isTopicFollowed={isTopicFollowed} toggleTopic={toggleTopic}
-            sopItems={!activeKw && !activeSrc && !search ? sopSourceItems : null}
-            sopGapItems={gapItems} sopBreakingItems={!activeKw && !activeSrc && !search ? catBreaking : []} sopMeta={CATS[cat]||CATS.general}
-            sopCollapsed={sopCollapsed} onToggleSop={toggleSop} formatDate={fmtDate}
-            acrossSections={isHome && !activeKw && !activeSrc && !search ? otherCatSections : null}
-            onAcrossSeeAll={handleTabChange}
-            followingModule={followingModule}
-            feeds={feeds} onToggleFeed={(c,name)=>setFeeds(prev=>{const next=JSON.parse(JSON.stringify(prev));const f=(next[c]||[]).find(x=>x.name===name);if(f){f.on=!f.on;sv('feeds',next);}return next;})}
-            showBriefing={isHome} onOpenBriefing={() => handleTabChange('briefing')} briefingExcludeCats={briefingExclude}/>
-        </div>{/* /page-grid */}
-      </div>
-    );
-  };
+  // J3: FeedPage hoisted to a module-level component (see above); rendered below as
+  // <FeedPage cat={tab} ctx={feedCtx}/> so App re-renders do not remount it.
 
   // ─── BRIEFING PAGE (v20) ───────────────────────────────────────────────
   // Full-page dedicated digest. Uses the same enhanced MorningBriefingInline
@@ -10698,7 +10704,15 @@ export default function App() {
                 followTeam, unfollowTeam, toggleTopic, loadCat, applyPending, refreshAll,
                 openCustomize, getRelated, voicesStripFor,
               }}/>}
-              {NEWS_CATS.filter(c=>c!=='sports').includes(tab)&&<FeedPage cat={tab}/>}
+              {NEWS_CATS.filter(c=>c!=='sports').includes(tab)&&<FeedPage cat={tab} ctx={{
+                activeKw, activeSrc, applyPending, arts, breakingItems, briefingExclude, feedHealth,
+                feeds, followTeam, followedTeams, handleTabChange, health, isSavedFn, isTeamFollowed,
+                isTopicFollowed, kw, kwMatch, lastUpdated, loadCat, loading, myTeams, myTopics, navigate, onRead,
+                onSave, openCustomize, pendingNew, recommended, refreshAll, refreshVoiceSignals, search,
+                setActiveKw, setActiveSrc, setChatContext, setFeeds, setPerspArticle, setSearch, social,
+                sorted, sourceRecs, srcWebLoading, srcWebResults, subcat, tab, teams, toggleTopic,
+                unfollowTeam, urgent, voicesStripFor, webLoading, webResults,
+              }}/>}
               {tab==='finance'&&<FinancePage/>}
               {tab==='podcasts'&&(
                 <Suspense fallback={<PodPageSkeleton/>}>
