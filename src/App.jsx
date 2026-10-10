@@ -1458,6 +1458,9 @@ body{
    Goal: present but unobtrusive — data visible
    when you look, invisible when you don't
 ═══════════════════════════════════════════ */
+/* L1: the scores + markets block is NON-sticky (scrolls away); only .topbar-wrap (the
+   nav, and on mobile the chips) is sticky, so the pinned bar is just the nav. */
+.header-scroll{position:relative;z-index:290;}
 .topbar-wrap{position:sticky;top:0;z-index:300;}
 /* Mobile notch: fill the status-bar strip with the bar's own surface and push the
    header below it (viewport-fit=cover lets content sit under the notch). 0 on
@@ -1486,7 +1489,7 @@ body{
    Dark ESPN theme so the homepage strip matches the Sports-page strip (item 6). */
 .topbar-scores{background:var(--surface2);border-bottom:1px solid var(--border2);}
 .topbar-scores .home-scores{max-width:1400px;margin:0 auto;padding:4px var(--s4) 5px;border:none;border-radius:0;background:none;overflow:visible;}
-.topbar-wrap.shrunk .topbar-scores{display:none;}
+/* L1: scores now scroll away in .header-scroll (not hidden on shrink). */
 /* Right-edge fade cue: partial cards read as "scroll for more," not a cutoff. */
 .topbar-scores .home-scores,.sports-score-strip{position:relative;}
 .topbar-scores .home-scores::after,.sports-score-strip::after{
@@ -4268,16 +4271,15 @@ body{overscroll-behavior-y:contain;}
   .pill-chg{font-size:9px;padding:1px 5px;}
 
   /* F7: default-collapsed market ticker — the header toggle reclaims the ~34px strip. */
-  .topbar-wrap.ticker-collapsed .status-strip{display:none;}
+  .header-scroll.ticker-collapsed .status-strip{display:none;}
   .mobile-ticker-toggle.on{color:var(--accent);border-color:var(--accent);}
   /* F7: when the header auto-hides on scroll-down, the wrap no longer slides fully away.
      The logo row + ticker + weather + scores hide, but the category CHIPS stay pinned at
      the top (under env(safe-area-inset-top), already on .topbar-wrap) so switching
      sections stays one tap while reading — no overlap, no dead zone. */
+  /* L1: on mobile, scroll-down hides only the compact mobile header/search; the chips
+     stay pinned. Scores/markets are no longer in here — they scroll away above the nav. */
   .topbar-wrap.hidden{transform:none;}
-  .topbar-wrap.hidden .status-strip,
-  .topbar-wrap.hidden .topbar-wx,
-  .topbar-wrap.hidden .topbar-scores,
   .topbar-wrap.hidden .mobile-header,
   .topbar-wrap.hidden .mobile-search{display:none;}
 
@@ -5590,7 +5592,9 @@ kbd{display:inline-block;padding:1px 5px;border:1px solid var(--border);border-r
 .topbar-wrap{transition:box-shadow 0.2s;}
 .topbar-wrap.shrunk .pill-bar{max-height:0;padding-top:0;padding-bottom:0;overflow:hidden;opacity:0;transition:all 0.22s ease;}
 .topbar-wrap.shrunk .logo-tag,.topbar-wrap.shrunk .mobile-logo-sub{display:none;}
-.topbar-wrap.shrunk .nav-bar-inner{padding-top:6px;padding-bottom:6px;}
+/* L1: the pinned nav slims on scroll (48px incl. borders vs 58px) so the pinned bar is
+   ~45% shorter than the old full masthead on iPad landscape. */
+.topbar-wrap.shrunk .nav-bar-inner{height:44px;}
 .topbar-wrap.shrunk{box-shadow:0 2px 12px rgba(0,0,0,0.08);}
 .pill-bar{transition:max-height 0.22s ease,opacity 0.22s ease;}
 
@@ -7850,7 +7854,13 @@ function TopBar({tab, setTab, search, setSearch, dark, setDark,
 
   return (
     <>
-    <div className={`topbar-wrap ${hidden?'hidden':''} ${shrunk?'shrunk':''} ${tickerOpen?'':'ticker-collapsed'}`}>
+    {/* L1: SCORES -> Markets/weather live in a NON-sticky block that scrolls away; only
+        the nav below stays pinned. Scores are General-only; markets show on every page.
+        The mobile ticker-collapse class rides here now (the strip moved out of the nav). */}
+    <div className={`header-scroll ${tickerOpen?'':'ticker-collapsed'}`}>
+      {tab==='general' && (
+        <div className="topbar-scores"><ActiveScoresBar favTeams={favTeams} onGoToSports={onGoToSports}/></div>
+      )}
       {/* Unified status strip — collapses the old weather + ticker + breaking bars
           into one slim row: live/breaking signal LEFT, market ticker CENTER,
           compact weather chip RIGHT. Red is a signal here, never a texture. */}
@@ -7890,6 +7900,14 @@ function TopBar({tab, setTab, search, setSearch, dark, setDark,
           )}
         </div>
       </div>
+      {/* Home weather band (<900px, where it is NOT merged onto the ticker line). */}
+      {tab==='general' && weatherData.length > 0 && (
+        <div className="topbar-wx"><RightNowWeather data={weatherData}/></div>
+      )}
+    </div>
+
+    {/* L1: STICKY block — only the nav (and, on mobile, the pinned chips). */}
+    <div className={`topbar-wrap ${hidden?'hidden':''} ${shrunk?'shrunk':''}`}>
 
       {/* ━━━ DESKTOP: nav bar ━━━ */}
       <div className="nav-bar">
@@ -8043,17 +8061,8 @@ function TopBar({tab, setTab, search, setSearch, dark, setDark,
         )}
       </div>
     </div>
-    {/* I0.3: Home weather + scores moved OUT of the sticky masthead so the sticky header
-        (ticker + nav) is a constant height on every page — no content jump Home<->Sports,
-        and nothing can sit under the nav. They scroll as the first page content on Home. */}
-    {tab==='general' && (
-      <div className="home-subbands">
-        <div className="topbar-wx"><RightNowWeather data={weatherData}/></div>
-        <div className="topbar-scores">
-          <ActiveScoresBar favTeams={favTeams} onGoToSports={onGoToSports}/>
-        </div>
-      </div>
-    )}
+    {/* L1: scores + markets/weather now live in the non-sticky header-scroll block ABOVE
+        the nav (see top of this component); the old home-subbands block is retired. */}
     </>
   );
 }
