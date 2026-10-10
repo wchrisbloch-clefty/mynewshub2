@@ -20,7 +20,7 @@
 // Renders nothing when fewer than 3 ranked items AND no breaking items. Styling:
 // co-located StateOfPlay.css + design tokens (src/styles/tokens.css).
 
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { FollowSourceChip } from '../follow-source';
 import { selectStateOfPlay } from './select';
 import './StateOfPlay.css';
@@ -50,6 +50,9 @@ export function StateOfPlay({ items, meta = {}, onRead, onAsk, formatDate = defa
   const { breaking, top, gaps } = useMemo(
     () => selectStateOfPlay({ items, breakingItems, gapItems }),
     [items, breakingItems, gapItems]);
+  // K5: the follow action for a coverage-gap row lives behind a quiet per-row menu
+  // (hover on desktop, tap the ⋯ on mobile) instead of an always-visible "+ Follow" pill.
+  const [openMenu, setOpenMenu] = useState(null);
 
   // Need a real ranked list OR something breaking to hang the module on.
   if (top.length < 3 && !breaking.length) return null;
@@ -101,41 +104,43 @@ export function StateOfPlay({ items, meta = {}, onRead, onAsk, formatDate = defa
         {gaps.map((g, i) => {
           const outlets = (g.outlets && g.outlets.length ? g.outlets : [g.source]).filter(Boolean);
           const num = String(top.length + i + 1).padStart(2, '0');
-          const outletText = outlets.length > 0
-            ? `${outlets.slice(0, 2).join(', ')}${g.outletCount > 2 ? ` +${g.outletCount - 2}` : ''}` : '';
-          // Sidebar: stack the badge/outlets under the headline and put Follow on its
-          // own right-aligned line — the inline row is too wide for 32% (Pass J item 2).
+          const n = g.outletCount || outlets.length;
+          const key = g.link || `gap-${i}`;
+          // K5: no "Not in your sources" pill, no always-visible Follow. Source names +
+          // "N sources" only; Follow sits in a quiet ⋯ menu (hover desktop / tap mobile).
+          const srcText = outlets.slice(0, 2).join(', ') + (outlets.length > 2 ? ` +${outlets.length - 2}` : '');
+          const meta = (
+            <span className="sop-item-meta">
+              {n > 1 && <span className="sources-tag sop-item-sources">{n} sources</span>}
+              {srcText && <span className="sop-item-time">{srcText}</span>}
+              {outlets[0] && (
+                <span className="sop-row-menu" onClick={e => { e.preventDefault(); e.stopPropagation(); setOpenMenu(openMenu === key ? null : key); }}>
+                  <button className="sop-row-menu-btn" aria-label="Row options" aria-expanded={openMenu === key}>⋯</button>
+                  {openMenu === key && (
+                    <span className="sop-row-menu-pop" onClick={e => e.preventDefault()}>
+                      <FollowSourceChip name={outlets[0]}/>
+                    </span>
+                  )}
+                </span>
+              )}
+            </span>
+          );
           if (sidebar) {
             return (
-              <a key={g.link || `gap-${i}`} className="sop-item sop-item-gap sop-item-gap-stacked" href={g.link}
-                target="_blank" rel="noreferrer">
+              <a key={key} className="sop-item sop-item-gap sop-item-gap-stacked" href={g.link} target="_blank" rel="noreferrer">
                 <div className="sop-gap-headline">
                   <span className="sop-num sop-num-gap">{num}</span>
                   <span className="sop-item-title">{g.title}</span>
                 </div>
-                <div className="sop-gap-below">
-                  <span className="sop-gap-tag" style={{ borderColor: color, color }}>Not in your sources</span>
-                  {outletText && <span className="sop-item-time">{outletText}</span>}
-                </div>
-                {outlets[0] && (
-                  <div className="sop-gap-follow" onClick={e => e.preventDefault()}>
-                    <FollowSourceChip name={outlets[0]}/>
-                  </div>
-                )}
+                <div className="sop-gap-below">{meta}</div>
               </a>
             );
           }
           return (
-            <a key={g.link || `gap-${i}`} className="sop-item sop-item-gap" href={g.link}
-              target="_blank" rel="noreferrer">
+            <a key={key} className="sop-item sop-item-gap" href={g.link} target="_blank" rel="noreferrer">
               <span className="sop-num sop-num-gap">{num}</span>
               <span className="sop-item-title">{g.title}</span>
-              <span className="sop-item-meta">
-                <span className="sop-gap-tag" style={{ borderColor: color, color }}>Not in your sources</span>
-                {outletText && <span className="sop-item-time">{outletText}</span>}
-                {/* Follow the lead outlet straight from the gap row (Pass G item 7). */}
-                {outlets[0] && <FollowSourceChip name={outlets[0]}/>}
-              </span>
+              {meta}
             </a>
           );
         })}

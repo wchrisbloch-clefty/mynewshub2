@@ -62,3 +62,13 @@
 .sop-gap-below{display:flex;flex-wrap:wrap;align-items:center;gap:6px;padding-left:26px;}
 .sop-gap-below .sop-item-time{white-space:normal;}
 .sop-gap-follow{padding-left:26px;display:flex;justify-content:flex-end;}
+
+/* K5: quiet per-row menu for the coverage-gap Follow action (replaces the always-on
+   "Not in your sources" pill + "+ Follow" chip). Hidden until hover (desktop) / faint
+   on touch; the ⋯ reveals the Follow control in a small popover. Tokens only. */
+.sop-row-menu{position:relative;display:inline-flex;align-items:center;}
+.sop-row-menu-btn{border:none;background:none;color:var(--text3);cursor:pointer;font-size:15px;line-height:1;padding:2px 5px;border-radius:5px;opacity:0;transition:opacity .12s,background .12s;}
+.sop-item:hover .sop-row-menu-btn,.sop-row-menu-btn[aria-expanded="true"]{opacity:1;}
+@media (hover:none){ .sop-row-menu-btn{opacity:.55;} }
+.sop-row-menu-btn:hover{background:var(--surface2);color:var(--text);}
+.sop-row-menu-pop{position:absolute;right:0;top:calc(100% + 4px);z-index:30;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:6px 8px;box-shadow:var(--shadow-md);white-space:nowrap;}

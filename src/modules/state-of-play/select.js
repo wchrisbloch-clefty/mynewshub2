@@ -8,11 +8,12 @@
 // deduped against each other by clusterKey (the shared cluster-identity normalization).
 import { rankClusters, sameStory } from '../clustering/index.js';
 import { isSatire } from '../satire/index.js';
+import { isPromoItem } from '../breaking/index.js';
 
 export function selectStateOfPlay({ items = [], breakingItems = [], gapItems = [] } = {}) {
-  // Satire (The Onion, Babylon Bee, …) is excluded from State of Play by rule (I0.8).
-  const noSatire = arr => (arr || []).filter(a => !isSatire(a));
-  items = noSatire(items); breakingItems = noSatire(breakingItems); gapItems = noSatire(gapItems);
+  // Satire (I0.8) AND promo/sponsored (K3) are excluded from State of Play by rule.
+  const clean = arr => (arr || []).filter(a => !isSatire(a) && !isPromoItem(a));
+  items = clean(items); breakingItems = clean(breakingItems); gapItems = clean(gapItems);
   // Breaking rows fold in at the TOP (top 3).
   const breaking = breakingItems.slice(0, 3);
   const notSameAsAny = (row, shown) => !shown.some(s => sameStory(row, s));

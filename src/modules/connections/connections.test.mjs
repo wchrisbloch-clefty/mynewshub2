@@ -45,6 +45,11 @@ const F = [
   // T6: shared term is a generic/stoplisted word only
   { id: 'T6a', cat: 'popculture', source: 'Pitchfork', title: 'The music market booms this year', pubDate: t(95) },
   { id: 'T6b', cat: 'business', source: 'Economist', title: 'Energy market shifts fast this year', pubDate: t(100) },
+  // K5 ALIAS traps: two articles that share only ONE person in two surface forms
+  // ("President Trump" + "Trump"). Before alias-merge they looked like 2 shared entities
+  // and faked a bridge; after merge they share 1 entity -> NO bridge.
+  { id: 'T7a', cat: 'general', source: 'NPR', title: 'President Trump speaks as Trump defends the new policy', pubDate: t(102) },
+  { id: 'T7b', cat: 'business', source: 'WSJ', title: 'Trump tariffs land as President Trump signs the order', pubDate: t(104) },
 
   // ── 10 FILLERS (isolated, no cross-category 2-entity overlap) ──
   ...Array.from({ length: 10 }, (_, i) => ({ id: 'F' + i, cat: ['general', 'sports', 'popculture', 'health', 'finance'][i % 5], source: 'Filler' + i, title: `Local update number ${i} about a neighbourhood meeting`, pubDate: t(120 + i) })),
@@ -56,7 +61,7 @@ const got = findConnections(F, { kw: KW, max: 20, catLabel: c => CATL[c] || c })
 const has = (links, a, b) => links.includes('https://ex.com/' + a) && links.includes('https://ex.com/' + b);
 const foundLinks = got.map(c => c.members.map(m => m.link));
 const bridges = [['B1a', 'B1b'], ['B2a', 'B2b'], ['B3a', 'B3b'], ['B4a', 'B4b']];
-const trapIds = ['T1a', 'T1b', 'T2', 'T3a', 'T3b', 'T4a', 'T4b', 'T5a', 'T5b', 'T6a', 'T6b'];
+const trapIds = ['T1a', 'T1b', 'T2', 'T3a', 'T3b', 'T4a', 'T4b', 'T5a', 'T5b', 'T6a', 'T6b', 'T7a', 'T7b'];
 
 let foundBridges = 0;
 for (const [a, b] of bridges) { if (foundLinks.some(ls => has(ls, a, b))) foundBridges++; }
@@ -67,7 +72,7 @@ console.log('Found connections:');
 for (const c of got) console.log(`  ${c.bridge} — shared: ${c.shared.join(', ')} — outlets: ${c.outlets} — [${c.members.map(m => m.id).join(',')}]`);
 const recall = foundBridges / bridges.length;
 const precision = got.length ? (got.length - trapsShown) / got.length : 1;
-console.log(`\nTrue bridges found: ${foundBridges}/4   Traps shown: ${trapsShown}/6`);
+console.log(`\nTrue bridges found: ${foundBridges}/4   Traps shown: ${trapsShown}`);
 console.log(`Recall: ${(recall * 100).toFixed(0)}%   Precision: ${(precision * 100).toFixed(0)}%`);
 const passAll = foundBridges === 4 && trapsShown === 0;
 console.log(passAll ? '\nPASS: 4/4 bridges found, 0 traps shown' : '\nFAIL');

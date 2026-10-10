@@ -1524,10 +1524,13 @@ body{
 @keyframes ss-pulse{0%{box-shadow:0 0 0 0 rgba(200,16,46,0.5);}70%{box-shadow:0 0 0 6px rgba(200,16,46,0);}100%{box-shadow:0 0 0 0 rgba(200,16,46,0);}}
 .ss-ticker{flex:1;min-width:0;overflow:hidden;
   /* G7f item 5: no left fade — the first symbol (S&P) is fully visible at scroll 0.
-     Only the right edge fades as a "more →" cue. */
-  -webkit-mask-image:linear-gradient(90deg,#000 0,#000 calc(100% - 24px),transparent);
-          mask-image:linear-gradient(90deg,#000 0,#000 calc(100% - 24px),transparent);}
-.ss-ticker-inner{display:flex;align-items:center;gap:var(--s4);overflow-x:auto;scrollbar-width:none;}
+     K1: a WIDER right fade (56px) so a partially-scrolled item (e.g. "BLOOM $280.50
+     +2…") fades out instead of being hard-cut by the weather divider at ~1180 — the
+     last FULLY visible item reads whole, and the fade is the "more →" cue. The ticker
+     clips only inside its own box (overflow:hidden), never under the weather. */
+  -webkit-mask-image:linear-gradient(90deg,#000 0,#000 calc(100% - 56px),transparent);
+          mask-image:linear-gradient(90deg,#000 0,#000 calc(100% - 56px),transparent);}
+.ss-ticker-inner{display:flex;align-items:center;gap:var(--s4);overflow-x:auto;scrollbar-width:none;padding-right:12px;}
 .ss-ticker-inner::-webkit-scrollbar{display:none;}
 .ss-tk{display:inline-flex;align-items:baseline;gap:6px;flex-shrink:0;
   background:none;border:none;cursor:pointer;font-family:inherit;padding:0;white-space:nowrap;}
@@ -6235,7 +6238,7 @@ function MorningBriefingInline({arts, excludeCats}) {
     // ── TIER 1: Priority briefing sources (Axios, Morning Brew, Morning Wire, Bloomberg) ──
     // Pull the latest 1-2 articles from each priority source. These are
     // labeled as "anchor" content for the AI synthesis.
-    const allArts = Object.values(arts).flat();
+    const allArts = Object.values(arts).flat().filter(a => !isPromoItem(a)); // K3
     const tier1 = [];
     const tier1Keys = new Set(); // dedup keys for Tier 2 to filter against
     briefingSourceList().forEach(srcName => {
@@ -6814,7 +6817,7 @@ function Sidebar({cat, arts, kw, health, activeKw, setActiveKw, activeSource, se
   // G6: cross-category connections over all loaded articles (AI-free). Home shows the top
   // 3 overall; a category page shows bridges that involve that category. Max 3.
   const connItems = useMemo(() => {
-    const flat = Object.entries(arts).flatMap(([c, list]) => (list || []).map(a => ({ ...a, cat: a.cat || c })));
+    const flat = Object.entries(arts).flatMap(([c, list]) => (list || []).map(a => ({ ...a, cat: a.cat || c }))).filter(a => !isPromoItem(a)); // K3
     const all = findConnections(flat, { kw: DEFAULT_KW, max: 12, catLabel: c => (CATS[c]?.label) || c });
     const scoped = cat === 'general' ? all : all.filter(c => c.categories.includes(cat));
     return scoped.slice(0, 3);
@@ -8370,6 +8373,7 @@ function FeedPage({ cat, ctx }) {
     useEffect(() => dbgMount('FeedPage'), []); // J1: remount counter
     const cc=CATS[cat];
     const [showFollowAdd, setShowFollowAdd] = useState(false);
+    const [followingOpen, setFollowingOpen] = useState(() => ld('followingOpen', false)); // K5: Following collapsed by default
     const [onboardingDismissed, setOnboardingDismissed] = useState(()=>ld('onboarded',false));
     const dismissOnboarding = () => { sv('onboarded',true); setOnboardingDismissed(true); };
     // Collapsible State of Play — expanded on first visit, choice remembered per category.
@@ -8471,7 +8475,7 @@ function FeedPage({ cat, ctx }) {
       if (!kws.length) { setCatWideItems([]); return () => { alive = false; }; }
       fetchDiscover(cat, kws, [], 'feed').then(r => {
         if (!alive) return;
-        const rows = ((r && r.items) || []).map(x => ({ ...x, cat, _tier: 'reported', _wide: true }));
+        const rows = ((r && r.items) || []).map(x => ({ ...x, cat, _tier: 'reported', _wide: true })).filter(a => !isPromoItem(a)); // K3
         setCatWideItems(rows);
       });
       return () => { alive = false; };
@@ -8625,62 +8629,62 @@ function FeedPage({ cat, ctx }) {
       // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [gapCat, gapKwKey, gapSrcKey, gapOn]);
 
+    // K5: keys of every story already on this page (Top Stories + State of Play + Houston
+    // + the numbered feed), so Across can dedupe against everything else on screen.
+    const shownKeysForAcross = useMemo(() => {
+      const s = new Set();
+      topStoryKeys.forEach(k => s.add(k)); sopShownKeys.forEach(k => s.add(k)); houstonKeys.forEach(k => s.add(k));
+      dedupedFeed.forEach(a => s.add(storyKey(a)));
+      return s;
+    }, [topStoryKeys, sopShownKeys, houstonKeys, dedupedFeed]);
+    // K5: "Across MyNewsHub" is REMOVED from General (General already spans every
+    // category) and shown on CATEGORY pages instead — the OTHER categories, promo-clean
+    // and deduped against this page's own stories (shownKeysForAcross).
     const otherCatSections = useMemo(() => {
-      if (!isHome) return [];
-      const otherCats = ['business','finance','bloom','sports','popculture'];
+      if (isHome) return [];
+      const otherCats = ['general','business','finance','bloom','sports','popculture','tech'].filter(c => c !== cat);
       return otherCats.map(c => ({
         cat: c,
         cc: CATS[c],
-        items: (arts[c] || []).slice(0, 3),
-      })).filter(s => s.items.length > 0);
-    }, [isHome, arts]);
+        items: (arts[c] || []).filter(a => !isPromoItem(a) && !shownKeysForAcross.has(storyKey(a))).slice(0, 3),
+      })).filter(s => s.items.length > 0).slice(0, 4);
+    }, [isHome, arts, cat, shownKeysForAcross]);
 
-    // Following module — relocated from the General-page full-width banner into the
-    // sidebar (Pass K item 3), rendered as a standard sidebar section with the existing
-    // follow-chip pills + "+ Add". General page only; injected into <Sidebar/> as a prop.
-    const followingModule = isHome ? (
+    // K5: Following — sidebar module on General. It now shows FOLLOWED TOPICS only;
+    // followed TEAMS live as pinned chips on the Sports page (the my-teams ribbon) and
+    // are no longer duplicated here. Collapsed by default to "Following · N" (state
+    // remembered), and the whole module is HIDDEN when N = 0. Add still adds teams or
+    // topics (teams route to Sports). Topic follow also works from Customize.
+    const followingCount = myTopics.length;
+    const followingModule = (isHome && followingCount > 0) ? (
       <div className="sidebar-section sb-following">
-        <div className="sidebar-sec-head"><span className="sidebar-sec-label">Following</span></div>
-        <div className="following-chips">
-          {(() => {
-            const nameCounts = {};
-            followedTeams.forEach(t => { const k = (t.name||'').toLowerCase(); nameCounts[k] = (nameCounts[k]||0) + 1; });
-            return followedTeams.map((t, i) => {
-              const dup = nameCounts[(t.name||'').toLowerCase()] > 1;
-              return (
-                <span key={`tm-${t.slug}-${t.league}-${i}`} className="following-chip following-chip-team">
-                  <button type="button" className="following-chip-main" onClick={()=>navigate('sports', t.league, t.slug)}>
-                    <TeamLogo name={t.name} league={t.league} size={18}/>
-                    <span className="following-chip-name">{t.name}{dup ? ` · ${(t.league||'').toUpperCase()}` : ''}</span>
-                  </button>
-                  <button type="button" className="following-chip-x" onClick={()=>unfollowTeam(t)} aria-label={`Unfollow ${t.name}`}><XIcon size={16} aria-hidden="true"/></button>
-                </span>
-              );
-            });
-          })()}
-          {myTopics.map((t, i) => (
-            <span key={`tp-${i}`} className="following-chip">
-              <button type="button" className="following-chip-main" onClick={()=>navigate('general','topic',teamSlug(t))}>
-                <span className="following-chip-name">{t}</span>
-              </button>
-              <button type="button" className="following-chip-x" onClick={()=>toggleTopic(t)} aria-label={`Unfollow ${t}`}><XIcon size={16} aria-hidden="true"/></button>
-            </span>
-          ))}
-          {followedTeams.length === 0 && myTopics.length === 0 && (
-            <span className="following-empty">Follow teams &amp; topics to build your row</span>
-          )}
-          <div className="follow-add-wrap">
-            <button className="following-add-btn" onClick={()=>setShowFollowAdd(v=>!v)} aria-expanded={showFollowAdd}>+ Add</button>
-            {showFollowAdd && (
-              <FollowAdd
-                isFollowingTeam={t => isTeamFollowed(t.name, t.league)}
-                isTopicFollowed={isTopicFollowed}
-                onAddTeam={t => followTeam(t.name, t.league)}
-                onAddTopic={topic => toggleTopic(topic)}
-                onClose={() => setShowFollowAdd(false)}/>
-            )}
+        <button className="sidebar-sec-collapse" onClick={()=>setFollowingOpen(o=>{const n=!o;sv('followingOpen',n);return n;})} aria-expanded={followingOpen}>
+          <span className="sidebar-sec-label">Following · {followingCount}</span>
+          <ChevronDown size={13} aria-hidden="true" style={{transform:followingOpen?'none':'rotate(-90deg)',transition:'transform .15s',color:'var(--text4)'}}/>
+        </button>
+        {followingOpen && (
+          <div className="following-chips">
+            {myTopics.map((t, i) => (
+              <span key={`tp-${i}`} className="following-chip">
+                <button type="button" className="following-chip-main" onClick={()=>navigate('general','topic',teamSlug(t))}>
+                  <span className="following-chip-name">{t}</span>
+                </button>
+                <button type="button" className="following-chip-x" onClick={()=>toggleTopic(t)} aria-label={`Unfollow ${t}`}><XIcon size={16} aria-hidden="true"/></button>
+              </span>
+            ))}
+            <div className="follow-add-wrap">
+              <button className="following-add-btn" onClick={()=>setShowFollowAdd(v=>!v)} aria-expanded={showFollowAdd}>+ Add</button>
+              {showFollowAdd && (
+                <FollowAdd
+                  isFollowingTeam={t => isTeamFollowed(t.name, t.league)}
+                  isTopicFollowed={isTopicFollowed}
+                  onAddTeam={t => followTeam(t.name, t.league)}
+                  onAddTopic={topic => toggleTopic(topic)}
+                  onClose={() => setShowFollowAdd(false)}/>
+              )}
+            </div>
           </div>
-        </div>
+        )}
       </div>
     ) : null;
 
@@ -8851,29 +8855,30 @@ function FeedPage({ cat, ctx }) {
                       treatment on desktop secondary rows; the lead stays a prominent card. */}
                   {/* AI & Tech only: optional GitHub street signal, click-to-load (3c). */}
                   {cat==='tech' && !activeKw && !activeSrc && !search && <GithubSignal/>}
+                  {/* K2: the mobile category header + State of Play are DECOUPLED from the
+                      feed lead — rendered once here, before the rows, so they appear with or
+                      without a lead (and even when the feed is empty). The feed itself has NO
+                      lead card now: Top Stories (above) is the single hero per page, and the
+                      article that used to be the feed lead is simply the first normal row. */}
+                  {!activeKw && !activeSrc && !search && (
+                    <div className="page-header-row phr-mobile">
+                      <span className="page-header" style={{fontFamily:'var(--font-sans)'}}>
+                        {cc.label}{feedItems.length>0?` — ${feedItems.length} articles`:''}
+                        <span style={{marginLeft:'10px'}}><LastUpdated timestamp={lastUpdated[cat]} onRefresh={() => loadCat(cat)}/></span>
+                      </span>
+                      <button className="page-customize-btn" onClick={()=>openCustomize('sources',cat)}><IconGear/> Customize</button>
+                    </div>
+                  )}
+                  {!activeKw && !activeSrc && !search && (
+                    <div className="sop-mobile">
+                      <StateOfPlay variant="sidebar" items={sopSourceItems} gapItems={gapItems} breakingItems={catBreaking}
+                        meta={CATS[cat]||CATS.general} onRead={onRead} onAsk={setChatContext} formatDate={fmtDate}
+                        collapsed={sopCollapsed} onToggleCollapse={toggleSop}/>
+                    </div>
+                  )}
                   {(activeKw||activeSrc||search ? feedItems.slice(0,20) : dedupedFeed.slice(0,20)).map((a,i)=>(
                     <Fragment key={a.link||i}>
-                      <SnapshotCard a={a} meta={CATS[cat]||CATS.general} isSaved={isSavedFn(a)} onSave={onSave} onRead={onRead} onPerspectives={setPerspArticle} onAsk={setChatContext} formatDate={fmtDate} opinionLabel={opinionLabel(a)} hideImage={i>=3} lead={i===0 && !activeKw && !activeSrc && !search}/>
-                      {/* Review item 5: on mobile the category header moves BELOW the lead so
-                          the lead is the first element in the body (desktop copy is hidden). */}
-                      {i===0 && !activeKw && !activeSrc && !search && (
-                        <div className="page-header-row phr-mobile">
-                          <span className="page-header" style={{fontFamily:'var(--font-sans)'}}>
-                            {cc.label}{feedItems.length>0?` — ${feedItems.length} articles`:''}
-                            <span style={{marginLeft:'10px'}}><LastUpdated timestamp={lastUpdated[cat]} onRefresh={() => loadCat(cat)}/></span>
-                          </span>
-                          <button className="page-customize-btn" onClick={()=>openCustomize('sources',cat)}><IconGear/> Customize</button>
-                        </div>
-                      )}
-                      {/* D5 fix 1: on mobile, State of Play sits directly under the lead (the
-                          sidebar copy is hidden on mobile via hideSopMobile). Mobile-only. */}
-                      {i===0 && !activeKw && !activeSrc && !search && (
-                        <div className="sop-mobile">
-                          <StateOfPlay variant="sidebar" items={sopSourceItems} gapItems={gapItems} breakingItems={catBreaking}
-                            meta={CATS[cat]||CATS.general} onRead={onRead} onAsk={setChatContext} formatDate={fmtDate}
-                            collapsed={sopCollapsed} onToggleCollapse={toggleSop}/>
-                        </div>
-                      )}
+                      <SnapshotCard a={a} meta={CATS[cat]||CATS.general} isSaved={isSavedFn(a)} onSave={onSave} onRead={onRead} onPerspectives={setPerspArticle} onAsk={setChatContext} formatDate={fmtDate} opinionLabel={opinionLabel(a)} hideImage={i>=3} lead={false}/>
                       {i===2 && <XPulse topic={cc?.label||cat} variant="feed"/>}
                     </Fragment>
                   ))}
@@ -8915,7 +8920,7 @@ function FeedPage({ cat, ctx }) {
               <div className="web-fallback">
                 <div className="rail-label" style={{margin:'24px 0 12px'}}>From the Web</div>
                 {webLoading && <div style={{fontSize:'12px',color:'var(--text3)',fontStyle:'italic',padding:'10px 0'}}>Searching the web…</div>}
-                {webResults.map((r,i) => (
+                {webResults.filter(r => !isPromoItem(r)).map((r,i) => ( /* K3 */
                   <a key={i} className="web-result" href={r.link} target="_blank" rel="noreferrer">
                     <div className="web-result-title">{r.title}</div>
                     {r.desc && <div className="web-result-desc">{r.desc.slice(0, 160)}</div>}
@@ -9001,7 +9006,7 @@ function FeedPage({ cat, ctx }) {
             sopItems={!activeKw && !activeSrc && !search ? sopSourceItems : null}
             sopGapItems={gapItems} sopBreakingItems={!activeKw && !activeSrc && !search ? catBreaking : []} sopMeta={CATS[cat]||CATS.general}
             sopCollapsed={sopCollapsed} onToggleSop={toggleSop} formatDate={fmtDate}
-            acrossSections={isHome && !activeKw && !activeSrc && !search ? otherCatSections : null}
+            acrossSections={!isHome && !activeKw && !activeSrc && !search ? otherCatSections : null}
             onAcrossSeeAll={handleTabChange}
             followingModule={followingModule}
             feeds={feeds} onToggleFeed={(c,name)=>setFeeds(prev=>{const next=JSON.parse(JSON.stringify(prev));const f=(next[c]||[]).find(x=>x.name===name);if(f){f.on=!f.on;sv('feeds',next);}return next;})}
@@ -9438,6 +9443,7 @@ export default function App() {
     if(activeKw) arr=arr.filter(a=>(a.title+(a.desc||'')).toLowerCase().includes(activeKw.toLowerCase()));
     if(activeSrc) arr=arr.filter(a=>a.source===activeSrc);
     arr=dedupe(arr);
+    arr = arr.filter(a => !isPromoItem(a)); // K3 defense-in-depth (arts is already promo-clean at load)
     if(cat==='general') {
       arr=arr.filter(a=>{
         if(a.link&&specificCatKeys.has(a.link))return false;
@@ -9464,7 +9470,11 @@ export default function App() {
     setHealth(h=>({...h,...hUpdates}));
     setFeedHealth(h=>({...h,...fhUpdates}));
     results.sort((a,b)=>new Date(b.pubDate)-new Date(a.pubDate));
-    setArts(a=>({...a,[cat]:results}));
+    // K3: strip promo/sponsored at the SOURCE so no surface (Top Stories, feed, Houston,
+    // State of Play, Across, Briefing, Connections) can ever show them. ?debug=1 tallies.
+    const clean = results.filter(a=>!isPromoItem(a));
+    if (DEBUG && typeof window !== 'undefined' && window.__dbg) window.__dbg.promo = (window.__dbg.promo||0) + (results.length - clean.length);
+    setArts(a=>({...a,[cat]:clean}));
     setPendingNew(p=>({...p,[cat]:[]}));   // fresh load supersedes any staged items
     setLastUpdated(prev => ({...prev, [cat]: Date.now()}));
     setLoading(l=>({...l,[cat]:false}));
@@ -9479,7 +9489,7 @@ export default function App() {
       items.forEach(i=>{if(i.title&&i.link)results.push({...i,source:f.name,cat,_tier:f.tier||'reported'});});
     }));
     results.sort((a,b)=>new Date(b.pubDate)-new Date(a.pubDate));
-    return results;
+    return results.filter(a=>!isPromoItem(a)); // K3: background poll is promo-clean too
   },[feeds]);
 
   // v46: "N new stories" — prepend staged articles for a category and jump to top.

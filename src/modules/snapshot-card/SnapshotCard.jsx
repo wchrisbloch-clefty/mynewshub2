@@ -34,8 +34,12 @@ export function SnapshotCard({ a, meta = {}, isSaved, onSave, onRead, onPerspect
   const hasImg = a.img && !imgErr && !hideImage;
   const heroImg = lead && hasImg;
   return (
-    <article className={`snap-card ${a.isAlert ? 'snap-breaking' : ''}${lead ? ' snap-lead' : ''}${lead && !hasImg ? ' snap-lead-noimg' : ''}${heroImg ? ' snap-lead-hero' : ''}`} onClick={() => onRead(a)}>
-      <span className="snap-accent" style={{ background: color }} />
+    <article className={`snap-card ${a.isAlert ? 'snap-breaking' : ''}${lead ? ' snap-lead' : ''}${lead && !hasImg ? ' snap-lead-noimg' : ''}${heroImg ? ' snap-lead-hero' : ''}${!heroImg ? ' snap-row' : ''}`} onClick={() => onRead(a)}>
+      {/* K6: STANDARD row — the image is on the LEFT at a fixed 4:3 (112x84 / 88x66),
+          its space reserved via aspect-ratio so nothing shifts; a text-only row keeps
+          the same min-height so the list rhythm holds (no placeholder tile). The accent
+          left bar + card box chrome are removed in CSS. */}
+      {!heroImg && hasImg && <img className="snap-thumb" src={a.img} loading="lazy" decoding="async" alt="" onError={() => setImgErr(true)} />}
       {heroImg && (
         <div className="snap-hero-media">
           <img className="snap-hero-img" src={a.img} loading="lazy" alt="" onError={() => setImgErr(true)} />
@@ -95,7 +99,6 @@ export function SnapshotCard({ a, meta = {}, isSaved, onSave, onRead, onPerspect
           </span>
         </div>
       </div>
-      {!heroImg && hasImg && <img className="snap-thumb" src={a.img} loading="lazy" alt="" onError={() => setImgErr(true)} />}
     </article>
   );
 }

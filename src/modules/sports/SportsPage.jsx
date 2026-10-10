@@ -9,6 +9,7 @@ import { StateOfPlay } from '../state-of-play';
 import { SnapshotCard } from '../snapshot-card';
 import { XPulse } from '../x-pulse';
 import { dbgRender, dbgMount } from '../debug';
+import { isPromoItem } from '../breaking'; // K3: promo filter for the team wide/gap scans
 
 export function SportsPage({ ctx }) {
   const { tab, subcat, tertiary, arts, loading, kw, teams, myTeams, followedTeams, activeTeam, activeKw, activeSrc, breakingItems, feeds, health, lastUpdated, pendingNew, recommended, search, sorted, setActiveTeam, setActiveKw, setActiveSrc, setChatContext, setPerspArticle, setSearch, navigate, onRead, onSave, isSavedFn, isReadFn, isTeamFollowed, isTopicFollowed, followTeam, unfollowTeam, toggleTopic, loadCat, applyPending, refreshAll, openCustomize, getRelated, voicesStripFor, CATS, CoverImg, EmptyState, FeedCard, IconGear, LEAGUES, LastUpdated, Sidebar, SourceFooter, SourcesDisagree, SportsScoreStrip, TEAM_CHIPS, TeamLogo, TrendingPills, storyKey, fmtDate, teamSlug, teamScanKeyword, fetchDiscover, fetchWebSearch, ld, sv, opinionLabel } = ctx;
@@ -69,7 +70,7 @@ export function SportsPage({ ctx }) {
       let alive = true;
       if (!teamEntityName) { setTeamWideItems([]); return () => { alive = false; }; }
       const kw = teamScanKeyword(teamEntityName, teamEntityLeague);
-      fetchDiscover('sports', [kw], [], 'feed').then(r => { if (alive) setTeamWideItems((r && r.items) || []); });
+      fetchDiscover('sports', [kw], [], 'feed').then(r => { if (alive) setTeamWideItems(((r && r.items) || []).filter(a => !isPromoItem(a))); });
       return () => { alive = false; };
       // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [teamEntityName, teamEntityLeague]);
@@ -182,7 +183,7 @@ export function SportsPage({ ctx }) {
       let alive = true;
       if (!teamName) { setTeamGapItems([]); return () => { alive = false; }; }
       const srcs = (feeds.sports || []).filter(f => f.on).map(f => f.name);
-      fetchDiscover('sports', [teamName], srcs).then(r => { if (alive) setTeamGapItems((r && r.items) || []); });
+      fetchDiscover('sports', [teamName], srcs).then(r => { if (alive) setTeamGapItems(((r && r.items) || []).filter(a => !isPromoItem(a))); });
       return () => { alive = false; };
       // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [teamName]);
