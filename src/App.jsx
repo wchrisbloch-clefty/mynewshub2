@@ -4293,7 +4293,14 @@ body{overscroll-behavior-y:contain;}
      order it to the TOP of the feed column so breaking is on the first screen — the Top
      Stories hero is ~736px tall here and would otherwise push it off-screen. */
   .feed-col{display:flex;flex-direction:column;}
-  .sop-hoist{display:block;order:-1;margin-bottom:18px;}
+  /* Q4: reserve the hoisted State-of-Play slot PERMANENTLY (260px on the container, not just
+     while loading) so it never collapses-then-reappears as cross-category breaking streams in
+     — that null->content toggle (when isLoading dropped before breaking had arrived) was the
+     big 1024 CLS spike. The .sop-strip also floors at 260 so later breaking fills the reserve
+     instead of growing it. On home State of Play is essentially always present, so the loaded
+     layout is unchanged (the breaking fixture fills the 260 exactly). */
+  .sop-hoist{display:block;order:-1;margin-bottom:18px;min-height:260px;}
+  .sop-hoist .sop-strip{min-height:260px;}
 }
 @media (max-width:640px){
   .whisper-bar{display:none;}
@@ -5409,13 +5416,22 @@ kbd{display:inline-block;padding:1px 5px;border:1px solid var(--border);border-r
 
 /* ── TOP OF HOUR STRIP ─────────────────────────────────────────── */
 .toh-strip{margin-bottom:28px;}
-/* P2/A4: reserve the Top Stories band while the feed loads so it does not appear from
-   nothing and shove the page (desktop/iPad CLS). Heights match a loaded strip: ~400px in
-   the two-column layout (>=900px) and ~740px where it stacks to one column (641–899px).
-   Mobile Home uses <MobileHome/> (own reserves), so this is not needed at <=640. */
+/* Q4: reserve the Top Stories band's FINAL height so it does not grow as the cross-category
+   picks fill in (the dominant desktop/iPad shifter). The min-height is kept at/below the
+   loaded height at each breakpoint so the loaded layout is unchanged: ~388px in the
+   two-column layout (>=900px; loaded 392–408) and ~720px where it stacks to one column
+   (641–899px; loaded ~736 at iPad portrait). The .toh-reserve placeholder (shown for the
+   brief fully-empty moment before the first pick) uses the same heights. Mobile category
+   pages (<=640) keep their short 1-col strip (no reserve); the phone Home uses <MobileHome/>. */
+.toh-strip{min-height:400px;}
 .toh-reserve{min-height:400px;margin-bottom:28px;}
-@media(min-width:641px) and (max-width:899px){ .toh-reserve{min-height:740px;} }
-@media(max-width:640px){ .toh-reserve{display:none;} }
+@media(min-width:641px) and (max-width:899px){ .toh-strip,.toh-reserve{min-height:720px;} }
+@media(min-width:1280px){ .toh-strip,.toh-reserve{min-height:410px;} } /* loaded ~408 at 1440 */
+@media(max-width:640px){ .toh-strip{min-height:0;} .toh-reserve{display:none;} }
+/* Q4: reserve the sidebar State of Play (desktop 2-col) the same way as the hoisted copy,
+   so its cross-category breaking growth does not shove the rail modules below it. The
+   desktop sidebar copy shows more ranked rows (~327px loaded) than the iPad hoist (~257px). */
+@media(min-width:1101px){ .sidebar .sop-strip{min-height:330px;} .sidebar-sop{min-height:330px;} }
 .toh-strip-head{
   display:flex;align-items:center;justify-content:space-between;
   margin-bottom:14px;
@@ -5440,6 +5456,9 @@ kbd{display:inline-block;padding:1px 5px;border:1px solid var(--border);border-r
 .toh-lead-col .toh-card-lead{align-self:stretch;width:100%;max-height:210px;}
 .toh-lead-col .toh-card-lead .toh-img{object-fit:cover;}
 .toh-side{display:flex;flex-direction:column;min-width:0;}
+/* Q4: reserve the Top Stories right column (3 compact rows) so the rows filling in — and
+   the picks churning as cross-category data streams — do not shift the band. */
+@media(min-width:900px){ .toh-side{min-height:360px;} }
 .toh-card{
   border-radius:var(--radius);overflow:hidden;cursor:pointer;
   transition:transform 0.2s,box-shadow 0.2s;
@@ -5511,9 +5530,12 @@ kbd{display:inline-block;padding:1px 5px;border:1px solid var(--border);border-r
 .toh-compact-row{
   display:flex;align-items:flex-start;gap:14px;text-align:left;cursor:pointer;
   background:none;border:none;border-bottom:1px solid var(--border2);
-  padding:12px 0;font-family:inherit;transition:background 0.12s;min-height:84px;
+  padding:12px 0;font-family:inherit;transition:background 0.12s;min-height:120px;
 }
 .toh-compact-row:first-child{border-top:1px solid var(--border2);}
+/* Q4: a fixed 3-line title box so a compact row is the SAME height whether the pick that
+   streams in has a 1- or 3-line headline — the picks churning no longer shift the rows. */
+@media(min-width:900px){ .toh-compact-title{min-height:3.72em;} }
 .toh-compact-row:hover{background:var(--surface2);}
 .toh-compact-thumb{
   width:112px;height:84px;aspect-ratio:4/3;flex-shrink:0;object-fit:cover;
@@ -6985,7 +7007,10 @@ function Sidebar({cat, arts, kw, health, activeKw, setActiveKw, activeSource, se
 
       {/* 1) STATE OF PLAY — moved into the sidebar (Pass J item 2), consistent
             sidebar-module styling, Coverage-Gap rows in a stacked (non-inline) layout. */}
-      {sopItems && !activeKw && !activeSource && (
+      {/* Q4: render the wrapper whenever sopItems is an array (even empty) so the desktop
+         sidebar State-of-Play slot is reserved from first paint — it then fills as breaking
+         streams in instead of appearing and shoving the rail modules below it. */}
+      {Array.isArray(sopItems) && !activeKw && !activeSource && (
         <div className={hideSopMobile ? 'sidebar-sop sop-hide-mobile' : 'sidebar-sop'}>
           <StateOfPlay variant="sidebar" items={sopItems} gapItems={sopGapItems||[]} breakingItems={sopBreakingItems||[]}
             meta={sopMeta||cc} onRead={onRead} onAsk={onAsk} formatDate={formatDate||fmtDate}
@@ -8886,6 +8911,9 @@ function FeedPage({ cat, ctx }) {
             would otherwise bury it. On desktop this copy is display:none and the sidebar
             copy renders instead (see .sop-hoist CSS). */}
         {!activeKw && !activeSrc && !search && (
+          /* Q4: at iPad portrait this hoisted State of Play sits at the TOP (Q2, order:-1);
+             its slot is reserved permanently in CSS (.sop-hoist min-height) so breaking
+             streaming in never shoves Top Stories + the feed. */
           <div className="sop-hoist">
             <StateOfPlay variant="sidebar" items={sopSourceItems} gapItems={gapItems} breakingItems={catBreaking}
               meta={CATS[cat]||CATS.general} onRead={onRead} onAsk={setChatContext} formatDate={fmtDate}
@@ -8961,7 +8989,10 @@ function FeedPage({ cat, ctx }) {
             )}
             {isLoading&&!feedItems.length
               ?<div className="snap-feed" data-no-swipe aria-busy="true" aria-label={`Loading ${cc.label}`}>
-                  {Array.from({length:6}).map((_,i)=>(
+                  {/* Q4: skeleton count = the rows expected to fill the viewport (~160px each),
+                      not a fixed 6, so the loading state covers the first screen and the
+                      skeleton->content swap shifts nothing above the fold. */}
+                  {Array.from({length: Math.min(12, Math.max(4, Math.ceil((typeof window!=='undefined'?window.innerHeight:800)/160)))}).map((_,i)=>(
                     <div key={i} className="snap-card snap-skel">
                       <div className="snap-accent"/>
                       <div className="snap-skel-main">
