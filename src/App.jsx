@@ -82,7 +82,8 @@ const prefetchLazy = () => { import('./modules/concierge'); import('./modules/vo
 // Icons: single set (lucide-react), fixed size per context — item 7.
 import { Settings, RefreshCw, Moon, Sun, User,
   Zap, Droplet, Leaf, TrendingUp, Scale, LayoutGrid, Film, Music, BookOpen, Laugh, Trophy,
-  ChevronDown, X as XIcon, ExternalLink, Sparkles, Star, Check, ArrowRight } from 'lucide-react';
+  ChevronDown, X as XIcon, ExternalLink, Sparkles, Star, Check, ArrowRight,
+  Home as HomeIcon, Search as SearchIcon, Menu as MenuIcon, FileText } from 'lucide-react';
 import { isCloudSyncEnabled, hasCloudSession, getUserId, signInWithEmail, signOut, onAuthStateChange, loadProfileFromCloud, saveProfileToCloud, emitEvent } from './lib/cloudSync';
 
 // ─── CATEGORIES ───────────────────────────────────────────────────────────────
@@ -4000,7 +4001,7 @@ body{overscroll-behavior-y:contain;}
   display:none;
   position:fixed;bottom:0;left:0;right:0;
   background:var(--surface);border-top:1px solid var(--border);
-  z-index:400;height:56px;
+  z-index:400;height:60px;
   padding-bottom:env(safe-area-inset-bottom, 0);
 }
 .bottom-tabs-inner{display:grid;grid-template-columns:repeat(5,1fr);height:100%;}
@@ -4012,8 +4013,8 @@ body{overscroll-behavior-y:contain;}
   -webkit-tap-highlight-color:transparent;
 }
 .bottom-tab:active{background:var(--surface2);}
-.bottom-tab-icon{width:20px;height:20px;flex-shrink:0;}
-.bottom-tab-label{font-size:9px;font-weight:600;letter-spacing:0.01em;}
+.bottom-tab-icon{width:22px;height:22px;flex-shrink:0;}
+.bottom-tab-label{font-size:11px;font-weight:600;letter-spacing:0.01em;}
 .bottom-tab.active{color:var(--accent);}
 
 /* ─── MENU SHEET (bottom-sheet for overflow nav) ─── */
@@ -4205,7 +4206,7 @@ body{overscroll-behavior-y:contain;}
 
 /* Swipe hint — brief toast when user changes category on mobile */
 .swipe-hint{
-  position:fixed;bottom:calc(56px + env(safe-area-inset-bottom, 0) + 12px);
+  position:fixed;bottom:calc(60px + env(safe-area-inset-bottom, 0) + 12px);
   left:50%;transform:translateX(-50%);
   background:rgba(17,24,39,0.9);color:#fff;
   font-size:var(--fs-meta);font-weight:600;padding:6px 14px;border-radius:16px;
@@ -4290,7 +4291,7 @@ body{overscroll-behavior-y:contain;}
   .topbar-wrap.hidden .mobile-header,
   .topbar-wrap.hidden .mobile-search{display:none;}
 
-  body{padding-bottom:calc(58px + env(safe-area-inset-bottom, 0));}
+  body{padding-bottom:calc(62px + env(safe-area-inset-bottom, 0));}
   .page{padding:14px 14px 24px;}
 
   /* Hero — full-bleed on mobile for maximum impact */
@@ -5656,8 +5657,8 @@ kbd{display:inline-block;padding:1px 5px;border:1px solid var(--border);border-r
   .mobile-icon-btn{padding:7px;}
   .chip-bar{height:44px;}
   .chip{padding:6px 13px;min-height:44px;display:inline-flex;align-items:center;} /* Pass M 1a: 44 hit area */
-  .bottom-tab-label{font-size:8.5px;}
-  .bottom-tab-icon{width:19px;height:19px;}
+  .bottom-tab-label{font-size:11px;}  /* M2: >=11px labels */
+  .bottom-tab-icon{width:22px;height:22px;}
   .sources-title{font-size:24px;}
   .sources-cat-grid{grid-template-columns:1fr;gap:14px;}
 }
@@ -7142,10 +7143,13 @@ function SourceFooter({cat, feeds, arts}) {
 // (Finance, Bloom, Comedy, Podcasts, Social) and actions (refresh, theme,
 // customize) so the bottom tab bar can stay focused on the 3 primary
 // destinations a mobile user actually uses for quick check-ins.
-function MenuSheet({ tab, onTabChange, onClose, onCustomize, onRefresh, dark, setDark, search, onSearch, trendingTopics }) {
+function MenuSheet({ tab, onTabChange, onClose, onCustomize, onRefresh, dark, setDark, search, onSearch, trendingTopics, savedCount = 0 }) {
+  // M2: Sources and Saved left the bottom bar; they stay reachable here (<=2 taps).
   const items = [
     { key:'briefing',   emoji:'', label:'The Briefing' },
     { key:'podcasts',   emoji:'', label:'Podcasts' },
+    { key:'sources',    emoji:'', label:'Sources' },
+    { key:'saved',      emoji:'', label:savedCount>0?`Saved (${savedCount})`:'Saved' },
   ];
   return (
     <div className="menu-sheet-overlay" onClick={onClose}>
@@ -7200,40 +7204,29 @@ function MenuSheet({ tab, onTabChange, onClose, onCustomize, onRefresh, dark, se
   );
 }
 
-// Fixed bottom tab bar with 4 thumb-reachable slots:
-//   Today | Feed | Saved | More
-// "Feed" intelligently targets the last-visited news category if you're
-// already on one (mirrors Yahoo Sports "Following" behavior — tapping doesn't
-// throw you off your current context). Hidden on desktop via CSS.
-function BottomTabBar({ tab, onTabChange, onMenuOpen, savedCount, lastFeedTab }) {
-  // v24a: 'Home' tab routes to General (the new homepage). 'Feed' still
-  // routes to last-visited category. If user is already on General, both
-  // tabs visually highlight 'Home' so the chip-bar is the way to navigate.
-  const inOtherFeed = ['sports','business','finance','bloom','popculture','comedy'].includes(tab);
-  const feedTarget = inOtherFeed ? tab : (lastFeedTab && lastFeedTab !== 'general' ? lastFeedTab : 'sports');
+// M2: fixed bottom tab bar, 5 thumb-reachable slots:
+//   Home | Sports | Briefing | Search | More
+// lucide line icons (one icon set), labels >=11px, each tab >=48px tall, a single accent
+// active state, safe-area inset preserved. Feed/Saved/Sources left the bar — Saved and
+// Sources stay reachable in More (same behavior). Tapping Home while already on Home
+// scrolls to top; Sports goes to the Sports page; Search opens the existing search UI.
+function BottomTabBar({ tab, onTabChange, onMenuOpen, onSearchOpen, onHomeReTap }) {
+  const Tab = ({ active, onClick, Icon, label }) => (
+    <button className={`bottom-tab ${active ? 'active' : ''}`} onClick={onClick}
+      aria-label={label} aria-current={active ? 'page' : undefined}>
+      <Icon className="bottom-tab-icon" size={22} strokeWidth={2} aria-hidden="true"/>
+      <span className="bottom-tab-label">{label}</span>
+    </button>
+  );
   return (
-    <nav className="bottom-tabs">
+    <nav className="bottom-tabs" aria-label="Primary">
       <div className="bottom-tabs-inner">
-        <button className={`bottom-tab ${tab==='general'?'active':''}`} onClick={()=>onTabChange('general')}>
-          <svg className="bottom-tab-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
-          <span className="bottom-tab-label">Home</span>
-        </button>
-        <button className={`bottom-tab ${inOtherFeed?'active':''}`} onClick={()=>onTabChange(feedTarget)}>
-          <svg className="bottom-tab-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>
-          <span className="bottom-tab-label">Feed</span>
-        </button>
-        <button className={`bottom-tab ${tab==='sources'?'active':''}`} onClick={()=>onTabChange('sources')}>
-          <svg className="bottom-tab-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>
-          <span className="bottom-tab-label">Sources</span>
-        </button>
-        <button className={`bottom-tab ${tab==='saved'?'active':''}`} onClick={()=>onTabChange('saved')}>
-          <svg className="bottom-tab-icon" viewBox="0 0 24 24" fill={tab==='saved'?'currentColor':'none'} stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg>
-          <span className="bottom-tab-label">{savedCount>0?`Saved (${savedCount})`:'Saved'}</span>
-        </button>
-        <button className="bottom-tab" onClick={onMenuOpen}>
-          <svg className="bottom-tab-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
-          <span className="bottom-tab-label">More</span>
-        </button>
+        <Tab active={tab === 'general'} Icon={HomeIcon} label="Home"
+          onClick={() => { if (tab === 'general') onHomeReTap(); else onTabChange('general'); }}/>
+        <Tab active={tab === 'sports'} Icon={Trophy} label="Sports" onClick={() => onTabChange('sports')}/>
+        <Tab active={tab === 'briefing'} Icon={FileText} label="Briefing" onClick={() => onTabChange('briefing')}/>
+        <Tab active={false} Icon={SearchIcon} label="Search" onClick={onSearchOpen}/>
+        <Tab active={false} Icon={MenuIcon} label="More" onClick={onMenuOpen}/>
       </div>
     </nav>
   );
@@ -8039,9 +8032,9 @@ function TopBar({tab, setTab, search, setSearch, dark, setDark,
             <button className="mobile-icon-btn" onClick={onAnalyze} title="Analyze">
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><rect x="8" y="2" width="8" height="4" rx="1"/><line x1="9" y1="12" x2="15" y2="12"/><line x1="9" y1="16" x2="13" y2="16"/></svg>
             </button>
-            <button className="mobile-icon-btn" onClick={onMobileSearchToggle} title="Search">
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-            </button>
+            {/* M2: the header search icon is removed on mobile — Search now lives in the
+                bottom tab bar (which opens this same .mobile-search input), so the two
+                would otherwise duplicate. */}
             <button className="mobile-icon-btn" onClick={onRefresh} title="Refresh">
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
             </button>
@@ -10362,6 +10355,7 @@ export default function App() {
             setDark={setDark}
             search={search}
             onSearch={setSearch}
+            savedCount={saved.length}
             trendingTopics={getTrendingTopics(Object.values(arts).flat(), 8)}
           />
         )}
@@ -10371,8 +10365,8 @@ export default function App() {
           tab={tab}
           onTabChange={handleTabChange}
           onMenuOpen={() => setMenuOpen(true)}
-          savedCount={saved.length}
-          lastFeedTab={lastFeedTab}
+          onSearchOpen={() => setMobileSearchOpen(true)}
+          onHomeReTap={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
         />
 
         {showPanel&&<Suspense fallback={null}><CustomizePanel feeds={feeds} kw={kw} alerts={alerts} urgent={urgent}
