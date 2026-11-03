@@ -516,7 +516,7 @@ function TrendingPills({ label, items, onOpen, isTopicFollowed, toggleTopic, lim
   const topics = useMemo(() => hotClusterTopics(items || [], limit), [items, limit]);
   if (topics.length < 2) return null;
   return (
-    <div className="trending-section trending-now-row">
+    <div className="trending-section trending-now-row" data-no-swipe>
       <span className="trending-section-label">{label}</span>
       {topics.map((t, i) => {
         const short = t.split(/\s+/).slice(0, 3).join(' ');
@@ -933,9 +933,11 @@ function useSwipe(onSwipe, { threshold = 80, enabled = true } = {}) {
   const state = useRef({ x: 0, y: 0, active: false, cancelled: false });
   const onTouchStart = (e) => {
     if (!enabled) return;
-    // Don't hijack gestures that begin inside a horizontally-scrollable rail —
-    // let those scroll natively instead of triggering category navigation.
-    if (e.target?.closest?.('.sport-tabs, .pc-subtabs, .chip-bar, .mkt-rail-inner, .my-teams-scroll, .trending-section, .snap-feed, .ss-ticker-inner, .houston-scroll, .score-strip-scroll')) {
+    // A7: don't hijack gestures that begin inside a horizontally-scrollable rail — let those
+    // scroll natively instead of triggering category navigation. Every horizontal scroller
+    // carries `data-no-swipe` (enforced by a test), so this is ONE attribute check instead of
+    // a hard-coded, drift-prone class list.
+    if (e.target?.closest?.('[data-no-swipe]')) {
       state.current = { x: 0, y: 0, active: false, cancelled: true };
       return;
     }
@@ -5663,6 +5665,26 @@ kbd{display:inline-block;padding:1px 5px;border:1px solid var(--border);border-r
   .sources-cat-grid{grid-template-columns:1fr;gap:14px;}
 }
 
+/* ═══════════ M5 — TOUCH TARGETS (>=44x44 on phones and any touch device) ═══════════
+   Applies at <=640 OR on a device that cannot hover (phones + touch iPads). Non-touch
+   desktop/iPad keep their compact controls (hover:hover), so this does not change their
+   output. Each control named here measured <44px on a phone before this rule. */
+@media (max-width:640px), (hover:none){
+  .snap-ask,.snap-save{min-width:44px;min-height:44px;justify-content:center;}
+  .mobile-icon-btn{min-width:44px;min-height:44px;}
+  .home-scores-see-all{min-height:44px;display:inline-flex;align-items:center;}
+  .src-footer-link{min-height:44px;display:inline-flex;align-items:center;}
+  .social-handle{min-height:44px;min-width:44px;display:inline-flex;align-items:center;justify-content:center;}
+  .sb-across-clabel{min-height:44px;display:flex;align-items:center;}
+  .sidebar-sec-collapse{min-height:44px;}
+  .last-updated{min-height:44px;display:inline-flex;align-items:center;}
+  .page-customize-btn{min-height:44px;}
+  .sport-tab,.pc-subtab,.en-subtabs .pc-subtab{min-width:44px;min-height:44px;}
+  .feed-degraded{min-height:44px;}
+  .follow-source-chip,.follow-chip-x,.following-chip-x,.ttp-chip-star,.src-show-more{min-height:44px;}
+  .sop-collapse,.sop-row-menu-btn,.sop-ask{min-width:44px;min-height:44px;}
+}
+
 /* ═══════════ v46 — "N NEW STORIES" PILL ═══════════ */
 .new-stories-pill{
   position:sticky;top:64px;z-index:120;left:50%;
@@ -5925,7 +5947,7 @@ function ActiveScoresBar({ onGoToSports, favTeams }) {
         <span className={`home-scores-label${anyLive ? ' is-live' : ''}`}>{anyLive ? 'Live Scores' : 'Scores'}</span>
         <button className="home-scores-see-all" onClick={onGoToSports}>Sports →</button>
       </div>
-      <div className="score-strip-scroll home-scores-scroll">
+      <div className="score-strip-scroll home-scores-scroll" data-no-swipe>
         {games.map((g, i) => <ScoreTile key={`${g._league}-${i}`} g={g}/>)}
       </div>
     </div>
@@ -7452,7 +7474,7 @@ function SportsScoreStrip({ sportTab = 'all', teams }) {
 
   return (
     <div className="sports-score-strip">
-      <div className="score-strip-scroll sports-score-strip-inner">
+      <div className="score-strip-scroll sports-score-strip-inner" data-no-swipe>
         {tiles.map(g => <ScoreTile key={g.id} g={g}/>)}
       </div>
     </div>
@@ -7548,7 +7570,7 @@ function SportsSkeleton() {
       <div className="sports-score-strip" aria-busy="true">
         <div className="pod-skel-line" style={{ width: '100%', height: '64px' }}/>
       </div>
-      <div className="sport-tabs" style={{ margin: '14px 0' }}>
+      <div className="sport-tabs" data-no-swipe style={{ margin: '14px 0' }}>
         {Array.from({ length: 6 }).map((_, i) => <div key={i} className="pod-skel-line" style={{ width: '64px', height: '30px', borderRadius: '16px', flexShrink: 0 }}/>)}
       </div>
       <div className="page-grid"><div className="feed-col">
@@ -7863,7 +7885,9 @@ function TopBar({tab, setTab, search, setSearch, dark, setDark,
 
   // D1: desktop nav is now priority-overflow (PriorityNav). Primary order lives in
   // NAV_PRIMARY; Sources/Saved always live in the More menu (NAV_ALWAYS_MORE).
-  const TAB_LABELS = {business:'Business & Markets',bloom:'Energy',finance:'Markets',tech:'AI & Tech',health:'Health',popculture:'Pop Culture',podcasts:'Podcasts',sources:'Sources',saved:'Saved',briefing:'Briefing'};
+  // A6: one name for the home category — "News" (not "General") in the desktop nav, matching
+  // the chips and page titles (CATS.general.label is already "News"). Internal key stays `general`.
+  const TAB_LABELS = {general:'News',business:'Business & Markets',bloom:'Energy',finance:'Markets',tech:'AI & Tech',health:'Health',popculture:'Pop Culture',podcasts:'Podcasts',sources:'Sources',saved:'Saved',briefing:'Briefing'};
   const TAB_CLASS  = {general:'t-general',sports:'t-sports',business:'t-business',finance:'t-finance',bloom:'t-bloom',tech:'t-tech',popculture:'t-popculture',podcasts:'t-podcasts'};
 
   // v24a Mobile chip bar per user: General · Business · Markets · Energy · Sports · Pop Culture
@@ -7906,7 +7930,7 @@ function TopBar({tab, setTab, search, setSearch, dark, setDark,
               lives ONLY as tagged rows inside State of Play. The strip is markets-only. */}
           <span className="ss-flag ss-flag-markets">Markets</span>
           <div className="ss-ticker">
-            <div className="ss-ticker-inner">
+            <div className="ss-ticker-inner" data-no-swipe>
               {INDICES.filter(idx=>!(hiddenIndices||[]).includes(idx.sym)).map(idx=>{
                 const q=quotes[idx.sym]; const up=q?q.chg>=0:null;
                 return (
@@ -8057,7 +8081,7 @@ function TopBar({tab, setTab, search, setSearch, dark, setDark,
           </div>
         )}
         <div className="chip-bar-wrap">
-        <div className="chip-bar" ref={chipBarRef}>
+        <div className="chip-bar" data-no-swipe ref={chipBarRef}>
           {MOBILE_CHIPS.map(c => {
             const isActive = tab === c.key;
             return (
@@ -8177,7 +8201,7 @@ function HoustonRow({ items, onRead, formatDate }) {
   return (
     <section className="houston-row">
       <div className="houston-head"><span className="houston-label">Houston</span><span className="houston-sub">Local</span></div>
-      <div className="houston-scroll">
+      <div className="houston-scroll" data-no-swipe>
         {items.map((a, i) => (
           <button key={a.link || i} className="houston-card" onClick={() => onRead(a)}>
             {a.img ? <img className="houston-img" src={a.img} loading="lazy" alt=""/> : <div className="houston-img houston-img-ph"><span className="ph-label">{a.source}</span></div>}
@@ -8769,7 +8793,7 @@ function FeedPage({ cat, ctx }) {
         {/* ── BUSINESS + MARKETS filter pills — reuses the Sports league-pill component.
             Markets routes to the full Markets page (FinancePage). ── */}
         {isMergedBiz && !activeKw && !activeSrc && !search && (
-          <div className="sport-tabs" style={{marginBottom:'12px'}}>
+          <div className="sport-tabs" data-no-swipe style={{marginBottom:'12px'}}>
             <button className={`sport-tab ${bizFilter==='all'?'active':''}`} onClick={()=>navigate('business')}>All</button>
             <button className={`sport-tab ${bizFilter==='business'?'active':''}`} onClick={()=>navigate('business','business')}>Business</button>
             <button className="sport-tab" onClick={()=>navigate('finance')}>Markets</button>
@@ -8779,7 +8803,7 @@ function FeedPage({ cat, ctx }) {
         {/* ── ENERGY sub-category pills — at the top of the page, matching the Sports
             league/team pill position + format (Pass J item 8). ── */}
         {cat === 'bloom' && !activeKw && !activeSrc && !search && (
-          <div className="pc-subtabs en-subtabs" style={{marginBottom:'12px'}}>
+          <div className="pc-subtabs en-subtabs" data-no-swipe style={{marginBottom:'12px'}}>
             {EN_SUBTABS.map(t => (
               <button key={t.key} className={`pc-subtab ${enSubTab===t.key?'active':''}`}
                 onClick={()=>{setEnSubTab(t.key);window.scrollTo({top:0,behavior:'instant'});}}>
@@ -8823,7 +8847,7 @@ function FeedPage({ cat, ctx }) {
 
         {/* Pop Culture sub-tabs */}
         {cat === 'popculture' && !activeKw && !activeSrc && !search && (
-          <div className="pc-subtabs">
+          <div className="pc-subtabs" data-no-swipe>
             {PC_SUBTABS.map(t => (
               <button key={t.key} className={`pc-subtab ${pcSubTab===t.key?'active':''}`}
                 onClick={()=>{setPcSubTab(t.key);window.scrollTo({top:0,behavior:'instant'});}}>
@@ -8888,7 +8912,7 @@ function FeedPage({ cat, ctx }) {
               </div>
             )}
             {isLoading&&!feedItems.length
-              ?<div className="snap-feed" aria-busy="true" aria-label={`Loading ${cc.label}`}>
+              ?<div className="snap-feed" data-no-swipe aria-busy="true" aria-label={`Loading ${cc.label}`}>
                   {Array.from({length:6}).map((_,i)=>(
                     <div key={i} className="snap-card snap-skel">
                       <div className="snap-accent"/>
@@ -8908,7 +8932,7 @@ function FeedPage({ cat, ctx }) {
                    message={activeKw||activeSrc?'No stories match this filter.':search?`No results for "${search}".`:`Couldn't load ${cc.label}. Try refresh.`}
                    actionLabel={activeKw?'Clear filter':activeSrc?'Clear filter':search?null:'Retry'}
                    onAction={activeKw?()=>setActiveKw(null):activeSrc?()=>setActiveSrc(null):search?null:()=>loadCat(cat)}/>
-                :<div className={`snap-feed${['business','bloom','tech','popculture'].includes(cat)?' snap-feed-divided':''}`}>
+                :<div className={`snap-feed${['business','bloom','tech','popculture'].includes(cat)?' snap-feed-divided':''}`} data-no-swipe>
                   {/* D5 fix 3: Business/Energy/AI&Tech/Pop Culture carry the divided-list
                       treatment on desktop secondary rows; the lead stays a prominent card. */}
                   {/* AI & Tech only: optional GitHub street signal, click-to-load (3c). */}
@@ -9961,7 +9985,7 @@ export default function App() {
         <SourcesDisagree topic={entity} items={entityItems}/>
         {entityItems.length === 0
           ? <EmptyState message={`No recent stories mentioning “${entity}”.`} actionLabel="Refresh" onAction={() => loadCat(cat)}/>
-          : <div className="snap-feed">
+          : <div className="snap-feed" data-no-swipe>
               {entityItems.slice(0, 20).map((a, i) => (
                 <Fragment key={a.link || i}>
                   <SnapshotCard a={a} meta={cc} isSaved={isSavedFn(a)} onSave={onSave} onRead={onRead} onPerspectives={setPerspArticle} onAsk={setChatContext} formatDate={fmtDate} opinionLabel={opinionLabel(a)} hideImage={i>=3}/>
@@ -10104,7 +10128,7 @@ export default function App() {
           </div>
         </div>
         {/* Business + Markets filter pills — Markets is this page; All/Business route to the feed. */}
-        <div className="sport-tabs" style={{marginBottom:'12px'}}>
+        <div className="sport-tabs" data-no-swipe style={{marginBottom:'12px'}}>
           <button className="sport-tab" onClick={()=>navigate('business')}>All</button>
           <button className="sport-tab" onClick={()=>navigate('business','business')}>Business</button>
           <button className="sport-tab active" onClick={()=>navigate('finance')}>Markets</button>
@@ -10220,7 +10244,7 @@ export default function App() {
               </div>
               {newsItems.length===0
                 ?<div className="empty-state"><div className="empty-icon"></div><div className="empty-msg">Loading Markets news…</div></div>
-                :<div className="snap-feed" style={{padding:'12px 0 0'}}>
+                :<div className="snap-feed" data-no-swipe style={{padding:'12px 0 0'}}>
                     {newsItems.slice(0, 15).map((a, i) => (
                       <Fragment key={a.link||i}>
                         <SnapshotCard a={a} meta={CATS.finance} isSaved={isSavedFn(a)} onSave={onSave} onRead={onRead} onPerspectives={setPerspArticle} onAsk={setChatContext} formatDate={fmtDate} opinionLabel={opinionLabel(a)} hideImage={i>=3}/>

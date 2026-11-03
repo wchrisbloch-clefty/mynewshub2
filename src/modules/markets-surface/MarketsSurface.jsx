@@ -70,11 +70,11 @@ export function MarketsSurface({ mkt, loading, error }) {
     <>
       {/* (a) STICKY TICKER RAIL — indices, price, % green/red, tabular nums */}
       {loading && !mkt
-        ? <div className="mkt-rail"><div className="mkt-rail-inner">{Array.from({ length: 5 }).map((_, i) => (
+        ? <div className="mkt-rail"><div className="mkt-rail-inner" data-no-swipe>{Array.from({ length: 5 }).map((_, i) => (
             <div key={i} className="mkt-rail-item"><span className="sk-line" style={{ width: '56px' }}/><span className="sk-line" style={{ width: '72px' }}/></div>
           ))}</div></div>
         : (mkt?.indices || []).length > 0 && (
-          <div className="mkt-rail"><div className="mkt-rail-inner">
+          <div className="mkt-rail"><div className="mkt-rail-inner" data-no-swipe>
             {mkt.indices.map(ix => { const up = (ix.pct || 0) >= 0; return (
               <div key={ix.symbol} className="mkt-rail-item">
                 <span className="mkt-rail-name">{ix.name}</span>

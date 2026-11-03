@@ -240,7 +240,7 @@ export function SportsPage({ ctx }) {
         {!teamName && <SportsScoreStrip sportTab={sportTab} teams={[...teams, ...myTeams.map(t=>({match:t.name, league:t.league}))]}/>}
 
         {/* ── LEAGUES — ESPN pill-style tab row ── */}
-        <div className="sport-tabs" ref={sportTabsRef}>
+        <div className="sport-tabs" data-no-swipe ref={sportTabsRef}>
           {SPORT_TABS.map(t => (
             <button key={t.key}
               className={`sport-tab ${sportTab===t.key?'active':''}`}
@@ -255,7 +255,7 @@ export function SportsPage({ ctx }) {
             click routes into the existing team-hub (setActiveTeam → filtered feed +
             ESPN/Team links). Order follows the user's My Teams (favorites) config. ── */}
         {!teamName && !activeSrc && !search && followedTeams.length > 0 && (
-          <div className="sport-tabs my-teams-ribbon">
+          <div className="sport-tabs my-teams-ribbon" data-no-swipe>
             {followedTeams.map((t, i) => (
               <button key={`${t.slug}-${t.league}-${i}`}
                 className={`sport-tab ${activeTeam && activeTeam.team===t.team && activeTeam.league===t.league ? 'active' : ''}`}
@@ -269,7 +269,7 @@ export function SportsPage({ ctx }) {
 
         {/* ── TEAM CHIP RAIL (Tier 3) — reuses sport-tabs styling ── */}
         {TEAM_CHIPS[sportTab] && (
-          <div className="sport-tabs" style={{marginTop:'-4px'}}>
+          <div className="sport-tabs" data-no-swipe style={{marginTop:'-4px'}}>
             <button className={`sport-tab ${!teamName?'active':''}`} onClick={()=>navigate('sports', sportTab)}>
               All {SPORT_TABS.find(s=>s.key===sportTab)?.label||''}
             </button>
@@ -315,7 +315,7 @@ export function SportsPage({ ctx }) {
                 <SourcesDisagree topic={teamName} items={teamItems}/>
                 {teamItems.length === 0
                   ? <EmptyState message={`No recent stories for .`} actionLabel="Refresh" onAction={()=>loadCat('sports')}/>
-                  : <div className="snap-feed">
+                  : <div className="snap-feed" data-no-swipe>
                       {teamItems.slice(0,20).map((a,i)=>(
                         <Fragment key={a.link||i}>
                           <SnapshotCard a={a} meta={CATS.sports} isSaved={isSavedFn(a)} onSave={onSave} onRead={onRead} onPerspectives={setPerspArticle} onAsk={setChatContext} formatDate={fmtDate} opinionLabel={opinionLabel(a)} hideImage={i>=3}/>
