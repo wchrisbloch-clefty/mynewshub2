@@ -1494,6 +1494,11 @@ body{
    Dark ESPN theme so the homepage strip matches the Sports-page strip (item 6). */
 .topbar-scores{background:var(--surface2);border-bottom:1px solid var(--border2);}
 .topbar-scores .home-scores{max-width:1400px;margin:0 auto;padding:4px var(--s4) 5px;border:none;border-radius:0;background:none;overflow:visible;}
+/* P2/A4: the scores strip is always in the DOM on Home (it wraps ActiveScoresBar, which is
+   null until games load). Reserve its height from first paint so the async scores bar never
+   grows the scroll-away header and shoves the page (desktop/iPad CLS). Hidden at <=640 (the
+   phone Home shows scores in its own body), so this only reserves on desktop/iPad Home. */
+.topbar-scores{min-height:90px;}
 /* M1: on the phone Home the live-scores strip moves into the sectioned body
    (ActiveScoresBar in <MobileHome/>), so hide the header copy at <=640 to avoid showing
    it twice. The header strip only ever renders on General, so this is Home-only; desktop
@@ -4717,6 +4722,7 @@ kbd{display:inline-block;padding:1px 5px;border:1px solid var(--border);border-r
 }
 .bottom-tab.active{color:var(--accent);}
 .bottom-tab:hover:not(.active){color:var(--text2);}
+.bottom-tab:focus-visible{outline:2px solid var(--accent);outline-offset:-3px;}  /* A12 */
 .bottom-tab-icon{width:20px;height:20px;flex-shrink:0;}
 
 /* Smooth page transitions */
@@ -5377,6 +5383,13 @@ kbd{display:inline-block;padding:1px 5px;border:1px solid var(--border);border-r
 
 /* ── TOP OF HOUR STRIP ─────────────────────────────────────────── */
 .toh-strip{margin-bottom:28px;}
+/* P2/A4: reserve the Top Stories band while the feed loads so it does not appear from
+   nothing and shove the page (desktop/iPad CLS). Heights match a loaded strip: ~400px in
+   the two-column layout (>=900px) and ~740px where it stacks to one column (641–899px).
+   Mobile Home uses <MobileHome/> (own reserves), so this is not needed at <=640. */
+.toh-reserve{min-height:400px;margin-bottom:28px;}
+@media(min-width:641px) and (max-width:899px){ .toh-reserve{min-height:740px;} }
+@media(max-width:640px){ .toh-reserve{display:none;} }
 .toh-strip-head{
   display:flex;align-items:center;justify-content:space-between;
   margin-bottom:14px;
@@ -5683,6 +5696,9 @@ kbd{display:inline-block;padding:1px 5px;border:1px solid var(--border);border-r
   .feed-degraded{min-height:44px;}
   .follow-source-chip,.follow-chip-x,.following-chip-x,.ttp-chip-star,.src-show-more{min-height:44px;}
   .sop-collapse,.sop-row-menu-btn,.sop-ask{min-width:44px;min-height:44px;}
+  /* P3: the desktop header/nav controls also show on a touch iPad (641–1100, hover:none). */
+  .nav-icon-btn,.nav-btn-brief,.nav-btn-blue{min-width:44px;min-height:44px;}
+  .ss-tk{min-height:44px;}
 }
 
 /* ═══════════ v46 — "N NEW STORIES" PILL ═══════════ */
@@ -6000,7 +6016,9 @@ function FeedCard({a, cat, isSaved, onSave, onRead, relatedSources, isRead, user
   const [disc, setDisc] = useState(null);
   const [loadingDisc, setLoadingDisc] = useState(false);
   const [actionsOpen, setActionsOpen] = useState(false);
-  const isMobile = typeof window !== 'undefined' && window.innerWidth <= 640;
+  // A9/P4: ONE isMobile source — the reactive useIsMobile() hook (matchMedia), not a
+  // render-time window.innerWidth read that never updates on resize/rotate.
+  const isMobile = useIsMobile();
   const cc = CATS[cat]||CATS.general;
   const topKw = a.matchedKw?.[0]||null;
   const paywall = isPaywalled(a.link);
@@ -8817,7 +8835,9 @@ function FeedPage({ cat, ctx }) {
             module below it provides a breathing-room break before the next image block
             (Pass H item 3). ── */}
         {isHome && !activeKw && !activeSrc && !search && (
-          <TopOfHourStrip catLead={catLead} arts={arts} onRead={onRead} stories={topStoryItems}/>
+          topStoryItems.length
+            ? <TopOfHourStrip catLead={catLead} arts={arts} onRead={onRead} stories={topStoryItems}/>
+            : (isLoading && <div className="toh-reserve" aria-hidden="true"/>)
         )}
 
         {/* State of Play moved into the sidebar (Pass J item 2). Across MyNewsHub also
@@ -8829,8 +8849,10 @@ function FeedPage({ cat, ctx }) {
             instead of the old headline-floating-below-a-plain-image grid (Pass: card
             consistency). Business, Energy, AI & Tech, Health, Pop Culture all route
             through here, so they unify together. */}
-        {!activeKw && !activeSrc && catLead && !isHome && (
-          <TopOfHourStrip stories={topStoryItems} catLead={catLead} arts={arts} onRead={onRead}/>
+        {!activeKw && !activeSrc && !isHome && (
+          catLead
+            ? <TopOfHourStrip stories={topStoryItems} catLead={catLead} arts={arts} onRead={onRead}/>
+            : (isLoading && <div className="toh-reserve" aria-hidden="true"/>)
         )}
 
         {/* State of Play hoisted into the main column right after Top Stories — shown
@@ -10390,7 +10412,7 @@ export default function App() {
           onTabChange={handleTabChange}
           onMenuOpen={() => setMenuOpen(true)}
           onSearchOpen={() => setMobileSearchOpen(true)}
-          onHomeReTap={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
+          onHomeReTap={() => { const rm = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches; window.scrollTo({ top: 0, behavior: rm ? 'auto' : 'smooth' }); }}
         />
 
         {showPanel&&<Suspense fallback={null}><CustomizePanel feeds={feeds} kw={kw} alerts={alerts} urgent={urgent}

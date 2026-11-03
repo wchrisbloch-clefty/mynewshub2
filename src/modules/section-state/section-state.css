@@ -17,6 +17,7 @@
   border-radius:var(--radius);background:var(--surface2);color:var(--accent);
   font-family:var(--font-sans);font-size:var(--fs-body);font-weight:700;cursor:pointer;}
 .sect-error-retry:hover{border-color:var(--accent);}
+.sect-error-retry:focus-visible{outline:2px solid var(--accent);outline-offset:2px;}
 @media(prefers-reduced-motion:reduce){
   .sect-skel-lead,.sect-skel-lines span{animation:none;}
 }

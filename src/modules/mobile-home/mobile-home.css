@@ -24,6 +24,10 @@
 
 .mh-rows{display:flex;flex-direction:column;}
 
+/* A12: visible keyboard focus on every new interactive control. */
+.mh-compact:focus-visible,.mh-seeall:focus-visible,.mh-edit-sections:focus-visible,
+.mh-lead .snap-card:focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:4px;}
+
 /* COMPACT row — text-only headline + source · time (K6 COMPACT). >=44px tap target. */
 .mh-compact{display:flex;flex-direction:column;gap:3px;text-align:left;cursor:pointer;
   background:none;border:none;border-bottom:1px solid var(--border2);
