@@ -4279,6 +4279,13 @@ body{overscroll-behavior-y:contain;}
   .mobile-top .mobile-header,.mobile-top .mobile-search{display:none;}
   .nav-tabs{display:none;}
   .chip{min-height:44px;padding:6px 14px;display:inline-flex;align-items:center;} /* >=44px tap target */
+  /* Q2: at iPad portrait State of Play / breaking was hidden entirely (the retired
+     .sop-hoist and the <=640 .sop-mobile are both off here, and the sidebar copy is hidden
+     by the <=1100 single-column rule). Reveal the EXISTING hoisted copy (no new DOM) and
+     order it to the TOP of the feed column so breaking is on the first screen — the Top
+     Stories hero is ~736px tall here and would otherwise push it off-screen. */
+  .feed-col{display:flex;flex-direction:column;}
+  .sop-hoist{display:block;order:-1;margin-bottom:18px;}
 }
 @media (max-width:640px){
   .whisper-bar{display:none;}
