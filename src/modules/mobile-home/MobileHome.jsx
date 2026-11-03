@@ -192,31 +192,32 @@ export function MobileHome({ ctx }) {
 
   const sopMeta = CATS.general || {};
   const hasBreaking = model.breaking.length > 0;
+  const generalLoaded = !!(lastUpdated && lastUpdated.general != null);
 
   return (
     <div className="page mobile-home" data-mobile-home="1">
-      {/* LEAD 16:9 */}
+      {/* LEAD 16:9 (reserved height so the deck/actions don't shift it in) */}
       {model.lead
         ? <div className="mh-lead"><SnapshotCard a={model.lead} meta={sopMeta} isSaved={isSavedFn(model.lead)} onSave={onSave} onRead={onRead} onAsk={setChatContext} formatDate={fmtDate} opinionLabel={opinionLabel(model.lead)} lead={true}/></div>
         : <div className="mh-lead"><SectionSkeleton lead rows={0} label="Top story"/></div>}
 
-      {/* TOP STORIES — 4 compact cross-category headlines */}
-      {model.top.length > 0 && (
-        <section className="mh-section mh-topstories">
-          <div className="mh-sec-head"><span className="eyebrow mh-sec-label">Top stories</span></div>
-          <div className="mh-rows">
-            {model.top.map((a, i) => <CompactRow key={a.link || i} a={a} fmtDate={fmtDate} onRead={onRead}/>)}
-          </div>
-        </section>
-      )}
+      {/* TOP STORIES — 4 compact cross-category headlines (always present once loaded) */}
+      <section className="mh-section mh-topstories">
+        <div className="mh-sec-head"><span className="eyebrow mh-sec-label">Top stories</span></div>
+        {model.top.length > 0
+          ? <div className="mh-rows">{model.top.map((a, i) => <CompactRow key={a.link || i} a={a} fmtDate={fmtDate} onRead={onRead}/>)}</div>
+          : <SectionSkeleton rows={4} label="Top stories"/>}
+      </section>
 
-      {/* BREAKING / STATE OF PLAY — existing selection rules, only when present */}
-      {hasBreaking && (
-        <section className="mh-section mh-breaking">
-          <StateOfPlay variant="sidebar" items={[]} breakingItems={model.breaking}
-            meta={sopMeta} onRead={onRead} onAsk={setChatContext} formatDate={fmtDate}/>
-        </section>
-      )}
+      {/* BREAKING / STATE OF PLAY — existing selection rules, only when present. While
+          General is still loading, reserve the slot so a late breaking block doesn't shove
+          the page; once loaded, show it or collapse. */}
+      {hasBreaking
+        ? <section className="mh-section mh-breaking">
+            <StateOfPlay variant="sidebar" items={[]} breakingItems={model.breaking}
+              meta={sopMeta} onRead={onRead} onAsk={setChatContext} formatDate={fmtDate}/>
+          </section>
+        : (!generalLoaded && <div className="mh-breaking mh-breaking-reserve" aria-hidden="true"><SectionSkeleton rows={3}/></div>)}
 
       {/* LIVE SCORES — one slim row; ActiveScoresBar self-hides when nothing is live/today */}
       {ActiveScoresBar && (
