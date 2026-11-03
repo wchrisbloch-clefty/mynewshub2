@@ -8906,8 +8906,8 @@ function FeedPage({ cat, ctx }) {
               :feedItems.length===0
                 ?<EmptyState
                    message={activeKw||activeSrc?'No stories match this filter.':search?`No results for "${search}".`:`Couldn't load ${cc.label}. Try refresh.`}
-                   actionLabel={activeKw?'Clear filter':activeSrc?'Clear filter':search?null:'Refresh'}
-                   onAction={activeKw?()=>setActiveKw(null):activeSrc?()=>setActiveSrc(null):search?null:refreshAll}/>
+                   actionLabel={activeKw?'Clear filter':activeSrc?'Clear filter':search?null:'Retry'}
+                   onAction={activeKw?()=>setActiveKw(null):activeSrc?()=>setActiveSrc(null):search?null:()=>loadCat(cat)}/>
                 :<div className={`snap-feed${['business','bloom','tech','popculture'].includes(cat)?' snap-feed-divided':''}`}>
                   {/* D5 fix 3: Business/Energy/AI&Tech/Pop Culture carry the divided-list
                       treatment on desktop secondary rows; the lead stays a prominent card. */}
