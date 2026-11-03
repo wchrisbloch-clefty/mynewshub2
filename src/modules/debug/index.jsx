@@ -18,7 +18,10 @@ export const DEBUG = typeof window !== 'undefined'
 // Mutable counters. Cheap plain object; only the overlay reads them.
 // J1: `mounts`/`unmounts` track page-component MOUNT/UNMOUNT (a remount = +1 each),
 // so the scroll test can prove a page is NOT being remounted on every App render.
-export const dbg = { renders: {}, mounts: {}, unmounts: {}, pollFires: 0, cls: 0, scrollJumps: 0, lastJump: 0 };
+export const dbg = { renders: {}, mounts: {}, unmounts: {}, pollFires: 0, cls: 0, scrollJumps: 0, lastJump: 0,
+  // M4: swipe navigations that actually fired vs. gestures ignored (by reason). CB reads these on
+  // the phone: after sliding a thumb across the bottom bar / scrolling, "swipe navs" should stay 0.
+  swipeNavs: 0, swipeIgnored: 0, swipeReasons: {} };
 // H5: expose the debug counters on window under ?debug=1 so the Sports-twitch
 // measurement (App/SportsPage renders/s, CLS, scroll jumps) can read them headlessly.
 if (DEBUG && typeof window !== 'undefined') window.__dbg = dbg;
@@ -37,6 +40,14 @@ export function dbgPoll(name) {
   dbg.pollFires++;
   // eslint-disable-next-line no-console
   console.log(`[debug] poll fire: ${name} (total ${dbg.pollFires})`);
+}
+// M4: record each completed swipe gesture — a real category navigation, or an ignore + why.
+export function dbgSwipe(fire, reason) {
+  if (!DEBUG) return;
+  if (fire) { dbg.swipeNavs++; }
+  else { dbg.swipeIgnored++; dbg.swipeReasons[reason] = (dbg.swipeReasons[reason] || 0) + 1; }
+  // eslint-disable-next-line no-console
+  console.log(`[debug] swipe ${fire ? 'NAV ' + fire : 'ignored (' + reason + ')'} — navs ${dbg.swipeNavs} / ignored ${dbg.swipeIgnored}`);
 }
 
 export function DebugOverlay() {
@@ -119,6 +130,8 @@ function DebugOverlayInner() {
       {row('poll fires', dbg.pollFires)}
       {row('CLS', dbg.cls.toFixed(4))}
       {row('scroll jumps', `${dbg.scrollJumps}${dbg.lastJump ? ` (last ${dbg.lastJump}px)` : ''}`)}
+      {row('swipe navs', dbg.swipeNavs)}
+      {row('swipe ignored', `${dbg.swipeIgnored}${Object.keys(dbg.swipeReasons).length ? ' (' + Object.entries(dbg.swipeReasons).map(([k, v]) => `${k}:${v}`).join(' ') + ')' : ''}`)}
     </div>
   );
 }

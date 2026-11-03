@@ -44,9 +44,11 @@ import { ShareControl, buildBriefingExcerpt } from './modules/share';
 import { ConnectionsStrip, findConnections } from './modules/connections';
 import { qualifyBreaking, isPromoItem } from './modules/breaking';
 import { claimConnections, claimAcrossSections } from './modules/dedup/railDedup';
+import { reconcileHeld } from './modules/stable-list/heldList';
 import { partitionSatire } from './modules/satire';
 import { rankByVelocity, signalFor } from '../lib/voices/velocity';
-import { DEBUG, dbgRender, dbgPoll, dbgMount, DebugOverlay } from './modules/debug';
+import { DEBUG, dbgRender, dbgPoll, dbgMount, dbgSwipe, DebugOverlay } from './modules/debug';
+import { evaluateSwipe } from './modules/swipe-gesture';
 import { useScores, configureScores, loadScores as loadScoresStore, anyLiveGame } from './state';
 import { makeVoice, upsertVoice, removeVoice as removeVoiceModel, mergeVoices, clearTombstone, voiceId, VOICE_PLATFORMS } from './modules/voices/model';
 import { SEED_VOICES } from './modules/voices/seeds';
@@ -57,8 +59,9 @@ import { VoicesStrip } from './modules/voices/VoicesStrip';
 import { extractContent, extractionFallbackMessage } from './modules/extractor';
 import { retrieveFeedContext, buildFeedContextBlock } from './modules/retrieval';
 import { XPulse } from './modules/x-pulse';
-import { StateOfPlay } from './modules/state-of-play';
+import { StateOfPlay, selectStateOfPlay } from './modules/state-of-play';
 import { SnapshotCard, CoverageList } from './modules/snapshot-card';
+import { MobileHome } from './modules/mobile-home';
 import { FollowSourceContext, FollowSourceChip } from './modules/follow-source';
 import { MarketsSurface, useMarkets } from './modules/markets-surface';
 import { parseRoute, buildPath } from './modules/routing';
@@ -81,7 +84,8 @@ const prefetchLazy = () => { import('./modules/concierge'); import('./modules/vo
 // Icons: single set (lucide-react), fixed size per context — item 7.
 import { Settings, RefreshCw, Moon, Sun, User,
   Zap, Droplet, Leaf, TrendingUp, Scale, LayoutGrid, Film, Music, BookOpen, Laugh, Trophy,
-  ChevronDown, X as XIcon, ExternalLink, Sparkles, Star, Check, ArrowRight } from 'lucide-react';
+  ChevronDown, X as XIcon, ExternalLink, Sparkles, Star, Check, ArrowRight,
+  Home as HomeIcon, Search as SearchIcon, Menu as MenuIcon, FileText } from 'lucide-react';
 import { isCloudSyncEnabled, hasCloudSession, getUserId, signInWithEmail, signOut, onAuthStateChange, loadProfileFromCloud, saveProfileToCloud, emitEvent } from './lib/cloudSync';
 
 // ─── CATEGORIES ───────────────────────────────────────────────────────────────
@@ -160,6 +164,13 @@ const IconGear = ({size=ICON.meta}) => (
 // (which has no mobile chip — it is folded into Business) is dropped so every swipe
 // target is a reachable chip, keeping this list a true mirror of MOBILE_CHIPS.
 const SWIPE_ORDER = ['general','business','bloom','tech','sports','health','popculture'];
+// M4.3: the pages where left/right swipe-to-change-category is ARMED. Home (`general`) is a
+// sectioned hub, not a category, so swipe is OFF there (category-hopping off Home is
+// unexpected); the six category pages keep it. Navigation still steps through SWIPE_ORDER,
+// so swiping right off the first category can still land on Home — you just can't swipe once
+// there. Flip Home back on in one line by adding 'general' here. The bottom bar + chip bar
+// remain the primary way to move; nothing is removed.
+const SWIPE_PAGES = ['business','bloom','tech','sports','health','popculture'];
 
 const TICKERS = [
   { sym:'BE',      label:'Bloom Energy', short:'BLOOM', color:'#60a5fa' }, // I0.9: NYSE:BE — themed pick for the Energy vertical
@@ -514,7 +525,7 @@ function TrendingPills({ label, items, onOpen, isTopicFollowed, toggleTopic, lim
   const topics = useMemo(() => hotClusterTopics(items || [], limit), [items, limit]);
   if (topics.length < 2) return null;
   return (
-    <div className="trending-section trending-now-row">
+    <div className="trending-section trending-now-row" data-no-swipe>
       <span className="trending-section-label">{label}</span>
       {topics.map((t, i) => {
         const short = t.split(/\s+/).slice(0, 3).join(' ');
@@ -927,37 +938,49 @@ function useIsMobile() {
 // element. Fires onSwipe('left'|'right') when user completes a decisive
 // horizontal swipe. Tracks touchMove to cancel early if vertical scroll
 // intent is detected, preventing accidental tab changes while scrolling.
-function useSwipe(onSwipe, { threshold = 80, enabled = true } = {}) {
-  const state = useRef({ x: 0, y: 0, active: false, cancelled: false });
+function useSwipe(onSwipe, { enabled = true } = {}) {
+  // M4.2: collect the gesture's metrics here; the pure evaluateSwipe() (unit-tested in
+  // modules/swipe-gesture) decides whether it's a deliberate category swipe. Rules:
+  // |dx|>=100, |dx|>=3*|dy|, duration<=600ms, start outside the 24px iOS edge zone, and
+  // the page must NOT have scrolled vertically during the gesture.
+  const state = useRef({ x: 0, y: 0, t: 0, scrollY: 0, w: 0, active: false, cancelled: false });
   const onTouchStart = (e) => {
     if (!enabled) return;
-    // Don't hijack gestures that begin inside a horizontally-scrollable rail —
-    // let those scroll natively instead of triggering category navigation.
-    if (e.target?.closest?.('.sport-tabs, .pc-subtabs, .chip-bar, .mkt-rail-inner, .my-teams-scroll, .trending-section, .snap-feed, .ss-ticker-inner, .houston-scroll, .score-strip-scroll')) {
-      state.current = { x: 0, y: 0, active: false, cancelled: true };
+    // Gestures that begin inside anything marked data-no-swipe (horizontal rails, sticky bars,
+    // the chip bar, score strips, …) never start a swipe — ONE attribute check, enforced by a test.
+    if (e.target?.closest?.('[data-no-swipe]')) {
+      state.current = { x: 0, y: 0, t: 0, scrollY: 0, w: 0, active: false, cancelled: true };
       return;
     }
     const t = e.touches[0];
-    state.current = { x: t.clientX, y: t.clientY, active: true, cancelled: false };
+    state.current = {
+      x: t.clientX, y: t.clientY, t: Date.now(),
+      scrollY: typeof window !== 'undefined' ? window.scrollY : 0,
+      w: (typeof window !== 'undefined' && window.innerWidth) || 0,
+      active: true, cancelled: false,
+    };
   };
   const onTouchMove = (e) => {
     if (!enabled || !state.current.active || state.current.cancelled) return;
     const t = e.touches[0];
     const dy = Math.abs(t.clientY - state.current.y);
     const dx = Math.abs(t.clientX - state.current.x);
-    // Cancel swipe if vertical scroll intent detected early
+    // Early vertical-scroll intent → cancel (so we don't fight a scroll).
     if (dy > 8 && dy > dx * 1.2) state.current.cancelled = true;
   };
   const onTouchEnd = (e) => {
     if (!enabled || !state.current.active) return;
+    const st = state.current; st.active = false;
     const t = (e.changedTouches && e.changedTouches[0]) || null;
-    state.current.active = false;
-    if (!t || state.current.cancelled) return;
-    const dx = t.clientX - state.current.x;
-    const dy = t.clientY - state.current.y;
-    if (Math.abs(dx) > threshold && Math.abs(dx) > Math.abs(dy) * 2.5) {
-      onSwipe(dx > 0 ? 'right' : 'left');
-    }
+    if (!t) return;  // no end coordinate — not a gesture we can judge
+    const res = evaluateSwipe({
+      dx: t.clientX - st.x, dy: t.clientY - st.y, dt: Date.now() - st.t,
+      startX: st.x, viewportW: st.w,
+      scrollChanged: typeof window !== 'undefined' && window.scrollY !== st.scrollY,
+      cancelled: st.cancelled,
+    });
+    dbgSwipe(res.fire, res.reason);
+    if (res.fire) onSwipe(res.fire);
   };
   return { onTouchStart, onTouchMove, onTouchEnd };
 }
@@ -1453,6 +1476,7 @@ body{
   color:var(--text);font-size:15px;line-height:1.5;
 }
 .hub{background:var(--bg);min-height:100vh;}
+.hub-main{display:block;}  /* M4.1: page-content wrapper that carries the swipe handlers (keeps fixed chrome out of the swipe region) */
 
 /* ═══════════════════════════════════════════
    WHISPER BAR (utility strip)
@@ -1485,11 +1509,22 @@ body{
 /* Home weather stacked under the ticker: full-bleed bar, content contained to the
    same max-width, flush (no card chrome). */
 .topbar-wx{background:var(--surface);border-bottom:1px solid var(--border2);}
+.topbar-wx-reserve{min-height:49px;}  /* R2: matches the loaded weather band so it swaps in without a shift */
 .topbar-wx .rnw-card{max-width:1400px;margin:0 auto;padding:0 var(--s4);border:none;border-radius:0;background:none;}
 /* Scoreboard band in the top bar (below weather, above nav — Pass G item 3).
    Dark ESPN theme so the homepage strip matches the Sports-page strip (item 6). */
 .topbar-scores{background:var(--surface2);border-bottom:1px solid var(--border2);}
 .topbar-scores .home-scores{max-width:1400px;margin:0 auto;padding:4px var(--s4) 5px;border:none;border-radius:0;background:none;overflow:visible;}
+/* P2/A4: the scores strip is always in the DOM on Home (it wraps ActiveScoresBar, which is
+   null until games load). Reserve its height from first paint so the async scores bar never
+   grows the scroll-away header and shoves the page (desktop/iPad CLS). Hidden at <=640 (the
+   phone Home shows scores in its own body), so this only reserves on desktop/iPad Home. */
+.topbar-scores{min-height:90px;}
+/* M1: on the phone Home the live-scores strip moves into the sectioned body
+   (ActiveScoresBar in <MobileHome/>), so hide the header copy at <=640 to avoid showing
+   it twice. The header strip only ever renders on General, so this is Home-only; desktop
+   and mobile category pages are unaffected. */
+@media(max-width:640px){ .topbar-scores{display:none;} }
 /* L1: scores now scroll away in .header-scroll (not hidden on shrink). */
 /* Right-edge fade cue: partial cards read as "scroll for more," not a cutoff. */
 .topbar-scores .home-scores,.sports-score-strip{position:relative;}
@@ -1851,6 +1886,14 @@ body:not(.dark) .pill-bar{
 ═══════════════════════════════════════════ */
 .page{max-width:1400px;margin:0 auto;padding:28px 24px;}
 .page-grid{display:grid;grid-template-columns:2.1fr 1fr;gap:28px;align-items:start;} /* main ~68% / sidebar ~32% (CNBC/NBC ratio) */
+/* Q3: on the 2-column desktop the rail is short (~600px) next to a ~1600px feed, so the
+   right ~490px went blank as you scrolled past it. Make the rail STICKY below the pinned
+   nav so it stays in view while you read the feed; if it is ever taller than the viewport
+   it gets its own scroll. Pure CSS — the scroll-0 geometry is unchanged (so the desktop
+   no-regression diff still holds) and there are zero new re-renders. */
+@media (min-width:1101px){
+  .page-grid > .sidebar{position:sticky;top:64px;align-self:start;max-height:calc(100vh - 76px);overflow-y:auto;overflow-x:hidden;overscroll-behavior:contain;}
+}
 /* D4: reclaim the wasted side gutters on large screens — the whole shell (header
    bars + content) grows from 1400 to 1560 at >=1440px so the main column gets wider
    instead of sitting small between big margins. The 2.1/1 grid keeps line length sane. */
@@ -3994,7 +4037,7 @@ body{overscroll-behavior-y:contain;}
   display:none;
   position:fixed;bottom:0;left:0;right:0;
   background:var(--surface);border-top:1px solid var(--border);
-  z-index:400;height:56px;
+  z-index:400;height:60px;
   padding-bottom:env(safe-area-inset-bottom, 0);
 }
 .bottom-tabs-inner{display:grid;grid-template-columns:repeat(5,1fr);height:100%;}
@@ -4006,8 +4049,8 @@ body{overscroll-behavior-y:contain;}
   -webkit-tap-highlight-color:transparent;
 }
 .bottom-tab:active{background:var(--surface2);}
-.bottom-tab-icon{width:20px;height:20px;flex-shrink:0;}
-.bottom-tab-label{font-size:9px;font-weight:600;letter-spacing:0.01em;}
+.bottom-tab-icon{width:22px;height:22px;flex-shrink:0;}
+.bottom-tab-label{font-size:11px;font-weight:600;letter-spacing:0.01em;}
 .bottom-tab.active{color:var(--accent);}
 
 /* ─── MENU SHEET (bottom-sheet for overflow nav) ─── */
@@ -4199,7 +4242,7 @@ body{overscroll-behavior-y:contain;}
 
 /* Swipe hint — brief toast when user changes category on mobile */
 .swipe-hint{
-  position:fixed;bottom:calc(56px + env(safe-area-inset-bottom, 0) + 12px);
+  position:fixed;bottom:calc(60px + env(safe-area-inset-bottom, 0) + 12px);
   left:50%;transform:translateX(-50%);
   background:rgba(17,24,39,0.9);color:#fff;
   font-size:var(--fs-meta);font-weight:600;padding:6px 14px;border-radius:16px;
@@ -4255,6 +4298,32 @@ body{overscroll-behavior-y:contain;}
    BBC News mobile: full-width cards, large serif
    headlines, clear category labels, generous spacing
 ═══════════════════════════════════════════ */
+/* Q1: iPad PORTRAIT (641–1024) — the priority-overflow nav cannot fit the categories at
+   this width (only "News" fits), so categories move to the pinned, horizontally-scrollable
+   chip bar (the same one as on phones), reachable in <=2 taps. The desktop nav-bar keeps
+   the logo + search/Analyze/Customize controls; only its category tabs (.nav-tabs) hide.
+   The chip bar rides the sticky header below the nav-bar. Desktop >=1025 is unchanged. */
+@media (min-width:641px) and (max-width:1024px){
+  /* Q1: iPad PORTRAIT only — categories move to the pinned chip bar; desktop nav tabs hide. */
+  .mobile-top{display:block;background:none;border-bottom:none;}
+  .mobile-top .mobile-header,.mobile-top .mobile-search{display:none;}
+  .nav-tabs{display:none;}
+  .chip{min-height:44px;padding:6px 14px;display:inline-flex;align-items:center;} /* >=44px tap target */
+}
+/* Q2 + R1: State of Play / breaking was hidden entirely across the WHOLE single-column range
+   (641–1100): the retired .sop-hoist and the <=640 .sop-mobile are both off, and the <=1100
+   single-column rule hides the sidebar copy. Reveal the EXISTING hoisted copy (no new DOM) and
+   order it to the TOP of the feed column so breaking is on the first screen. This spans iPad
+   portrait (641–1024, Q2) AND the 1025–1100 landscape band (9th/10th-gen & 10.2" iPads, R1),
+   WITHOUT touching the >=1025 desktop nav (that stays in the 641–1024 block above). Desktop
+   >=1101 (two-column, sidebar copy visible) is unchanged.
+   Q4: the slot is reserved PERMANENTLY (260px) so streaming cross-category breaking fills it
+   instead of collapsing-then-reappearing (that toggle was the big 1024 CLS spike). */
+@media (min-width:641px) and (max-width:1100px){
+  .feed-col{display:flex;flex-direction:column;}
+  .sop-hoist{display:block;order:-1;margin-bottom:18px;min-height:260px;}
+  .sop-hoist .sop-strip{min-height:260px;}
+}
 @media (max-width:640px){
   .whisper-bar{display:none;}
   .nav-bar{display:none;}
@@ -4284,7 +4353,7 @@ body{overscroll-behavior-y:contain;}
   .topbar-wrap.hidden .mobile-header,
   .topbar-wrap.hidden .mobile-search{display:none;}
 
-  body{padding-bottom:calc(58px + env(safe-area-inset-bottom, 0));}
+  body{padding-bottom:calc(62px + env(safe-area-inset-bottom, 0));}
   .page{padding:14px 14px 24px;}
 
   /* Hero — full-bleed on mobile for maximum impact */
@@ -4708,6 +4777,7 @@ kbd{display:inline-block;padding:1px 5px;border:1px solid var(--border);border-r
 }
 .bottom-tab.active{color:var(--accent);}
 .bottom-tab:hover:not(.active){color:var(--text2);}
+.bottom-tab:focus-visible{outline:2px solid var(--accent);outline-offset:-3px;}  /* A12 */
 .bottom-tab-icon{width:20px;height:20px;flex-shrink:0;}
 
 /* Smooth page transitions */
@@ -5368,6 +5438,22 @@ kbd{display:inline-block;padding:1px 5px;border:1px solid var(--border);border-r
 
 /* ── TOP OF HOUR STRIP ─────────────────────────────────────────── */
 .toh-strip{margin-bottom:28px;}
+/* Q4: reserve the Top Stories band's FINAL height so it does not grow as the cross-category
+   picks fill in (the dominant desktop/iPad shifter). The min-height is kept at/below the
+   loaded height at each breakpoint so the loaded layout is unchanged: ~388px in the
+   two-column layout (>=900px; loaded 392–408) and ~720px where it stacks to one column
+   (641–899px; loaded ~736 at iPad portrait). The .toh-reserve placeholder (shown for the
+   brief fully-empty moment before the first pick) uses the same heights. Mobile category
+   pages (<=640) keep their short 1-col strip (no reserve); the phone Home uses <MobileHome/>. */
+.toh-strip{min-height:400px;}
+.toh-reserve{min-height:400px;margin-bottom:28px;}
+@media(min-width:641px) and (max-width:899px){ .toh-strip,.toh-reserve{min-height:720px;} }
+@media(min-width:1280px){ .toh-strip,.toh-reserve{min-height:410px;} } /* loaded ~408 at 1440 */
+@media(max-width:640px){ .toh-strip{min-height:0;} .toh-reserve{display:none;} }
+/* Q4: reserve the sidebar State of Play (desktop 2-col) the same way as the hoisted copy,
+   so its cross-category breaking growth does not shove the rail modules below it. The
+   desktop sidebar copy shows more ranked rows (~327px loaded) than the iPad hoist (~257px). */
+@media(min-width:1101px){ .sidebar .sop-strip{min-height:330px;} .sidebar-sop{min-height:330px;} }
 .toh-strip-head{
   display:flex;align-items:center;justify-content:space-between;
   margin-bottom:14px;
@@ -5392,6 +5478,9 @@ kbd{display:inline-block;padding:1px 5px;border:1px solid var(--border);border-r
 .toh-lead-col .toh-card-lead{align-self:stretch;width:100%;max-height:210px;}
 .toh-lead-col .toh-card-lead .toh-img{object-fit:cover;}
 .toh-side{display:flex;flex-direction:column;min-width:0;}
+/* Q4: reserve the Top Stories right column (3 compact rows) so the rows filling in — and
+   the picks churning as cross-category data streams — do not shift the band. */
+@media(min-width:900px){ .toh-side{min-height:360px;} }
 .toh-card{
   border-radius:var(--radius);overflow:hidden;cursor:pointer;
   transition:transform 0.2s,box-shadow 0.2s;
@@ -5463,9 +5552,12 @@ kbd{display:inline-block;padding:1px 5px;border:1px solid var(--border);border-r
 .toh-compact-row{
   display:flex;align-items:flex-start;gap:14px;text-align:left;cursor:pointer;
   background:none;border:none;border-bottom:1px solid var(--border2);
-  padding:12px 0;font-family:inherit;transition:background 0.12s;min-height:84px;
+  padding:12px 0;font-family:inherit;transition:background 0.12s;min-height:120px;
 }
 .toh-compact-row:first-child{border-top:1px solid var(--border2);}
+/* Q4: a fixed 3-line title box so a compact row is the SAME height whether the pick that
+   streams in has a 1- or 3-line headline — the picks churning no longer shift the rows. */
+@media(min-width:900px){ .toh-compact-title{min-height:3.72em;} }
 .toh-compact-row:hover{background:var(--surface2);}
 .toh-compact-thumb{
   width:112px;height:84px;aspect-ratio:4/3;flex-shrink:0;object-fit:cover;
@@ -5650,10 +5742,33 @@ kbd{display:inline-block;padding:1px 5px;border:1px solid var(--border);border-r
   .mobile-icon-btn{padding:7px;}
   .chip-bar{height:44px;}
   .chip{padding:6px 13px;min-height:44px;display:inline-flex;align-items:center;} /* Pass M 1a: 44 hit area */
-  .bottom-tab-label{font-size:8.5px;}
-  .bottom-tab-icon{width:19px;height:19px;}
+  .bottom-tab-label{font-size:11px;}  /* M2: >=11px labels */
+  .bottom-tab-icon{width:22px;height:22px;}
   .sources-title{font-size:24px;}
   .sources-cat-grid{grid-template-columns:1fr;gap:14px;}
+}
+
+/* ═══════════ M5 — TOUCH TARGETS (>=44x44 on phones and any touch device) ═══════════
+   Applies at <=640 OR on a device that cannot hover (phones + touch iPads). Non-touch
+   desktop/iPad keep their compact controls (hover:hover), so this does not change their
+   output. Each control named here measured <44px on a phone before this rule. */
+@media (max-width:640px), (hover:none){
+  .snap-ask,.snap-save{min-width:44px;min-height:44px;justify-content:center;}
+  .mobile-icon-btn{min-width:44px;min-height:44px;}
+  .home-scores-see-all{min-height:44px;display:inline-flex;align-items:center;}
+  .src-footer-link{min-height:44px;display:inline-flex;align-items:center;}
+  .social-handle{min-height:44px;min-width:44px;display:inline-flex;align-items:center;justify-content:center;}
+  .sb-across-clabel{min-height:44px;display:flex;align-items:center;}
+  .sidebar-sec-collapse{min-height:44px;}
+  .last-updated{min-height:44px;display:inline-flex;align-items:center;}
+  .page-customize-btn{min-height:44px;}
+  .sport-tab,.pc-subtab,.en-subtabs .pc-subtab{min-width:44px;min-height:44px;}
+  .feed-degraded{min-height:44px;}
+  .follow-source-chip,.follow-chip-x,.following-chip-x,.ttp-chip-star,.src-show-more{min-height:44px;}
+  .sop-collapse,.sop-row-menu-btn,.sop-ask{min-width:44px;min-height:44px;}
+  /* P3: the desktop header/nav controls also show on a touch iPad (641–1100, hover:none). */
+  .nav-icon-btn,.nav-btn-brief,.nav-btn-blue{min-width:44px;min-height:44px;}
+  .ss-tk{min-height:44px;}
 }
 
 /* ═══════════ v46 — "N NEW STORIES" PILL ═══════════ */
@@ -5918,7 +6033,7 @@ function ActiveScoresBar({ onGoToSports, favTeams }) {
         <span className={`home-scores-label${anyLive ? ' is-live' : ''}`}>{anyLive ? 'Live Scores' : 'Scores'}</span>
         <button className="home-scores-see-all" onClick={onGoToSports}>Sports →</button>
       </div>
-      <div className="score-strip-scroll home-scores-scroll">
+      <div className="score-strip-scroll home-scores-scroll" data-no-swipe>
         {games.map((g, i) => <ScoreTile key={`${g._league}-${i}`} g={g}/>)}
       </div>
     </div>
@@ -5971,7 +6086,9 @@ function FeedCard({a, cat, isSaved, onSave, onRead, relatedSources, isRead, user
   const [disc, setDisc] = useState(null);
   const [loadingDisc, setLoadingDisc] = useState(false);
   const [actionsOpen, setActionsOpen] = useState(false);
-  const isMobile = typeof window !== 'undefined' && window.innerWidth <= 640;
+  // A9/P4: ONE isMobile source — the reactive useIsMobile() hook (matchMedia), not a
+  // render-time window.innerWidth read that never updates on resize/rotate.
+  const isMobile = useIsMobile();
   const cc = CATS[cat]||CATS.general;
   const topKw = a.matchedKw?.[0]||null;
   const paywall = isPaywalled(a.link);
@@ -6912,7 +7029,10 @@ function Sidebar({cat, arts, kw, health, activeKw, setActiveKw, activeSource, se
 
       {/* 1) STATE OF PLAY — moved into the sidebar (Pass J item 2), consistent
             sidebar-module styling, Coverage-Gap rows in a stacked (non-inline) layout. */}
-      {sopItems && !activeKw && !activeSource && (
+      {/* Q4: render the wrapper whenever sopItems is an array (even empty) so the desktop
+         sidebar State-of-Play slot is reserved from first paint — it then fills as breaking
+         streams in instead of appearing and shoving the rail modules below it. */}
+      {Array.isArray(sopItems) && !activeKw && !activeSource && (
         <div className={hideSopMobile ? 'sidebar-sop sop-hide-mobile' : 'sidebar-sop'}>
           <StateOfPlay variant="sidebar" items={sopItems} gapItems={sopGapItems||[]} breakingItems={sopBreakingItems||[]}
             meta={sopMeta||cc} onRead={onRead} onAsk={onAsk} formatDate={formatDate||fmtDate}
@@ -7136,10 +7256,13 @@ function SourceFooter({cat, feeds, arts}) {
 // (Finance, Bloom, Comedy, Podcasts, Social) and actions (refresh, theme,
 // customize) so the bottom tab bar can stay focused on the 3 primary
 // destinations a mobile user actually uses for quick check-ins.
-function MenuSheet({ tab, onTabChange, onClose, onCustomize, onRefresh, dark, setDark, search, onSearch, trendingTopics }) {
+function MenuSheet({ tab, onTabChange, onClose, onCustomize, onRefresh, dark, setDark, search, onSearch, trendingTopics, savedCount = 0 }) {
+  // M2: Sources and Saved left the bottom bar; they stay reachable here (<=2 taps).
   const items = [
     { key:'briefing',   emoji:'', label:'The Briefing' },
     { key:'podcasts',   emoji:'', label:'Podcasts' },
+    { key:'sources',    emoji:'', label:'Sources' },
+    { key:'saved',      emoji:'', label:savedCount>0?`Saved (${savedCount})`:'Saved' },
   ];
   return (
     <div className="menu-sheet-overlay" onClick={onClose}>
@@ -7194,40 +7317,29 @@ function MenuSheet({ tab, onTabChange, onClose, onCustomize, onRefresh, dark, se
   );
 }
 
-// Fixed bottom tab bar with 4 thumb-reachable slots:
-//   Today | Feed | Saved | More
-// "Feed" intelligently targets the last-visited news category if you're
-// already on one (mirrors Yahoo Sports "Following" behavior — tapping doesn't
-// throw you off your current context). Hidden on desktop via CSS.
-function BottomTabBar({ tab, onTabChange, onMenuOpen, savedCount, lastFeedTab }) {
-  // v24a: 'Home' tab routes to General (the new homepage). 'Feed' still
-  // routes to last-visited category. If user is already on General, both
-  // tabs visually highlight 'Home' so the chip-bar is the way to navigate.
-  const inOtherFeed = ['sports','business','finance','bloom','popculture','comedy'].includes(tab);
-  const feedTarget = inOtherFeed ? tab : (lastFeedTab && lastFeedTab !== 'general' ? lastFeedTab : 'sports');
+// M2: fixed bottom tab bar, 5 thumb-reachable slots:
+//   Home | Sports | Briefing | Search | More
+// lucide line icons (one icon set), labels >=11px, each tab >=48px tall, a single accent
+// active state, safe-area inset preserved. Feed/Saved/Sources left the bar — Saved and
+// Sources stay reachable in More (same behavior). Tapping Home while already on Home
+// scrolls to top; Sports goes to the Sports page; Search opens the existing search UI.
+function BottomTabBar({ tab, onTabChange, onMenuOpen, onSearchOpen, onHomeReTap }) {
+  const Tab = ({ active, onClick, Icon, label }) => (
+    <button className={`bottom-tab ${active ? 'active' : ''}`} onClick={onClick}
+      aria-label={label} aria-current={active ? 'page' : undefined}>
+      <Icon className="bottom-tab-icon" size={22} strokeWidth={2} aria-hidden="true"/>
+      <span className="bottom-tab-label">{label}</span>
+    </button>
+  );
   return (
-    <nav className="bottom-tabs">
+    <nav className="bottom-tabs" aria-label="Primary">
       <div className="bottom-tabs-inner">
-        <button className={`bottom-tab ${tab==='general'?'active':''}`} onClick={()=>onTabChange('general')}>
-          <svg className="bottom-tab-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
-          <span className="bottom-tab-label">Home</span>
-        </button>
-        <button className={`bottom-tab ${inOtherFeed?'active':''}`} onClick={()=>onTabChange(feedTarget)}>
-          <svg className="bottom-tab-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>
-          <span className="bottom-tab-label">Feed</span>
-        </button>
-        <button className={`bottom-tab ${tab==='sources'?'active':''}`} onClick={()=>onTabChange('sources')}>
-          <svg className="bottom-tab-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>
-          <span className="bottom-tab-label">Sources</span>
-        </button>
-        <button className={`bottom-tab ${tab==='saved'?'active':''}`} onClick={()=>onTabChange('saved')}>
-          <svg className="bottom-tab-icon" viewBox="0 0 24 24" fill={tab==='saved'?'currentColor':'none'} stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg>
-          <span className="bottom-tab-label">{savedCount>0?`Saved (${savedCount})`:'Saved'}</span>
-        </button>
-        <button className="bottom-tab" onClick={onMenuOpen}>
-          <svg className="bottom-tab-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
-          <span className="bottom-tab-label">More</span>
-        </button>
+        <Tab active={tab === 'general'} Icon={HomeIcon} label="Home"
+          onClick={() => { if (tab === 'general') onHomeReTap(); else onTabChange('general'); }}/>
+        <Tab active={tab === 'sports'} Icon={Trophy} label="Sports" onClick={() => onTabChange('sports')}/>
+        <Tab active={tab === 'briefing'} Icon={FileText} label="Briefing" onClick={() => onTabChange('briefing')}/>
+        <Tab active={false} Icon={SearchIcon} label="Search" onClick={onSearchOpen}/>
+        <Tab active={false} Icon={MenuIcon} label="More" onClick={onMenuOpen}/>
       </div>
     </nav>
   );
@@ -7446,14 +7558,14 @@ function SportsScoreStrip({ sportTab = 'all', teams }) {
   }, [scores, teams]);
 
   if (tiles.length === 0) return (
-    <div className="sports-score-strip empty">
+    <div className="sports-score-strip empty" data-no-swipe>
       <span className="sports-score-strip-empty">No games today across selected leagues</span>
     </div>
   );
 
   return (
-    <div className="sports-score-strip">
-      <div className="score-strip-scroll sports-score-strip-inner">
+    <div className="sports-score-strip" data-no-swipe>
+      <div className="score-strip-scroll sports-score-strip-inner" data-no-swipe>
         {tiles.map(g => <ScoreTile key={g.id} g={g}/>)}
       </div>
     </div>
@@ -7546,10 +7658,10 @@ function HeroBand({ heroStories, heroIdx, setHeroIdx, paused, setPaused, onRead 
 function SportsSkeleton() {
   return (
     <div className="page sports-page">
-      <div className="sports-score-strip" aria-busy="true">
+      <div className="sports-score-strip" aria-busy="true" data-no-swipe>
         <div className="pod-skel-line" style={{ width: '100%', height: '64px' }}/>
       </div>
-      <div className="sport-tabs" style={{ margin: '14px 0' }}>
+      <div className="sport-tabs" data-no-swipe style={{ margin: '14px 0' }}>
         {Array.from({ length: 6 }).map((_, i) => <div key={i} className="pod-skel-line" style={{ width: '64px', height: '30px', borderRadius: '16px', flexShrink: 0 }}/>)}
       </div>
       <div className="page-grid"><div className="feed-col">
@@ -7864,7 +7976,9 @@ function TopBar({tab, setTab, search, setSearch, dark, setDark,
 
   // D1: desktop nav is now priority-overflow (PriorityNav). Primary order lives in
   // NAV_PRIMARY; Sources/Saved always live in the More menu (NAV_ALWAYS_MORE).
-  const TAB_LABELS = {business:'Business & Markets',bloom:'Energy',finance:'Markets',tech:'AI & Tech',health:'Health',popculture:'Pop Culture',podcasts:'Podcasts',sources:'Sources',saved:'Saved',briefing:'Briefing'};
+  // A6: one name for the home category — "News" (not "General") in the desktop nav, matching
+  // the chips and page titles (CATS.general.label is already "News"). Internal key stays `general`.
+  const TAB_LABELS = {general:'News',business:'Business & Markets',bloom:'Energy',finance:'Markets',tech:'AI & Tech',health:'Health',popculture:'Pop Culture',podcasts:'Podcasts',sources:'Sources',saved:'Saved',briefing:'Briefing'};
   const TAB_CLASS  = {general:'t-general',sports:'t-sports',business:'t-business',finance:'t-finance',bloom:'t-bloom',tech:'t-tech',popculture:'t-popculture',podcasts:'t-podcasts'};
 
   // v24a Mobile chip bar per user: General · Business · Markets · Energy · Sports · Pop Culture
@@ -7907,7 +8021,7 @@ function TopBar({tab, setTab, search, setSearch, dark, setDark,
               lives ONLY as tagged rows inside State of Play. The strip is markets-only. */}
           <span className="ss-flag ss-flag-markets">Markets</span>
           <div className="ss-ticker">
-            <div className="ss-ticker-inner">
+            <div className="ss-ticker-inner" data-no-swipe>
               {INDICES.filter(idx=>!(hiddenIndices||[]).includes(idx.sym)).map(idx=>{
                 const q=quotes[idx.sym]; const up=q?q.chg>=0:null;
                 return (
@@ -7937,9 +8051,13 @@ function TopBar({tab, setTab, search, setSearch, dark, setDark,
           )}
         </div>
       </div>
-      {/* Home weather band (<900px, where it is NOT merged onto the ticker line). */}
-      {tab==='general' && weatherData.length > 0 && (
-        <div className="topbar-wx"><RightNowWeather data={weatherData}/></div>
+      {/* Home weather band (<900px, where it is NOT merged onto the ticker line). R2: reserve the
+          band's height until the weather resolves so it doesn't pop in and shove the page down
+          (the band is display:none >=900, so this reserve is phone/narrow-tablet only). */}
+      {tab==='general' && (
+        weatherData.length > 0
+          ? <div className="topbar-wx"><RightNowWeather data={weatherData}/></div>
+          : <div className="topbar-wx topbar-wx-reserve" aria-hidden="true"/>
       )}
     </div>
 
@@ -8033,9 +8151,9 @@ function TopBar({tab, setTab, search, setSearch, dark, setDark,
             <button className="mobile-icon-btn" onClick={onAnalyze} title="Analyze">
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><rect x="8" y="2" width="8" height="4" rx="1"/><line x1="9" y1="12" x2="15" y2="12"/><line x1="9" y1="16" x2="13" y2="16"/></svg>
             </button>
-            <button className="mobile-icon-btn" onClick={onMobileSearchToggle} title="Search">
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-            </button>
+            {/* M2: the header search icon is removed on mobile — Search now lives in the
+                bottom tab bar (which opens this same .mobile-search input), so the two
+                would otherwise duplicate. */}
             <button className="mobile-icon-btn" onClick={onRefresh} title="Refresh">
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
             </button>
@@ -8058,7 +8176,7 @@ function TopBar({tab, setTab, search, setSearch, dark, setDark,
           </div>
         )}
         <div className="chip-bar-wrap">
-        <div className="chip-bar" ref={chipBarRef}>
+        <div className="chip-bar" data-no-swipe ref={chipBarRef}>
           {MOBILE_CHIPS.map(c => {
             const isActive = tab === c.key;
             return (
@@ -8171,6 +8289,33 @@ const HOUSTON_SOURCES = ['KHOU Houston', 'Chron.com', 'Click2Houston', 'Houston 
 // so the same story is caught across modules even when different sources give it
 // different URLs (e.g. a clustered State-of-Play item vs the raw Houston-source item).
 const storyKey = a => (((a && a.title) || '').slice(0, 60).toLowerCase().replace(/\s+/g, ''));
+
+// R2: hold an above-the-fold list stable once it has first rendered in full. `reconcileHeld`
+// is the pure rule (unit-tested in heldList.test.mjs); this hook keeps the committed list in a
+// ref, re-picks on page switch / refresh (refreshKey changes after commit), and counts
+// suppressed late changes for
+// ?debug. Returns the STABLE list — Top Stories, the lead and State-of-Play rows stop churning
+// as slow feeds arrive, so they stop shoving the page (desktop/iPad CLS).
+function useHeldList(live, { keyOf, target, done = false, refreshKey }) {
+  const ref = useRef({ items: null, held: 0, lastSig: '', committedAt: undefined });
+  const r = ref.current;
+  // A real refresh / page switch changes refreshKey AFTER we have committed → re-pick. The
+  // first load's undefined->timestamp transition is NOT a reset (committedAt is only set at
+  // commit time), so the committed selection survives the initial fill instead of re-picking.
+  if (r.committedAt !== undefined && refreshKey !== r.committedAt) {
+    r.items = null; r.held = 0; r.lastSig = ''; r.committedAt = undefined;
+  }
+  // Don't commit until the page's OWN category has loaded at least once, so the lead is this
+  // page's lead — not a cross-category fallback chosen before it arrived.
+  const ready = refreshKey != null && refreshKey !== 0;
+  if (!ready) return { items: live, held: r.held };
+  const { items, committed, suppressed } = reconcileHeld(r.items, live, { keyOf, target, done });
+  if (committed && !r.items) { r.items = items; r.committedAt = refreshKey; } // first commit freezes
+  const sig = (live || []).map(keyOf).join('|');
+  if (committed && suppressed && sig !== r.lastSig) { r.held += 1; r.lastSig = sig; }
+  return { items: r.items || items, held: r.held, committed: r.items != null };
+}
+
 function HoustonRow({ items, onRead, formatDate }) {
   // Items are computed by the caller (FeedPage) so they share the page's
   // cross-module dedup set (Pass I item 1).
@@ -8178,7 +8323,7 @@ function HoustonRow({ items, onRead, formatDate }) {
   return (
     <section className="houston-row">
       <div className="houston-head"><span className="houston-label">Houston</span><span className="houston-sub">Local</span></div>
-      <div className="houston-scroll">
+      <div className="houston-scroll" data-no-swipe>
         {items.map((a, i) => (
           <button key={a.link || i} className="houston-card" onClick={() => onRead(a)}>
             {a.img ? <img className="houston-img" src={a.img} loading="lazy" alt=""/> : <div className="houston-img houston-img-ph"><span className="ph-label">{a.source}</span></div>}
@@ -8579,7 +8724,7 @@ function FeedPage({ cat, ctx }) {
     // A story placed in a top-of-page module is excluded from every other module
     // on the SAME page — on every category, not just General. Priority order:
     // Top Stories → State of Play → Houston → main feed.
-    const topStoryItems = useMemo(() => {
+    const liveTopStoryItems = useMemo(() => {
       if (isHome) {
         // Home Top Stories = TopOfHourStrip picks (catLead + cross-category images).
         // Mirror its selection exactly so State of Play + the feed exclude what it
@@ -8587,26 +8732,38 @@ function FeedPage({ cat, ctx }) {
         // L2: Top Stories = hero (image) + up to 6 more (2-3 text headlines + 3 compact
         // rows). The hero needs an image; the rest may be text-only.
         const picks = catLead && catLead.img ? [catLead] : [];
-        const used = new Set(catLead ? [catLead.link] : []);
+        // Dedup by storyKey (title), not link: two syndicated copies of one story carry
+        // different links but the same title, so a link-only guard let the hero reappear as
+        // a text/compact row below it. storyKey matches what every downstream module dedupes on.
+        const used = new Set(catLead ? [storyKey(catLead)] : []);
         const catOrder = ['sports','business','finance','bloom','popculture','general','tech'];
         for (const c of catOrder) {
           if (picks.length >= 6) break;
-          const item = (arts[c]||[]).find(a => a.img && !used.has(a.link));
-          if (item) { picks.push({ ...item, cat: item.cat || c }); used.add(item.link); }
+          const item = (arts[c]||[]).find(a => a.img && !used.has(storyKey(a)));
+          if (item) { picks.push({ ...item, cat: item.cat || c }); used.add(storyKey(item)); }
         }
         for (const c of catOrder) {
           if (picks.length >= 6) break;
           for (const a of (arts[c]||[])) {
             if (picks.length >= 6) break;
-            if (!used.has(a.link)) { picks.push({ ...a, cat: a.cat || c }); used.add(a.link); }
+            if (!used.has(storyKey(a))) { picks.push({ ...a, cat: a.cat || c }); used.add(storyKey(a)); }
           }
         }
         return picks.slice(0, 6);
       }
       if (!catLead) return [];   // category Top Stories = hero + 5 secondaries (6 shown total)
-      const secondaries = feedItems.slice(0, 10).filter(a => a.link !== catLead.link).slice(0, 5);
+      const secondaries = feedItems.slice(0, 10).filter(a => storyKey(a) !== storyKey(catLead)).slice(0, 5);
       return [catLead, ...secondaries];
     }, [isHome, catLead, feedItems, arts]);
+    // R2: hold the chosen Top Stories + order once the first full set has rendered, so late
+    // feeds don't reorder/replace what's above the fold (they flow to the sections instead, and
+    // are picked up on the next refresh). Home commits once it reaches 6 cross-category picks;
+    // a category commits at 6 or when its own load finishes. Resets on page switch / refresh.
+    const { items: topStoryItems, held: topStoriesHeld, committed: topStoriesCommitted } = useHeldList(liveTopStoryItems, {
+      keyOf: storyKey, target: 6, done: !isHome && !isLoading,
+      refreshKey: lastUpdated[cat],
+    });
+    useEffect(() => { if (DEBUG && typeof window !== 'undefined') { window.__dbg = window.__dbg || {}; window.__dbg.heldTopStories = topStoriesHeld; window.__dbg.topStoriesCommitted = topStoriesCommitted; } }, [topStoriesHeld, topStoriesCommitted]);
     const topStoryKeys = useMemo(() => new Set(topStoryItems.map(storyKey)), [topStoryItems]);
     // Breaking stories for THIS category's State of Play (Pass L item 3) — the urgent
     // items relevant to the page, deduped against what Top Stories already shows. Home
@@ -8614,7 +8771,7 @@ function FeedPage({ cat, ctx }) {
     // D2 relevance (gate a): a story shows on a page only if it belongs to that page.
     // Category page = its own feed-category OR a DEFAULT_KW match for that category.
     // General = general/world-US top-news OR a match on ANY category's keywords.
-    const catBreaking = useMemo(() => {
+    const liveCatBreaking = useMemo(() => {
       if (!breakingItems || !breakingItems.length) return [];
       const anyKw = (b) => {
         const txt = (b.title + ' ' + (b.desc || '')).toLowerCase();
@@ -8629,32 +8786,57 @@ function FeedPage({ cat, ctx }) {
       };
       return breakingItems.filter(relevant).filter(b => !topStoryKeys.has(storyKey(b))).slice(0, 3);
     }, [breakingItems, cat, isHome, isMergedBiz, topStoryKeys, kw, kwMatch]);
+    // R2: hold the State-of-Play breaking rows stable the same way as Top Stories, so a late
+    // breaking story streaming in from another category doesn't reorder the visible rows (it is
+    // picked up on the next refresh). Same selection rules / max 3 / dedupe against Top Stories.
+    const { items: catBreaking } = useHeldList(liveCatBreaking, {
+      keyOf: storyKey, target: 3, done: !isLoading,
+      refreshKey: lastUpdated[cat],
+    });
+    // State of Play shows the breaking rows ABOVE its ranked clusters, so those breaking
+    // stories are claimed too — otherwise a breaking story repeats further down in the feed.
+    const catBreakingKeys = useMemo(() => new Set(catBreaking.map(storyKey)), [catBreaking]);
     // State of Play ranks only from what Top Stories didn't already take.
     // D2: promos/sportsbook content are excluded from SoP ranking too, not just Breaking.
+    // NB: breaking is NOT subtracted here — selectStateOfPlay already drops any ranked row that
+    // matches a breaking row (notSameAsAny), so subtracting the HELD catBreaking keys up here only
+    // coupled breaking's (later) commit into the feed/rail dedup and made them re-flow late (CLS).
     const sopSourceItems = useMemo(
       () => activeFilteredItems.filter(a => !topStoryKeys.has(storyKey(a)) && !isPromoItem(a)),
       [activeFilteredItems, topStoryKeys]);
-    const sopShownKeys = useMemo(() => {
-      const ranked = rankClusters(sopSourceItems, { max: 2, limit: 5 });
-      return new Set(ranked.length >= 3 ? ranked.map(storyKey) : []);
-    }, [sopSourceItems]);
+    // The numbered State-of-Play rows — ranked by the SAME pure selector the component uses, so
+    // what we claim for dedup is exactly what SoP shows. (Breaking is held/claimed above via
+    // catBreaking.) Coverage-gap rows are NOT claimed: they come from fetchDiscover — stories none
+    // of the reader's own sources carried — so by construction they never appear in the feed or in
+    // `arts`, and depending on that late async fetch here would re-dedup the feed/rail again (CLS).
+    const liveSopTop = useMemo(
+      () => selectStateOfPlay({ items: sopSourceItems, breakingItems: catBreaking, gapItems: [] }).top,
+      [sopSourceItems, catBreaking]);
+    // R2: HOLD the ranked rows the same way as Top Stories + breaking — once the first full set
+    // has rendered, keep those rows + order until refresh / page switch. A late story that would
+    // outrank a visible row waits for the next refresh. Holding the ranked pool here also freezes
+    // the dedup keys below, so the main feed and the rail stop re-flowing as slow feeds arrive.
+    const { items: sopTopItems } = useHeldList(liveSopTop, {
+      keyOf: storyKey, target: 5, done: !isLoading, refreshKey: lastUpdated[cat],
+    });
+    const sopShownKeys = useMemo(() => new Set(sopTopItems.map(storyKey)), [sopTopItems]);
     // Houston Local (General) claims its stories too.
     const houstonItems = useMemo(() => {
       if (!isHome) return [];
       const seen = new Set();
       return Object.values(arts || {}).flat()
         .filter(a => HOUSTON_SOURCES.includes(a.source))
-        .filter(a => !topStoryKeys.has(storyKey(a)) && !sopShownKeys.has(storyKey(a)))
+        .filter(a => !topStoryKeys.has(storyKey(a)) && !catBreakingKeys.has(storyKey(a)) && !sopShownKeys.has(storyKey(a)))
         .filter(a => { const k = storyKey(a); if (seen.has(k)) return false; seen.add(k); return true; })
         .sort((a, b) => new Date(b.pubDate) - new Date(a.pubDate))
         .slice(0, 6);
-    }, [isHome, arts, topStoryKeys, sopShownKeys]);
+    }, [isHome, arts, topStoryKeys, catBreakingKeys, sopShownKeys]);
     const houstonKeys = useMemo(() => new Set(houstonItems.map(storyKey)), [houstonItems]);
     // The main feed excludes everything already placed above it (by title key, so
     // the same story from a different source can't slip back in).
     const dedupedFeed = useMemo(
-      () => feedItems.filter(a => !topStoryKeys.has(storyKey(a)) && !sopShownKeys.has(storyKey(a)) && !houstonKeys.has(storyKey(a))),
-      [feedItems, topStoryKeys, sopShownKeys, houstonKeys]);
+      () => feedItems.filter(a => !topStoryKeys.has(storyKey(a)) && !catBreakingKeys.has(storyKey(a)) && !sopShownKeys.has(storyKey(a)) && !houstonKeys.has(storyKey(a))),
+      [feedItems, topStoryKeys, catBreakingKeys, sopShownKeys, houstonKeys]);
 
     // ── COVERAGE GAP (folded into State of Play) — widely-covered stories none of the
     //    reader's own sources carried. Home keys off this category; the merged
@@ -8695,7 +8877,8 @@ function FeedPage({ cat, ctx }) {
     // one and is suppressed below it. (railDedup.js is unit-tested in railDedup.test.mjs.)
     const { railConnections, otherCatSections } = useMemo(() => {
       const used = new Set();
-      topStoryKeys.forEach(k => used.add(k)); sopShownKeys.forEach(k => used.add(k)); houstonKeys.forEach(k => used.add(k));
+      topStoryKeys.forEach(k => used.add(k)); catBreakingKeys.forEach(k => used.add(k));
+      sopShownKeys.forEach(k => used.add(k)); houstonKeys.forEach(k => used.add(k));
       dedupedFeed.forEach(a => used.add(storyKey(a)));
       // Connections claim their member stories before Across is computed.
       const railConnections = claimConnections(railConnCandidates, used, storyKey).slice(0, 3);
@@ -8707,7 +8890,7 @@ function FeedPage({ cat, ctx }) {
       const otherCatSections = claimAcrossSections(acrossCandidates, used, storyKey)
         .map(s => ({ ...s, items: s.items.slice(0, 3) })).filter(s => s.items.length > 0).slice(0, 4);
       return { railConnections, otherCatSections };
-    }, [topStoryKeys, sopShownKeys, houstonKeys, dedupedFeed, railConnCandidates, isHome, arts, cat]);
+    }, [topStoryKeys, catBreakingKeys, sopShownKeys, houstonKeys, dedupedFeed, railConnCandidates, isHome, arts, cat]);
 
     // K5: Following — sidebar module on General. It now shows FOLLOWED TOPICS only;
     // followed TEAMS live as pinned chips on the Sports page (the my-teams ribbon) and
@@ -8770,7 +8953,7 @@ function FeedPage({ cat, ctx }) {
         {/* ── BUSINESS + MARKETS filter pills — reuses the Sports league-pill component.
             Markets routes to the full Markets page (FinancePage). ── */}
         {isMergedBiz && !activeKw && !activeSrc && !search && (
-          <div className="sport-tabs" style={{marginBottom:'12px'}}>
+          <div className="sport-tabs" data-no-swipe style={{marginBottom:'12px'}}>
             <button className={`sport-tab ${bizFilter==='all'?'active':''}`} onClick={()=>navigate('business')}>All</button>
             <button className={`sport-tab ${bizFilter==='business'?'active':''}`} onClick={()=>navigate('business','business')}>Business</button>
             <button className="sport-tab" onClick={()=>navigate('finance')}>Markets</button>
@@ -8780,7 +8963,7 @@ function FeedPage({ cat, ctx }) {
         {/* ── ENERGY sub-category pills — at the top of the page, matching the Sports
             league/team pill position + format (Pass J item 8). ── */}
         {cat === 'bloom' && !activeKw && !activeSrc && !search && (
-          <div className="pc-subtabs en-subtabs" style={{marginBottom:'12px'}}>
+          <div className="pc-subtabs en-subtabs" data-no-swipe style={{marginBottom:'12px'}}>
             {EN_SUBTABS.map(t => (
               <button key={t.key} className={`pc-subtab ${enSubTab===t.key?'active':''}`}
                 onClick={()=>{setEnSubTab(t.key);window.scrollTo({top:0,behavior:'instant'});}}>
@@ -8794,7 +8977,12 @@ function FeedPage({ cat, ctx }) {
             module below it provides a breathing-room break before the next image block
             (Pass H item 3). ── */}
         {isHome && !activeKw && !activeSrc && !search && (
-          <TopOfHourStrip catLead={catLead} arts={arts} onRead={onRead} stories={topStoryItems}/>
+          // R2: hold the reserved (fixed-height) slot until the held Top Stories has COMMITTED
+          // (or the load has settled), then drop in the full set at once — so the strip never
+          // renders a growing partial list that shoves its own rows as late feeds arrive.
+          (topStoriesCommitted || !isLoading) && topStoryItems.length
+            ? <TopOfHourStrip catLead={catLead} arts={arts} onRead={onRead} stories={topStoryItems}/>
+            : (isLoading && <div className="toh-reserve" aria-hidden="true"/>)
         )}
 
         {/* State of Play moved into the sidebar (Pass J item 2). Across MyNewsHub also
@@ -8806,8 +8994,10 @@ function FeedPage({ cat, ctx }) {
             instead of the old headline-floating-below-a-plain-image grid (Pass: card
             consistency). Business, Energy, AI & Tech, Health, Pop Culture all route
             through here, so they unify together. */}
-        {!activeKw && !activeSrc && catLead && !isHome && (
-          <TopOfHourStrip stories={topStoryItems} catLead={catLead} arts={arts} onRead={onRead}/>
+        {!activeKw && !activeSrc && !isHome && (
+          catLead && (topStoriesCommitted || !isLoading)
+            ? <TopOfHourStrip stories={topStoryItems} catLead={catLead} arts={arts} onRead={onRead}/>
+            : (isLoading && <div className="toh-reserve" aria-hidden="true"/>)
         )}
 
         {/* State of Play hoisted into the main column right after Top Stories — shown
@@ -8815,8 +9005,11 @@ function FeedPage({ cat, ctx }) {
             would otherwise bury it. On desktop this copy is display:none and the sidebar
             copy renders instead (see .sop-hoist CSS). */}
         {!activeKw && !activeSrc && !search && (
+          /* Q4: at iPad portrait this hoisted State of Play sits at the TOP (Q2, order:-1);
+             its slot is reserved permanently in CSS (.sop-hoist min-height) so breaking
+             streaming in never shoves Top Stories + the feed. */
           <div className="sop-hoist">
-            <StateOfPlay variant="sidebar" items={sopSourceItems} gapItems={gapItems} breakingItems={catBreaking}
+            <StateOfPlay variant="sidebar" items={sopTopItems} gapItems={gapItems} breakingItems={catBreaking}
               meta={CATS[cat]||CATS.general} onRead={onRead} onAsk={setChatContext} formatDate={fmtDate}
               collapsed={sopCollapsed} onToggleCollapse={toggleSop}/>
           </div>
@@ -8824,7 +9017,7 @@ function FeedPage({ cat, ctx }) {
 
         {/* Pop Culture sub-tabs */}
         {cat === 'popculture' && !activeKw && !activeSrc && !search && (
-          <div className="pc-subtabs">
+          <div className="pc-subtabs" data-no-swipe>
             {PC_SUBTABS.map(t => (
               <button key={t.key} className={`pc-subtab ${pcSubTab===t.key?'active':''}`}
                 onClick={()=>{setPcSubTab(t.key);window.scrollTo({top:0,behavior:'instant'});}}>
@@ -8889,8 +9082,11 @@ function FeedPage({ cat, ctx }) {
               </div>
             )}
             {isLoading&&!feedItems.length
-              ?<div className="snap-feed" aria-busy="true" aria-label={`Loading ${cc.label}`}>
-                  {Array.from({length:6}).map((_,i)=>(
+              ?<div className="snap-feed" data-no-swipe aria-busy="true" aria-label={`Loading ${cc.label}`}>
+                  {/* Q4: skeleton count = the rows expected to fill the viewport (~160px each),
+                      not a fixed 6, so the loading state covers the first screen and the
+                      skeleton->content swap shifts nothing above the fold. */}
+                  {Array.from({length: Math.min(12, Math.max(4, Math.ceil((typeof window!=='undefined'?window.innerHeight:800)/160)))}).map((_,i)=>(
                     <div key={i} className="snap-card snap-skel">
                       <div className="snap-accent"/>
                       <div className="snap-skel-main">
@@ -8907,9 +9103,9 @@ function FeedPage({ cat, ctx }) {
               :feedItems.length===0
                 ?<EmptyState
                    message={activeKw||activeSrc?'No stories match this filter.':search?`No results for "${search}".`:`Couldn't load ${cc.label}. Try refresh.`}
-                   actionLabel={activeKw?'Clear filter':activeSrc?'Clear filter':search?null:'Refresh'}
-                   onAction={activeKw?()=>setActiveKw(null):activeSrc?()=>setActiveSrc(null):search?null:refreshAll}/>
-                :<div className={`snap-feed${['business','bloom','tech','popculture'].includes(cat)?' snap-feed-divided':''}`}>
+                   actionLabel={activeKw?'Clear filter':activeSrc?'Clear filter':search?null:'Retry'}
+                   onAction={activeKw?()=>setActiveKw(null):activeSrc?()=>setActiveSrc(null):search?null:()=>loadCat(cat)}/>
+                :<div className={`snap-feed${['business','bloom','tech','popculture'].includes(cat)?' snap-feed-divided':''}`} data-no-swipe>
                   {/* D5 fix 3: Business/Energy/AI&Tech/Pop Culture carry the divided-list
                       treatment on desktop secondary rows; the lead stays a prominent card. */}
                   {/* AI & Tech only: optional GitHub street signal, click-to-load (3c). */}
@@ -8930,7 +9126,7 @@ function FeedPage({ cat, ctx }) {
                   )}
                   {!activeKw && !activeSrc && !search && (
                     <div className="sop-mobile">
-                      <StateOfPlay variant="sidebar" items={sopSourceItems} gapItems={gapItems} breakingItems={catBreaking}
+                      <StateOfPlay variant="sidebar" items={sopTopItems} gapItems={gapItems} breakingItems={catBreaking}
                         meta={CATS[cat]||CATS.general} onRead={onRead} onAsk={setChatContext} formatDate={fmtDate}
                         collapsed={sopCollapsed} onToggleCollapse={toggleSop}/>
                     </div>
@@ -9062,7 +9258,7 @@ function FeedPage({ cat, ctx }) {
             favTeams={[...teams, ...myTeams.map(t=>({match:t.name, league:t.league}))]}
             onTopicOpen={label => navigate(cat, 'topic', teamSlug(label))}
             isTopicFollowed={isTopicFollowed} toggleTopic={toggleTopic}
-            sopItems={!activeKw && !activeSrc && !search ? sopSourceItems : null}
+            sopItems={!activeKw && !activeSrc && !search ? sopTopItems : null}
             sopGapItems={gapItems} sopBreakingItems={!activeKw && !activeSrc && !search ? catBreaking : []} sopMeta={CATS[cat]||CATS.general}
             sopCollapsed={sopCollapsed} onToggleSop={toggleSop} formatDate={fmtDate}
             acrossSections={!isHome && !activeKw && !activeSrc && !search ? otherCatSections : null}
@@ -9870,8 +10066,11 @@ export default function App() {
     { enabled: isMobile, threshold: 110 }
   );
 
-  // Swipe left/right between categories on mobile. Only active on news-ish
-  // pages where changing category makes sense (not on Customize, podcasts, etc.)
+  // Swipe left/right between categories on mobile — only on the SWIPE_PAGES category pages
+  // (not Home/Customize/podcasts/…) and only when nothing is layered on top: the search input,
+  // the More sheet, Customize, or the reader (M4.3: "any open overlay → OFF"). The reader/more
+  // render outside the swipe region already; search is a top input over live content, so it
+  // needs the explicit gate.
   const swipeHandlers = useSwipe(
     (dir) => {
       const idx = SWIPE_ORDER.indexOf(tab);
@@ -9879,7 +10078,8 @@ export default function App() {
       const next = dir === 'left' ? idx + 1 : idx - 1;
       if (next >= 0 && next < SWIPE_ORDER.length) handleTabChange(SWIPE_ORDER[next]);
     },
-    { enabled: isMobile && SWIPE_ORDER.includes(tab) }
+    { enabled: isMobile && SWIPE_PAGES.includes(tab)
+        && !mobileSearchOpen && !menuOpen && !showPanel && !readerArticle && !search }
   );
 
   const getRelated = (a,cat)=>{
@@ -9962,7 +10162,7 @@ export default function App() {
         <SourcesDisagree topic={entity} items={entityItems}/>
         {entityItems.length === 0
           ? <EmptyState message={`No recent stories mentioning “${entity}”.`} actionLabel="Refresh" onAction={() => loadCat(cat)}/>
-          : <div className="snap-feed">
+          : <div className="snap-feed" data-no-swipe>
               {entityItems.slice(0, 20).map((a, i) => (
                 <Fragment key={a.link || i}>
                   <SnapshotCard a={a} meta={cc} isSaved={isSavedFn(a)} onSave={onSave} onRead={onRead} onPerspectives={setPerspArticle} onAsk={setChatContext} formatDate={fmtDate} opinionLabel={opinionLabel(a)} hideImage={i>=3}/>
@@ -10105,7 +10305,7 @@ export default function App() {
           </div>
         </div>
         {/* Business + Markets filter pills — Markets is this page; All/Business route to the feed. */}
-        <div className="sport-tabs" style={{marginBottom:'12px'}}>
+        <div className="sport-tabs" data-no-swipe style={{marginBottom:'12px'}}>
           <button className="sport-tab" onClick={()=>navigate('business')}>All</button>
           <button className="sport-tab" onClick={()=>navigate('business','business')}>Business</button>
           <button className="sport-tab active" onClick={()=>navigate('finance')}>Markets</button>
@@ -10221,7 +10421,7 @@ export default function App() {
               </div>
               {newsItems.length===0
                 ?<div className="empty-state"><div className="empty-icon"></div><div className="empty-msg">Loading Markets news…</div></div>
-                :<div className="snap-feed" style={{padding:'12px 0 0'}}>
+                :<div className="snap-feed" data-no-swipe style={{padding:'12px 0 0'}}>
                     {newsItems.slice(0, 15).map((a, i) => (
                       <Fragment key={a.link||i}>
                         <SnapshotCard a={a} meta={CATS.finance} isSaved={isSavedFn(a)} onSave={onSave} onRead={onRead} onPerspectives={setPerspArticle} onAsk={setChatContext} formatDate={fmtDate} opinionLabel={opinionLabel(a)} hideImage={i>=3}/>
@@ -10250,7 +10450,7 @@ export default function App() {
     <>
       <style>{GLOBAL_CSS}</style>
       <FollowSourceContext.Provider value={{ isSourceFollowed, followSource }}>
-      <div className={`hub${dark?' dark':''}`} {...swipeHandlers}>
+      <div className={`hub${dark?' dark':''}`}>
         <TopBar tab={tab} setTab={handleTabChange} search={search} setSearch={setSearch}
           dark={dark} setDark={setDark}
           onCustomize={()=>openCustomize('keywords','general')} onRefresh={refreshAll}
@@ -10270,8 +10470,20 @@ export default function App() {
         {/* Pull-to-refresh indicator (mobile, touch-only) */}
         {isMobile && <PtrIndicator distance={ptrDistance} threshold={70} refreshing={refreshing}/>}
 
+        {/* M4.1: swipe-to-change-category handlers live ONLY on the page-content wrapper, never
+            on `.hub`. That structurally excludes the fixed chrome — the header/TopBar (with its
+            More sheet + mobile search), the pull-to-refresh indicator, the overflow MenuSheet,
+            BottomTabBar, CustomizePanel/ResolveModal, and the reader/chat/modals rendered outside
+            `.hub` — so a thumb sliding across the bottom bar or header can never start a swipe.
+            (Lower-risk than scattering data-no-swipe across every bar; enforced by m4-swipe-region.) */}
         {/* v24a: Today removed (its content folded into General page).
             BriefingPage restored as a dedicated full-read destination. */}
+        {/* key={tab}: a fresh wrapper per page so a page CHANGE (e.g. Home's weather band, which
+            is general-only, leaving the scroll-away header) is a mount, not a 49px move of a
+            persistent element — keeps nav transitions off the CLS budget. It changes only on
+            navigation, never on scroll, so the stable-identity / no-remount-on-scroll invariant
+            (J-series) is untouched; the page components inside already mount per tab. */}
+        <main className="hub-main" key={tab} {...swipeHandlers}>
         {(() => {
           // Entity mini-hub route: /:cat/topic/:slug for any non-sports category.
           // (Sports keeps its own Tier-3 team page, which handles tertiary itself.)
@@ -10302,7 +10514,16 @@ export default function App() {
                 storyKey, fmtDate, teamSlug, teamScanKeyword, fetchDiscover, fetchWebSearch,
                 ld, sv, opinionLabel,
               }}/></Suspense>}
-              {NEWS_CATS.filter(c=>c!=='sports').includes(tab)&&<FeedPage cat={tab} ctx={{
+              {/* M1: the phone Home is a dedicated sectioned surface. Desktop/iPad (and any
+                  active filter/search) keep the existing FeedPage render unchanged. */}
+              {tab==='general' && isMobile && !search && !activeKw && !activeSrc
+                ? <MobileHome ctx={{
+                    arts, breakingItems, loadCat, loading, lastUpdated, onRead, onSave, isSavedFn,
+                    setChatContext, navigate, openCustomize, feeds, feedHealth,
+                    favTeams: [...teams, ...myTeams.map(t=>({match:t.name, league:t.league}))],
+                    CATS, storyKey, fmtDate, opinionLabel, HOUSTON_SOURCES, ActiveScoresBar, DEBUG,
+                  }}/>
+                : NEWS_CATS.filter(c=>c!=='sports').includes(tab)&&<FeedPage cat={tab} ctx={{
                 activeKw, activeSrc, applyPending, arts, breakingItems, briefingExclude, feedHealth,
                 feeds, followTeam, followedTeams, handleTabChange, health, isSavedFn, isTeamFollowed,
                 isTopicFollowed, kw, kwMatch, lastUpdated, loadCat, loading, myTeams, myTopics, navigate, onRead,
@@ -10334,6 +10555,7 @@ export default function App() {
             </>
           );
         })()}
+        </main>
 
         {/* Mobile overflow menu sheet */}
         {menuOpen && (
@@ -10347,6 +10569,7 @@ export default function App() {
             setDark={setDark}
             search={search}
             onSearch={setSearch}
+            savedCount={saved.length}
             trendingTopics={getTrendingTopics(Object.values(arts).flat(), 8)}
           />
         )}
@@ -10356,8 +10579,8 @@ export default function App() {
           tab={tab}
           onTabChange={handleTabChange}
           onMenuOpen={() => setMenuOpen(true)}
-          savedCount={saved.length}
-          lastFeedTab={lastFeedTab}
+          onSearchOpen={() => setMobileSearchOpen(true)}
+          onHomeReTap={() => { const rm = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches; window.scrollTo({ top: 0, behavior: rm ? 'auto' : 'smooth' }); }}
         />
 
         {showPanel&&<Suspense fallback={null}><CustomizePanel feeds={feeds} kw={kw} alerts={alerts} urgent={urgent}

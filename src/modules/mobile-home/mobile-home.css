@@ -1,0 +1,60 @@
+/* Mobile sectioned Home (Batch M). Consumes design tokens (src/styles/tokens.css).
+   Every selector is scoped under .mobile-home / .mh-* which exist ONLY on the phone Home,
+   so desktop/iPad output is untouched. */
+.mobile-home{display:flex;flex-direction:column;gap:22px;}
+
+/* LEAD 16:9 — SnapshotCard renders its own .snap-lead-hero (16:9 + a deck/actions block).
+   Reserve its full height so the skeleton and the loaded lead occupy the same space (CLS). */
+.mh-lead{margin:0;min-height:360px;}
+
+/* Section shell: one shared header (eyebrow + See all) then its rows. Reserve a min-height
+   that matches a loaded 3-row section (one STANDARD ~188px + two COMPACT ~75px + header),
+   so the skeleton and the final content occupy ~the same space and nothing below shifts
+   when a lazy section fills in (M4). Hidden sections collapse to 0. */
+.mh-section{display:flex;flex-direction:column;gap:10px;min-height:360px;}
+.mh-section-hidden{min-height:0;height:0;gap:0;margin:0;overflow:hidden;}
+.mh-sec-head{display:flex;align-items:center;justify-content:space-between;
+  padding-bottom:7px;border-bottom:2px solid var(--border);}
+.mh-sec-label{color:var(--text3);}
+/* "See all" — a real >=44px tap target with a line chevron. */
+.mh-seeall{display:inline-flex;align-items:center;gap:3px;min-height:44px;padding:0 2px 0 10px;
+  background:none;border:none;cursor:pointer;font-family:var(--font-sans);
+  font-size:var(--fs-body);font-weight:700;color:var(--accent);}
+.mh-seeall svg{margin-top:1px;}
+
+.mh-rows{display:flex;flex-direction:column;}
+
+/* A12: visible keyboard focus on every new interactive control. */
+.mh-compact:focus-visible,.mh-seeall:focus-visible,.mh-edit-sections:focus-visible,
+.mh-lead .snap-card:focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:4px;}
+
+/* COMPACT row — text-only headline + source · time (K6 COMPACT). >=44px tap target. */
+.mh-compact{display:flex;flex-direction:column;gap:3px;text-align:left;cursor:pointer;
+  background:none;border:none;border-bottom:1px solid var(--border2);
+  padding:12px 0;min-height:44px;font-family:inherit;transition:background 0.12s;}
+.mh-compact:last-child{border-bottom:none;}
+.mh-compact:active{background:var(--surface2);}
+.mh-compact-title{font-family:var(--font-serif);font-size:var(--fs-subhead);font-weight:700;
+  color:var(--text);line-height:1.26;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;}
+.mh-compact-meta{font-family:var(--font-sans);font-size:var(--fs-meta);color:var(--text3);font-weight:500;}
+
+/* Top stories — always present once General loads; reserve 4 compact rows + header so the
+   block does not pop in and shove the lead/sections (M4). */
+.mh-topstories{min-height:330px;}
+/* Breaking is conditional; reserve its slot only while General is still loading so it does
+   not shove content when it arrives, then it collapses if there is nothing breaking. */
+.mh-breaking{min-height:0;}
+.mh-breaking-reserve{min-height:300px;}
+
+/* Live scores strip — ActiveScoresBar styles itself (.home-scores); just spacing. */
+.mh-scores{min-height:0;}
+.mh-scores:empty{display:none;}
+
+.mh-houston{min-height:0;}
+
+/* Footer — Edit sections opens Customize. */
+.mh-footer{display:flex;justify-content:center;padding:8px 0 4px;}
+.mh-edit-sections{min-height:44px;padding:10px 20px;background:var(--surface2);
+  border:1px solid var(--border);border-radius:var(--radius);cursor:pointer;
+  font-family:var(--font-sans);font-size:var(--fs-body);font-weight:700;color:var(--text2);}
+.mh-edit-sections:active{background:var(--border);}

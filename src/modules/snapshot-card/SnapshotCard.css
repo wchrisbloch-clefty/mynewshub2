@@ -106,11 +106,15 @@
 .snap-thumb{width:112px;height:84px;aspect-ratio:4/3;flex-shrink:0;object-fit:cover;border-radius:8px;background:var(--ph-field);margin:12px 0;order:0;}
 /* Loading skeleton — mirrors the real card's layout so it reserves the SAME
    height. Content then swaps in place instead of popping in and shifting scroll. */
+/* Q4: the skeleton row is sized to the REAL card — same left 112x84 thumbnail and, on
+   desktop/iPad, the same ~151px min-height — so swapping the skeleton for the loaded row
+   shifts nothing. Mobile keeps its existing shorter skeleton (its feed CLS is already 0). */
 .snap-skel{cursor:default;}
 .snap-skel:hover{transform:none;box-shadow:none;}
 .snap-skel .snap-accent{background:var(--border);}
-.snap-skel-main{flex:1;min-width:0;padding:14px 16px;}
-.snap-skel-thumb{width:150px;aspect-ratio:4/3;align-self:center;flex-shrink:0;background:var(--surface2);border-radius:6px;margin:0 12px;}
+.snap-skel-main{flex:1;min-width:0;padding:12px 0;order:1;}
+.snap-skel-thumb{width:112px;height:84px;aspect-ratio:4/3;flex-shrink:0;background:var(--surface2);border-radius:8px;margin:12px 0;order:0;}
+@media(min-width:641px){ .snap-skel{min-height:151px;} }
 .snap-skel-line{border-radius:5px;margin-bottom:8px;background:linear-gradient(90deg,var(--surface2) 25%,var(--border) 50%,var(--surface2) 75%);background-size:200% 100%;animation:shimmer 1.4s infinite;}
 @media(max-width:640px){
   /* D5 — NYT/Bloomberg mobile: ONE dominant lead, then a DIVIDED LIST (no boxes).
