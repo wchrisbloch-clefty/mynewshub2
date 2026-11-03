@@ -59,6 +59,7 @@ import { retrieveFeedContext, buildFeedContextBlock } from './modules/retrieval'
 import { XPulse } from './modules/x-pulse';
 import { StateOfPlay } from './modules/state-of-play';
 import { SnapshotCard, CoverageList } from './modules/snapshot-card';
+import { MobileHome } from './modules/mobile-home';
 import { FollowSourceContext, FollowSourceChip } from './modules/follow-source';
 import { MarketsSurface, useMarkets } from './modules/markets-surface';
 import { parseRoute, buildPath } from './modules/routing';
@@ -1490,6 +1491,11 @@ body{
    Dark ESPN theme so the homepage strip matches the Sports-page strip (item 6). */
 .topbar-scores{background:var(--surface2);border-bottom:1px solid var(--border2);}
 .topbar-scores .home-scores{max-width:1400px;margin:0 auto;padding:4px var(--s4) 5px;border:none;border-radius:0;background:none;overflow:visible;}
+/* M1: on the phone Home the live-scores strip moves into the sectioned body
+   (ActiveScoresBar in <MobileHome/>), so hide the header copy at <=640 to avoid showing
+   it twice. The header strip only ever renders on General, so this is Home-only; desktop
+   and mobile category pages are unaffected. */
+@media(max-width:640px){ .topbar-scores{display:none;} }
 /* L1: scores now scroll away in .header-scroll (not hidden on shrink). */
 /* Right-edge fade cue: partial cards read as "scroll for more," not a cutoff. */
 .topbar-scores .home-scores,.sports-score-strip{position:relative;}
@@ -10302,7 +10308,16 @@ export default function App() {
                 storyKey, fmtDate, teamSlug, teamScanKeyword, fetchDiscover, fetchWebSearch,
                 ld, sv, opinionLabel,
               }}/></Suspense>}
-              {NEWS_CATS.filter(c=>c!=='sports').includes(tab)&&<FeedPage cat={tab} ctx={{
+              {/* M1: the phone Home is a dedicated sectioned surface. Desktop/iPad (and any
+                  active filter/search) keep the existing FeedPage render unchanged. */}
+              {tab==='general' && isMobile && !search && !activeKw && !activeSrc
+                ? <MobileHome ctx={{
+                    arts, breakingItems, loadCat, loading, lastUpdated, onRead, onSave, isSavedFn,
+                    setChatContext, navigate, openCustomize, feeds, feedHealth,
+                    favTeams: [...teams, ...myTeams.map(t=>({match:t.name, league:t.league}))],
+                    CATS, storyKey, fmtDate, opinionLabel, HOUSTON_SOURCES, ActiveScoresBar, DEBUG,
+                  }}/>
+                : NEWS_CATS.filter(c=>c!=='sports').includes(tab)&&<FeedPage cat={tab} ctx={{
                 activeKw, activeSrc, applyPending, arts, breakingItems, briefingExclude, feedHealth,
                 feeds, followTeam, followedTeams, handleTabChange, health, isSavedFn, isTeamFollowed,
                 isTopicFollowed, kw, kwMatch, lastUpdated, loadCat, loading, myTeams, myTopics, navigate, onRead,
