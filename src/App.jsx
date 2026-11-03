@@ -47,7 +47,8 @@ import { claimConnections, claimAcrossSections } from './modules/dedup/railDedup
 import { reconcileHeld } from './modules/stable-list/heldList';
 import { partitionSatire } from './modules/satire';
 import { rankByVelocity, signalFor } from '../lib/voices/velocity';
-import { DEBUG, dbgRender, dbgPoll, dbgMount, DebugOverlay } from './modules/debug';
+import { DEBUG, dbgRender, dbgPoll, dbgMount, dbgSwipe, DebugOverlay } from './modules/debug';
+import { evaluateSwipe } from './modules/swipe-gesture';
 import { useScores, configureScores, loadScores as loadScoresStore, anyLiveGame } from './state';
 import { makeVoice, upsertVoice, removeVoice as removeVoiceModel, mergeVoices, clearTombstone, voiceId, VOICE_PLATFORMS } from './modules/voices/model';
 import { SEED_VOICES } from './modules/voices/seeds';
@@ -930,39 +931,49 @@ function useIsMobile() {
 // element. Fires onSwipe('left'|'right') when user completes a decisive
 // horizontal swipe. Tracks touchMove to cancel early if vertical scroll
 // intent is detected, preventing accidental tab changes while scrolling.
-function useSwipe(onSwipe, { threshold = 80, enabled = true } = {}) {
-  const state = useRef({ x: 0, y: 0, active: false, cancelled: false });
+function useSwipe(onSwipe, { enabled = true } = {}) {
+  // M4.2: collect the gesture's metrics here; the pure evaluateSwipe() (unit-tested in
+  // modules/swipe-gesture) decides whether it's a deliberate category swipe. Rules:
+  // |dx|>=100, |dx|>=3*|dy|, duration<=600ms, start outside the 24px iOS edge zone, and
+  // the page must NOT have scrolled vertically during the gesture.
+  const state = useRef({ x: 0, y: 0, t: 0, scrollY: 0, w: 0, active: false, cancelled: false });
   const onTouchStart = (e) => {
     if (!enabled) return;
-    // A7: don't hijack gestures that begin inside a horizontally-scrollable rail — let those
-    // scroll natively instead of triggering category navigation. Every horizontal scroller
-    // carries `data-no-swipe` (enforced by a test), so this is ONE attribute check instead of
-    // a hard-coded, drift-prone class list.
+    // Gestures that begin inside anything marked data-no-swipe (horizontal rails, sticky bars,
+    // the chip bar, score strips, …) never start a swipe — ONE attribute check, enforced by a test.
     if (e.target?.closest?.('[data-no-swipe]')) {
-      state.current = { x: 0, y: 0, active: false, cancelled: true };
+      state.current = { x: 0, y: 0, t: 0, scrollY: 0, w: 0, active: false, cancelled: true };
       return;
     }
     const t = e.touches[0];
-    state.current = { x: t.clientX, y: t.clientY, active: true, cancelled: false };
+    state.current = {
+      x: t.clientX, y: t.clientY, t: Date.now(),
+      scrollY: typeof window !== 'undefined' ? window.scrollY : 0,
+      w: (typeof window !== 'undefined' && window.innerWidth) || 0,
+      active: true, cancelled: false,
+    };
   };
   const onTouchMove = (e) => {
     if (!enabled || !state.current.active || state.current.cancelled) return;
     const t = e.touches[0];
     const dy = Math.abs(t.clientY - state.current.y);
     const dx = Math.abs(t.clientX - state.current.x);
-    // Cancel swipe if vertical scroll intent detected early
+    // Early vertical-scroll intent → cancel (so we don't fight a scroll).
     if (dy > 8 && dy > dx * 1.2) state.current.cancelled = true;
   };
   const onTouchEnd = (e) => {
     if (!enabled || !state.current.active) return;
+    const st = state.current; st.active = false;
     const t = (e.changedTouches && e.changedTouches[0]) || null;
-    state.current.active = false;
-    if (!t || state.current.cancelled) return;
-    const dx = t.clientX - state.current.x;
-    const dy = t.clientY - state.current.y;
-    if (Math.abs(dx) > threshold && Math.abs(dx) > Math.abs(dy) * 2.5) {
-      onSwipe(dx > 0 ? 'right' : 'left');
-    }
+    if (!t) return;  // no end coordinate — not a gesture we can judge
+    const res = evaluateSwipe({
+      dx: t.clientX - st.x, dy: t.clientY - st.y, dt: Date.now() - st.t,
+      startX: st.x, viewportW: st.w,
+      scrollChanged: typeof window !== 'undefined' && window.scrollY !== st.scrollY,
+      cancelled: st.cancelled,
+    });
+    dbgSwipe(res.fire, res.reason);
+    if (res.fire) onSwipe(res.fire);
   };
   return { onTouchStart, onTouchMove, onTouchEnd };
 }
