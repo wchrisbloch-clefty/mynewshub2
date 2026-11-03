@@ -21,7 +21,52 @@ export const DEBUG = typeof window !== 'undefined'
 export const dbg = { renders: {}, mounts: {}, unmounts: {}, pollFires: 0, cls: 0, scrollJumps: 0, lastJump: 0,
   // M4: swipe navigations that actually fired vs. gestures ignored (by reason). CB reads these on
   // the phone: after sliding a thumb across the bottom bar / scrolling, "swipe navs" should stay 0.
-  swipeNavs: 0, swipeIgnored: 0, swipeReasons: {} };
+  swipeNavs: 0, swipeIgnored: 0, swipeReasons: {},
+  // N6: main-thread long frames (>50ms) via PerformanceObserver('longtask').
+  longFrames: 0 };
+
+// N6: the build id, replaced at build time (vite define); 'dev' under `vite dev`.
+const BUILD_ID = typeof __BUILD_ID__ !== 'undefined' ? __BUILD_ID__ : 'dev';
+
+// N6: assemble ONE device-report blob for CB to copy from the ?debug=1 overlay and paste back.
+// Pure read of what's already measured + a few on-demand DOM reads; no new timers, no network.
+export function buildDeviceReport() {
+  const r = { build: BUILD_ID, t: new Date().toISOString() };
+  try {
+    r.viewport = { w: window.innerWidth, h: window.innerHeight, dpr: +(window.devicePixelRatio || 1).toFixed(2) };
+    r.ua = navigator.userAgent;
+    r.appRenders = dbg.renders.App || 0;
+    r.pageRenders = { ...dbg.renders }; delete r.pageRenders.App;
+    r.pageMounts = { ...dbg.mounts };
+    r.cls = +(dbg.cls || 0).toFixed(4);
+    r.scrollJumps = dbg.scrollJumps;
+    r.longFrames = dbg.longFrames;
+    r.swipe = { navs: dbg.swipeNavs, ignored: dbg.swipeIgnored, reasons: { ...dbg.swipeReasons } };
+    r.coverage = (typeof window !== 'undefined' && window.__dbg && window.__dbg.coverage) || null;
+    const main = document.querySelector('.hub-main');
+    r.headerHeight = main ? Math.round(main.getBoundingClientRect().top + window.scrollY) : null;
+    // controls smaller than 44px in either dimension (ticker items excluded — known exception).
+    let under = 0;
+    for (const el of document.querySelectorAll('button,a,[role=button],input,select')) {
+      if (el.closest && el.closest('.ss-ticker')) continue;
+      const rc = el.getBoundingClientRect(); const s = getComputedStyle(el);
+      if (rc.width > 0 && rc.height > 0 && s.display !== 'none' && (rc.height < 44 || rc.width < 44)) under++;
+    }
+    r.controlsUnder44 = under;
+    // network requests in the last 60s, grouped by path (resource timings; no fetch wrapping).
+    const now = performance.now ? performance.now() : 0;
+    const net = {};
+    try {
+      for (const e of performance.getEntriesByType('resource')) {
+        if (e.startTime < now - 60000) continue;
+        let path; try { path = new URL(e.name).pathname; } catch { path = e.name; }
+        net[path] = (net[path] || 0) + 1;
+      }
+    } catch { /* resource timing unsupported */ }
+    r.network60s = net;
+  } catch (e) { r.error = String(e); }
+  return r;
+}
 // H5: expose the debug counters on window under ?debug=1 so the Sports-twitch
 // measurement (App/SportsPage renders/s, CLS, scroll jumps) can read them headlessly.
 if (DEBUG && typeof window !== 'undefined') window.__dbg = dbg;
@@ -94,6 +139,11 @@ function DebugOverlayInner() {
     window.addEventListener('touchmove', onTouch, { passive: true });
     window.addEventListener('scroll', onScroll, { passive: true });
 
+    // N6: main-thread long frames (>50ms) — jank the reader feels.
+    let lpo;
+    try { lpo = new PerformanceObserver(list => { for (const e of list.getEntries()) if (e.duration > 50) dbg.longFrames++; });
+      lpo.observe({ type: 'longtask', buffered: true }); } catch { /* longtask unsupported */ }
+
     // 1s tick: compute renders/sec and repaint the overlay.
     const iv = setInterval(() => {
       for (const k of Object.keys(dbg.renders)) {
@@ -105,12 +155,28 @@ function DebugOverlayInner() {
 
     return () => {
       try { po && po.disconnect(); } catch { /* noop */ }
+      try { lpo && lpo.disconnect(); } catch { /* noop */ }
       window.removeEventListener('touchstart', onTouch);
       window.removeEventListener('touchmove', onTouch);
       window.removeEventListener('scroll', onScroll);
       clearInterval(iv);
     };
   }, []);
+
+  const [copied, setCopied] = useState(false);
+  const copyReport = () => {
+    const blob = JSON.stringify(buildDeviceReport(), null, 2);
+    const done = () => { setCopied(true); setTimeout(() => setCopied(false), 1500); };
+    try {
+      if (navigator.clipboard && navigator.clipboard.writeText) { navigator.clipboard.writeText(blob).then(done, () => fallback(blob, done)); }
+      else fallback(blob, done);
+    } catch { fallback(blob, done); }
+  };
+  const fallback = (text, done) => {
+    try { const ta = document.createElement('textarea'); ta.value = text; ta.style.position = 'fixed'; ta.style.opacity = '0';
+      document.body.appendChild(ta); ta.select(); document.execCommand('copy'); document.body.removeChild(ta); done(); }
+    catch { /* eslint-disable-next-line no-console */ console.log('[debug] device report:\n' + text); done(); }
+  };
 
   const row = (k, v) => (
     <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12 }}>
@@ -132,6 +198,14 @@ function DebugOverlayInner() {
       {row('scroll jumps', `${dbg.scrollJumps}${dbg.lastJump ? ` (last ${dbg.lastJump}px)` : ''}`)}
       {row('swipe navs', dbg.swipeNavs)}
       {row('swipe ignored', `${dbg.swipeIgnored}${Object.keys(dbg.swipeReasons).length ? ' (' + Object.entries(dbg.swipeReasons).map(([k, v]) => `${k}:${v}`).join(' ') + ')' : ''}`)}
+      {row('long frames', dbg.longFrames)}
+      {/* N6: one-tap device report → clipboard, for CB to paste back. pointerEvents re-enabled
+          on the button only (the overlay itself stays click-through). */}
+      <button onClick={copyReport} style={{
+        pointerEvents: 'auto', marginTop: 6, width: '100%', cursor: 'pointer',
+        background: copied ? 'rgba(0,160,0,0.9)' : 'rgba(0,70,40,0.9)', color: '#0f0', border: '1px solid #0f0',
+        borderRadius: 5, font: 'inherit', fontWeight: 700, padding: '5px 8px',
+      }}>{copied ? '✓ copied — paste to Claude' : 'Copy report'}</button>
     </div>
   );
 }
