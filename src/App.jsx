@@ -10478,7 +10478,12 @@ export default function App() {
             (Lower-risk than scattering data-no-swipe across every bar; enforced by m4-swipe-region.) */}
         {/* v24a: Today removed (its content folded into General page).
             BriefingPage restored as a dedicated full-read destination. */}
-        <main className="hub-main" {...swipeHandlers}>
+        {/* key={tab}: a fresh wrapper per page so a page CHANGE (e.g. Home's weather band, which
+            is general-only, leaving the scroll-away header) is a mount, not a 49px move of a
+            persistent element — keeps nav transitions off the CLS budget. It changes only on
+            navigation, never on scroll, so the stable-identity / no-remount-on-scroll invariant
+            (J-series) is untouched; the page components inside already mount per tab. */}
+        <main className="hub-main" key={tab} {...swipeHandlers}>
         {(() => {
           // Entity mini-hub route: /:cat/topic/:slug for any non-sports category.
           // (Sports keeps its own Tier-3 team page, which handles tertiary itself.)
