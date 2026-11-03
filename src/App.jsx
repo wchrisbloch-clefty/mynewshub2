@@ -44,6 +44,7 @@ import { ShareControl, buildBriefingExcerpt } from './modules/share';
 import { ConnectionsStrip, findConnections } from './modules/connections';
 import { qualifyBreaking, isPromoItem } from './modules/breaking';
 import { claimConnections, claimAcrossSections } from './modules/dedup/railDedup';
+import { reconcileHeld } from './modules/stable-list/heldList';
 import { partitionSatire } from './modules/satire';
 import { rankByVelocity, signalFor } from '../lib/voices/velocity';
 import { DEBUG, dbgRender, dbgPoll, dbgMount, DebugOverlay } from './modules/debug';
@@ -57,7 +58,7 @@ import { VoicesStrip } from './modules/voices/VoicesStrip';
 import { extractContent, extractionFallbackMessage } from './modules/extractor';
 import { retrieveFeedContext, buildFeedContextBlock } from './modules/retrieval';
 import { XPulse } from './modules/x-pulse';
-import { StateOfPlay } from './modules/state-of-play';
+import { StateOfPlay, selectStateOfPlay } from './modules/state-of-play';
 import { SnapshotCard, CoverageList } from './modules/snapshot-card';
 import { MobileHome } from './modules/mobile-home';
 import { FollowSourceContext, FollowSourceChip } from './modules/follow-source';
@@ -1489,6 +1490,7 @@ body{
 /* Home weather stacked under the ticker: full-bleed bar, content contained to the
    same max-width, flush (no card chrome). */
 .topbar-wx{background:var(--surface);border-bottom:1px solid var(--border2);}
+.topbar-wx-reserve{min-height:49px;}  /* R2: matches the loaded weather band so it swaps in without a shift */
 .topbar-wx .rnw-card{max-width:1400px;margin:0 auto;padding:0 var(--s4);border:none;border-radius:0;background:none;}
 /* Scoreboard band in the top bar (below weather, above nav — Pass G item 3).
    Dark ESPN theme so the homepage strip matches the Sports-page strip (item 6). */
@@ -8030,9 +8032,13 @@ function TopBar({tab, setTab, search, setSearch, dark, setDark,
           )}
         </div>
       </div>
-      {/* Home weather band (<900px, where it is NOT merged onto the ticker line). */}
-      {tab==='general' && weatherData.length > 0 && (
-        <div className="topbar-wx"><RightNowWeather data={weatherData}/></div>
+      {/* Home weather band (<900px, where it is NOT merged onto the ticker line). R2: reserve the
+          band's height until the weather resolves so it doesn't pop in and shove the page down
+          (the band is display:none >=900, so this reserve is phone/narrow-tablet only). */}
+      {tab==='general' && (
+        weatherData.length > 0
+          ? <div className="topbar-wx"><RightNowWeather data={weatherData}/></div>
+          : <div className="topbar-wx topbar-wx-reserve" aria-hidden="true"/>
       )}
     </div>
 
@@ -8264,6 +8270,33 @@ const HOUSTON_SOURCES = ['KHOU Houston', 'Chron.com', 'Click2Houston', 'Houston 
 // so the same story is caught across modules even when different sources give it
 // different URLs (e.g. a clustered State-of-Play item vs the raw Houston-source item).
 const storyKey = a => (((a && a.title) || '').slice(0, 60).toLowerCase().replace(/\s+/g, ''));
+
+// R2: hold an above-the-fold list stable once it has first rendered in full. `reconcileHeld`
+// is the pure rule (unit-tested in heldList.test.mjs); this hook keeps the committed list in a
+// ref, re-picks on page switch / refresh (refreshKey changes after commit), and counts
+// suppressed late changes for
+// ?debug. Returns the STABLE list — Top Stories, the lead and State-of-Play rows stop churning
+// as slow feeds arrive, so they stop shoving the page (desktop/iPad CLS).
+function useHeldList(live, { keyOf, target, done = false, refreshKey }) {
+  const ref = useRef({ items: null, held: 0, lastSig: '', committedAt: undefined });
+  const r = ref.current;
+  // A real refresh / page switch changes refreshKey AFTER we have committed → re-pick. The
+  // first load's undefined->timestamp transition is NOT a reset (committedAt is only set at
+  // commit time), so the committed selection survives the initial fill instead of re-picking.
+  if (r.committedAt !== undefined && refreshKey !== r.committedAt) {
+    r.items = null; r.held = 0; r.lastSig = ''; r.committedAt = undefined;
+  }
+  // Don't commit until the page's OWN category has loaded at least once, so the lead is this
+  // page's lead — not a cross-category fallback chosen before it arrived.
+  const ready = refreshKey != null && refreshKey !== 0;
+  if (!ready) return { items: live, held: r.held };
+  const { items, committed, suppressed } = reconcileHeld(r.items, live, { keyOf, target, done });
+  if (committed && !r.items) { r.items = items; r.committedAt = refreshKey; } // first commit freezes
+  const sig = (live || []).map(keyOf).join('|');
+  if (committed && suppressed && sig !== r.lastSig) { r.held += 1; r.lastSig = sig; }
+  return { items: r.items || items, held: r.held, committed: r.items != null };
+}
+
 function HoustonRow({ items, onRead, formatDate }) {
   // Items are computed by the caller (FeedPage) so they share the page's
   // cross-module dedup set (Pass I item 1).
@@ -8672,7 +8705,7 @@ function FeedPage({ cat, ctx }) {
     // A story placed in a top-of-page module is excluded from every other module
     // on the SAME page — on every category, not just General. Priority order:
     // Top Stories → State of Play → Houston → main feed.
-    const topStoryItems = useMemo(() => {
+    const liveTopStoryItems = useMemo(() => {
       if (isHome) {
         // Home Top Stories = TopOfHourStrip picks (catLead + cross-category images).
         // Mirror its selection exactly so State of Play + the feed exclude what it
@@ -8680,26 +8713,38 @@ function FeedPage({ cat, ctx }) {
         // L2: Top Stories = hero (image) + up to 6 more (2-3 text headlines + 3 compact
         // rows). The hero needs an image; the rest may be text-only.
         const picks = catLead && catLead.img ? [catLead] : [];
-        const used = new Set(catLead ? [catLead.link] : []);
+        // Dedup by storyKey (title), not link: two syndicated copies of one story carry
+        // different links but the same title, so a link-only guard let the hero reappear as
+        // a text/compact row below it. storyKey matches what every downstream module dedupes on.
+        const used = new Set(catLead ? [storyKey(catLead)] : []);
         const catOrder = ['sports','business','finance','bloom','popculture','general','tech'];
         for (const c of catOrder) {
           if (picks.length >= 6) break;
-          const item = (arts[c]||[]).find(a => a.img && !used.has(a.link));
-          if (item) { picks.push({ ...item, cat: item.cat || c }); used.add(item.link); }
+          const item = (arts[c]||[]).find(a => a.img && !used.has(storyKey(a)));
+          if (item) { picks.push({ ...item, cat: item.cat || c }); used.add(storyKey(item)); }
         }
         for (const c of catOrder) {
           if (picks.length >= 6) break;
           for (const a of (arts[c]||[])) {
             if (picks.length >= 6) break;
-            if (!used.has(a.link)) { picks.push({ ...a, cat: a.cat || c }); used.add(a.link); }
+            if (!used.has(storyKey(a))) { picks.push({ ...a, cat: a.cat || c }); used.add(storyKey(a)); }
           }
         }
         return picks.slice(0, 6);
       }
       if (!catLead) return [];   // category Top Stories = hero + 5 secondaries (6 shown total)
-      const secondaries = feedItems.slice(0, 10).filter(a => a.link !== catLead.link).slice(0, 5);
+      const secondaries = feedItems.slice(0, 10).filter(a => storyKey(a) !== storyKey(catLead)).slice(0, 5);
       return [catLead, ...secondaries];
     }, [isHome, catLead, feedItems, arts]);
+    // R2: hold the chosen Top Stories + order once the first full set has rendered, so late
+    // feeds don't reorder/replace what's above the fold (they flow to the sections instead, and
+    // are picked up on the next refresh). Home commits once it reaches 6 cross-category picks;
+    // a category commits at 6 or when its own load finishes. Resets on page switch / refresh.
+    const { items: topStoryItems, held: topStoriesHeld, committed: topStoriesCommitted } = useHeldList(liveTopStoryItems, {
+      keyOf: storyKey, target: 6, done: !isHome && !isLoading,
+      refreshKey: lastUpdated[cat],
+    });
+    useEffect(() => { if (DEBUG && typeof window !== 'undefined') { window.__dbg = window.__dbg || {}; window.__dbg.heldTopStories = topStoriesHeld; window.__dbg.topStoriesCommitted = topStoriesCommitted; } }, [topStoriesHeld, topStoriesCommitted]);
     const topStoryKeys = useMemo(() => new Set(topStoryItems.map(storyKey)), [topStoryItems]);
     // Breaking stories for THIS category's State of Play (Pass L item 3) — the urgent
     // items relevant to the page, deduped against what Top Stories already shows. Home
@@ -8707,7 +8752,7 @@ function FeedPage({ cat, ctx }) {
     // D2 relevance (gate a): a story shows on a page only if it belongs to that page.
     // Category page = its own feed-category OR a DEFAULT_KW match for that category.
     // General = general/world-US top-news OR a match on ANY category's keywords.
-    const catBreaking = useMemo(() => {
+    const liveCatBreaking = useMemo(() => {
       if (!breakingItems || !breakingItems.length) return [];
       const anyKw = (b) => {
         const txt = (b.title + ' ' + (b.desc || '')).toLowerCase();
@@ -8722,32 +8767,57 @@ function FeedPage({ cat, ctx }) {
       };
       return breakingItems.filter(relevant).filter(b => !topStoryKeys.has(storyKey(b))).slice(0, 3);
     }, [breakingItems, cat, isHome, isMergedBiz, topStoryKeys, kw, kwMatch]);
+    // R2: hold the State-of-Play breaking rows stable the same way as Top Stories, so a late
+    // breaking story streaming in from another category doesn't reorder the visible rows (it is
+    // picked up on the next refresh). Same selection rules / max 3 / dedupe against Top Stories.
+    const { items: catBreaking } = useHeldList(liveCatBreaking, {
+      keyOf: storyKey, target: 3, done: !isLoading,
+      refreshKey: lastUpdated[cat],
+    });
+    // State of Play shows the breaking rows ABOVE its ranked clusters, so those breaking
+    // stories are claimed too — otherwise a breaking story repeats further down in the feed.
+    const catBreakingKeys = useMemo(() => new Set(catBreaking.map(storyKey)), [catBreaking]);
     // State of Play ranks only from what Top Stories didn't already take.
     // D2: promos/sportsbook content are excluded from SoP ranking too, not just Breaking.
+    // NB: breaking is NOT subtracted here — selectStateOfPlay already drops any ranked row that
+    // matches a breaking row (notSameAsAny), so subtracting the HELD catBreaking keys up here only
+    // coupled breaking's (later) commit into the feed/rail dedup and made them re-flow late (CLS).
     const sopSourceItems = useMemo(
       () => activeFilteredItems.filter(a => !topStoryKeys.has(storyKey(a)) && !isPromoItem(a)),
       [activeFilteredItems, topStoryKeys]);
-    const sopShownKeys = useMemo(() => {
-      const ranked = rankClusters(sopSourceItems, { max: 2, limit: 5 });
-      return new Set(ranked.length >= 3 ? ranked.map(storyKey) : []);
-    }, [sopSourceItems]);
+    // The numbered State-of-Play rows — ranked by the SAME pure selector the component uses, so
+    // what we claim for dedup is exactly what SoP shows. (Breaking is held/claimed above via
+    // catBreaking.) Coverage-gap rows are NOT claimed: they come from fetchDiscover — stories none
+    // of the reader's own sources carried — so by construction they never appear in the feed or in
+    // `arts`, and depending on that late async fetch here would re-dedup the feed/rail again (CLS).
+    const liveSopTop = useMemo(
+      () => selectStateOfPlay({ items: sopSourceItems, breakingItems: catBreaking, gapItems: [] }).top,
+      [sopSourceItems, catBreaking]);
+    // R2: HOLD the ranked rows the same way as Top Stories + breaking — once the first full set
+    // has rendered, keep those rows + order until refresh / page switch. A late story that would
+    // outrank a visible row waits for the next refresh. Holding the ranked pool here also freezes
+    // the dedup keys below, so the main feed and the rail stop re-flowing as slow feeds arrive.
+    const { items: sopTopItems } = useHeldList(liveSopTop, {
+      keyOf: storyKey, target: 5, done: !isLoading, refreshKey: lastUpdated[cat],
+    });
+    const sopShownKeys = useMemo(() => new Set(sopTopItems.map(storyKey)), [sopTopItems]);
     // Houston Local (General) claims its stories too.
     const houstonItems = useMemo(() => {
       if (!isHome) return [];
       const seen = new Set();
       return Object.values(arts || {}).flat()
         .filter(a => HOUSTON_SOURCES.includes(a.source))
-        .filter(a => !topStoryKeys.has(storyKey(a)) && !sopShownKeys.has(storyKey(a)))
+        .filter(a => !topStoryKeys.has(storyKey(a)) && !catBreakingKeys.has(storyKey(a)) && !sopShownKeys.has(storyKey(a)))
         .filter(a => { const k = storyKey(a); if (seen.has(k)) return false; seen.add(k); return true; })
         .sort((a, b) => new Date(b.pubDate) - new Date(a.pubDate))
         .slice(0, 6);
-    }, [isHome, arts, topStoryKeys, sopShownKeys]);
+    }, [isHome, arts, topStoryKeys, catBreakingKeys, sopShownKeys]);
     const houstonKeys = useMemo(() => new Set(houstonItems.map(storyKey)), [houstonItems]);
     // The main feed excludes everything already placed above it (by title key, so
     // the same story from a different source can't slip back in).
     const dedupedFeed = useMemo(
-      () => feedItems.filter(a => !topStoryKeys.has(storyKey(a)) && !sopShownKeys.has(storyKey(a)) && !houstonKeys.has(storyKey(a))),
-      [feedItems, topStoryKeys, sopShownKeys, houstonKeys]);
+      () => feedItems.filter(a => !topStoryKeys.has(storyKey(a)) && !catBreakingKeys.has(storyKey(a)) && !sopShownKeys.has(storyKey(a)) && !houstonKeys.has(storyKey(a))),
+      [feedItems, topStoryKeys, catBreakingKeys, sopShownKeys, houstonKeys]);
 
     // ── COVERAGE GAP (folded into State of Play) — widely-covered stories none of the
     //    reader's own sources carried. Home keys off this category; the merged
@@ -8788,7 +8858,8 @@ function FeedPage({ cat, ctx }) {
     // one and is suppressed below it. (railDedup.js is unit-tested in railDedup.test.mjs.)
     const { railConnections, otherCatSections } = useMemo(() => {
       const used = new Set();
-      topStoryKeys.forEach(k => used.add(k)); sopShownKeys.forEach(k => used.add(k)); houstonKeys.forEach(k => used.add(k));
+      topStoryKeys.forEach(k => used.add(k)); catBreakingKeys.forEach(k => used.add(k));
+      sopShownKeys.forEach(k => used.add(k)); houstonKeys.forEach(k => used.add(k));
       dedupedFeed.forEach(a => used.add(storyKey(a)));
       // Connections claim their member stories before Across is computed.
       const railConnections = claimConnections(railConnCandidates, used, storyKey).slice(0, 3);
@@ -8800,7 +8871,7 @@ function FeedPage({ cat, ctx }) {
       const otherCatSections = claimAcrossSections(acrossCandidates, used, storyKey)
         .map(s => ({ ...s, items: s.items.slice(0, 3) })).filter(s => s.items.length > 0).slice(0, 4);
       return { railConnections, otherCatSections };
-    }, [topStoryKeys, sopShownKeys, houstonKeys, dedupedFeed, railConnCandidates, isHome, arts, cat]);
+    }, [topStoryKeys, catBreakingKeys, sopShownKeys, houstonKeys, dedupedFeed, railConnCandidates, isHome, arts, cat]);
 
     // K5: Following — sidebar module on General. It now shows FOLLOWED TOPICS only;
     // followed TEAMS live as pinned chips on the Sports page (the my-teams ribbon) and
@@ -8887,7 +8958,10 @@ function FeedPage({ cat, ctx }) {
             module below it provides a breathing-room break before the next image block
             (Pass H item 3). ── */}
         {isHome && !activeKw && !activeSrc && !search && (
-          topStoryItems.length
+          // R2: hold the reserved (fixed-height) slot until the held Top Stories has COMMITTED
+          // (or the load has settled), then drop in the full set at once — so the strip never
+          // renders a growing partial list that shoves its own rows as late feeds arrive.
+          (topStoriesCommitted || !isLoading) && topStoryItems.length
             ? <TopOfHourStrip catLead={catLead} arts={arts} onRead={onRead} stories={topStoryItems}/>
             : (isLoading && <div className="toh-reserve" aria-hidden="true"/>)
         )}
@@ -8902,7 +8976,7 @@ function FeedPage({ cat, ctx }) {
             consistency). Business, Energy, AI & Tech, Health, Pop Culture all route
             through here, so they unify together. */}
         {!activeKw && !activeSrc && !isHome && (
-          catLead
+          catLead && (topStoriesCommitted || !isLoading)
             ? <TopOfHourStrip stories={topStoryItems} catLead={catLead} arts={arts} onRead={onRead}/>
             : (isLoading && <div className="toh-reserve" aria-hidden="true"/>)
         )}
@@ -8916,7 +8990,7 @@ function FeedPage({ cat, ctx }) {
              its slot is reserved permanently in CSS (.sop-hoist min-height) so breaking
              streaming in never shoves Top Stories + the feed. */
           <div className="sop-hoist">
-            <StateOfPlay variant="sidebar" items={sopSourceItems} gapItems={gapItems} breakingItems={catBreaking}
+            <StateOfPlay variant="sidebar" items={sopTopItems} gapItems={gapItems} breakingItems={catBreaking}
               meta={CATS[cat]||CATS.general} onRead={onRead} onAsk={setChatContext} formatDate={fmtDate}
               collapsed={sopCollapsed} onToggleCollapse={toggleSop}/>
           </div>
@@ -9033,7 +9107,7 @@ function FeedPage({ cat, ctx }) {
                   )}
                   {!activeKw && !activeSrc && !search && (
                     <div className="sop-mobile">
-                      <StateOfPlay variant="sidebar" items={sopSourceItems} gapItems={gapItems} breakingItems={catBreaking}
+                      <StateOfPlay variant="sidebar" items={sopTopItems} gapItems={gapItems} breakingItems={catBreaking}
                         meta={CATS[cat]||CATS.general} onRead={onRead} onAsk={setChatContext} formatDate={fmtDate}
                         collapsed={sopCollapsed} onToggleCollapse={toggleSop}/>
                     </div>
@@ -9165,7 +9239,7 @@ function FeedPage({ cat, ctx }) {
             favTeams={[...teams, ...myTeams.map(t=>({match:t.name, league:t.league}))]}
             onTopicOpen={label => navigate(cat, 'topic', teamSlug(label))}
             isTopicFollowed={isTopicFollowed} toggleTopic={toggleTopic}
-            sopItems={!activeKw && !activeSrc && !search ? sopSourceItems : null}
+            sopItems={!activeKw && !activeSrc && !search ? sopTopItems : null}
             sopGapItems={gapItems} sopBreakingItems={!activeKw && !activeSrc && !search ? catBreaking : []} sopMeta={CATS[cat]||CATS.general}
             sopCollapsed={sopCollapsed} onToggleSop={toggleSop} formatDate={fmtDate}
             acrossSections={!isHome && !activeKw && !activeSrc && !search ? otherCatSections : null}

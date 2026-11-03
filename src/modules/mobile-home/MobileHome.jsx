@@ -139,6 +139,36 @@ export function MobileHome({ ctx }) {
 
   // The one shared model: lead → top stories → breaking → sections → Houston, all deduped
   // against a single used-keys set (COVERAGE GUARANTEE). Recomputes as feeds fill in.
+    // R2: above-the-fold selection (lead + top + breaking). Computed live here, then FROZEN once
+    // the first full render settles (see frozenHead below), so slow feeds streaming in don't
+    // re-pick/reorder the lead or the Top Stories rows and shove the page — they flow into the
+    // category sections instead, and the head is re-picked on the next refresh. Mirrors the
+    // desktop held-list (App.useHeldList / modules/stable-list).
+  const liveHead = useMemo(() => {
+    const used = new Set();
+    const clean = c => (arts[c] || []).filter(a => a && a.title && a.link && !isPromoItem(a));
+    const general = clean('general');
+    const lead = general.find(a => a.img) || general[0] || null;
+    if (lead) used.add(storyKey(lead));
+    const top = [];
+    for (const c of TOP_ORDER) { const it = clean(c).find(a => !used.has(storyKey(a))); if (it) { top.push(it); used.add(storyKey(it)); } if (top.length >= 4) break; }
+    if (top.length < 4) for (const c of TOP_ORDER) { for (const a of clean(c)) { if (top.length >= 4) break; if (!used.has(storyKey(a))) { top.push(a); used.add(storyKey(a)); } } if (top.length >= 4) break; }
+    const breaking = (breakingItems || []).filter(b => !used.has(storyKey(b))).slice(0, 3);
+    return { lead, top, breaking };
+  }, [arts, breakingItems]);
+    // Freeze the head once General has loaded AND Top Stories is full (4) — or nothing in the
+    // TOP_ORDER set is still loading (thin data). Re-pick on refresh (lastUpdated.general change).
+  const refreshKey = (lastUpdated && lastUpdated.general != null) ? lastUpdated.general : 0;
+  const [frozenHead, setFrozenHead] = useState(null);
+  useEffect(() => { setFrozenHead(null); }, [refreshKey]);
+  useEffect(() => {
+    if (!refreshKey || frozenHead) return;
+    const settled = !TOP_ORDER.some(c => loading && loading[c]);
+    if (liveHead.top.length >= 4 || (liveHead.top.length > 0 && settled)) setFrozenHead(liveHead);
+  }, [refreshKey, liveHead, frozenHead, loading]);
+  const committed = !!frozenHead;
+  const head = frozenHead || liveHead;
+
   const model = useMemo(() => {
     const used = new Set();
     const clean = c => (arts[c] || []).filter(a => a && a.title && a.link && !isPromoItem(a));
@@ -147,17 +177,12 @@ export function MobileHome({ ctx }) {
     const general = clean('general');
     cov.general = { found: (arts.general || []).length, filtered: (arts.general || []).length - general.length, shown: 0, breaking: 0 };
 
-    // LEAD — the top General story with an image (fallback: first General story).
-    const lead = general.find(a => a.img) || general[0] || null;
+    // Head (held): lead + top + breaking seed the shared used-keys set, exactly as before —
+    // the coverage guarantee (one story shown at most once) is preserved because the sections
+    // below dedupe against this same set.
+    const { lead, top, breaking } = head;
     if (lead) used.add(storyKey(lead));
-
-    // TOP STORIES — 4 COMPACT cross-category headlines, one per category first for variety.
-    const top = [];
-    for (const c of TOP_ORDER) { const it = clean(c).find(a => !used.has(storyKey(a))); if (it) { top.push(it); used.add(storyKey(it)); } if (top.length >= 4) break; }
-    if (top.length < 4) for (const c of TOP_ORDER) { for (const a of clean(c)) { if (top.length >= 4) break; if (!used.has(storyKey(a))) { top.push(a); used.add(storyKey(a)); } } if (top.length >= 4) break; }
-
-    // BREAKING — cross-category qualified items (already satire/promo-clean upstream), max 3.
-    const breaking = (breakingItems || []).filter(b => !used.has(storyKey(b))).slice(0, 3);
+    top.forEach(t => used.add(storyKey(t)));
     breaking.forEach(b => { used.add(storyKey(b)); const c = b.cat || 'general'; cov[c] = cov[c] || { found: 0, filtered: 0, shown: 0, breaking: 0 }; cov[c].breaking++; });
 
     // SECTIONS — each shows up to 3 not-yet-used stories (promote past duplicates).
@@ -178,7 +203,7 @@ export function MobileHome({ ctx }) {
 
     cov.general.shown = (lead ? 1 : 0) + top.filter(t => (t.cat || 'general') === 'general').length;
     return { lead, top, breaking, sections, houston, cov };
-  }, [arts, breakingItems]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [arts, breakingItems, head]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ?debug=1 coverage readout: per category = found / shown / breaking / filtered / hidden.
   useEffect(() => {
@@ -204,7 +229,7 @@ export function MobileHome({ ctx }) {
       {/* TOP STORIES — 4 compact cross-category headlines (always present once loaded) */}
       <section className="mh-section mh-topstories">
         <div className="mh-sec-head"><span className="eyebrow mh-sec-label">Top stories</span></div>
-        {model.top.length > 0
+        {committed && model.top.length > 0
           ? <div className="mh-rows">{model.top.map((a, i) => <CompactRow key={a.link || i} a={a} fmtDate={fmtDate} onRead={onRead}/>)}</div>
           : <SectionSkeleton rows={4} label="Top stories"/>}
       </section>
