@@ -4283,22 +4283,23 @@ body{overscroll-behavior-y:contain;}
    the logo + search/Analyze/Customize controls; only its category tabs (.nav-tabs) hide.
    The chip bar rides the sticky header below the nav-bar. Desktop >=1025 is unchanged. */
 @media (min-width:641px) and (max-width:1024px){
+  /* Q1: iPad PORTRAIT only — categories move to the pinned chip bar; desktop nav tabs hide. */
   .mobile-top{display:block;background:none;border-bottom:none;}
   .mobile-top .mobile-header,.mobile-top .mobile-search{display:none;}
   .nav-tabs{display:none;}
   .chip{min-height:44px;padding:6px 14px;display:inline-flex;align-items:center;} /* >=44px tap target */
-  /* Q2: at iPad portrait State of Play / breaking was hidden entirely (the retired
-     .sop-hoist and the <=640 .sop-mobile are both off here, and the sidebar copy is hidden
-     by the <=1100 single-column rule). Reveal the EXISTING hoisted copy (no new DOM) and
-     order it to the TOP of the feed column so breaking is on the first screen — the Top
-     Stories hero is ~736px tall here and would otherwise push it off-screen. */
+}
+/* Q2 + R1: State of Play / breaking was hidden entirely across the WHOLE single-column range
+   (641–1100): the retired .sop-hoist and the <=640 .sop-mobile are both off, and the <=1100
+   single-column rule hides the sidebar copy. Reveal the EXISTING hoisted copy (no new DOM) and
+   order it to the TOP of the feed column so breaking is on the first screen. This spans iPad
+   portrait (641–1024, Q2) AND the 1025–1100 landscape band (9th/10th-gen & 10.2" iPads, R1),
+   WITHOUT touching the >=1025 desktop nav (that stays in the 641–1024 block above). Desktop
+   >=1101 (two-column, sidebar copy visible) is unchanged.
+   Q4: the slot is reserved PERMANENTLY (260px) so streaming cross-category breaking fills it
+   instead of collapsing-then-reappearing (that toggle was the big 1024 CLS spike). */
+@media (min-width:641px) and (max-width:1100px){
   .feed-col{display:flex;flex-direction:column;}
-  /* Q4: reserve the hoisted State-of-Play slot PERMANENTLY (260px on the container, not just
-     while loading) so it never collapses-then-reappears as cross-category breaking streams in
-     — that null->content toggle (when isLoading dropped before breaking had arrived) was the
-     big 1024 CLS spike. The .sop-strip also floors at 260 so later breaking fills the reserve
-     instead of growing it. On home State of Play is essentially always present, so the loaded
-     layout is unchanged (the breaking fixture fills the 260 exactly). */
   .sop-hoist{display:block;order:-1;margin-bottom:18px;min-height:260px;}
   .sop-hoist .sop-strip{min-height:260px;}
 }
