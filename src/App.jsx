@@ -4269,6 +4269,17 @@ body{overscroll-behavior-y:contain;}
    BBC News mobile: full-width cards, large serif
    headlines, clear category labels, generous spacing
 ═══════════════════════════════════════════ */
+/* Q1: iPad PORTRAIT (641–1024) — the priority-overflow nav cannot fit the categories at
+   this width (only "News" fits), so categories move to the pinned, horizontally-scrollable
+   chip bar (the same one as on phones), reachable in <=2 taps. The desktop nav-bar keeps
+   the logo + search/Analyze/Customize controls; only its category tabs (.nav-tabs) hide.
+   The chip bar rides the sticky header below the nav-bar. Desktop >=1025 is unchanged. */
+@media (min-width:641px) and (max-width:1024px){
+  .mobile-top{display:block;background:none;border-bottom:none;}
+  .mobile-top .mobile-header,.mobile-top .mobile-search{display:none;}
+  .nav-tabs{display:none;}
+  .chip{min-height:44px;padding:6px 14px;display:inline-flex;align-items:center;} /* >=44px tap target */
+}
 @media (max-width:640px){
   .whisper-bar{display:none;}
   .nav-bar{display:none;}
