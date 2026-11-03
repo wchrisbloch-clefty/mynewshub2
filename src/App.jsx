@@ -5755,6 +5755,15 @@ kbd{display:inline-block;padding:1px 5px;border:1px solid var(--border);border-r
 @media (max-width:640px), (hover:none){
   .snap-ask,.snap-save{min-width:44px;min-height:44px;justify-content:center;}
   .mobile-icon-btn{min-width:44px;min-height:44px;}
+  /* N1: controls that measured <44px on touch tablets/landscape (the phone-only rules didn't
+     reach them). Desktop mouse (hover:hover) is unaffected. The market ticker (.ss-tk) is exempt —
+     it lives in the 30px status strip and can't grow without a header redesign (deferred). */
+  .nav-icon-btn{width:44px;height:44px;}
+  .fc-read-link{min-height:44px;}
+  .fc-act{min-height:44px;}
+  .fc-ellipsis-btn{min-width:44px;}
+  .teams-shelf-edit{min-height:44px;display:inline-flex;align-items:center;}
+  .rnw-row{min-height:44px;}
   .home-scores-see-all{min-height:44px;display:inline-flex;align-items:center;}
   .src-footer-link{min-height:44px;display:inline-flex;align-items:center;}
   .social-handle{min-height:44px;min-width:44px;display:inline-flex;align-items:center;justify-content:center;}
