@@ -164,6 +164,13 @@ const IconGear = ({size=ICON.meta}) => (
 // (which has no mobile chip — it is folded into Business) is dropped so every swipe
 // target is a reachable chip, keeping this list a true mirror of MOBILE_CHIPS.
 const SWIPE_ORDER = ['general','business','bloom','tech','sports','health','popculture'];
+// M4.3: the pages where left/right swipe-to-change-category is ARMED. Home (`general`) is a
+// sectioned hub, not a category, so swipe is OFF there (category-hopping off Home is
+// unexpected); the six category pages keep it. Navigation still steps through SWIPE_ORDER,
+// so swiping right off the first category can still land on Home — you just can't swipe once
+// there. Flip Home back on in one line by adding 'general' here. The bottom bar + chip bar
+// remain the primary way to move; nothing is removed.
+const SWIPE_PAGES = ['business','bloom','tech','sports','health','popculture'];
 
 const TICKERS = [
   { sym:'BE',      label:'Bloom Energy', short:'BLOOM', color:'#60a5fa' }, // I0.9: NYSE:BE — themed pick for the Energy vertical
@@ -10059,8 +10066,11 @@ export default function App() {
     { enabled: isMobile, threshold: 110 }
   );
 
-  // Swipe left/right between categories on mobile. Only active on news-ish
-  // pages where changing category makes sense (not on Customize, podcasts, etc.)
+  // Swipe left/right between categories on mobile — only on the SWIPE_PAGES category pages
+  // (not Home/Customize/podcasts/…) and only when nothing is layered on top: the search input,
+  // the More sheet, Customize, or the reader (M4.3: "any open overlay → OFF"). The reader/more
+  // render outside the swipe region already; search is a top input over live content, so it
+  // needs the explicit gate.
   const swipeHandlers = useSwipe(
     (dir) => {
       const idx = SWIPE_ORDER.indexOf(tab);
@@ -10068,7 +10078,8 @@ export default function App() {
       const next = dir === 'left' ? idx + 1 : idx - 1;
       if (next >= 0 && next < SWIPE_ORDER.length) handleTabChange(SWIPE_ORDER[next]);
     },
-    { enabled: isMobile && SWIPE_ORDER.includes(tab) }
+    { enabled: isMobile && SWIPE_PAGES.includes(tab)
+        && !mobileSearchOpen && !menuOpen && !showPanel && !readerArticle && !search }
   );
 
   const getRelated = (a,cat)=>{
