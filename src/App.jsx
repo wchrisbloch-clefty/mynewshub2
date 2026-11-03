@@ -1458,6 +1458,7 @@ body{
   color:var(--text);font-size:15px;line-height:1.5;
 }
 .hub{background:var(--bg);min-height:100vh;}
+.hub-main{display:block;}  /* M4.1: page-content wrapper that carries the swipe handlers (keeps fixed chrome out of the swipe region) */
 
 /* ═══════════════════════════════════════════
    WHISPER BAR (utility strip)
@@ -7539,13 +7540,13 @@ function SportsScoreStrip({ sportTab = 'all', teams }) {
   }, [scores, teams]);
 
   if (tiles.length === 0) return (
-    <div className="sports-score-strip empty">
+    <div className="sports-score-strip empty" data-no-swipe>
       <span className="sports-score-strip-empty">No games today across selected leagues</span>
     </div>
   );
 
   return (
-    <div className="sports-score-strip">
+    <div className="sports-score-strip" data-no-swipe>
       <div className="score-strip-scroll sports-score-strip-inner" data-no-swipe>
         {tiles.map(g => <ScoreTile key={g.id} g={g}/>)}
       </div>
@@ -7639,7 +7640,7 @@ function HeroBand({ heroStories, heroIdx, setHeroIdx, paused, setPaused, onRead 
 function SportsSkeleton() {
   return (
     <div className="page sports-page">
-      <div className="sports-score-strip" aria-busy="true">
+      <div className="sports-score-strip" aria-busy="true" data-no-swipe>
         <div className="pod-skel-line" style={{ width: '100%', height: '64px' }}/>
       </div>
       <div className="sport-tabs" data-no-swipe style={{ margin: '14px 0' }}>
@@ -10427,7 +10428,7 @@ export default function App() {
     <>
       <style>{GLOBAL_CSS}</style>
       <FollowSourceContext.Provider value={{ isSourceFollowed, followSource }}>
-      <div className={`hub${dark?' dark':''}`} {...swipeHandlers}>
+      <div className={`hub${dark?' dark':''}`}>
         <TopBar tab={tab} setTab={handleTabChange} search={search} setSearch={setSearch}
           dark={dark} setDark={setDark}
           onCustomize={()=>openCustomize('keywords','general')} onRefresh={refreshAll}
@@ -10447,8 +10448,15 @@ export default function App() {
         {/* Pull-to-refresh indicator (mobile, touch-only) */}
         {isMobile && <PtrIndicator distance={ptrDistance} threshold={70} refreshing={refreshing}/>}
 
+        {/* M4.1: swipe-to-change-category handlers live ONLY on the page-content wrapper, never
+            on `.hub`. That structurally excludes the fixed chrome — the header/TopBar (with its
+            More sheet + mobile search), the pull-to-refresh indicator, the overflow MenuSheet,
+            BottomTabBar, CustomizePanel/ResolveModal, and the reader/chat/modals rendered outside
+            `.hub` — so a thumb sliding across the bottom bar or header can never start a swipe.
+            (Lower-risk than scattering data-no-swipe across every bar; enforced by m4-swipe-region.) */}
         {/* v24a: Today removed (its content folded into General page).
             BriefingPage restored as a dedicated full-read destination. */}
+        <main className="hub-main" {...swipeHandlers}>
         {(() => {
           // Entity mini-hub route: /:cat/topic/:slug for any non-sports category.
           // (Sports keeps its own Tier-3 team page, which handles tertiary itself.)
@@ -10520,6 +10528,7 @@ export default function App() {
             </>
           );
         })()}
+        </main>
 
         {/* Mobile overflow menu sheet */}
         {menuOpen && (
