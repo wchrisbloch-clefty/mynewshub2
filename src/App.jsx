@@ -1865,6 +1865,14 @@ body:not(.dark) .pill-bar{
 ═══════════════════════════════════════════ */
 .page{max-width:1400px;margin:0 auto;padding:28px 24px;}
 .page-grid{display:grid;grid-template-columns:2.1fr 1fr;gap:28px;align-items:start;} /* main ~68% / sidebar ~32% (CNBC/NBC ratio) */
+/* Q3: on the 2-column desktop the rail is short (~600px) next to a ~1600px feed, so the
+   right ~490px went blank as you scrolled past it. Make the rail STICKY below the pinned
+   nav so it stays in view while you read the feed; if it is ever taller than the viewport
+   it gets its own scroll. Pure CSS — the scroll-0 geometry is unchanged (so the desktop
+   no-regression diff still holds) and there are zero new re-renders. */
+@media (min-width:1101px){
+  .page-grid > .sidebar{position:sticky;top:64px;align-self:start;max-height:calc(100vh - 76px);overflow-y:auto;overflow-x:hidden;overscroll-behavior:contain;}
+}
 /* D4: reclaim the wasted side gutters on large screens — the whole shell (header
    bars + content) grows from 1400 to 1560 at >=1440px so the main column gets wider
    instead of sitting small between big margins. The 2.1/1 grid keeps line length sane. */
