@@ -9236,8 +9236,13 @@ function FeedPage({ cat, ctx }) {
               </div>
             )}
 
-            {/* v20: Topics chips mirrored at bottom of feed — mid-scroll filter access */}
-            {catKws.length > 0 && !activeKw && (
+            {/* v20: Topics chips mirrored at bottom of feed — mid-scroll filter access.
+                N7a: render only AFTER the feed has committed (not during the skeleton→content
+                swap). The loading skeleton is sized for a full first screen but the first real
+                batch is often shorter, so the feed column shrinks on swap; rendering the chips
+                before that settles let them ride the shrink and shift. (They sit at the feed
+                tail, so waiting costs nothing the reader sees.) */}
+            {catKws.length > 0 && !activeKw && !isLoading && (
               <div className="bottom-topics">
                 <div className="bottom-topics-label">Filter by topic</div>
                 <div className="bottom-topics-chips">
