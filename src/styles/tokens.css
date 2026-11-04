@@ -18,8 +18,9 @@
   --font-serif:'Source Serif 4',Georgia,'Times New Roman',serif;
   --font-sans:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,sans-serif;
 
-  /* ── LIGHT (primary) — pearl canvas, pure-white cards, near-black ink ── */
-  --bg:#f4f4f2;          /* pearl canvas (was warm beige) */
+  /* ── LIGHT (primary) — S12: CRISP WHITE canvas (was pearl #f4f4f2), white cards separated by
+     the 1px --border, near-black ink. Dark mode is unchanged (its tokens live under .dark). ── */
+  --bg:#ffffff;          /* crisp white canvas (S12) */
   --surface:#ffffff;     /* clean white card — decisive against the pearl canvas */
   --surface2:#ededea;    /* subtle raised / hover */
   --border:#d8d8d4;      /* hairline divider (1.30:1 on canvas — visible but quiet) */

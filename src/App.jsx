@@ -1553,6 +1553,9 @@ body{
 /* Scoreboard band in the top bar (below weather, above nav — Pass G item 3).
    Dark ESPN theme so the homepage strip matches the Sports-page strip (item 6). */
 .topbar-scores{background:var(--surface2);border-bottom:1px solid var(--border2);}
+/* S12: in the crisp-white light theme the Scores band is white, separated by its hairline
+   bottom border instead of a grey tint. Scoped to light so the dark theme is byte-identical. */
+body:not(.dark) .topbar-scores{background:var(--surface);}
 .topbar-scores .home-scores{max-width:1400px;margin:0 auto;padding:4px var(--s4) 5px;border:none;border-radius:0;background:none;overflow:visible;}
 /* P2/A4: the scores strip is always in the DOM on Home (it wraps ActiveScoresBar, which is
    null until games load). Reserve its height from first paint so the async scores bar never
@@ -2443,7 +2446,7 @@ body:not(.dark) .pill-bar{
 .sb-box-title{font-size:var(--fs-meta);font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:0.07em;}
 .sb-box-sub{font-size:9px;color:var(--text3);text-transform:uppercase;letter-spacing:0.05em;display:flex;align-items:center;gap:8px;}
 .sb-box-head-btn{width:100%;background:none;border:none;border-bottom:1px solid var(--border2);cursor:pointer;font-family:inherit;}
-.sb-box-head-btn:hover{background:var(--bg);}
+.sb-box-head-btn:hover{background:var(--surface2);} /* S12: visible on white */
 .sb-collapse-chev{font-size:10px;color:var(--text3);}
 .sb-live-pill{background:var(--red);color:#fff;border-radius:10px;padding:1px 7px;font-size:9px;font-weight:800;letter-spacing:0.04em;animation:score-pulse 2s ease-in-out infinite;}
 .sb-league-live{color:var(--red);font-weight:800;font-size:9px;}
@@ -2455,7 +2458,7 @@ body:not(.dark) .pill-bar{
   padding:9px 14px;cursor:pointer;font-family:inherit;text-align:left;font-size:var(--fs-meta);
   transition:background 0.1s;
 }
-.sb-league-head:hover{background:var(--bg);}
+.sb-league-head:hover{background:var(--surface2);} /* S12 */
 .sb-league-meta{margin-left:auto;display:flex;gap:5px;align-items:center;font-size:10px;color:var(--text3);}
 .sb-league-fav{background:#fef3c7;color:#92400e;border-radius:6px;padding:1px 5px;font-weight:700;font-size:9px;}
 .sb-chevron{color:var(--text3);font-size:10px;width:12px;text-align:center;}
@@ -5805,10 +5808,10 @@ kbd{display:inline-block;padding:1px 5px;border:1px solid var(--border);border-r
   padding:12px 14px;background:var(--surface2);border:none;border-left:4px solid var(--accent);
   cursor:pointer;font-family:inherit;text-align:left;transition:background 0.12s;
 }
-.sources-cat-head:hover{background:var(--bg);}
+.sources-cat-head:hover{background:var(--surface2);} /* S12 */
 .sources-cat-emoji{font-size:var(--fs-headline);}
 .sources-cat-label{font-size:var(--fs-body);font-weight:800;text-transform:uppercase;letter-spacing:0.04em;}
-.sources-cat-count{margin-left:auto;font-size:var(--fs-meta);font-weight:800;color:var(--text3);background:var(--bg);border-radius:10px;padding:2px 9px;}
+.sources-cat-count{margin-left:auto;font-size:var(--fs-meta);font-weight:800;color:var(--text3);background:var(--surface2);border-radius:10px;padding:2px 9px;}
 .sources-list{display:flex;flex-direction:column;}
 .source-row{
   display:flex;align-items:center;gap:10px;padding:10px 14px;
