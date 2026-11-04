@@ -171,6 +171,11 @@ const SWIPE_ORDER = ['general','business','bloom','tech','sports','health','popc
 // there. Flip Home back on in one line by adding 'general' here. The bottom bar + chip bar
 // remain the primary way to move; nothing is removed.
 const SWIPE_PAGES = ['business','bloom','tech','sports','health','popculture'];
+// N5: iPad-portrait sectioned Home — experiment behind a single flag, DEFAULT OFF. When true,
+// the phone Home's sectioned surface (<MobileHome/>) also renders at 641–900px (iPad portrait)
+// in place of the desktop FeedPage, and the duplicate header scores band is hidden there. With
+// the flag OFF, every gate below short-circuits to false, so the output is identical to today.
+const IPAD_PORTRAIT_SECTIONS = false;
 
 const TICKERS = [
   { sym:'BE',      label:'Bloom Energy', short:'BLOOM', color:'#60a5fa' }, // I0.9: NYSE:BE — themed pick for the Energy vertical
@@ -931,6 +936,26 @@ function useIsMobile() {
   return isMobile;
 }
 
+// N5: true only when the iPad-portrait-sections flag is ON and the viewport is 641–900px.
+// When the flag is OFF it is a constant false and wires up no listener (zero behavior change).
+function useIpadPortraitSections() {
+  const q = '(min-width: 641px) and (max-width: 900px)';
+  const [on, setOn] = useState(() =>
+    IPAD_PORTRAIT_SECTIONS && typeof window !== 'undefined' && window.matchMedia(q).matches);
+  useEffect(() => {
+    if (!IPAD_PORTRAIT_SECTIONS || typeof window === 'undefined') return;
+    const mq = window.matchMedia(q);
+    const handler = e => setOn(e.matches);
+    if (mq.addEventListener) mq.addEventListener('change', handler);
+    else mq.addListener(handler);
+    return () => {
+      if (mq.removeEventListener) mq.removeEventListener('change', handler);
+      else mq.removeListener(handler);
+    };
+  }, []);
+  return on;
+}
+
 // J2: useScrollDirection removed — the header shrink/hide is now a ref-based class
 // toggle inside TopBar (no React state, so scrolling re-renders nothing).
 
@@ -1529,6 +1554,9 @@ body{
    it twice. The header strip only ever renders on General, so this is Home-only; desktop
    and mobile category pages are unaffected. */
 @media(max-width:640px){ .topbar-scores{display:none;} }
+/* N5: when the iPad-portrait-sections flag is on, MobileHome shows scores in its own body, so
+   hide the header copy there too (avoids showing scores twice). Inert while the flag is off. */
+.hub.ipad-sections .topbar-scores{display:none;}
 /* L1: scores now scroll away in .header-scroll (not hidden on shrink). */
 /* Right-edge fade cue: partial cards read as "scroll for more," not a cutoff. */
 .topbar-scores .home-scores,.sports-score-strip{position:relative;}
@@ -9616,6 +9644,7 @@ export default function App() {
   const [lastUpdated, setLastUpdated]   = useState({}); // per-cat timestamp
   const [lastFeedTab, setLastFeedTab]   = useState('general');
   const isMobile                        = useIsMobile();
+  const ipadSections                    = useIpadPortraitSections();  // N5: flag-gated, default false
   // J2: the smart-sticky header (shrink >60px / hide on mobile scroll-down) moved INTO
   // TopBar, where it toggles classes on the header element via a ref — no App state, so
   // scrolling no longer re-renders App (and so no longer remounts the page).
@@ -10473,7 +10502,7 @@ export default function App() {
     <>
       <style>{GLOBAL_CSS}</style>
       <FollowSourceContext.Provider value={{ isSourceFollowed, followSource }}>
-      <div className={`hub${dark?' dark':''}`}>
+      <div className={`hub${dark?' dark':''}${ipadSections?' ipad-sections':''}`}>
         <TopBar tab={tab} setTab={handleTabChange} search={search} setSearch={setSearch}
           dark={dark} setDark={setDark}
           onCustomize={()=>openCustomize('keywords','general')} onRefresh={refreshAll}
@@ -10539,7 +10568,7 @@ export default function App() {
               }}/></Suspense>}
               {/* M1: the phone Home is a dedicated sectioned surface. Desktop/iPad (and any
                   active filter/search) keep the existing FeedPage render unchanged. */}
-              {tab==='general' && isMobile && !search && !activeKw && !activeSrc
+              {tab==='general' && (isMobile || ipadSections) && !search && !activeKw && !activeSrc
                 ? <MobileHome ctx={{
                     arts, breakingItems, loadCat, loading, lastUpdated, onRead, onSave, isSavedFn,
                     setChatContext, navigate, openCustomize, feeds, feedHealth,
