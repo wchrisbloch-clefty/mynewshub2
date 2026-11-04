@@ -451,6 +451,17 @@ export function SportsPage({ ctx }) {
               </article>
             )}
 
+            {/* S4: State of Play up front on single-column widths (<=1100) — directly after the
+                lead, before the long feed. The rail copy (buried at the bottom when the rail
+                stacks) is hidden <=1100 via CSS. CB: State of Play is the draw on Sports. */}
+            {(sportTab === 'all' || activeTeam) && !activeSrc && !search && sopRailItems.length >= 3 && (
+              <div className="sports-sop-hoist">
+                <StateOfPlay variant="sidebar" items={sopRailItems} meta={CATS.sports}
+                  onRead={onRead} onAsk={setChatContext} formatDate={fmtDate}
+                  collapsed={sopCollapsed} onToggleCollapse={toggleSop}/>
+              </div>
+            )}
+
             {/* 3-column story grid — ESPN visual punch for top stories */}
             {showGrid && (
               <div className="gn-row" style={{marginBottom:'24px'}}>

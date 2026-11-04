@@ -5985,6 +5985,14 @@ kbd{display:inline-block;padding:1px 5px;border:1px solid var(--border);border-r
     box-shadow:0 3px 10px rgba(0,0,0,0.25);
   }
 }
+/* S4: on the Sports page the State of Play lives in the rail, which stacks LAST on a single
+   column (<=1100) — buried. Hoist a copy to the top of the feed column there and hide the rail
+   copy, so "what's driving the day" is on the first screen. >=1101 (two-column) is unchanged. */
+.sports-sop-hoist{display:none;}
+@media(max-width:1100px){
+  .sports-sop-hoist{display:block;margin-bottom:18px;}
+  .sports-page .sidebar .sidebar-sop{display:none;}
+}
 
 /* ═══════════ v46 — CARD MICRO-ANIM ═══════════ */
 .gn-card{transition:transform 0.16s ease,box-shadow 0.16s ease;}
