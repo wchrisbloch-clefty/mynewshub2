@@ -61,6 +61,7 @@ import { retrieveFeedContext, buildFeedContextBlock } from './modules/retrieval'
 import { XPulse } from './modules/x-pulse';
 import { StateOfPlay, selectStateOfPlay } from './modules/state-of-play';
 import { rankHomeTop } from './modules/top-stories/select';
+import { TopicTag } from './modules/topic-tag';
 import { SnapshotCard, CoverageList } from './modules/snapshot-card';
 import { MobileHome } from './modules/mobile-home';
 import { FollowSourceContext, FollowSourceChip } from './modules/follow-source';
@@ -8641,9 +8642,11 @@ function TopOfHourStrip({ catLead, arts, onRead, stories: storiesProp }) {
             {hero.img && <img className="toh-img" src={hero.img} alt="" loading="lazy" onError={e => { e.currentTarget.style.display = 'none'; }}/>}
             <div className="toh-grad"/>
             <div className="toh-body">
-              <span className="toh-cat">{heroBadge.label}</span>
+              {/* S13: the topic moves INTO the meta line (first token, category colour) instead of a
+                  separate eyebrow, so every Top Stories row shows its topic in one consistent place
+                  and the element count per row does not grow. */}
               <h3 className="toh-title">{hero.title}</h3>
-              <div className="toh-meta">{hero.source} · {fmtDate(hero.pubDate)}</div>
+              <div className="toh-meta"><TopicTag cat={hero.cat}/> · {hero.source} · {fmtDate(hero.pubDate)}</div>
             </div>
           </article>
           {textHeads.length > 0 && (
@@ -8651,7 +8654,7 @@ function TopOfHourStrip({ catLead, arts, onRead, stories: storiesProp }) {
               {textHeads.map((a, i) => (
                 <button key={i} className="toh-text-row" onClick={() => onRead(a)}>
                   <span className="toh-text-title">{a.title}</span>
-                  <span className="toh-text-meta">{a.source} · {fmtDate(a.pubDate)}</span>
+                  <span className="toh-text-meta"><TopicTag cat={a.cat}/> · {a.source} · {fmtDate(a.pubDate)}</span>
                 </button>
               ))}
             </div>
@@ -8663,9 +8666,8 @@ function TopOfHourStrip({ catLead, arts, onRead, stories: storiesProp }) {
               <button key={i} className="toh-compact-row" onClick={() => onRead(a)}>
                 {a.img && <img className="toh-compact-thumb" src={a.img} loading="lazy" decoding="async" alt="" onError={e => { e.currentTarget.style.visibility = 'hidden'; }}/>}
                 <span className="toh-compact-body">
-                  <span className="toh-compact-cat" style={{ color: catBadge(a).color }}>{catBadge(a).label}</span>
                   <span className="toh-compact-title">{a.title}</span>
-                  <span className="toh-compact-meta">{a.source} · {fmtDate(a.pubDate)}</span>
+                  <span className="toh-compact-meta"><TopicTag cat={a.cat}/> · {a.source} · {fmtDate(a.pubDate)}</span>
                 </span>
               </button>
             ))}

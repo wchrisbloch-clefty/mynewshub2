@@ -24,6 +24,7 @@ import { useMemo, useState } from 'react';
 import { FollowSourceChip } from '../follow-source';
 import { selectStateOfPlay } from './select';
 import { cleanSourceName } from '../source-name';
+import { TopicTag } from '../topic-tag';
 import './StateOfPlay.css';
 
 const defaultFormatDate = d => { try { return new Date(d).toLocaleString(); } catch { return ''; } };
@@ -41,7 +42,7 @@ function AskBtn({ onAsk, item }) {
   );
 }
 
-export function StateOfPlay({ items, meta = {}, onRead, onAsk, formatDate = defaultFormatDate, collapsed = false, onToggleCollapse, gapItems = [], breakingItems = [], variant = 'strip' }) {
+export function StateOfPlay({ items, meta = {}, onRead, onAsk, formatDate = defaultFormatDate, collapsed = false, onToggleCollapse, gapItems = [], breakingItems = [], variant = 'strip', showTopic = false }) {
   const color = meta.color;
   const label = meta.label || '';
   const sidebar = variant === 'sidebar';
@@ -57,6 +58,10 @@ export function StateOfPlay({ items, meta = {}, onRead, onAsk, formatDate = defa
 
   // Need a real ranked list OR something breaking to hang the module on.
   if (top.length < 3 && !breaking.length) return null;
+  // S13: show the topic token only on a MIXED-category surface (Home). On a single-category page
+  // every row has the same topic, so it would be redundant — auto-detected from the rows' cats
+  // (the explicit prop can still force it on).
+  const topicOn = showTopic || new Set([...breaking, ...top, ...gaps].map(x => x && (x.cat || 'general'))).size > 1;
 
   return (
     <section className={`sop-strip${sidebar ? ' sop-sidebar' : ''}`}>
@@ -83,6 +88,7 @@ export function StateOfPlay({ items, meta = {}, onRead, onAsk, formatDate = defa
             title={b._breakingWhy ? `Breaking — ${b._breakingWhy}` : 'Breaking'}>
             <span className="sop-item-title">{b.title}</span>
             <span className="sop-item-meta">
+              {topicOn && <TopicTag cat={b.cat}/>}
               {/* S10: the red "BREAKING" word is the ONLY breaking marker — the red dot is gone, so
                   breaking rows align exactly with every other row. The word carries meaning without
                   colour (accessible) and stays >=4.5:1 on white. */}
@@ -98,6 +104,7 @@ export function StateOfPlay({ items, meta = {}, onRead, onAsk, formatDate = defa
             {/* S11: no number — each story is its own boxed row, so every title shares one left edge. */}
             <span className="sop-item-title">{a.title}</span>
             <span className="sop-item-meta">
+              {topicOn && <TopicTag cat={a.cat}/>}
               {a._clusterSize > 1 && <span className="sources-tag sop-item-sources">{a._clusterSize} sources</span>}
               <span className="sop-item-time">{formatDate(a.pubDate)}</span>
               {onAsk && <AskBtn onAsk={onAsk} item={a}/>}
@@ -114,6 +121,7 @@ export function StateOfPlay({ items, meta = {}, onRead, onAsk, formatDate = defa
           const srcText = outlets.slice(0, 2).map(cleanSourceName).join(', ') + (outlets.length > 2 ? ` +${outlets.length - 2}` : '');
           const meta = (
             <span className="sop-item-meta">
+              {topicOn && <TopicTag cat={g.cat}/>}
               {n > 1 && <span className="sources-tag sop-item-sources">{n} sources</span>}
               {srcText && <span className="sop-item-time">{srcText}</span>}
               {outlets[0] && (

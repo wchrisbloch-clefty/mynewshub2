@@ -20,6 +20,7 @@ import { useEffect, useMemo, useRef, useState, Fragment } from 'react';
 import { SnapshotCard } from '../snapshot-card';
 import { StateOfPlay } from '../state-of-play';
 import { SectionSkeleton, SectionError } from '../section-state';
+import { TopicTag } from '../topic-tag';
 import { isPromoItem } from '../breaking';
 import './mobile-home.css';
 
@@ -52,7 +53,7 @@ function CompactRow({ a, fmtDate, onRead }) {
   return (
     <button className="mh-compact" type="button" onClick={() => onRead(a)}>
       <span className="mh-compact-title">{a.title}</span>
-      <span className="mh-compact-meta">{a.source} · {fmtDate(a.pubDate)}</span>
+      <span className="mh-compact-meta"><TopicTag cat={a.cat}/> · {a.source} · {fmtDate(a.pubDate)}</span>
     </button>
   );
 }
