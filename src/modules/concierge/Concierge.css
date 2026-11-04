@@ -2,16 +2,20 @@
    The launcher uses the single brand accent (one accent across the whole app). */
 /* ── CHATBOT ─────────────────────────────────────────────────── */
 .chat-fab{
-  position:fixed;bottom:calc(70px + env(safe-area-inset-bottom, 0));right:20px;
-  width:52px;height:52px;border-radius:50%;
+  position:fixed;bottom:calc(64px + env(safe-area-inset-bottom, 0));right:20px;
+  width:44px;height:44px;border-radius:50%;
   background:var(--accent);
   color:var(--on-accent);border:none;cursor:pointer;
   display:flex;align-items:center;justify-content:center;font-size:var(--fs-lead);
   box-shadow:var(--shadow-md);
-  z-index:200;transition:transform 0.15s,box-shadow 0.15s;
+  z-index:200;transition:transform 0.2s,box-shadow 0.15s,opacity 0.2s;
 }
-.chat-fab:hover{transform:scale(1.08);box-shadow:var(--shadow-lg);}
+/* O5: hover scale only on real pointers (it was sticking after a tap on touch). */
+@media (hover:hover){ .chat-fab:hover{transform:scale(1.08);box-shadow:var(--shadow-lg);} }
 .chat-fab.open{background:linear-gradient(135deg,#444,#222);}
+/* O3: hidden while scrolling DOWN (returns on scroll-up / at top / idle). Slides off-screen and
+   stops taking taps so it never covers a headline or section header mid-scroll. */
+.chat-fab-hidden{transform:translateY(130%);opacity:0;pointer-events:none;}
 @media (min-width:641px){
   .chat-fab{bottom:24px;}
 }

@@ -30,10 +30,57 @@ export function ChatBot({ arts, onNavigate, fetchSummary, fetchListen, fetchWebS
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
   const messagesEndRef = useRef(null);
+  const fabRef = useRef(null);
 
   useEffect(() => {
     if (open) messagesEndRef.current?.scrollIntoView({ behavior:'smooth' });
   }, [msgs, open]);
+
+  // O3: on touch / narrow viewports, hide the launcher while scrolling DOWN so it never covers a
+  // headline or section header mid-scroll; bring it back on scroll up / near the top / when
+  // scrolling stops. Ref-based class toggle (no React state → no re-render), one rAF-throttled
+  // passive scroll listener + a one-shot idle timeout (not an interval). Desktop mouse keeps it.
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const fab = fabRef.current; if (fab && open) fab.classList.remove('chat-fab-hidden');
+    const mq = window.matchMedia('(hover: none), (max-width: 1100px)');
+    if (!mq.matches) return;
+    let ticking = false, idle;
+    // Does the launcher's fixed box currently sit over any real text? (cheap, run once on stop.)
+    const coversText = () => {
+      const el = fabRef.current; if (!el) return false;
+      const fb = el.getBoundingClientRect();
+      for (const t of document.querySelectorAll('.hub h1,.hub h2,.hub h3,.hub h4,.hub a,.hub span,.hub p,.hub li')) {
+        if (t.closest('.chat-fab,.chat-drawer')) continue;
+        const own = [...t.childNodes].filter(n => n.nodeType === 3).map(n => n.textContent).join('').trim();
+        if (own.length < 2) continue;
+        const s = getComputedStyle(t); if (s.display === 'none' || s.visibility === 'hidden') continue;
+        const r = t.getBoundingClientRect(); if (r.width < 1) continue;
+        if (Math.min(fb.right, r.right) - Math.max(fb.left, r.left) > 2 && Math.min(fb.bottom, r.bottom) - Math.max(fb.top, r.top) > 2) return true;
+      }
+      return false;
+    };
+    const apply = () => {
+      ticking = false;
+      const el = fabRef.current; if (!el || open) return;
+      el.classList.add('chat-fab-hidden');          // hidden while the page is moving
+      clearTimeout(idle);
+      idle = setTimeout(() => {                       // on stop, return it ONLY where it is clear of text
+        const f = fabRef.current; if (!f || open) return;
+        f.classList.remove('chat-fab-hidden');
+        if (coversText()) f.classList.add('chat-fab-hidden');
+      }, 320);
+    };
+    const onScroll = () => { if (!ticking) { ticking = true; requestAnimationFrame(apply); } };
+    window.addEventListener('scroll', onScroll, { passive: true });
+    // On touch/narrow the launcher starts tucked and reveals only where it is clear of text — on
+    // mount and whenever the reader stops scrolling. So it never covers a headline, yet is one tap
+    // away wherever there's room (gaps between cards, the foot of the page).
+    const reveal = () => { const f = fabRef.current; if (!f || open) return; f.classList.remove('chat-fab-hidden'); if (coversText()) f.classList.add('chat-fab-hidden'); };
+    if (fabRef.current && !open) fabRef.current.classList.add('chat-fab-hidden');
+    const t0 = setTimeout(reveal, 500);
+    return () => { window.removeEventListener('scroll', onScroll); clearTimeout(idle); clearTimeout(t0); };
+  }, [open]);
 
   // When the reader hands us an article to ground on, pop the chat open.
   useEffect(() => {
@@ -134,7 +181,7 @@ export function ChatBot({ arts, onNavigate, fetchSummary, fetchListen, fetchWebS
 
   return (
     <>
-      <button className={`chat-fab ${open?'open':''}`} onClick={() => setOpen(o => !o)} aria-label="Chat assistant">
+      <button ref={fabRef} className={`chat-fab ${open?'open':''}`} onClick={() => setOpen(o => !o)} aria-label="Chat assistant">
         {open
           ? <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
           : <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
