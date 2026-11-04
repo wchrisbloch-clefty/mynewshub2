@@ -60,6 +60,7 @@ import { extractContent, extractionFallbackMessage } from './modules/extractor';
 import { retrieveFeedContext, buildFeedContextBlock } from './modules/retrieval';
 import { XPulse } from './modules/x-pulse';
 import { StateOfPlay, selectStateOfPlay } from './modules/state-of-play';
+import { rankHomeTop } from './modules/top-stories/select';
 import { SnapshotCard, CoverageList } from './modules/snapshot-card';
 import { MobileHome } from './modules/mobile-home';
 import { FollowSourceContext, FollowSourceChip } from './modules/follow-source';
@@ -8951,18 +8952,26 @@ function FeedPage({ cat, ctx }) {
         // different links but the same title, so a link-only guard let the hero reappear as
         // a text/compact row below it. storyKey matches what every downstream module dedupes on.
         const used = new Set(catLead ? [storyKey(catLead)] : []);
-        const catOrder = ['sports','business','finance','bloom','popculture','general','tech'];
-        for (const c of catOrder) {
-          if (picks.length >= 6) break;
-          const item = (arts[c]||[]).find(a => a.img && !used.has(storyKey(a)));
-          if (item) { picks.push({ ...item, cat: item.cat || c }); used.add(storyKey(item)); }
+        // S7: rank the WHOLE cross-category pool by how widely the cluster is covered (distinct
+        // outlets carrying the same title), then recency — and allow at most ONE non-general
+        // category story (only when it is >=2 outlets or breaking). Replaces the old category
+        // round-robin that let a niche single-outlet trade/sports item take a national slot. K4's
+        // per-category balance still governs the SECTIONS below, not these 4-6.
+        const flat = Object.entries(arts).flatMap(([c, list]) => (list || []).map(a => ({ ...a, cat: a.cat || c })));
+        const outletCount = {};
+        for (const a of flat) { const k = storyKey(a); outletCount[k] = (outletCount[k] || 0) + 1; }
+        const byKey = new Map();
+        const pool = [];
+        for (const a of flat) {
+          const k = storyKey(a);
+          if (used.has(k) || isPromoItem(a)) continue;
+          if (!byKey.has(k)) byKey.set(k, a);
+          pool.push({ key: k, cat: a.cat, clusterSize: outletCount[k] || 1, pubDate: a.pubDate, breaking: !!(a.isAlert || a._breaking) });
         }
-        for (const c of catOrder) {
-          if (picks.length >= 6) break;
-          for (const a of (arts[c]||[])) {
-            if (picks.length >= 6) break;
-            if (!used.has(storyKey(a))) { picks.push({ ...a, cat: a.cat || c }); used.add(storyKey(a)); }
-          }
+        const leadNonGen = catLead && (catLead.cat || 'general') !== 'general' ? 1 : 0;
+        for (const k of rankHomeTop(pool, { max: 6 - picks.length, nonGeneralUsed: leadNonGen })) {
+          const it = byKey.get(k);
+          if (it && !used.has(k)) { picks.push({ ...it, cat: it.cat || 'general' }); used.add(k); }
         }
         return picks.slice(0, 6);
       }
