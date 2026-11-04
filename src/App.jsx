@@ -1619,10 +1619,11 @@ body{
      +2…") fades out instead of being hard-cut by the weather divider at ~1180 — the
      last FULLY visible item reads whole, and the fade is the "more →" cue. The ticker
      clips only inside its own box (overflow:hidden), never under the weather. */
-  -webkit-mask-image:linear-gradient(90deg,#000 0,#000 calc(100% - 56px),transparent);
-          mask-image:linear-gradient(90deg,#000 0,#000 calc(100% - 56px),transparent);}
+  -webkit-mask-image:linear-gradient(90deg,#000 0,#000 calc(100% - 72px),transparent);
+          mask-image:linear-gradient(90deg,#000 0,#000 calc(100% - 72px),transparent);}
 .ss-ticker-inner{display:flex;align-items:center;gap:var(--s4);overflow-x:auto;scrollbar-width:none;padding-right:12px;}
 .ss-ticker-inner::-webkit-scrollbar{display:none;}
+.ss-tk-clipped{display:none;}  /* O6: items the right edge would cut are hidden (whole items only) */
 .ss-tk{display:inline-flex;align-items:baseline;gap:6px;flex-shrink:0;
   background:none;border:none;cursor:pointer;font-family:inherit;padding:0;white-space:nowrap;}
 /* D3: ticker + weather share one role scale.
@@ -8090,6 +8091,34 @@ function TopBar({tab, setTab, search, setSearch, dark, setDark,
     }
   }, [tab]);
 
+  // O6: show WHOLE market-ticker items only. Any item whose right edge is clipped by the
+  // container (the weather divider on iPad) is hidden, so nothing reads as cut mid-glyph
+  // ("BLOOM $201.06 −("). Re-fits on container resize AND when quote text changes width
+  // (ResizeObserver + MutationObserver — no timers). The fade mask stays as the "more" cue.
+  const tickerRef = useRef(null);
+  useEffect(() => {
+    const el = tickerRef.current;
+    if (!el || typeof ResizeObserver === 'undefined') return;
+    const clip = el.closest('.ss-ticker') || el;  // the overflow:hidden box (the visible edge)
+    const fit = () => {
+      // reveal all (so positions are the full flow), then hide the FIRST item the right edge cuts
+      // and every item after it — showing only the whole items that fit.
+      const items = [...el.querySelectorAll('.ss-tk')];
+      items.forEach(it => it.classList.remove('ss-tk-clipped'));
+      const right = clip.getBoundingClientRect().right - 6;
+      let hide = false;
+      for (const it of items) {
+        if (hide) { it.classList.add('ss-tk-clipped'); continue; }
+        if (it.getBoundingClientRect().right > right) { it.classList.add('ss-tk-clipped'); hide = true; }
+      }
+    };
+    fit();
+    const ro = new ResizeObserver(fit); ro.observe(el); ro.observe(clip);  // weather loading narrows `clip`
+    let mo; try { mo = new MutationObserver(fit); mo.observe(el, { subtree: true, characterData: true, childList: true }); } catch { /* noop */ }
+    const t = setTimeout(fit, 700);  // one late pass after quotes + weather settle (not a poll)
+    return () => { ro.disconnect(); mo && mo.disconnect(); clearTimeout(t); };
+  }, []);
+
   return (
     <>
     {/* L1: SCORES -> Markets/weather live in a NON-sticky block that scrolls away; only
@@ -8108,7 +8137,7 @@ function TopBar({tab, setTab, search, setSearch, dark, setDark,
               lives ONLY as tagged rows inside State of Play. The strip is markets-only. */}
           <span className="ss-flag ss-flag-markets">Markets</span>
           <div className="ss-ticker">
-            <div className="ss-ticker-inner" data-no-swipe>
+            <div className="ss-ticker-inner" data-no-swipe ref={tickerRef}>
               {INDICES.filter(idx=>!(hiddenIndices||[]).includes(idx.sym)).map(idx=>{
                 const q=quotes[idx.sym]; const up=q?q.chg>=0:null;
                 return (
