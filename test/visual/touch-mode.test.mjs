@@ -42,7 +42,8 @@ for (const v of VIEWPORTS) {
     const markets = r('.status-strip');
     const label = centerOf('.ss-flag-markets');
     const val = centerOf('.ss-tk-val');
-    const wx = centerOf('.ss-weather .rnw-label') ?? centerOf('.ss-weather');
+    const ssw = document.querySelector('.ss-weather'); // only on the ticker line >=1100; display:none below
+    const wx = (ssw && ssw.getBoundingClientRect().height > 0) ? (centerOf('.ss-weather .rnw-label') ?? centerOf('.ss-weather')) : null;
     // content overflow: do any .status-strip descendants extend past the strip box?
     let overflow = 0;
     const strip = document.querySelector('.status-strip');

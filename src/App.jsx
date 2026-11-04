@@ -5886,11 +5886,7 @@ kbd{display:inline-block;padding:1px 5px;border:1px solid var(--border);border-r
      reach them). Desktop mouse (hover:hover) is unaffected. The market ticker (.ss-tk) is exempt —
      it lives in the 30px status strip and can't grow without a header redesign (deferred). */
   .nav-icon-btn{width:44px;height:44px;}
-  .fc-read-link{min-height:44px;}
-  .fc-act{min-height:44px;}
-  .fc-ellipsis-btn{min-width:44px;}
   .teams-shelf-edit{min-height:44px;display:inline-flex;align-items:center;}
-  .rnw-row{min-height:44px;}
   .home-scores-see-all{min-height:44px;display:inline-flex;align-items:center;}
   .src-footer-link{min-height:44px;display:inline-flex;align-items:center;}
   .social-handle{min-height:44px;min-width:44px;display:inline-flex;align-items:center;justify-content:center;}
@@ -5901,10 +5897,26 @@ kbd{display:inline-block;padding:1px 5px;border:1px solid var(--border);border-r
   .sport-tab,.pc-subtab,.en-subtabs .pc-subtab{min-width:44px;min-height:44px;}
   .feed-degraded{min-height:44px;}
   .follow-source-chip,.follow-chip-x,.following-chip-x,.ttp-chip-star,.src-show-more{min-height:44px;}
-  .sop-collapse,.sop-row-menu-btn,.sop-ask{min-width:44px;min-height:44px;}
+  .sop-collapse{min-width:44px;min-height:44px;}
   /* P3: the desktop header/nav controls also show on a touch iPad (641–1100, hover:none). */
   .nav-icon-btn,.nav-btn-brief,.nav-btn-blue{min-width:44px;min-height:44px;}
-  .ss-tk{min-height:44px;}
+  /* ───────────────────────────────────────────────────────────────────────────────────────
+     S1: ROOT CAUSE. The controls below live INSIDE a shared row/band (the ticker strip, the
+     weather band, a State-of-Play meta line, a feed-card foot). Forcing their LAYOUT box to
+     44px here inflated those rows on touch — the iPad header bands crossed and the SoP rows
+     grew a ~29px dead gap (none of which reproduced in Chromium desktop emulation). They now
+     keep a COMPACT visual box and take the 44px tap target from an invisible ::after hit-area
+     (the Ask/Save pattern), so neighbours never move. Effective target stays >=44px. */
+  .ss-tk,.rnw-row,.sop-ask,.sop-row-menu-btn,.fc-read-link,.fc-act,.fc-ellipsis-btn{position:relative;}
+  /* The ticker items and the ticker-line weather live in the slim ~30px Markets strip. A 44px
+     LAYOUT box there is what crossed the bands (the N1 bug), and a 44px hit-area would overflow
+     14px into the Scores band above and the nav below, causing mis-taps. So these get the largest
+     target the band allows (fills the strip, ~30px) — a documented slim-strip exception for these
+     low-priority convenience links, exactly as the pre-S1 comment intended. Vertical-only inset so
+     the ::after never adds horizontal scrollWidth or page overflow. */
+  .ss-tk::after,.rnw-row::after{content:"";position:absolute;inset:-8px 0;}
+  /* Rail / feed-foot controls (not in a measured strip) extend both ways to reach 44x44. */
+  .sop-ask::after,.sop-row-menu-btn::after,.fc-read-link::after,.fc-act::after,.fc-ellipsis-btn::after{content:"";position:absolute;inset:-12px -10px;}
 }
 
 /* ═══════════ v46 — "N NEW STORIES" PILL ═══════════ */

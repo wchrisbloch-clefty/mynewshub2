@@ -22,7 +22,9 @@
 .sop-ask-label{display:none;font-family:var(--font-sans);font-size:var(--fs-eyebrow);font-weight:700;text-transform:uppercase;letter-spacing:0.06em;}
 .sop-ask:hover .sop-ask-label,.sop-ask:focus-visible .sop-ask-label{display:inline;}
 .sop-ask:focus-visible{outline:2px solid var(--accent);outline-offset:2px;}
-@media(max-width:640px){ .sop-ask{min-width:44px;min-height:44px;justify-content:center;} }
+/* S1: keep the Ask box COMPACT on touch; the 44px tap target comes from the ::after hit-area
+   defined in the global M5 block (a 44px layout box here inflated the SoP meta row — the dead gap). */
+@media(max-width:640px){ .sop-ask{justify-content:center;} }
 /* Coverage-gap rows folded into the list: dimmer number + "Not in your sources" tag. */
 .sop-item-gap{text-decoration:none;}
 .sop-num-gap{opacity:0.5;}
