@@ -18,8 +18,9 @@
 // here, not in App.jsx (beyond the one-line wiring). Data arrives via the `ctx` pattern.
 import { useEffect, useMemo, useRef, useState, Fragment } from 'react';
 import { SnapshotCard } from '../snapshot-card';
-import { StateOfPlay } from '../state-of-play';
+import { StateOfPlay, selectStateOfPlay } from '../state-of-play';
 import { SectionSkeleton, SectionError } from '../section-state';
+import { TopicTag } from '../topic-tag';
 import { isPromoItem } from '../breaking';
 import './mobile-home.css';
 
@@ -52,7 +53,7 @@ function CompactRow({ a, fmtDate, onRead }) {
   return (
     <button className="mh-compact" type="button" onClick={() => onRead(a)}>
       <span className="mh-compact-title">{a.title}</span>
-      <span className="mh-compact-meta">{a.source} · {fmtDate(a.pubDate)}</span>
+      <span className="mh-compact-meta"><TopicTag cat={a.cat}/> · {a.source} · {fmtDate(a.pubDate)}</span>
     </button>
   );
 }
@@ -185,6 +186,13 @@ export function MobileHome({ ctx }) {
     top.forEach(t => used.add(storyKey(t)));
     breaking.forEach(b => { used.add(storyKey(b)); const c = b.cat || 'general'; cov[c] = cov[c] || { found: 0, filtered: 0, shown: 0, breaking: 0 }; cov[c].breaking++; });
 
+    // S4: STATE OF PLAY up front — a ranked cross-category card right after Top Stories (CB:
+    // "it's the draw", not the last block). It claims its heat-ranked top BEFORE the sections, so
+    // those rows don't reappear below (coverage guarantee); sections then take what's left.
+    const sopPool = Object.values(arts).flat()
+      .filter(a => a && a.title && a.link && !isPromoItem(a) && !used.has(storyKey(a)));
+    selectStateOfPlay({ items: sopPool, breakingItems: [], gapItems: [] }).top.forEach(a => used.add(storyKey(a)));
+
     // SECTIONS — each shows up to 3 not-yet-used stories (promote past duplicates).
     const sections = SECTIONS.map(s => {
       const cats = [s.cat, ...(s.extra || [])];
@@ -202,7 +210,7 @@ export function MobileHome({ ctx }) {
     houston.forEach(a => used.add(storyKey(a)));
 
     cov.general.shown = (lead ? 1 : 0) + top.filter(t => (t.cat || 'general') === 'general').length;
-    return { lead, top, breaking, sections, houston, cov };
+    return { lead, top, breaking, sopPool, sections, houston, cov };
   }, [arts, breakingItems, head]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ?debug=1 coverage readout: per category = found / shown / breaking / filtered / hidden.
@@ -226,6 +234,15 @@ export function MobileHome({ ctx }) {
         ? <div className="mh-lead"><SnapshotCard a={model.lead} meta={sopMeta} isSaved={isSavedFn(model.lead)} onSave={onSave} onRead={onRead} onAsk={setChatContext} formatDate={fmtDate} opinionLabel={opinionLabel(model.lead)} lead={true}/></div>
         : <div className="mh-lead"><SectionSkeleton lead rows={0} label="Top story"/></div>}
 
+      {/* S4: BREAKING up front — directly under the LEAD, above Top Stories (CB: the "what is
+          happening" signal is the draw). Only when present; while General loads, reserve the slot. */}
+      {hasBreaking
+        ? <section className="mh-section mh-breaking">
+            <StateOfPlay variant="sidebar" items={[]} breakingItems={model.breaking}
+              meta={sopMeta} onRead={onRead} onAsk={setChatContext} formatDate={fmtDate}/>
+          </section>
+        : (!generalLoaded && <div className="mh-breaking mh-breaking-reserve" aria-hidden="true"><SectionSkeleton rows={3}/></div>)}
+
       {/* TOP STORIES — 4 compact cross-category headlines (always present once loaded) */}
       <section className="mh-section mh-topstories">
         <div className="mh-sec-head"><span className="eyebrow mh-sec-label">Top stories</span></div>
@@ -234,15 +251,14 @@ export function MobileHome({ ctx }) {
           : <SectionSkeleton rows={4} label="Top stories"/>}
       </section>
 
-      {/* BREAKING / STATE OF PLAY — existing selection rules, only when present. While
-          General is still loading, reserve the slot so a late breaking block doesn't shove
-          the page; once loaded, show it or collapse. */}
-      {hasBreaking
-        ? <section className="mh-section mh-breaking">
-            <StateOfPlay variant="sidebar" items={[]} breakingItems={model.breaking}
-              meta={sopMeta} onRead={onRead} onAsk={setChatContext} formatDate={fmtDate}/>
-          </section>
-        : (!generalLoaded && <div className="mh-breaking mh-breaking-reserve" aria-hidden="true"><SectionSkeleton rows={3}/></div>)}
+      {/* S4: STATE OF PLAY card — the ranked cross-category "what's driving the day", up front
+          (after Top Stories, before the long section feed) instead of buried at the bottom. */}
+      {committed && (model.sopPool || []).length >= 3 && (
+        <section className="mh-section mh-sop">
+          <StateOfPlay variant="sidebar" items={model.sopPool} showTopic
+            meta={sopMeta} onRead={onRead} onAsk={setChatContext} formatDate={fmtDate}/>
+        </section>
+      )}
 
       {/* O2: Live Scores moved to the TOP of the scrolling header stack (match iPad order:
           Scores → Markets/weather → nav), so it is no longer rendered here mid-page. */}

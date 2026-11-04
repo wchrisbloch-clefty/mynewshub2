@@ -1,0 +1,6 @@
+/* S13: one compact uppercase topic token at the head of a meta line. Category colour (P1 token,
+   >=4.5:1 on surface in both themes); it sits in the existing meta row, so no new element height. */
+.topic-tag{
+  font-family:var(--font-sans);font-size:11px;font-weight:600;letter-spacing:0.05em;
+  text-transform:uppercase;white-space:nowrap;flex-shrink:0;
+}

@@ -58,3 +58,8 @@
   border:1px solid var(--border);border-radius:var(--radius);cursor:pointer;
   font-family:var(--font-sans);font-size:var(--fs-body);font-weight:700;color:var(--text2);}
 .mh-edit-sections:active{background:var(--border);}
+
+/* S4: the breaking block under the lead is breaking ROWS only — hide its "State of Play" header
+   so it doesn't duplicate the ranked State of Play card below (each row's red "BREAKING" word is
+   the label). The ranked card (.mh-sop) keeps the header. */
+.mh-breaking .sop-head{display:none;}

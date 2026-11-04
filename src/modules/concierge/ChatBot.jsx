@@ -45,41 +45,24 @@ export function ChatBot({ arts, onNavigate, fetchSummary, fetchListen, fetchWebS
     const fab = fabRef.current; if (fab && open) fab.classList.remove('chat-fab-hidden');
     const mq = window.matchMedia('(hover: none), (max-width: 1100px)');
     if (!mq.matches) return;
-    let ticking = false, idle;
-    // Does the launcher's fixed box currently sit over any real text? (cheap, run once on stop.)
-    const coversText = () => {
-      const el = fabRef.current; if (!el) return false;
-      const fb = el.getBoundingClientRect();
-      for (const t of document.querySelectorAll('.hub h1,.hub h2,.hub h3,.hub h4,.hub a,.hub span,.hub p,.hub li')) {
-        if (t.closest('.chat-fab,.chat-drawer')) continue;
-        const own = [...t.childNodes].filter(n => n.nodeType === 3).map(n => n.textContent).join('').trim();
-        if (own.length < 2) continue;
-        const s = getComputedStyle(t); if (s.display === 'none' || s.visibility === 'hidden') continue;
-        const r = t.getBoundingClientRect(); if (r.width < 1) continue;
-        if (Math.min(fb.right, r.right) - Math.max(fb.left, r.left) > 2 && Math.min(fb.bottom, r.bottom) - Math.max(fb.top, r.top) > 2) return true;
-      }
-      return false;
-    };
+    // S6: the launcher is VISIBLE at rest (CB saw it hidden in every shot — the old "reveal only
+    // where it is clear of text" rule meant it was always hidden on Home, since there is always
+    // some text near the corner). It now hides ONLY while the reader actively scrolls DOWN — so it
+    // never sweeps across a headline as it passes — and comes back on scroll-up or after 400ms idle
+    // (a single timeout, no interval). It stays keyboard-focusable while visually hidden.
+    let ticking = false, idle, lastY = window.scrollY;
+    const show = () => { const f = fabRef.current; if (f && !open) f.classList.remove('chat-fab-hidden'); };
+    const hide = () => { const f = fabRef.current; if (f && !open) f.classList.add('chat-fab-hidden'); };
     const apply = () => {
-      ticking = false;
-      const el = fabRef.current; if (!el || open) return;
-      el.classList.add('chat-fab-hidden');          // hidden while the page is moving
-      clearTimeout(idle);
-      idle = setTimeout(() => {                       // on stop, return it ONLY where it is clear of text
-        const f = fabRef.current; if (!f || open) return;
-        f.classList.remove('chat-fab-hidden');
-        if (coversText()) f.classList.add('chat-fab-hidden');
-      }, 320);
+      ticking = false; if (open) return;
+      const y = window.scrollY; const goingDown = y > lastY + 4; lastY = y;
+      if (goingDown && y > 80) hide(); else show();
+      clearTimeout(idle); idle = setTimeout(show, 400); // always returns when the page stops moving
     };
     const onScroll = () => { if (!ticking) { ticking = true; requestAnimationFrame(apply); } };
     window.addEventListener('scroll', onScroll, { passive: true });
-    // On touch/narrow the launcher starts tucked and reveals only where it is clear of text — on
-    // mount and whenever the reader stops scrolling. So it never covers a headline, yet is one tap
-    // away wherever there's room (gaps between cards, the foot of the page).
-    const reveal = () => { const f = fabRef.current; if (!f || open) return; f.classList.remove('chat-fab-hidden'); if (coversText()) f.classList.add('chat-fab-hidden'); };
-    if (fabRef.current && !open) fabRef.current.classList.add('chat-fab-hidden');
-    const t0 = setTimeout(reveal, 500);
-    return () => { window.removeEventListener('scroll', onScroll); clearTimeout(idle); clearTimeout(t0); };
+    show(); // visible at load / at rest
+    return () => { window.removeEventListener('scroll', onScroll); clearTimeout(idle); };
   }, [open]);
 
   // When the reader hands us an article to ground on, pop the chat open.

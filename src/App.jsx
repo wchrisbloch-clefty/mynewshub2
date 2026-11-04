@@ -60,6 +60,8 @@ import { extractContent, extractionFallbackMessage } from './modules/extractor';
 import { retrieveFeedContext, buildFeedContextBlock } from './modules/retrieval';
 import { XPulse } from './modules/x-pulse';
 import { StateOfPlay, selectStateOfPlay } from './modules/state-of-play';
+import { rankHomeTop } from './modules/top-stories/select';
+import { TopicTag } from './modules/topic-tag';
 import { SnapshotCard, CoverageList } from './modules/snapshot-card';
 import { MobileHome } from './modules/mobile-home';
 import { FollowSourceContext, FollowSourceChip } from './modules/follow-source';
@@ -1531,10 +1533,13 @@ body{
   background:var(--surface);border-bottom:1px solid var(--border2);
   font-family:var(--font-sans);
 }
-/* Contain the ticker to the same max-width as the nav/content below it. */
+/* S2: Band 2 is ONE grid — [MARKETS label auto][ticker 1fr][RIGHT NOW weather auto] — vertically
+   centered in a single row, so the label, the ticker values and the weather share one baseline and
+   no cell can push past the band. (The weather's left divider is its own border-left.) Contained to
+   the same max-width as the nav/content below it. */
 .status-strip-inner{
   max-width:1400px;margin:0 auto;height:100%;
-  display:flex;align-items:center;gap:var(--s3);padding:0 var(--s4);
+  display:grid;grid-template-columns:auto 1fr auto;align-items:center;gap:var(--s3);padding:0 var(--s4);
 }
 /* Home weather stacked under the ticker: full-bleed bar, content contained to the
    same max-width, flush (no card chrome). */
@@ -1548,6 +1553,9 @@ body{
 /* Scoreboard band in the top bar (below weather, above nav — Pass G item 3).
    Dark ESPN theme so the homepage strip matches the Sports-page strip (item 6). */
 .topbar-scores{background:var(--surface2);border-bottom:1px solid var(--border2);}
+/* S12: in the crisp-white light theme the Scores band is white, separated by its hairline
+   bottom border instead of a grey tint. Scoped to light so the dark theme is byte-identical. */
+body:not(.dark) .topbar-scores{background:var(--surface);}
 .topbar-scores .home-scores{max-width:1400px;margin:0 auto;padding:4px var(--s4) 5px;border:none;border-radius:0;background:none;overflow:visible;}
 /* P2/A4: the scores strip is always in the DOM on Home (it wraps ActiveScoresBar, which is
    null until games load). Reserve its height from first paint so the async scores bar never
@@ -1674,6 +1682,11 @@ body{
   /* keep a 44px tap area (expand forecast) without inflating the 32px band — invisible ::after */
   .topbar-wx .rnw-row::after{content:'';position:absolute;inset:-7px 0;}
   .topbar-wx .rnw-cities{flex-wrap:nowrap;gap:var(--s3);overflow:hidden;}
+  /* S5a: in the one-line HEADER band, show only the FIRST city in full (HOUSTON 69° Clear) so it
+     never clips mid-word ("LOUISVILLE 6…"). The other cities stay one tap away in the forecast the
+     caret expands. The in-body Right Now card (not .topbar-wx) still shows every city. */
+  .topbar-wx .rnw-city-item{flex-shrink:0;}
+  .topbar-wx .rnw-city-item:not(:first-child){display:none;}
 }
 .houston-row{margin-bottom:var(--s4);}
 .houston-head{display:flex;align-items:baseline;gap:8px;margin-bottom:10px;}
@@ -2433,7 +2446,7 @@ body:not(.dark) .pill-bar{
 .sb-box-title{font-size:var(--fs-meta);font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:0.07em;}
 .sb-box-sub{font-size:9px;color:var(--text3);text-transform:uppercase;letter-spacing:0.05em;display:flex;align-items:center;gap:8px;}
 .sb-box-head-btn{width:100%;background:none;border:none;border-bottom:1px solid var(--border2);cursor:pointer;font-family:inherit;}
-.sb-box-head-btn:hover{background:var(--bg);}
+.sb-box-head-btn:hover{background:var(--surface2);} /* S12: visible on white */
 .sb-collapse-chev{font-size:10px;color:var(--text3);}
 .sb-live-pill{background:var(--red);color:#fff;border-radius:10px;padding:1px 7px;font-size:9px;font-weight:800;letter-spacing:0.04em;animation:score-pulse 2s ease-in-out infinite;}
 .sb-league-live{color:var(--red);font-weight:800;font-size:9px;}
@@ -2445,7 +2458,7 @@ body:not(.dark) .pill-bar{
   padding:9px 14px;cursor:pointer;font-family:inherit;text-align:left;font-size:var(--fs-meta);
   transition:background 0.1s;
 }
-.sb-league-head:hover{background:var(--bg);}
+.sb-league-head:hover{background:var(--surface2);} /* S12 */
 .sb-league-meta{margin-left:auto;display:flex;gap:5px;align-items:center;font-size:10px;color:var(--text3);}
 .sb-league-fav{background:#fef3c7;color:#92400e;border-radius:6px;padding:1px 5px;font-weight:700;font-size:9px;}
 .sb-chevron{color:var(--text3);font-size:10px;width:12px;text-align:center;}
@@ -5795,10 +5808,10 @@ kbd{display:inline-block;padding:1px 5px;border:1px solid var(--border);border-r
   padding:12px 14px;background:var(--surface2);border:none;border-left:4px solid var(--accent);
   cursor:pointer;font-family:inherit;text-align:left;transition:background 0.12s;
 }
-.sources-cat-head:hover{background:var(--bg);}
+.sources-cat-head:hover{background:var(--surface2);} /* S12 */
 .sources-cat-emoji{font-size:var(--fs-headline);}
 .sources-cat-label{font-size:var(--fs-body);font-weight:800;text-transform:uppercase;letter-spacing:0.04em;}
-.sources-cat-count{margin-left:auto;font-size:var(--fs-meta);font-weight:800;color:var(--text3);background:var(--bg);border-radius:10px;padding:2px 9px;}
+.sources-cat-count{margin-left:auto;font-size:var(--fs-meta);font-weight:800;color:var(--text3);background:var(--surface2);border-radius:10px;padding:2px 9px;}
 .sources-list{display:flex;flex-direction:column;}
 .source-row{
   display:flex;align-items:center;gap:10px;padding:10px 14px;
@@ -5886,11 +5899,7 @@ kbd{display:inline-block;padding:1px 5px;border:1px solid var(--border);border-r
      reach them). Desktop mouse (hover:hover) is unaffected. The market ticker (.ss-tk) is exempt —
      it lives in the 30px status strip and can't grow without a header redesign (deferred). */
   .nav-icon-btn{width:44px;height:44px;}
-  .fc-read-link{min-height:44px;}
-  .fc-act{min-height:44px;}
-  .fc-ellipsis-btn{min-width:44px;}
   .teams-shelf-edit{min-height:44px;display:inline-flex;align-items:center;}
-  .rnw-row{min-height:44px;}
   .home-scores-see-all{min-height:44px;display:inline-flex;align-items:center;}
   .src-footer-link{min-height:44px;display:inline-flex;align-items:center;}
   .social-handle{min-height:44px;min-width:44px;display:inline-flex;align-items:center;justify-content:center;}
@@ -5901,10 +5910,26 @@ kbd{display:inline-block;padding:1px 5px;border:1px solid var(--border);border-r
   .sport-tab,.pc-subtab,.en-subtabs .pc-subtab{min-width:44px;min-height:44px;}
   .feed-degraded{min-height:44px;}
   .follow-source-chip,.follow-chip-x,.following-chip-x,.ttp-chip-star,.src-show-more{min-height:44px;}
-  .sop-collapse,.sop-row-menu-btn,.sop-ask{min-width:44px;min-height:44px;}
+  .sop-collapse{min-width:44px;min-height:44px;}
   /* P3: the desktop header/nav controls also show on a touch iPad (641–1100, hover:none). */
   .nav-icon-btn,.nav-btn-brief,.nav-btn-blue{min-width:44px;min-height:44px;}
-  .ss-tk{min-height:44px;}
+  /* ───────────────────────────────────────────────────────────────────────────────────────
+     S1: ROOT CAUSE. The controls below live INSIDE a shared row/band (the ticker strip, the
+     weather band, a State-of-Play meta line, a feed-card foot). Forcing their LAYOUT box to
+     44px here inflated those rows on touch — the iPad header bands crossed and the SoP rows
+     grew a ~29px dead gap (none of which reproduced in Chromium desktop emulation). They now
+     keep a COMPACT visual box and take the 44px tap target from an invisible ::after hit-area
+     (the Ask/Save pattern), so neighbours never move. Effective target stays >=44px. */
+  .ss-tk,.rnw-row,.sop-ask,.sop-row-menu-btn,.fc-read-link,.fc-act,.fc-ellipsis-btn{position:relative;}
+  /* The ticker items and the ticker-line weather live in the slim ~30px Markets strip. A 44px
+     LAYOUT box there is what crossed the bands (the N1 bug), and a 44px hit-area would overflow
+     14px into the Scores band above and the nav below, causing mis-taps. So these get the largest
+     target the band allows (fills the strip, ~30px) — a documented slim-strip exception for these
+     low-priority convenience links, exactly as the pre-S1 comment intended. Vertical-only inset so
+     the ::after never adds horizontal scrollWidth or page overflow. */
+  .ss-tk::after,.rnw-row::after{content:"";position:absolute;inset:-8px 0;}
+  /* Rail / feed-foot controls (not in a measured strip) extend both ways to reach 44x44. */
+  .sop-ask::after,.sop-row-menu-btn::after,.fc-read-link::after,.fc-act::after,.fc-ellipsis-btn::after{content:"";position:absolute;inset:-12px -10px;}
 }
 
 /* ═══════════ v46 — "N NEW STORIES" PILL ═══════════ */
@@ -5953,9 +5978,20 @@ kbd{display:inline-block;padding:1px 5px;border:1px solid var(--border);border-r
 /* ═══════════ v46 — STICKY SPORTS SCORE STRIP (mobile) ═══════════ */
 @media(max-width:640px){
   .sports-page .sports-score-strip{
-    position:sticky;top:env(safe-area-inset-top, 0);z-index:110;
+    /* S5c: stick BELOW the sticky header (nav + chips), not at viewport top — otherwise the
+       z:300 header covered the strip's top ~12-16px and hid each card's first team row. --sticky-h
+       is the header's live measured height (S2); it tracks the header shrinking on scroll. */
+    position:sticky;top:calc(var(--sticky-h, 56px) + env(safe-area-inset-top, 0));z-index:110;
     box-shadow:0 3px 10px rgba(0,0,0,0.25);
   }
+}
+/* S4: on the Sports page the State of Play lives in the rail, which stacks LAST on a single
+   column (<=1100) — buried. Hoist a copy to the top of the feed column there and hide the rail
+   copy, so "what's driving the day" is on the first screen. >=1101 (two-column) is unchanged. */
+.sports-sop-hoist{display:none;}
+@media(max-width:1100px){
+  .sports-sop-hoist{display:block;margin-bottom:18px;}
+  .sports-page .sidebar .sidebar-sop{display:none;}
 }
 
 /* ═══════════ v46 — CARD MICRO-ANIM ═══════════ */
@@ -8175,6 +8211,26 @@ function TopBar({tab, setTab, search, setSearch, dark, setDark,
     return () => { ro.disconnect(); mo && mo.disconnect(); clearTimeout(t); };
   }, []);
 
+  // S2: publish the live heights of the header bands + the sticky block as CSS variables, so every
+  // sticky offset / reserve reads the REAL measured height instead of a hard-coded constant that
+  // drifts when touch rules change a band's height (the source of the phone-Sports "strip tucks
+  // under the chip bar" defect, S5c). ResizeObserver only — no timers, no polling.
+  useEffect(() => {
+    if (typeof ResizeObserver === 'undefined') return;
+    const root = document.documentElement;
+    const set = () => {
+      const h = sel => { const el = document.querySelector(sel); return el ? Math.round(el.getBoundingClientRect().height) : 0; };
+      root.style.setProperty('--band-scores-h', h('.topbar-scores') + 'px');
+      root.style.setProperty('--band-markets-h', h('.status-strip') + 'px');
+      root.style.setProperty('--sticky-h', h('.topbar-wrap') + 'px');
+    };
+    set();
+    const ro = new ResizeObserver(set);
+    ['.topbar-scores', '.status-strip', '.topbar-wrap'].forEach(s => { const el = document.querySelector(s); if (el) ro.observe(el); });
+    const t = setTimeout(set, 700);
+    return () => { ro.disconnect(); clearTimeout(t); };
+  }, [tab]);
+
   return (
     <>
     {/* L1: SCORES -> Markets/weather live in a NON-sticky block that scrolls away; only
@@ -8597,9 +8653,11 @@ function TopOfHourStrip({ catLead, arts, onRead, stories: storiesProp }) {
             {hero.img && <img className="toh-img" src={hero.img} alt="" loading="lazy" onError={e => { e.currentTarget.style.display = 'none'; }}/>}
             <div className="toh-grad"/>
             <div className="toh-body">
-              <span className="toh-cat">{heroBadge.label}</span>
+              {/* S13: the topic moves INTO the meta line (first token, category colour) instead of a
+                  separate eyebrow, so every Top Stories row shows its topic in one consistent place
+                  and the element count per row does not grow. */}
               <h3 className="toh-title">{hero.title}</h3>
-              <div className="toh-meta">{hero.source} · {fmtDate(hero.pubDate)}</div>
+              <div className="toh-meta"><TopicTag cat={hero.cat}/> · {hero.source} · {fmtDate(hero.pubDate)}</div>
             </div>
           </article>
           {textHeads.length > 0 && (
@@ -8607,7 +8665,7 @@ function TopOfHourStrip({ catLead, arts, onRead, stories: storiesProp }) {
               {textHeads.map((a, i) => (
                 <button key={i} className="toh-text-row" onClick={() => onRead(a)}>
                   <span className="toh-text-title">{a.title}</span>
-                  <span className="toh-text-meta">{a.source} · {fmtDate(a.pubDate)}</span>
+                  <span className="toh-text-meta"><TopicTag cat={a.cat}/> · {a.source} · {fmtDate(a.pubDate)}</span>
                 </button>
               ))}
             </div>
@@ -8619,9 +8677,8 @@ function TopOfHourStrip({ catLead, arts, onRead, stories: storiesProp }) {
               <button key={i} className="toh-compact-row" onClick={() => onRead(a)}>
                 {a.img && <img className="toh-compact-thumb" src={a.img} loading="lazy" decoding="async" alt="" onError={e => { e.currentTarget.style.visibility = 'hidden'; }}/>}
                 <span className="toh-compact-body">
-                  <span className="toh-compact-cat" style={{ color: catBadge(a).color }}>{catBadge(a).label}</span>
                   <span className="toh-compact-title">{a.title}</span>
-                  <span className="toh-compact-meta">{a.source} · {fmtDate(a.pubDate)}</span>
+                  <span className="toh-compact-meta"><TopicTag cat={a.cat}/> · {a.source} · {fmtDate(a.pubDate)}</span>
                 </span>
               </button>
             ))}
@@ -8908,18 +8965,26 @@ function FeedPage({ cat, ctx }) {
         // different links but the same title, so a link-only guard let the hero reappear as
         // a text/compact row below it. storyKey matches what every downstream module dedupes on.
         const used = new Set(catLead ? [storyKey(catLead)] : []);
-        const catOrder = ['sports','business','finance','bloom','popculture','general','tech'];
-        for (const c of catOrder) {
-          if (picks.length >= 6) break;
-          const item = (arts[c]||[]).find(a => a.img && !used.has(storyKey(a)));
-          if (item) { picks.push({ ...item, cat: item.cat || c }); used.add(storyKey(item)); }
+        // S7: rank the WHOLE cross-category pool by how widely the cluster is covered (distinct
+        // outlets carrying the same title), then recency — and allow at most ONE non-general
+        // category story (only when it is >=2 outlets or breaking). Replaces the old category
+        // round-robin that let a niche single-outlet trade/sports item take a national slot. K4's
+        // per-category balance still governs the SECTIONS below, not these 4-6.
+        const flat = Object.entries(arts).flatMap(([c, list]) => (list || []).map(a => ({ ...a, cat: a.cat || c })));
+        const outletCount = {};
+        for (const a of flat) { const k = storyKey(a); outletCount[k] = (outletCount[k] || 0) + 1; }
+        const byKey = new Map();
+        const pool = [];
+        for (const a of flat) {
+          const k = storyKey(a);
+          if (used.has(k) || isPromoItem(a)) continue;
+          if (!byKey.has(k)) byKey.set(k, a);
+          pool.push({ key: k, cat: a.cat, clusterSize: outletCount[k] || 1, pubDate: a.pubDate, breaking: !!(a.isAlert || a._breaking) });
         }
-        for (const c of catOrder) {
-          if (picks.length >= 6) break;
-          for (const a of (arts[c]||[])) {
-            if (picks.length >= 6) break;
-            if (!used.has(storyKey(a))) { picks.push({ ...a, cat: a.cat || c }); used.add(storyKey(a)); }
-          }
+        const leadNonGen = catLead && (catLead.cat || 'general') !== 'general' ? 1 : 0;
+        for (const k of rankHomeTop(pool, { max: 6 - picks.length, nonGeneralUsed: leadNonGen })) {
+          const it = byKey.get(k);
+          if (it && !used.has(k)) { picks.push({ ...it, cat: it.cat || 'general' }); used.add(k); }
         }
         return picks.slice(0, 6);
       }

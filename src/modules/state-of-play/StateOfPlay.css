@@ -1,17 +1,21 @@
 /* State of Play — co-located styles. Consumes design tokens (src/styles/tokens.css). */
-.sop-strip{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:14px 16px;margin-bottom:22px;}
-.sop-head{display:flex;align-items:baseline;gap:10px;margin-bottom:8px;flex-wrap:wrap;}
+/* S11: the module drops its OWN outer card (CB: avoid box-in-box) — header then a stack of
+   lightly boxed rows directly on the surface. (Other rail modules keep their outer card.) */
+.sop-strip{background:none;border:none;border-radius:0;padding:0;margin-bottom:22px;}
+.sop-head{display:flex;align-items:baseline;gap:10px;margin-bottom:10px;flex-wrap:wrap;}
 .sop-collapse{margin-left:auto;background:none;border:none;cursor:pointer;color:var(--text3);padding:2px 2px 0;display:flex;align-items:center;align-self:center;}
 .sop-collapse:hover{color:var(--text);}
 .sop-label{font-family:var(--font-serif);font-weight:800;font-size:12px;text-transform:uppercase;letter-spacing:0.08em;border-left:3px solid;padding-left:8px;}
 .sop-sub{font-family:var(--font-sans);font-size:12px;color:var(--text3);}
-.sop-list{display:flex;flex-direction:column;}
-.sop-item{display:flex;align-items:center;gap:12px;padding:9px 0;border:none;border-top:1px solid var(--border2);background:none;cursor:pointer;text-align:left;font-family:inherit;width:100%;transition:opacity 0.12s;}
-.sop-item:first-of-type{border-top:none;}
-.sop-item:hover{opacity:0.68;}
-.sop-num{font-family:var(--font-serif);font-weight:800;font-size:15px;min-width:24px;font-variant-numeric:tabular-nums;flex-shrink:0;}
-.sop-item-title{font-family:var(--font-serif);font-weight:700;font-size:var(--fs-subhead);line-height:1.3;color:var(--text);flex:1;min-width:0;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;overflow-wrap:anywhere;word-break:break-word;}
-.sop-item-meta{display:flex;align-items:center;gap:8px;flex-shrink:0;}
+/* S11/S3: ONE row anatomy — every story (ranked, cluster, breaking, gap) is its own lightly
+   boxed row: 1px border, 8px radius, 12px padding, 8px gap between rows. No number column, so
+   every row's title shares the exact same left edge. Headline on line 1, ONE meta line directly
+   under it (<=8px gap, no dead space). */
+.sop-list{display:flex;flex-direction:column;gap:8px;}
+.sop-item{display:flex;flex-direction:column;align-items:stretch;gap:4px;padding:12px;border:1px solid var(--border);border-radius:8px;background:var(--surface);cursor:pointer;text-align:left;font-family:inherit;width:100%;transition:border-color 0.12s,background 0.12s;}
+@media(hover:hover){ .sop-item:hover{border-color:var(--text3);} }
+.sop-item-title{font-family:var(--font-sans);font-weight:500;font-size:var(--fs-body);line-height:1.35;color:var(--text);min-width:0;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden;overflow-wrap:anywhere;word-break:break-word;}
+.sop-item-meta{display:flex;align-items:center;flex-wrap:wrap;gap:6px;}
 .sop-item-sources{font-family:var(--font-sans);font-size:10px;font-weight:700;color:var(--accent);background:var(--surface2);border-radius:10px;padding:2px 8px;white-space:nowrap;}
 .sop-item-time{font-family:var(--font-sans);font-size:var(--fs-meta);color:var(--text3);white-space:nowrap;}
 /* G7f item 4: quiet icon-only Ask — the "Ask" word appears only on hover/focus. */
@@ -22,7 +26,9 @@
 .sop-ask-label{display:none;font-family:var(--font-sans);font-size:var(--fs-eyebrow);font-weight:700;text-transform:uppercase;letter-spacing:0.06em;}
 .sop-ask:hover .sop-ask-label,.sop-ask:focus-visible .sop-ask-label{display:inline;}
 .sop-ask:focus-visible{outline:2px solid var(--accent);outline-offset:2px;}
-@media(max-width:640px){ .sop-ask{min-width:44px;min-height:44px;justify-content:center;} }
+/* S1: keep the Ask box COMPACT on touch; the 44px tap target comes from the ::after hit-area
+   defined in the global M5 block (a 44px layout box here inflated the SoP meta row — the dead gap). */
+@media(max-width:640px){ .sop-ask{justify-content:center;} }
 /* Coverage-gap rows folded into the list: dimmer number + "Not in your sources" tag. */
 .sop-item-gap{text-decoration:none;}
 .sop-num-gap{opacity:0.5;}
@@ -31,13 +37,8 @@
 /* Breaking rows folded in at the top (Pass L item 3): red pulse dot in place of the
    number + a "Breaking" tag, replacing the cramped status-strip marquee. */
 .sop-item-breaking .sop-item-title{font-weight:800;}
-/* F6: stronger live indicator — larger dot, a solid red core and a wider pulse ring. */
-.sop-brk-dot{width:10px;height:10px;min-width:10px;border-radius:50%;background:var(--red);align-self:center;margin:0 8px 0 8px;box-shadow:0 0 0 2px rgba(200,16,46,0.25);animation:sop-brk-pulse 1.6s ease-out infinite;}
-@keyframes sop-brk-pulse{0%{box-shadow:0 0 0 0 rgba(200,16,46,0.6);}70%{box-shadow:0 0 0 8px rgba(200,16,46,0);}100%{box-shadow:0 0 0 0 rgba(200,16,46,0);}}
-/* G7f item 3: plain red "BREAKING" eyebrow — no filled pill (the red dot carries colour). */
+/* S10: the breaking red DOT is removed — the red "BREAKING" word is the only marker. */
 .sop-brk-tag{font-family:var(--font-sans);font-size:var(--fs-eyebrow);font-weight:700;text-transform:uppercase;letter-spacing:0.08em;color:var(--red);background:none;padding:0;white-space:nowrap;}
-.sop-sidebar .sop-brk-dot{margin-left:0;}
-@media(prefers-reduced-motion:reduce){ .sop-brk-dot{animation:none;} }
 @media(max-width:640px){ .sop-strip{padding:12px 14px;} .sop-strip:not(.sop-sidebar) .sop-gap-tag{display:none;} }
 
 /* ── SIDEBAR VARIANT (Pass J item 2) — renders as a consistent sidebar module
@@ -52,20 +53,13 @@
    0.08em tracking. Was weight 800 / --text2 / 0.14em / a hardcoded 10px. */
 .sop-sidebar .sop-label{border-left:none;padding-left:0;font-family:var(--font-sans);font-size:var(--fs-eyebrow);font-weight:700;color:var(--text3);letter-spacing:0.08em;}
 .sop-sidebar .sop-collapse{margin-left:auto;}
-/* P2: one row anatomy — grid [number 24px][content]; the headline on line 1 and ONE meta
-   line directly under it (no wrap, no dead vertical gap). Breaking dot / num sit in column 1. */
-.sop-sidebar .sop-item{display:grid;grid-template-columns:24px 1fr;align-items:start;column-gap:8px;row-gap:2px;padding:9px 0;}
-.sop-sidebar .sop-num{grid-column:1;grid-row:1 / span 2;align-self:start;font-size:var(--fs-body);min-width:0;}
-.sop-sidebar .sop-brk-dot{grid-column:1;grid-row:1;align-self:center;margin:0;}
-/* P3: dense rail rows use the sans at medium weight (serif stays on the lead/hero). */
-.sop-sidebar .sop-item-title{grid-column:2;grid-row:1;font-family:var(--font-sans);font-weight:500;font-size:var(--fs-body);line-height:1.35;-webkit-line-clamp:3;}
-.sop-sidebar .sop-item-meta{grid-column:2;grid-row:2;width:auto;padding-left:0;justify-content:flex-start;gap:6px;flex-wrap:wrap;}
+/* S11: the rail uses the SAME boxed row anatomy as everywhere else (the base .sop-item box).
+   No grid, no number column — just tighter type for the narrow column. */
 .sop-sidebar .sop-item-time{font-size:10px;}
 .sop-sidebar .sop-item-sources{font-size:9px;padding:1px 6px;}
-/* Coverage-gap rows: badge + outlets under the headline; Follow on its own line. */
-.sop-item-gap-stacked{display:flex!important;flex-direction:column;align-items:stretch!important;gap:5px!important;padding:9px 0!important;}
+/* Coverage-gap rows: the headline, then outlets + a quiet Follow menu — inside the same box. */
 .sop-gap-headline{display:flex;gap:8px;align-items:flex-start;}
-.sop-gap-below{display:flex;flex-wrap:wrap;align-items:center;gap:6px;padding-left:26px;}
+.sop-gap-below{display:flex;flex-wrap:wrap;align-items:center;gap:6px;}
 .sop-gap-below .sop-item-time{white-space:normal;}
 .sop-gap-follow{padding-left:26px;display:flex;justify-content:flex-end;}
 

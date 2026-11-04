@@ -23,6 +23,8 @@
 import { useMemo, useState } from 'react';
 import { FollowSourceChip } from '../follow-source';
 import { selectStateOfPlay } from './select';
+import { cleanSourceName } from '../source-name';
+import { TopicTag } from '../topic-tag';
 import './StateOfPlay.css';
 
 const defaultFormatDate = d => { try { return new Date(d).toLocaleString(); } catch { return ''; } };
@@ -40,7 +42,7 @@ function AskBtn({ onAsk, item }) {
   );
 }
 
-export function StateOfPlay({ items, meta = {}, onRead, onAsk, formatDate = defaultFormatDate, collapsed = false, onToggleCollapse, gapItems = [], breakingItems = [], variant = 'strip' }) {
+export function StateOfPlay({ items, meta = {}, onRead, onAsk, formatDate = defaultFormatDate, collapsed = false, onToggleCollapse, gapItems = [], breakingItems = [], variant = 'strip', showTopic = false }) {
   const color = meta.color;
   const label = meta.label || '';
   const sidebar = variant === 'sidebar';
@@ -56,6 +58,10 @@ export function StateOfPlay({ items, meta = {}, onRead, onAsk, formatDate = defa
 
   // Need a real ranked list OR something breaking to hang the module on.
   if (top.length < 3 && !breaking.length) return null;
+  // S13: show the topic token only on a MIXED-category surface (Home). On a single-category page
+  // every row has the same topic, so it would be redundant — auto-detected from the rows' cats
+  // (the explicit prop can still force it on).
+  const topicOn = showTopic || new Set([...breaking, ...top, ...gaps].map(x => x && (x.cat || 'general'))).size > 1;
 
   return (
     <section className={`sop-strip${sidebar ? ' sop-sidebar' : ''}`}>
@@ -80,11 +86,12 @@ export function StateOfPlay({ items, meta = {}, onRead, onAsk, formatDate = defa
           <div key={b.link || `brk-${i}`} className="sop-item sop-item-breaking" role="button" tabIndex={0}
             onClick={() => onRead(b)} onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onRead(b); } }}
             title={b._breakingWhy ? `Breaking — ${b._breakingWhy}` : 'Breaking'}>
-            <span className="sop-brk-dot" aria-hidden="true"/>
             <span className="sop-item-title">{b.title}</span>
             <span className="sop-item-meta">
-              {/* G7f item 3: one breaking signal — plain red "BREAKING" eyebrow (no filled
-                  pill) + the age only. The red dot (left) carries the colour. */}
+              {topicOn && <TopicTag cat={b.cat}/>}
+              {/* S10: the red "BREAKING" word is the ONLY breaking marker — the red dot is gone, so
+                  breaking rows align exactly with every other row. The word carries meaning without
+                  colour (accessible) and stays >=4.5:1 on white. */}
               <span className="sop-brk-tag">Breaking</span>
               <span className="sop-item-time">{formatDate(b.pubDate)}</span>
               {onAsk && <AskBtn onAsk={onAsk} item={b}/>}
@@ -94,9 +101,10 @@ export function StateOfPlay({ items, meta = {}, onRead, onAsk, formatDate = defa
         {top.map((a, i) => (
           <div key={a.link || i} className="sop-item" role="button" tabIndex={0}
             onClick={() => onRead(a)} onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onRead(a); } }}>
-            <span className="sop-num" style={{ color }}>{String(i + 1).padStart(2, '0')}</span>
+            {/* S11: no number — each story is its own boxed row, so every title shares one left edge. */}
             <span className="sop-item-title">{a.title}</span>
             <span className="sop-item-meta">
+              {topicOn && <TopicTag cat={a.cat}/>}
               {a._clusterSize > 1 && <span className="sources-tag sop-item-sources">{a._clusterSize} sources</span>}
               <span className="sop-item-time">{formatDate(a.pubDate)}</span>
               {onAsk && <AskBtn onAsk={onAsk} item={a}/>}
@@ -105,14 +113,15 @@ export function StateOfPlay({ items, meta = {}, onRead, onAsk, formatDate = defa
         ))}
         {gaps.map((g, i) => {
           const outlets = (g.outlets && g.outlets.length ? g.outlets : [g.source]).filter(Boolean);
-          const num = String(top.length + i + 1).padStart(2, '0');
           const n = g.outletCount || outlets.length;
           const key = g.link || `gap-${i}`;
           // K5: no "Not in your sources" pill, no always-visible Follow. Source names +
           // "N sources" only; Follow sits in a quiet ⋯ menu (hover desktop / tap mobile).
-          const srcText = outlets.slice(0, 2).join(', ') + (outlets.length > 2 ? ` +${outlets.length - 2}` : '');
+          // S3: never render a raw ALL-CAPS hostname (e.g. WWW.CHEMENGONLINE.COM) — normalize.
+          const srcText = outlets.slice(0, 2).map(cleanSourceName).join(', ') + (outlets.length > 2 ? ` +${outlets.length - 2}` : '');
           const meta = (
             <span className="sop-item-meta">
+              {topicOn && <TopicTag cat={g.cat}/>}
               {n > 1 && <span className="sources-tag sop-item-sources">{n} sources</span>}
               {srcText && <span className="sop-item-time">{srcText}</span>}
               {outlets[0] && (
@@ -129,18 +138,14 @@ export function StateOfPlay({ items, meta = {}, onRead, onAsk, formatDate = defa
           );
           if (sidebar) {
             return (
-              <a key={key} className="sop-item sop-item-gap sop-item-gap-stacked" href={g.link} target="_blank" rel="noreferrer">
-                <div className="sop-gap-headline">
-                  <span className="sop-num sop-num-gap">{num}</span>
-                  <span className="sop-item-title">{g.title}</span>
-                </div>
+              <a key={key} className="sop-item sop-item-gap" href={g.link} target="_blank" rel="noreferrer">
+                <span className="sop-item-title">{g.title}</span>
                 <div className="sop-gap-below">{meta}</div>
               </a>
             );
           }
           return (
             <a key={key} className="sop-item sop-item-gap" href={g.link} target="_blank" rel="noreferrer">
-              <span className="sop-num sop-num-gap">{num}</span>
               <span className="sop-item-title">{g.title}</span>
               {meta}
             </a>
