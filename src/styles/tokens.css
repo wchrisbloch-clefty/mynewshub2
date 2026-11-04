@@ -43,6 +43,20 @@
   --navy:#0d1b2e;--navy-light:#1d2d4a;
   /* Market direction (identical in both themes by design) */
   --pos:#0f9d58;--neg:#d02f2f;
+  /* P1: category colour system (muted slate/earth, harmonised with the navy brand). Two uses
+     ONLY — --cat-X-text for eyebrow/label text (>=4.5:1 on --surface), --cat-X-bar for 3px
+     stripes/ticks (>=3:1). Never on body text, buttons or backgrounds. No two neighbours alike.
+     Named by category key so a component can do var(--cat-<cat>-text). Light values: */
+  --cat-general-text:#4d5f70;--cat-general-bar:#5a7084;
+  --cat-business-text:#6e5540;--cat-business-bar:#8a6a4c;
+  --cat-finance-text:#2f6a55;--cat-finance-bar:#3c8068;
+  --cat-bloom-text:#8a5712;--cat-bloom-bar:#a66a1c;
+  --cat-tech-text:#585086;--cat-tech-bar:#6a62a0;
+  --cat-sports-text:#8a4634;--cat-sports-bar:#a85a44;
+  --cat-health-text:#45683f;--cat-health-bar:#54804c;
+  --cat-popculture-text:#7a456b;--cat-popculture-bar:#96588a;
+  --cat-comedy-text:#6b5f1f;--cat-comedy-bar:#857734;
+  --cat-local-text:#2f6a6a;--cat-local-bar:#3c8686;
 
   /* I0.5: ONE consistent missing-image placeholder — a neutral surface field with
      the source name in the brand accent. --ph-ink on --ph-field is 6.8:1 (light)
@@ -112,6 +126,17 @@
   --amber:#f0b429;
   --navy:#0a121e;--navy-light:#0f1a2a;
   --pos:#3ecf8e;--neg:#f0533f;
+  /* P1 dark: lighter muted versions (text >=4.5:1 on dark --surface, bar >=3:1). */
+  --cat-general-text:#9fb3c6;--cat-general-bar:#7f99af;
+  --cat-business-text:#c6a98d;--cat-business-bar:#a98a6a;
+  --cat-finance-text:#84c3a6;--cat-finance-bar:#5fae8d;
+  --cat-bloom-text:#d6a85f;--cat-bloom-bar:#c0923f;
+  --cat-tech-text:#a9a0d4;--cat-tech-bar:#8a82c0;
+  --cat-sports-text:#d69a84;--cat-sports-bar:#c07a60;
+  --cat-health-text:#96c08c;--cat-health-bar:#76a86a;
+  --cat-popculture-text:#c99bbb;--cat-popculture-bar:#b47aa6;
+  --cat-comedy-text:#c7b95f;--cat-comedy-bar:#a89a4a;
+  --cat-local-text:#74c2c2;--cat-local-bar:#5faeae;
 
   --shadow-sm:0 1px 3px rgba(0,0,0,0.5);
   --shadow-md:0 4px 18px rgba(0,0,0,0.55);
