@@ -9363,7 +9363,7 @@ function FeedPage({ cat, ctx }) {
                   )}
                   {!activeKw && !activeSrc && !search && (
                     <div className="sop-mobile">
-                      <StateOfPlay variant="sidebar" items={sopTopItems} gapItems={gapItems} breakingItems={catBreaking}
+                      <StateOfPlay variant="sidebar" items={sopTopItems} gapItems={gapItems} breakingItems={catBreaking} maxRows={3}
                         meta={CATS[cat]||CATS.general} onRead={onRead} onAsk={setChatContext} formatDate={fmtDate}
                         collapsed={sopCollapsed} onToggleCollapse={toggleSop}/>
                     </div>

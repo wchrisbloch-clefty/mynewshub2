@@ -456,7 +456,7 @@ export function SportsPage({ ctx }) {
                 stacks) is hidden <=1100 via CSS. CB: State of Play is the draw on Sports. */}
             {(sportTab === 'all' || activeTeam) && !activeSrc && !search && sopHasRows && (
               <div className="sports-sop-hoist">
-                <StateOfPlay variant="sidebar" items={sopRailItems} meta={CATS.sports}
+                <StateOfPlay variant="sidebar" items={sopRailItems} meta={CATS.sports} maxRows={3}
                   onRead={onRead} onAsk={setChatContext} formatDate={fmtDate}
                   collapsed={sopCollapsed} onToggleCollapse={toggleSop}/>
               </div>
