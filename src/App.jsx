@@ -1891,18 +1891,31 @@ body:not(.dark) .pill-bar{
 }
 .nav-tabs::-webkit-scrollbar{display:none;}
 .nav-tab{
+  position:relative;z-index:0;display:inline-flex;align-items:center;
   background:transparent;border:none;color:var(--text3);
   padding:0 11px;height:54px;cursor:pointer; /* F7: tighter tab spacing (was 0 14px) */
   font-family:var(--font-sans);font-size:12px;font-weight:700;
   white-space:nowrap;border-bottom:3px solid transparent;
-  transition:color 0.12s,border-color 0.12s;letter-spacing:0.03em;
+  transition:color 0.12s;letter-spacing:0.03em;
   text-transform:uppercase;
 }
-/* F7: ONE accent for the active section, made decisive — accent ink, heavier weight and
-   a full-weight 3px underline. Identity is the label + the single accent, never a colour
-   per tab. */
-.nav-tab.active{color:var(--accent);border-bottom-color:var(--accent);font-weight:800;}
-.nav-tab:hover:not(.active){color:var(--text2);}
+/* P4: the active section is a filled brand-navy rounded pill with its tuned on-accent ink
+   (white in light, dark ink in dark — both >=4.5:1 by G1), not an underline. The pill is drawn
+   by a ::before inset inside the 54px tab so the row height and tab width are unchanged; z-index
+   keeps the label above the fill. Replaces the F7 accent-ink + 3px underline treatment. */
+.nav-tab.active{color:var(--on-accent);border-bottom-color:transparent;font-weight:800;}
+.nav-tab.active::before{content:'';position:absolute;inset:11px 2px;border-radius:999px;background:var(--accent);z-index:-1;}
+/* Hover only on real pointers (P4) — a quiet pill tint, never on touch where it would stick. */
+@media(hover:hover){
+  .nav-tab:hover:not(.active){color:var(--text);}
+  .nav-tab:hover:not(.active)::before{content:'';position:absolute;inset:11px 2px;border-radius:999px;background:var(--surface2);z-index:-1;}
+}
+/* P4: a thin vertical divider separates the primary category tabs from the secondary
+   destinations grouped under More (Sources / Saved / overflow). Nav tabs are hidden below
+   641px, so this only shows on the >=641 desktop/tablet nav. */
+@media(min-width:641px){
+  .nav-more::before{content:'';align-self:center;flex-shrink:0;width:1px;height:20px;background:var(--border);margin:0 10px 0 6px;}
+}
 .nav-right{display:flex;gap:8px;align-items:center;flex-shrink:0;padding-left:16px;border-left:1px solid var(--border);}
 /* D1: priority-overflow nav. The visible row is flex (no scroll); the hidden
    measuring row holds the full set at natural width for the fit calculation. */
