@@ -62,6 +62,7 @@ import { XPulse } from './modules/x-pulse';
 import { StateOfPlay, selectStateOfPlay } from './modules/state-of-play';
 import { rankHomeTop } from './modules/top-stories/select';
 import { TopicTag } from './modules/topic-tag';
+import { cleanSourceName } from './modules/source-name';
 import { SnapshotCard, CoverageList } from './modules/snapshot-card';
 import { MobileHome } from './modules/mobile-home';
 import { FollowSourceContext, FollowSourceChip } from './modules/follow-source';
@@ -79,6 +80,7 @@ const SourcesPage = lazy(() => import('./modules/sources/SourcesPage').then(m =>
 const CustomizePanel = lazy(() => import('./modules/customize/CustomizePanel').then(m => ({ default: m.CustomizePanel })));
 const BriefingPage = lazy(() => import('./modules/briefing/BriefingPage').then(m => ({ default: m.BriefingPage })));
 const SportsPage = lazy(() => import('./modules/sports/SportsPage').then(m => ({ default: m.SportsPage })));
+const StateOfPlayPage = lazy(() => import('./modules/state-of-play-page/StateOfPlayPage').then(m => ({ default: m.StateOfPlayPage })));
 const PAGE_IMPORTERS = { podcasts: () => import('./modules/podcasts/PodcastsPage'), sources: () => import('./modules/sources/SourcesPage'), briefing: () => import('./modules/briefing/BriefingPage'), sports: () => import('./modules/sports/SportsPage') };
 export const prefetchPage = (name) => { const f = PAGE_IMPORTERS[name]; if (f) f(); };
 const prefetchCustomize = () => import('./modules/customize/CustomizePanel');
@@ -7466,6 +7468,13 @@ function MenuSheet({ tab, onTabChange, onClose, onCustomize, onRefresh, dark, se
           </div>
         )}
         <div className="menu-sheet-head">More sections</div>
+        {/* T3: entry into the full single-column State of Play view (no new bottom-bar tab). */}
+        <button className={`menu-sheet-item ${tab==='stateofplay'?'active':''}`}
+          onClick={() => { onTabChange('stateofplay'); onClose(); }}>
+          <span className="menu-sheet-item-emoji">◆</span>
+          <span className="menu-sheet-item-label">State of Play</span>
+          <span className="menu-sheet-item-chevron">›</span>
+        </button>
         {items.map(it => (
           <button key={it.key}
             className={`menu-sheet-item ${tab===it.key?'active':''}`}
@@ -9364,6 +9373,7 @@ function FeedPage({ cat, ctx }) {
                   {!activeKw && !activeSrc && !search && (
                     <div className="sop-mobile">
                       <StateOfPlay variant="sidebar" items={sopTopItems} gapItems={gapItems} breakingItems={catBreaking} maxRows={3}
+                        onOpenFull={() => handleTabChange('stateofplay')}
                         meta={CATS[cat]||CATS.general} onRead={onRead} onAsk={setChatContext} formatDate={fmtDate}
                         collapsed={sopCollapsed} onToggleCollapse={toggleSop}/>
                     </div>
@@ -10795,6 +10805,15 @@ export default function App() {
                 </Suspense>
               )}
               {tab==='saved'&&<SavedPage/>}
+              {tab==='stateofplay'&&(
+                <Suspense fallback={<SourcesSkeleton/>}>
+                  <StateOfPlayPage ctx={{
+                    arts, breakingItems, kw, health, onRead, setChatContext, fmtDate, setSearch,
+                    isTopicFollowed, toggleTopic, isPromoItem, storyKey, CATS,
+                    TrendingPills, PredictionMarkets, cleanSourceName,
+                  }}/>
+                </Suspense>
+              )}
             </>
           );
         })()}

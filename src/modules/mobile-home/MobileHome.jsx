@@ -270,6 +270,7 @@ export function MobileHome({ ctx }) {
         <section className="mh-section mh-sop">
           {committed && (model.sopPool || []).length >= 3
             ? <StateOfPlay variant="sidebar" items={model.sopPool} showTopic maxRows={3}
+                onOpenFull={() => navigate('stateofplay')}
                 meta={sopMeta} onRead={onRead} onAsk={setChatContext} formatDate={fmtDate}/>
             : <SectionSkeleton rows={3} label="State of Play"/>}
         </section>

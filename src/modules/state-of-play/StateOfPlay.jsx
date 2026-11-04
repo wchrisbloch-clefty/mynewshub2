@@ -42,7 +42,7 @@ function AskBtn({ onAsk, item }) {
   );
 }
 
-export function StateOfPlay({ items, meta = {}, onRead, onAsk, formatDate = defaultFormatDate, collapsed = false, onToggleCollapse, gapItems = [], breakingItems = [], variant = 'strip', showTopic = false, maxRows = 0 }) {
+export function StateOfPlay({ items, meta = {}, onRead, onAsk, formatDate = defaultFormatDate, collapsed = false, onToggleCollapse, gapItems = [], breakingItems = [], variant = 'strip', showTopic = false, maxRows = 0, onOpenFull }) {
   const color = meta.color;
   const label = meta.label || '';
   const sidebar = variant === 'sidebar';
@@ -157,10 +157,18 @@ export function StateOfPlay({ items, meta = {}, onRead, onAsk, formatDate = defa
           );
         })}
       </div>
-      {maxRows > 0 && totalRows > maxRows && !collapsed && (
-        <button className="sop-showall" type="button" aria-expanded={expanded} onClick={() => setExpanded(v => !v)}>
-          {expanded ? 'Show less' : `Show all ${totalRows}`}
-        </button>
+      {!collapsed && (maxRows > 0 && totalRows > maxRows || onOpenFull) && (
+        <div className="sop-foot-actions">
+          {maxRows > 0 && totalRows > maxRows && (
+            <button className="sop-showall" type="button" aria-expanded={expanded} onClick={() => setExpanded(v => !v)}>
+              {expanded ? 'Show less' : `Show all ${totalRows}`}
+            </button>
+          )}
+          {/* T3: a second affordance opens the full single-column State of Play page. */}
+          {onOpenFull && (
+            <button className="sop-fullview" type="button" onClick={onOpenFull}>Open full view →</button>
+          )}
+        </div>
       )}
     </section>
   );

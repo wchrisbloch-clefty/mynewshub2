@@ -457,6 +457,7 @@ export function SportsPage({ ctx }) {
             {(sportTab === 'all' || activeTeam) && !activeSrc && !search && sopHasRows && (
               <div className="sports-sop-hoist">
                 <StateOfPlay variant="sidebar" items={sopRailItems} meta={CATS.sports} maxRows={3}
+                  onOpenFull={() => navigate('stateofplay')}
                   onRead={onRead} onAsk={setChatContext} formatDate={fmtDate}
                   collapsed={sopCollapsed} onToggleCollapse={toggleSop}/>
               </div>
