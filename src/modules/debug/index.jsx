@@ -203,7 +203,7 @@ function DebugOverlayInner() {
           on the button only (the overlay itself stays click-through). */}
       <button onClick={copyReport} style={{
         pointerEvents: 'auto', marginTop: 6, width: '100%', cursor: 'pointer',
-        background: copied ? 'rgba(0,160,0,0.9)' : 'rgba(0,70,40,0.9)', color: '#0f0', border: '1px solid #0f0',
+        background: copied ? 'rgba(0,160,0,0.9)' : 'rgba(0,70,40,0.9)', color: 'inherit', border: '1px solid currentColor',
         borderRadius: 5, font: 'inherit', fontWeight: 700, padding: '5px 8px',
       }}>{copied ? '✓ copied — paste to Claude' : 'Copy report'}</button>
     </div>
