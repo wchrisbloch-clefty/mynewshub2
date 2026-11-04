@@ -2224,6 +2224,9 @@ body:not(.dark) .pill-bar{
 /* F6: tagline shown once under the collapsible header; muted, out of the way. */
 .pm-tagline{font-family:var(--font-sans);font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:0.04em;color:var(--text4);margin:-2px 0 8px;}
 .pm-empty{font-family:var(--font-sans);font-size:var(--fs-meta);color:var(--text3);padding:4px 0 2px;}
+/* N7b: reserved loading skeleton — ~4 market rows, so expanding the module doesn't shove the rail. */
+.pm-skel-row{height:50px;border-top:1px solid var(--border2);}
+.pm-skel-row:first-child{border-top:none;}
 .pm-list{display:flex;flex-direction:column;}
 .pm-row{display:flex;align-items:flex-start;gap:10px;padding:9px 0;border-top:1px solid var(--border2);text-decoration:none;}
 .pm-row:first-of-type{border-top:none;}
@@ -6813,7 +6816,9 @@ function PredictionMarkets({ keywords }) {
       {open && (
         <>
           <div className="pm-tagline">market sentiment · not news</div>
-          {loading && <div className="pm-empty">Loading markets…</div>}
+          {/* N7b: a fixed-height skeleton while the (expanded) module loads, so the swap to the
+              real list doesn't grow the module and shove the rail sections beneath it. */}
+          {loading && <div className="pm-skel" aria-hidden="true">{[0,1,2,3].map(i => <div key={i} className="pm-skel-row"/>)}</div>}
           {!loading && markets && markets.length === 0 && <div className="pm-empty">No active markets right now.</div>}
           {!loading && markets && markets.length > 0 && (
             <div className="pm-list">
