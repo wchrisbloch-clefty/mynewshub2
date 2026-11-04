@@ -80,11 +80,11 @@ export function StateOfPlay({ items, meta = {}, onRead, onAsk, formatDate = defa
           <div key={b.link || `brk-${i}`} className="sop-item sop-item-breaking" role="button" tabIndex={0}
             onClick={() => onRead(b)} onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onRead(b); } }}
             title={b._breakingWhy ? `Breaking — ${b._breakingWhy}` : 'Breaking'}>
-            <span className="sop-brk-dot" aria-hidden="true"/>
             <span className="sop-item-title">{b.title}</span>
             <span className="sop-item-meta">
-              {/* G7f item 3: one breaking signal — plain red "BREAKING" eyebrow (no filled
-                  pill) + the age only. The red dot (left) carries the colour. */}
+              {/* S10: the red "BREAKING" word is the ONLY breaking marker — the red dot is gone, so
+                  breaking rows align exactly with every other row. The word carries meaning without
+                  colour (accessible) and stays >=4.5:1 on white. */}
               <span className="sop-brk-tag">Breaking</span>
               <span className="sop-item-time">{formatDate(b.pubDate)}</span>
               {onAsk && <AskBtn onAsk={onAsk} item={b}/>}
