@@ -92,15 +92,20 @@ import { isCloudSyncEnabled, hasCloudSession, getUserId, signInWithEmail, signOu
 // One brand accent across all sections — hierarchy comes from type, not colour-coded
 // boxes (editorial-premium, FT/NBC). Section identity is the label text itself.
 const CATS = {
-  general:    { label:'News',         color:'var(--accent)', bg:'var(--accent-bg)', emoji:'' },
-  sports:     { label:'Sports',       color:'var(--accent)', bg:'var(--accent-bg)', emoji:'' },
-  business:   { label:'Business',     color:'var(--accent)', bg:'var(--accent-bg)', emoji:'' },
-  finance:    { label:'Markets',      color:'var(--accent)', bg:'var(--accent-bg)', emoji:'' },
-  bloom:      { label:'Energy',       color:'var(--accent)', bg:'var(--accent-bg)', emoji:'' },
-  tech:       { label:'AI & Tech',    color:'var(--accent)', bg:'var(--accent-bg)', emoji:'' },
-  popculture: { label:'Pop Culture',  color:'var(--accent)', bg:'var(--accent-bg)', emoji:'' },
-  comedy:     { label:'Comedy',       color:'var(--accent)', bg:'var(--accent-bg)', emoji:'' },
-  health:     { label:'Health & Longevity', color:'var(--accent)', bg:'var(--accent-bg)', emoji:'' },
+  // P1/P3: each category carries its own muted identity colour (the --cat-*-text token, >=4.5:1
+  // on surface) instead of the single brand accent. This colours the EXISTING category signals
+  // (source/eyebrow text, the SoP label rule, active trending chips) — no new elements — so the
+  // app reads by category the way the AetherHub look wants. The brand navy --accent stays on the
+  // nav pill, buttons, links and focus rings (those use var(--accent) directly, not cc.color).
+  general:    { label:'News',         color:'var(--cat-general-text)',    bg:'var(--accent-bg)', emoji:'' },
+  sports:     { label:'Sports',       color:'var(--cat-sports-text)',     bg:'var(--accent-bg)', emoji:'' },
+  business:   { label:'Business',     color:'var(--cat-business-text)',   bg:'var(--accent-bg)', emoji:'' },
+  finance:    { label:'Markets',      color:'var(--cat-finance-text)',    bg:'var(--accent-bg)', emoji:'' },
+  bloom:      { label:'Energy',       color:'var(--cat-bloom-text)',      bg:'var(--accent-bg)', emoji:'' },
+  tech:       { label:'AI & Tech',    color:'var(--cat-tech-text)',       bg:'var(--accent-bg)', emoji:'' },
+  popculture: { label:'Pop Culture',  color:'var(--cat-popculture-text)', bg:'var(--accent-bg)', emoji:'' },
+  comedy:     { label:'Comedy',       color:'var(--cat-comedy-text)',     bg:'var(--accent-bg)', emoji:'' },
+  health:     { label:'Health & Longevity', color:'var(--cat-health-text)', bg:'var(--accent-bg)', emoji:'' },
 };
 
 // ── Energy subsector tagging (Pass L item 3) — classify an Energy (bloom) story into
@@ -2077,9 +2082,11 @@ body:not(.dark) .pill-bar{
   overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;}
 .fc-text{flex:1;min-width:0;}
 .fc-title{
-  /* TIME Magazine: Source Serif 4 bold serif headline — the definitive editorial signal */
-  font-family:var(--font-serif);
-  font-size:18px;font-weight:700;color:var(--text);line-height:1.25;
+  /* P3: the standard/compact feed row is a scannable list row, so it takes the sans at medium
+     weight (600). Serif stays on the editorial leads (hero, Top Stories, section leads, the
+     lead card). Same size/line-height/clamp as before, so the row geometry is unchanged. */
+  font-family:var(--font-sans);
+  font-size:18px;font-weight:600;color:var(--text);line-height:1.25;
   letter-spacing:-0.2px;margin-bottom:6px;
   display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden;
   overflow-wrap:break-word;
@@ -2956,6 +2963,8 @@ body:not(.dark) .pill-bar{
 .gn-lead-text{display:flex;flex-direction:column;}
 .gn-lead-title{
   /* Top-Stories-module hero — smaller than the page hero token, per Pass G addendum */
+  /* P3: Top Stories is an editorial lead, so its headline is serif (the dense rows go sans). */
+  font-family:var(--font-serif);
   font-size:20px;font-weight:700;line-height:1.2;
   letter-spacing:-0.3px;color:var(--text);margin:0 0 8px;
   display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden;
@@ -3464,6 +3473,8 @@ body:not(.dark) .pill-bar{
 }
 .sports-hero-text{display:flex;flex-direction:column;justify-content:center;}
 .sports-hero-title{
+  /* P3: the Sports page hero is an editorial lead → serif (dense Sports rows go sans). */
+  font-family:var(--font-serif);
   font-size:26px;font-weight:900;line-height:1.18;
   letter-spacing:-0.5px;color:var(--text);margin:0 0 10px 0;
   display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden;
@@ -4485,7 +4496,7 @@ body{overscroll-behavior-y:contain;}
   .fc-body{flex-direction:row;gap:8px;align-items:flex-start;}
   .fc-thumb,.fc-thumb-ph{width:90px;height:68px;flex-shrink:0;border-radius:6px;}
   .fc-text{flex:1;min-width:0;}
-  .fc-title{font-size:15px;-webkit-line-clamp:3;letter-spacing:0;line-height:1.3;font-weight:700;}
+  .fc-title{font-size:15px;-webkit-line-clamp:3;letter-spacing:0;line-height:1.3;font-weight:600;}
   .fc-desc{display:none;}
   .fc-meta{margin-bottom:5px;order:-1;font-size:10px;}
   .fc-act{padding:6px 10px;font-size:var(--fs-meta);min-height:36px;border-radius:18px;}
