@@ -5000,7 +5000,7 @@ kbd{display:inline-block;padding:1px 5px;border:1px solid var(--border);border-r
 .home-scores-label.is-live::before{content:'●';color:var(--red);font-size:7px;animation:score-pulse 2s ease-in-out infinite;}
 @keyframes score-pulse{0%,100%{opacity:1;}50%{opacity:0.4;}}
 .home-scores-see-all{
-  font-size:10px;font-weight:600;color:var(--text3);
+  font-size:10px;font-weight:600;color:var(--text2);  /* N2: text3 was 4.35:1 on the dark scores band (<4.5); text2 clears it */
   background:none;border:none;cursor:pointer;font-family:inherit;
 }
 .home-scores-see-all:hover{color:var(--accent);}

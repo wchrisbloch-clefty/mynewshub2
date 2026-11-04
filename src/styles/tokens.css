@@ -13,6 +13,7 @@
    Fonts are loaded in index.html (preconnect + display=swap), not via @import. */
 
 :root{
+  color-scheme: light;  /* N2: light by default; the manual dark toggle sets dark below */
   /* Type — TWO families. Serif for headlines, Inter for everything UI/label/data. */
   --font-serif:'Source Serif 4',Georgia,'Times New Roman',serif;
   --font-sans:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,sans-serif;
@@ -90,6 +91,7 @@
   }
 }
 .dark{
+  color-scheme: dark;  /* N2: match native controls/scrollbars to the dark theme */
   /* ── DARK (first-class) — near-black canvas, pearl text (not pure #fff) ── */
   --bg:#0b0b0c;          /* near-black canvas */
   --surface:#141416;     /* raised surface */

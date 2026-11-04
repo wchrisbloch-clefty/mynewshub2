@@ -29,7 +29,9 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Serif+4:opsz,wght@8..60,400;8..60,600;8..60,700;8..60,800&family=Inter:wght@400;500;600;700;800&display=swap" />
     <title>MyNewsHub — Your Daily Briefing</title>
-    <style>* { margin: 0; padding: 0; box-sizing: border-box; }</style>
+    <!-- N2: declare both schemes so the browser paints the correct canvas background BEFORE CSS/JS
+         load (no white flash for dark-system users) and native controls/scrollbars match the theme. -->
+    <style>* { margin: 0; padding: 0; box-sizing: border-box; } html { color-scheme: light dark; }</style>
   </head>
   <body>
     <div id="root"></div>
