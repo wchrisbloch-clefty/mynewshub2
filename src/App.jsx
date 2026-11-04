@@ -171,6 +171,11 @@ const SWIPE_ORDER = ['general','business','bloom','tech','sports','health','popc
 // there. Flip Home back on in one line by adding 'general' here. The bottom bar + chip bar
 // remain the primary way to move; nothing is removed.
 const SWIPE_PAGES = ['business','bloom','tech','sports','health','popculture'];
+// N5: iPad-portrait sectioned Home — experiment behind a single flag, DEFAULT OFF. When true,
+// the phone Home's sectioned surface (<MobileHome/>) also renders at 641–900px (iPad portrait)
+// in place of the desktop FeedPage, and the duplicate header scores band is hidden there. With
+// the flag OFF, every gate below short-circuits to false, so the output is identical to today.
+const IPAD_PORTRAIT_SECTIONS = false;
 
 const TICKERS = [
   { sym:'BE',      label:'Bloom Energy', short:'BLOOM', color:'#60a5fa' }, // I0.9: NYSE:BE — themed pick for the Energy vertical
@@ -931,6 +936,26 @@ function useIsMobile() {
   return isMobile;
 }
 
+// N5: true only when the iPad-portrait-sections flag is ON and the viewport is 641–900px.
+// When the flag is OFF it is a constant false and wires up no listener (zero behavior change).
+function useIpadPortraitSections() {
+  const q = '(min-width: 641px) and (max-width: 900px)';
+  const [on, setOn] = useState(() =>
+    IPAD_PORTRAIT_SECTIONS && typeof window !== 'undefined' && window.matchMedia(q).matches);
+  useEffect(() => {
+    if (!IPAD_PORTRAIT_SECTIONS || typeof window === 'undefined') return;
+    const mq = window.matchMedia(q);
+    const handler = e => setOn(e.matches);
+    if (mq.addEventListener) mq.addEventListener('change', handler);
+    else mq.addListener(handler);
+    return () => {
+      if (mq.removeEventListener) mq.removeEventListener('change', handler);
+      else mq.removeListener(handler);
+    };
+  }, []);
+  return on;
+}
+
 // J2: useScrollDirection removed — the header shrink/hide is now a ref-based class
 // toggle inside TopBar (no React state, so scrolling re-renders nothing).
 
@@ -1509,7 +1534,11 @@ body{
 /* Home weather stacked under the ticker: full-bleed bar, content contained to the
    same max-width, flush (no card chrome). */
 .topbar-wx{background:var(--surface);border-bottom:1px solid var(--border2);}
-.topbar-wx-reserve{min-height:49px;}  /* R2: matches the loaded weather band so it swaps in without a shift */
+/* N7c: reserve the EXACT loaded weather-band height per breakpoint — it wraps to ~45px on phones
+   but is a single 26px row at 641–899px, so the old flat 49px reserve over-reserved at tablet
+   widths and the band shrank ~23px when weather arrived (the 820 header shove). */
+.topbar-wx-reserve{min-height:45px;}
+@media(min-width:641px){ .topbar-wx-reserve{min-height:26px;} }
 .topbar-wx .rnw-card{max-width:1400px;margin:0 auto;padding:0 var(--s4);border:none;border-radius:0;background:none;}
 /* Scoreboard band in the top bar (below weather, above nav — Pass G item 3).
    Dark ESPN theme so the homepage strip matches the Sports-page strip (item 6). */
@@ -1519,12 +1548,15 @@ body{
    null until games load). Reserve its height from first paint so the async scores bar never
    grows the scroll-away header and shoves the page (desktop/iPad CLS). Hidden at <=640 (the
    phone Home shows scores in its own body), so this only reserves on desktop/iPad Home. */
-.topbar-scores{min-height:90px;}
+.topbar-scores{min-height:97px;}  /* N7c: match the loaded scores-bar height (was 90 → shoved the header ~7px when scores arrived); header height now identical before/after data */
 /* M1: on the phone Home the live-scores strip moves into the sectioned body
    (ActiveScoresBar in <MobileHome/>), so hide the header copy at <=640 to avoid showing
    it twice. The header strip only ever renders on General, so this is Home-only; desktop
    and mobile category pages are unaffected. */
 @media(max-width:640px){ .topbar-scores{display:none;} }
+/* N5: when the iPad-portrait-sections flag is on, MobileHome shows scores in its own body, so
+   hide the header copy there too (avoids showing scores twice). Inert while the flag is off. */
+.hub.ipad-sections .topbar-scores{display:none;}
 /* L1: scores now scroll away in .header-scroll (not hidden on shrink). */
 /* Right-edge fade cue: partial cards read as "scroll for more," not a cutoff. */
 .topbar-scores .home-scores,.sports-score-strip{position:relative;}
@@ -2220,6 +2252,9 @@ body:not(.dark) .pill-bar{
 /* F6: tagline shown once under the collapsible header; muted, out of the way. */
 .pm-tagline{font-family:var(--font-sans);font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:0.04em;color:var(--text4);margin:-2px 0 8px;}
 .pm-empty{font-family:var(--font-sans);font-size:var(--fs-meta);color:var(--text3);padding:4px 0 2px;}
+/* N7b: reserved loading skeleton — ~4 market rows, so expanding the module doesn't shove the rail. */
+.pm-skel-row{height:50px;border-top:1px solid var(--border2);}
+.pm-skel-row:first-child{border-top:none;}
 .pm-list{display:flex;flex-direction:column;}
 .pm-row{display:flex;align-items:flex-start;gap:10px;padding:9px 0;border-top:1px solid var(--border2);text-decoration:none;}
 .pm-row:first-of-type{border-top:none;}
@@ -4965,7 +5000,7 @@ kbd{display:inline-block;padding:1px 5px;border:1px solid var(--border);border-r
 .home-scores-label.is-live::before{content:'●';color:var(--red);font-size:7px;animation:score-pulse 2s ease-in-out infinite;}
 @keyframes score-pulse{0%,100%{opacity:1;}50%{opacity:0.4;}}
 .home-scores-see-all{
-  font-size:10px;font-weight:600;color:var(--text3);
+  font-size:10px;font-weight:600;color:var(--text2);  /* N2: text3 was 4.35:1 on the dark scores band (<4.5); text2 clears it */
   background:none;border:none;cursor:pointer;font-family:inherit;
 }
 .home-scores-see-all:hover{color:var(--accent);}
@@ -5755,6 +5790,15 @@ kbd{display:inline-block;padding:1px 5px;border:1px solid var(--border);border-r
 @media (max-width:640px), (hover:none){
   .snap-ask,.snap-save{min-width:44px;min-height:44px;justify-content:center;}
   .mobile-icon-btn{min-width:44px;min-height:44px;}
+  /* N1: controls that measured <44px on touch tablets/landscape (the phone-only rules didn't
+     reach them). Desktop mouse (hover:hover) is unaffected. The market ticker (.ss-tk) is exempt —
+     it lives in the 30px status strip and can't grow without a header redesign (deferred). */
+  .nav-icon-btn{width:44px;height:44px;}
+  .fc-read-link{min-height:44px;}
+  .fc-act{min-height:44px;}
+  .fc-ellipsis-btn{min-width:44px;}
+  .teams-shelf-edit{min-height:44px;display:inline-flex;align-items:center;}
+  .rnw-row{min-height:44px;}
   .home-scores-see-all{min-height:44px;display:inline-flex;align-items:center;}
   .src-footer-link{min-height:44px;display:inline-flex;align-items:center;}
   .social-handle{min-height:44px;min-width:44px;display:inline-flex;align-items:center;justify-content:center;}
@@ -6800,7 +6844,9 @@ function PredictionMarkets({ keywords }) {
       {open && (
         <>
           <div className="pm-tagline">market sentiment · not news</div>
-          {loading && <div className="pm-empty">Loading markets…</div>}
+          {/* N7b: a fixed-height skeleton while the (expanded) module loads, so the swap to the
+              real list doesn't grow the module and shove the rail sections beneath it. */}
+          {loading && <div className="pm-skel" aria-hidden="true">{[0,1,2,3].map(i => <div key={i} className="pm-skel-row"/>)}</div>}
           {!loading && markets && markets.length === 0 && <div className="pm-empty">No active markets right now.</div>}
           {!loading && markets && markets.length > 0 && (
             <div className="pm-list">
@@ -9227,8 +9273,13 @@ function FeedPage({ cat, ctx }) {
               </div>
             )}
 
-            {/* v20: Topics chips mirrored at bottom of feed — mid-scroll filter access */}
-            {catKws.length > 0 && !activeKw && (
+            {/* v20: Topics chips mirrored at bottom of feed — mid-scroll filter access.
+                N7a: render only AFTER the feed has committed (not during the skeleton→content
+                swap). The loading skeleton is sized for a full first screen but the first real
+                batch is often shorter, so the feed column shrinks on swap; rendering the chips
+                before that settles let them ride the shrink and shift. (They sit at the feed
+                tail, so waiting costs nothing the reader sees.) */}
+            {catKws.length > 0 && !activeKw && !isLoading && (
               <div className="bottom-topics">
                 <div className="bottom-topics-label">Filter by topic</div>
                 <div className="bottom-topics-chips">
@@ -9593,6 +9644,7 @@ export default function App() {
   const [lastUpdated, setLastUpdated]   = useState({}); // per-cat timestamp
   const [lastFeedTab, setLastFeedTab]   = useState('general');
   const isMobile                        = useIsMobile();
+  const ipadSections                    = useIpadPortraitSections();  // N5: flag-gated, default false
   // J2: the smart-sticky header (shrink >60px / hide on mobile scroll-down) moved INTO
   // TopBar, where it toggles classes on the header element via a ref — no App state, so
   // scrolling no longer re-renders App (and so no longer remounts the page).
@@ -10450,7 +10502,7 @@ export default function App() {
     <>
       <style>{GLOBAL_CSS}</style>
       <FollowSourceContext.Provider value={{ isSourceFollowed, followSource }}>
-      <div className={`hub${dark?' dark':''}`}>
+      <div className={`hub${dark?' dark':''}${ipadSections?' ipad-sections':''}`}>
         <TopBar tab={tab} setTab={handleTabChange} search={search} setSearch={setSearch}
           dark={dark} setDark={setDark}
           onCustomize={()=>openCustomize('keywords','general')} onRefresh={refreshAll}
@@ -10516,7 +10568,7 @@ export default function App() {
               }}/></Suspense>}
               {/* M1: the phone Home is a dedicated sectioned surface. Desktop/iPad (and any
                   active filter/search) keep the existing FeedPage render unchanged. */}
-              {tab==='general' && isMobile && !search && !activeKw && !activeSrc
+              {tab==='general' && (isMobile || ipadSections) && !search && !activeKw && !activeSrc
                 ? <MobileHome ctx={{
                     arts, breakingItems, loadCat, loading, lastUpdated, onRead, onSave, isSavedFn,
                     setChatContext, navigate, openCustomize, feeds, feedHealth,
