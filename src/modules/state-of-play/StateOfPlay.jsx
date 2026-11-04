@@ -42,7 +42,7 @@ function AskBtn({ onAsk, item }) {
   );
 }
 
-export function StateOfPlay({ items, meta = {}, onRead, onAsk, formatDate = defaultFormatDate, collapsed = false, onToggleCollapse, gapItems = [], breakingItems = [], variant = 'strip', showTopic = false }) {
+export function StateOfPlay({ items, meta = {}, onRead, onAsk, formatDate = defaultFormatDate, collapsed = false, onToggleCollapse, gapItems = [], breakingItems = [], variant = 'strip', showTopic = false, maxRows = 0, onOpenFull }) {
   const color = meta.color;
   const label = meta.label || '';
   const sidebar = variant === 'sidebar';
@@ -55,9 +55,14 @@ export function StateOfPlay({ items, meta = {}, onRead, onAsk, formatDate = defa
   // K5: the follow action for a coverage-gap row lives behind a quiet per-row menu
   // (hover on desktop, tap the ⋯ on mobile) instead of an always-visible "+ Follow" pill.
   const [openMenu, setOpenMenu] = useState(null);
+  // T2: collapsed by default to `maxRows` boxed rows + a "Show all N" control that expands IN PLACE
+  // (grows downward only — nothing above moves). No new fetch; collapsed on every load.
+  const [expanded, setExpanded] = useState(false);
 
   // Need a real ranked list OR something breaking to hang the module on.
   if (top.length < 3 && !breaking.length) return null;
+  const totalRows = breaking.length + top.length + gaps.length;
+  const limited = maxRows > 0 && totalRows > maxRows && !expanded;
   // S13: show the topic token only on a MIXED-category surface (Home). On a single-category page
   // every row has the same topic, so it would be redundant — auto-detected from the rows' cats
   // (the explicit prop can still force it on).
@@ -81,7 +86,7 @@ export function StateOfPlay({ items, meta = {}, onRead, onAsk, formatDate = defa
           </button>
         )}
       </div>
-      <div className="sop-list" style={collapsed ? { display: 'none' } : undefined}>
+      <div className={`sop-list${limited ? ' sop-limited' : ''}`} style={collapsed ? { display: 'none' } : { overflowAnchor: 'none' }}>
         {breaking.map((b, i) => (
           <div key={b.link || `brk-${i}`} className="sop-item sop-item-breaking" role="button" tabIndex={0}
             onClick={() => onRead(b)} onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onRead(b); } }}
@@ -152,6 +157,19 @@ export function StateOfPlay({ items, meta = {}, onRead, onAsk, formatDate = defa
           );
         })}
       </div>
+      {!collapsed && (maxRows > 0 && totalRows > maxRows || onOpenFull) && (
+        <div className="sop-foot-actions">
+          {maxRows > 0 && totalRows > maxRows && (
+            <button className="sop-showall" type="button" aria-expanded={expanded} onClick={() => setExpanded(v => !v)}>
+              {expanded ? 'Show less' : `Show all ${totalRows}`}
+            </button>
+          )}
+          {/* T3: a second affordance opens the full single-column State of Play page. */}
+          {onOpenFull && (
+            <button className="sop-fullview" type="button" onClick={onOpenFull}>Open full view →</button>
+          )}
+        </div>
+      )}
     </section>
   );
 }

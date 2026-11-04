@@ -107,3 +107,21 @@ Safari is **NEEDS-DEVICE**. Open with `?debug=1`.
 33. **Crisp white + topic labels (S12/S13).** Light mode is white with hairline dividers; every
     Home headline carries its topic (ENERGY / SPORTS / …) in its colour at the head of the meta
     line. Dark mode looks exactly as before.
+
+---
+
+## Batch T — finish "State of Play up front"
+
+Chromium touch emulation; real iPad/iPhone Safari = NEEDS-DEVICE. Open with `?debug=1`.
+
+34. **Breaking strip under the Home lead (T1).** When there's breaking news, up to 3 one-line rows
+    sit right under the lead (red BREAKING + headline + age); tapping a row opens the story; the
+    same stories don't repeat in the State of Play card below.
+35. **"Show all" on the State of Play card (T2).** The card shows 3 rows; "Show all N" expands the
+    rest in place (nothing above moves); it's collapsed again next time you open Home.
+36. **Full State of Play view (T3).** "Open full view" on the card, or "State of Play" in the More
+    sheet, opens a single-column page with State of Play, Connections, Trending, Prediction Markets
+    and Sources; browser Back returns you to where you were.
+37. **State of Play is populated on Sports (T4).** On the Sports page (and Energy/Business/Health),
+    the State of Play card near the top shows real rows (not an empty box) and never repeats a story
+    that's also in the lead/grid/list.

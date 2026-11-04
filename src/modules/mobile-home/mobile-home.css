@@ -41,10 +41,12 @@
 /* Top stories — always present once General loads; reserve 4 compact rows + header so the
    block does not pop in and shove the lead/sections (M4). */
 .mh-topstories{min-height:330px;}
-/* Breaking is conditional; reserve its slot only while General is still loading so it does
-   not shove content when it arrives, then it collapses if there is nothing breaking. */
+/* Breaking is conditional; reserve its slot only while General is still loading so it does not
+   shove content when it arrives, then it collapses if there is nothing breaking. T1: sized to the
+   one-line strip (~2 rows) — the old 300px reserve was for the retired breaking CARD and collapsing
+   it to the lean strip was the Home CLS. */
 .mh-breaking{min-height:0;}
-.mh-breaking-reserve{min-height:300px;}
+.mh-breaking-reserve{min-height:108px;}
 
 /* Live scores strip — ActiveScoresBar styles itself (.home-scores); just spacing. */
 .mh-scores{min-height:0;}
@@ -63,3 +65,17 @@
    so it doesn't duplicate the ranked State of Play card below (each row's red "BREAKING" word is
    the label). The ranked card (.mh-sop) keeps the header. */
 .mh-breaking .sop-head{display:none;}
+
+/* T1: one-line breaking strip under the lead. Red BREAKING word (no dot) + 1-line ellipsised
+   headline + age, on a single row; the whole row opens the story (>=44px hit via ::after). */
+.mh-brk-strip{display:flex;flex-direction:column;}
+.mh-brk-row{position:relative;display:flex;align-items:center;gap:8px;width:100%;min-height:36px;
+  padding:7px 0;background:none;border:none;border-bottom:1px solid var(--border2);text-align:left;
+  cursor:pointer;font-family:inherit;}
+.mh-brk-row:last-child{border-bottom:none;}
+.mh-brk-row::after{content:'';position:absolute;inset:-4px 0;} /* 44px effective tap target */
+.mh-brk-tag{flex-shrink:0;color:var(--red);font-family:var(--font-sans);font-weight:800;
+  font-size:var(--fs-eyebrow);text-transform:uppercase;letter-spacing:0.06em;}
+.mh-brk-title{flex:1;min-width:0;font-family:var(--font-sans);font-weight:500;font-size:var(--fs-body);
+  color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.mh-brk-age{flex-shrink:0;font-size:var(--fs-meta);color:var(--text3);white-space:nowrap;}

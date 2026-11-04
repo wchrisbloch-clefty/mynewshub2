@@ -234,14 +234,25 @@ export function MobileHome({ ctx }) {
         ? <div className="mh-lead"><SnapshotCard a={model.lead} meta={sopMeta} isSaved={isSavedFn(model.lead)} onSave={onSave} onRead={onRead} onAsk={setChatContext} formatDate={fmtDate} opinionLabel={opinionLabel(model.lead)} lead={true}/></div>
         : <div className="mh-lead"><SectionSkeleton lead rows={0} label="Top story"/></div>}
 
-      {/* S4: BREAKING up front — directly under the LEAD, above Top Stories (CB: the "what is
-          happening" signal is the draw). Only when present; while General loads, reserve the slot. */}
+      {/* T1: BREAKING strip — directly under the LEAD, above Top Stories (CB: the "what is
+          happening" signal is the draw). ONE line per row: red BREAKING word (no dot, S10) +
+          1-line headline + age; the whole row opens the story, with a >=44px hit area via ::after.
+          Max 3 (breaking rules); these stories are seeded into the dedupe set, so they never repeat
+          in the State of Play card below. While General loads, reserve the slot (no shove). */}
       {hasBreaking
         ? <section className="mh-section mh-breaking">
-            <StateOfPlay variant="sidebar" items={[]} breakingItems={model.breaking}
-              meta={sopMeta} onRead={onRead} onAsk={setChatContext} formatDate={fmtDate}/>
+            <div className="mh-brk-strip" role="list">
+              {model.breaking.slice(0, 3).map((b, i) => (
+                <button key={b.link || i} className="mh-brk-row" role="listitem" onClick={() => onRead(b)}
+                  title={b._breakingWhy ? `Breaking — ${b._breakingWhy}` : 'Breaking'}>
+                  <span className="mh-brk-tag">Breaking</span>
+                  <span className="mh-brk-title">{b.title}</span>
+                  <span className="mh-brk-age">{fmtDate(b.pubDate)}</span>
+                </button>
+              ))}
+            </div>
           </section>
-        : (!generalLoaded && <div className="mh-breaking mh-breaking-reserve" aria-hidden="true"><SectionSkeleton rows={3}/></div>)}
+        : (!generalLoaded && <div className="mh-breaking mh-breaking-reserve" aria-hidden="true"/>)}
 
       {/* TOP STORIES — 4 compact cross-category headlines (always present once loaded) */}
       <section className="mh-section mh-topstories">
@@ -251,12 +262,17 @@ export function MobileHome({ ctx }) {
           : <SectionSkeleton rows={4} label="Top stories"/>}
       </section>
 
-      {/* S4: STATE OF PLAY card — the ranked cross-category "what's driving the day", up front
-          (after Top Stories, before the long section feed) instead of buried at the bottom. */}
-      {committed && (model.sopPool || []).length >= 3 && (
+      {/* S4/T1: STATE OF PLAY card — the ranked cross-category "what's driving the day", up front
+          (after Top Stories, before the long section feed) instead of buried at the bottom. The
+          slot is reserved from first paint (skeleton while loading) so the card filling in does not
+          shove the sections below (CLS). T2: shows 3 rows + "Show all N". */}
+      {(!generalLoaded || (committed && (model.sopPool || []).length >= 3)) && (
         <section className="mh-section mh-sop">
-          <StateOfPlay variant="sidebar" items={model.sopPool} showTopic
-            meta={sopMeta} onRead={onRead} onAsk={setChatContext} formatDate={fmtDate}/>
+          {committed && (model.sopPool || []).length >= 3
+            ? <StateOfPlay variant="sidebar" items={model.sopPool} showTopic maxRows={3}
+                onOpenFull={() => navigate('stateofplay')}
+                meta={sopMeta} onRead={onRead} onAsk={setChatContext} formatDate={fmtDate}/>
+            : <SectionSkeleton rows={3} label="State of Play"/>}
         </section>
       )}
 
