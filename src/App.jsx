@@ -3316,6 +3316,19 @@ body:not(.dark) .pill-bar{
 /* Team icon inside a pill: keep it legible on the blue active pill. */
 .sport-tab .team-logo{width:16px;height:16px;border-radius:5px;}
 .sport-tab.active .team-logo-ph{background:rgba(255,255,255,0.9);}
+/* P5: the count lives on the >=641 index tiles only; the phone chip row stays label-only. */
+.sport-tab-count{display:none;}
+@media(min-width:641px){
+  /* Sports INDEX (the league row, not the My Teams ribbon): a wrapping grid of equal outlined
+     tiles — never a horizontal scroll. Each tile is "Label N"; the selected tile is the filled
+     navy pill (inherited from .sport-tab.active); 0-count leagues are hidden unless selected. */
+  .sport-index{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:8px;overflow:visible;padding-bottom:12px;}
+  .sport-index .sport-tab{border-radius:10px;justify-content:space-between;min-height:40px;padding:8px 12px;}
+  .sport-index .sport-tab-label{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0;}
+  .sport-index .sport-tab-count{display:inline-flex;align-items:center;justify-content:center;flex-shrink:0;min-width:20px;height:18px;padding:0 6px;border-radius:9px;background:var(--surface);border:1px solid var(--border);font-size:11px;font-weight:800;color:var(--text3);font-variant-numeric:tabular-nums;}
+  .sport-index .sport-tab.active .sport-tab-count{background:rgba(255,255,255,0.22);border-color:transparent;color:var(--on-accent);}
+  .sport-index .sport-tab.is-zero:not(.active){display:none;}
+}
 
 /* ── LEAGUE HEADER — ESPN-style hero banner ── */
 .sport-league-header{

@@ -11,6 +11,19 @@ import { XPulse } from '../x-pulse';
 import { dbgRender, dbgMount } from '../debug';
 import { isPromoItem } from '../breaking'; // K3: promo filter for the team wide/gap scans
 
+// Per-league keyword sets (lifted to module scope, P5) so the feed filter AND the index-tile
+// counts share ONE source of truth — a tile's number is exactly what selecting it would show.
+const SPORT_KWS = {
+  nfl:   ['nfl','football','quarterback','touchdown','super bowl','running back','wide receiver','defensive end','nfc','afc','nfl draft'],
+  nba:   ['nba','basketball','lakers','celtics','warriors','knicks','heat','bulls','playoffs','nba draft','three-pointer','slam dunk'],
+  mlb:   ['mlb','baseball','world series','yankees','dodgers','cubs','home run','pitcher','bullpen','batting average','mlb draft'],
+  cfb:   ['cfb','college football','ncaa football','sec','big ten','acc','pac-12','big 12','cfp','bowl game','heisman'],
+  cbb:   ['cbb','college basketball','ncaa','march madness','final four','ncaa tournament','big east','sweet 16'],
+  cbase: ['college baseball','ncaa baseball','cws','college world series','super regional','sec baseball','acc baseball','big 12 baseball','d1baseball','college world'],
+  racing:['horse racing','thoroughbred','derby','stakes','jockey','paddock','furlong','harness racing','horse race','breeders cup','kentucky derby','preakness','belmont'],
+  golf:  ['golf','pga tour','masters','us open golf','british open','ryder cup','tiger woods','golfer','birdie','bogey','fairway','tee shot','pga championship','lpga'],
+};
+
 export function SportsPage({ ctx }) {
   const { tab, subcat, tertiary, arts, loading, kw, teams, myTeams, followedTeams, activeTeam, activeKw, activeSrc, breakingItems, feeds, health, lastUpdated, pendingNew, recommended, search, sorted, setActiveTeam, setActiveKw, setActiveSrc, setChatContext, setPerspArticle, setSearch, navigate, onRead, onSave, isSavedFn, isReadFn, isTeamFollowed, isTopicFollowed, followTeam, unfollowTeam, toggleTopic, loadCat, applyPending, refreshAll, openCustomize, getRelated, voicesStripFor, CATS, CoverImg, EmptyState, FeedCard, IconGear, LEAGUES, LastUpdated, Sidebar, SourceFooter, SourcesDisagree, SportsScoreStrip, TEAM_CHIPS, TeamLogo, TrendingPills, storyKey, fmtDate, teamSlug, teamScanKeyword, fetchDiscover, fetchWebSearch, ld, sv, opinionLabel } = ctx;
     dbgRender('SportsPage'); // D8: ?debug=1 render counter (no-op when off)
@@ -134,15 +147,7 @@ export function SportsPage({ ctx }) {
         // Sport-tab filter: keep articles mentioning any team in this sport,
         // OR keep any article from sport-specific kw (broad fallback).
         const teamsInSport = visibleTeams.map(t => (t.match||'').toLowerCase());
-        const sportKws = sportTab === 'nfl'    ? ['nfl','football','quarterback','touchdown','super bowl','running back','wide receiver','defensive end','nfc','afc','nfl draft']
-                       : sportTab === 'nba'    ? ['nba','basketball','lakers','celtics','warriors','knicks','heat','bulls','playoffs','nba draft','three-pointer','slam dunk']
-                       : sportTab === 'mlb'    ? ['mlb','baseball','world series','yankees','dodgers','cubs','home run','pitcher','bullpen','batting average','mlb draft']
-                       : sportTab === 'cfb'    ? ['cfb','college football','ncaa football','sec','big ten','acc','pac-12','big 12','cfp','bowl game','heisman']
-                       : sportTab === 'cbb'    ? ['cbb','college basketball','ncaa','march madness','final four','ncaa tournament','big east','sweet 16']
-                       : sportTab === 'cbase'  ? ['college baseball','ncaa baseball','cws','college world series','super regional','sec baseball','acc baseball','big 12 baseball','d1baseball','college world']
-                       : sportTab === 'racing' ? ['horse racing','thoroughbred','derby','stakes','jockey','paddock','furlong','harness racing','horse race','breeders cup','kentucky derby','preakness','belmont']
-                       : sportTab === 'golf'   ? ['golf','pga tour','masters','us open golf','british open','ryder cup','tiger woods','golfer','birdie','bogey','fairway','tee shot','pga championship','lpga']
-                       : [];
+        const sportKws = SPORT_KWS[sportTab] || [];
         items = items.filter(a => {
           const t = (a.title + ' ' + (a.desc||'')).toLowerCase();
           return teamsInSport.some(m => m && t.includes(m)) || sportKws.some(k => t.includes(k));
@@ -237,6 +242,21 @@ export function SportsPage({ ctx }) {
       { key:'golf',   label:'Golf' },
     ];
 
+    // P5: per-league story counts for the index tiles — the SAME keyword + team-name predicate
+    // the feed uses, so "NFL 12" means selecting NFL shows 12. Computed once over the sports pool.
+    const leagueCounts = useMemo(() => {
+      const counts = { all: allItems.length };
+      for (const key of Object.keys(SPORT_KWS)) {
+        const kws = SPORT_KWS[key];
+        const teamNames = ((TEAM_CHIPS && TEAM_CHIPS[key]) || []).map(n => (n || '').toLowerCase()).filter(Boolean);
+        counts[key] = allItems.filter(a => {
+          const t = (a.title + ' ' + (a.desc || '')).toLowerCase();
+          return kws.some(k => t.includes(k)) || teamNames.some(m => t.includes(m));
+        }).length;
+      }
+      return counts;
+    }, [allItems]);
+
     // Keep the active subcategory chip scrolled into view (on load + on change).
     const sportTabsRef = useRef(null);
     useEffect(() => {
@@ -265,16 +285,23 @@ export function SportsPage({ ctx }) {
         {/* ── SCORES — live scoreboard, anchored at the very top of the ribbon ── */}
         {!teamName && <SportsScoreStrip sportTab={sportTab} teams={[...teams, ...myTeams.map(t=>({match:t.name, league:t.league}))]}/>}
 
-        {/* ── LEAGUES — ESPN pill-style tab row ── */}
-        <div className="sport-tabs" data-no-swipe ref={sportTabsRef}>
-          {SPORT_TABS.map(t => (
-            <button key={t.key}
-              className={`sport-tab ${sportTab===t.key?'active':''}`}
-              onClick={()=>{setSportTab(t.key); setActiveTeam(null); setTimeout(scrollToFeed,80);}}>
-              {t.icon && <t.icon size={14} strokeWidth={2.2}/>}
-              {t.label}
-            </button>
-          ))}
+        {/* ── LEAGUES — phone: scrollable pill chips (unchanged). >=641 (P5): a wrapping grid of
+            equal outlined INDEX TILES carrying live counts ("NFL 12"); 0-count leagues are hidden
+            (except the selected one) and the selected tile is the filled navy pill. ── */}
+        <div className="sport-tabs sport-index" data-no-swipe ref={sportTabsRef}>
+          {SPORT_TABS.map(t => {
+            const n = leagueCounts[t.key] || 0;
+            const zero = n === 0 && t.key !== 'all';
+            return (
+              <button key={t.key}
+                className={`sport-tab ${sportTab===t.key?'active':''} ${zero?'is-zero':''}`}
+                onClick={()=>{setSportTab(t.key); setActiveTeam(null); setTimeout(scrollToFeed,80);}}>
+                {t.icon && <t.icon size={14} strokeWidth={2.2}/>}
+                <span className="sport-tab-label">{t.label}</span>
+                <span className="sport-tab-count" aria-label={`${n} stories`}>{n}</span>
+              </button>
+            );
+          })}
         </div>
 
         {/* ── MY TEAMS — followed teams as a pill ribbon (Yahoo Sports style). A pill
