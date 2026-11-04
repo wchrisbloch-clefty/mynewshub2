@@ -1553,7 +1553,27 @@ body{
    (ActiveScoresBar in <MobileHome/>), so hide the header copy at <=640 to avoid showing
    it twice. The header strip only ever renders on General, so this is Home-only; desktop
    and mobile category pages are unaffected. */
-@media(max-width:640px){ .topbar-scores{display:none;} }
+/* O2: show the Live Scores strip at the TOP of the scrolling header on phone (match the iPad
+   order; M1 had moved it mid-page). Compact band <=64px — tighter head + one scrolling tile row;
+   the min-height reserves its slot so scores loading causes no CLS. It scrolls away with the
+   header; only the nav/chip bar stays pinned. */
+@media(max-width:640px){
+  .topbar-scores{min-height:60px;}
+  /* O2: one horizontal band — the "Live Scores / Scores" label sits at the LEFT, the tile row
+     scrolls to its right, so the whole strip is a single compact line (<=64px). */
+  .topbar-scores .home-scores{padding:4px var(--s3);display:flex;align-items:center;gap:10px;}
+  .topbar-scores .home-scores-head{margin:0;flex:0 0 auto;max-width:58px;}
+  .topbar-scores .home-scores-label{line-height:1.1;}
+  .topbar-scores .home-scores-scroll{flex:1;min-width:0;}
+  /* compact strip: the "Sports →" link is redundant with the bottom-bar Sports tab, and its
+     44px touch target would blow the 64px budget — drop it here (not elsewhere). */
+  .topbar-scores .home-scores-see-all{display:none;}
+  .topbar-scores .score-tile{min-width:104px;padding:2px 8px;}
+  .topbar-scores .score-tile-side{gap:4px;line-height:1.15;}
+  .topbar-scores .score-tile-team,.topbar-scores .score-tile-score{font-size:11px;}
+  .topbar-scores .score-tile-logo{width:13px;height:13px;}
+  .topbar-scores .score-tile-status{font-size:8px;margin-top:0;}
+}
 /* N5: when the iPad-portrait-sections flag is on, MobileHome shows scores in its own body, so
    hide the header copy there too (avoids showing scores twice). Inert while the flag is off. */
 .hub.ipad-sections .topbar-scores{display:none;}
