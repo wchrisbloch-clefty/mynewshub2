@@ -25,7 +25,7 @@ hoist in CI. Batch T finishes them.
 |---|---|
 | `touch-mode.test.mjs` (S0 harness, 390/430/834/1194) | **ALL PASS** |
 | `sop-up-front.test.mjs` (T4: card ≤1.5vh, ≥3 rows, no empty box, disjoint — sports/energy/business/health) | **ALL PASS** |
-| `text-overlap.test.mjs` (10 widths × 5 pages **+ the new State of Play page** × light/dark) | _(filled below)_ |
+| `text-overlap.test.mjs` (10 widths × 6 pages incl. the new State of Play page × light/dark) | **PASS — 0 overlaps** |
 | `sports-dedup`, `o7-hero-contrast`, `p5-sports-index` | **PASS** |
 | unit tests (11): incl. source-name, top-stories select | **PASS** |
 | hard constraints vs `main`: new `api/` / `setInterval` / hex-outside-`tokens.css` / SW changed | **0 / 0 / 0 / 0** |
