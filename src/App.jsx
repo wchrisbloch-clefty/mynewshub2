@@ -5876,7 +5876,11 @@ kbd{display:inline-block;padding:1px 5px;border:1px solid var(--border);border-r
    desktop/iPad keep their compact controls (hover:hover), so this does not change their
    output. Each control named here measured <44px on a phone before this rule. */
 @media (max-width:640px), (hover:none){
-  .snap-ask,.snap-save{min-width:44px;min-height:44px;justify-content:center;}
+  /* O5/P2: .snap-ask and .snap-save already carry a 44px HIT target via their ::after inset
+     (SnapshotCard.css) while keeping a 32px VISUAL box, so they are NOT forced to a 44px box
+     here — a 44px box overflowed the short standard row and bled the "Ask" button 3px into the
+     next section's headline (a real text overlap). The ::after keeps the tap target >=44px. */
+  .snap-ask,.snap-save{min-width:44px;justify-content:center;}
   .mobile-icon-btn{min-width:44px;min-height:44px;}
   /* N1: controls that measured <44px on touch tablets/landscape (the phone-only rules didn't
      reach them). Desktop mouse (hover:hover) is unaffected. The market ticker (.ss-tk) is exempt —
