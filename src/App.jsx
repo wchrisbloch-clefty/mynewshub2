@@ -1519,7 +1519,7 @@ body{
    null until games load). Reserve its height from first paint so the async scores bar never
    grows the scroll-away header and shoves the page (desktop/iPad CLS). Hidden at <=640 (the
    phone Home shows scores in its own body), so this only reserves on desktop/iPad Home. */
-.topbar-scores{min-height:90px;}
+.topbar-scores{min-height:97px;}  /* N7c: match the loaded scores-bar height (was 90 → shoved the header ~7px when scores arrived); header height now identical before/after data */
 /* M1: on the phone Home the live-scores strip moves into the sectioned body
    (ActiveScoresBar in <MobileHome/>), so hide the header copy at <=640 to avoid showing
    it twice. The header strip only ever renders on General, so this is Home-only; desktop
