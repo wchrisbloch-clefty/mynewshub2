@@ -23,6 +23,7 @@
 import { useMemo, useState } from 'react';
 import { FollowSourceChip } from '../follow-source';
 import { selectStateOfPlay } from './select';
+import { cleanSourceName } from '../source-name';
 import './StateOfPlay.css';
 
 const defaultFormatDate = d => { try { return new Date(d).toLocaleString(); } catch { return ''; } };
@@ -94,7 +95,7 @@ export function StateOfPlay({ items, meta = {}, onRead, onAsk, formatDate = defa
         {top.map((a, i) => (
           <div key={a.link || i} className="sop-item" role="button" tabIndex={0}
             onClick={() => onRead(a)} onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onRead(a); } }}>
-            <span className="sop-num" style={{ color }}>{String(i + 1).padStart(2, '0')}</span>
+            {/* S11: no number — each story is its own boxed row, so every title shares one left edge. */}
             <span className="sop-item-title">{a.title}</span>
             <span className="sop-item-meta">
               {a._clusterSize > 1 && <span className="sources-tag sop-item-sources">{a._clusterSize} sources</span>}
@@ -105,12 +106,12 @@ export function StateOfPlay({ items, meta = {}, onRead, onAsk, formatDate = defa
         ))}
         {gaps.map((g, i) => {
           const outlets = (g.outlets && g.outlets.length ? g.outlets : [g.source]).filter(Boolean);
-          const num = String(top.length + i + 1).padStart(2, '0');
           const n = g.outletCount || outlets.length;
           const key = g.link || `gap-${i}`;
           // K5: no "Not in your sources" pill, no always-visible Follow. Source names +
           // "N sources" only; Follow sits in a quiet ⋯ menu (hover desktop / tap mobile).
-          const srcText = outlets.slice(0, 2).join(', ') + (outlets.length > 2 ? ` +${outlets.length - 2}` : '');
+          // S3: never render a raw ALL-CAPS hostname (e.g. WWW.CHEMENGONLINE.COM) — normalize.
+          const srcText = outlets.slice(0, 2).map(cleanSourceName).join(', ') + (outlets.length > 2 ? ` +${outlets.length - 2}` : '');
           const meta = (
             <span className="sop-item-meta">
               {n > 1 && <span className="sources-tag sop-item-sources">{n} sources</span>}
@@ -129,18 +130,14 @@ export function StateOfPlay({ items, meta = {}, onRead, onAsk, formatDate = defa
           );
           if (sidebar) {
             return (
-              <a key={key} className="sop-item sop-item-gap sop-item-gap-stacked" href={g.link} target="_blank" rel="noreferrer">
-                <div className="sop-gap-headline">
-                  <span className="sop-num sop-num-gap">{num}</span>
-                  <span className="sop-item-title">{g.title}</span>
-                </div>
+              <a key={key} className="sop-item sop-item-gap" href={g.link} target="_blank" rel="noreferrer">
+                <span className="sop-item-title">{g.title}</span>
                 <div className="sop-gap-below">{meta}</div>
               </a>
             );
           }
           return (
             <a key={key} className="sop-item sop-item-gap" href={g.link} target="_blank" rel="noreferrer">
-              <span className="sop-num sop-num-gap">{num}</span>
               <span className="sop-item-title">{g.title}</span>
               {meta}
             </a>
