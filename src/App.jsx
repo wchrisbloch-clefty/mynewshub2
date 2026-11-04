@@ -4715,7 +4715,10 @@ body{overscroll-behavior-y:contain;}
 
 /* Skeleton loading shimmer for feed cards */
 @keyframes shimmer{0%{background-position:-200% 0;}100%{background-position:200% 0;}}
-.fc-skeleton{padding:20px 14px;border-bottom:1px solid var(--border2);}
+/* P6: loading placeholders are light-bordered cards (the AetherHub row anatomy — 1px border,
+   10px radius, 14px padding, 12px gap) at a row-matching min-height, so the skeleton previews
+   the loaded layout instead of a bare divider and nothing jumps when content swaps in. */
+.fc-skeleton{padding:14px;border:1px solid var(--border);border-radius:10px;background:var(--surface);margin-bottom:12px;min-height:92px;}
 .fc-skeleton-line{height:14px;border-radius:4px;background:linear-gradient(90deg,var(--surface2) 25%,var(--border) 50%,var(--surface2) 75%);background-size:200% 100%;animation:shimmer 1.4s infinite;margin-bottom:8px;}
 .fc-skeleton-title{height:18px;width:80%;border-radius:4px;background:linear-gradient(90deg,var(--surface2) 25%,var(--border) 50%,var(--surface2) 75%);background-size:200% 100%;animation:shimmer 1.4s infinite;margin-bottom:10px;}
 
@@ -7062,6 +7065,12 @@ function Sidebar({cat, arts, kw, health, activeKw, setActiveKw, activeSource, se
   const srcCounts = {};
   catArts.forEach(a=>{srcCounts[a.source]=(srcCounts[a.source]||0)+1;});
   const sources = [...new Set(catArts.map(a=>a.source))];
+  // P6: honest source status — how many of the user's sources have actually returned (green),
+  // and how many are still being fetched (no health reported yet). The rest responded stale or
+  // failed. The "still loading" clause disappears once everything has resolved.
+  const srcLive = sources.filter(n => health[n] === 'green').length;
+  const srcLoading = sources.filter(n => !health[n]).length;
+  const srcStatusLabel = `Sources · ${srcLive}/${sources.length} live${srcLoading ? ` · ${srcLoading} still loading` : ''}`;
 
   // L3: Sources collapsed by default AND remembered (persisted), like Trending / Following
   // / Prediction Markets. Still force-opens when a source filter is active.
@@ -7274,7 +7283,7 @@ function Sidebar({cat, arts, kw, health, activeKw, setActiveKw, activeSource, se
           <div className="sidebar-sec-head">
             <button className="sidebar-sec-collapse" onClick={()=>setShowSources(s=>!s)}>
               <span className="sidebar-sec-label">
-                {activeSource ? `Source: ${activeSource}` : `Sources · ${sources.length}`}
+                {activeSource ? `Source: ${activeSource}` : srcStatusLabel}
               </span>
               <span className="gs-collapse-chevron" style={{fontSize:'10px',color:'var(--text4)'}}><ChevronDown size={11} aria-hidden="true" style={{transform:showSources?'none':'rotate(-90deg)',transition:"transform .15s"}}/></span>
             </button>
