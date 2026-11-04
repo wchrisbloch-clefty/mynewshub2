@@ -1537,7 +1537,7 @@ body{
 /* N7c: reserve the EXACT loaded weather-band height per breakpoint — it wraps to ~45px on phones
    but is a single 26px row at 641–899px, so the old flat 49px reserve over-reserved at tablet
    widths and the band shrank ~23px when weather arrived (the 820 header shove). */
-.topbar-wx-reserve{min-height:45px;}
+.topbar-wx-reserve{min-height:26px;}
 @media(min-width:641px){ .topbar-wx-reserve{min-height:26px;} }
 .topbar-wx .rnw-card{max-width:1400px;margin:0 auto;padding:0 var(--s4);border:none;border-radius:0;background:none;}
 /* Scoreboard band in the top bar (below weather, above nav — Pass G item 3).
@@ -1663,6 +1663,12 @@ body{
   .rnw-feels{display:none;}
   .rnw-row{flex-wrap:wrap;gap:var(--s2) var(--s3);}
   .rnw-cities{flex-wrap:wrap;gap:var(--s2) var(--s3);}
+  /* O8: the header "Right Now" band is ONE compact line (<=32px) — cities inline, tap the caret
+     to expand the forecast (unchanged). Only the header copy; the in-body weather card keeps wrap. */
+  .topbar-wx .rnw-row{flex-wrap:nowrap;gap:var(--s3);padding:5px var(--s3);overflow:hidden;align-items:center;min-height:0;position:relative;}
+  /* keep a 44px tap area (expand forecast) without inflating the 32px band — invisible ::after */
+  .topbar-wx .rnw-row::after{content:'';position:absolute;inset:-7px 0;}
+  .topbar-wx .rnw-cities{flex-wrap:nowrap;gap:var(--s3);overflow:hidden;}
 }
 .houston-row{margin-bottom:var(--s4);}
 .houston-head{display:flex;align-items:baseline;gap:8px;margin-bottom:10px;}
