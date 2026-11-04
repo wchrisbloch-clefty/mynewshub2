@@ -190,11 +190,37 @@ export function SportsPage({ ctx }) {
 
     const heroItems = sportItems.filter(a => a.img);
     const lead = heroItems[0] || null;
-    // Exclude the hero by object identity (not link equality): in sparse/out-of-
-    // season sets like NCAAF the lead's link can collide with or duplicate other
-    // entries, which previously collapsed the whole feed while the count stayed high.
-    let feedItems = lead ? sportItems.filter(a => a !== lead) : sportItems;
-    if (feedItems.length === 0 && sportItems.length > 0) feedItems = sportItems; // never blank when stories exist
+    // O4: one story once per PAGE. Dedupe the feed by storyKey (title-key, the same rule Home
+    // uses) so a syndicated copy of the lead — or of another story — can't reappear as a list
+    // row or a second grid card.
+    const feedSeen = new Set();
+    if (lead) feedSeen.add(storyKey(lead));
+    let feedItems = sportItems.filter(a => {
+      if (a === lead) return false;
+      const k = storyKey(a);
+      if (feedSeen.has(k)) return false;
+      feedSeen.add(k);
+      return true;
+    });
+    if (feedItems.length === 0 && sportItems.length > 0) { feedItems = sportItems.filter(a => a !== lead); } // never blank when stories exist
+    // The hero grid (gn-row) and the list below it draw from the same feed, so they must be
+    // disjoint. The grid takes its 3 cards image-first from the top; the list then renders
+    // everything the grid didn't take. (Pre-O4 the list started at a fixed slice(3), which
+    // double-showed a story whenever an early row had no image and the grid reached past index 3.)
+    const showGrid = !activeTeam && feedItems.length > 0;
+    const gridCards = showGrid
+      ? feedItems.slice(0, 6).filter(a => a.img).slice(0, 3).concat(feedItems.slice(0, 6).filter(a => !a.img)).slice(0, 3)
+      : [];
+    const gridKeys = new Set(gridCards.map(storyKey));
+    const listItems = (activeTeam ? feedItems : feedItems.filter(a => !gridKeys.has(storyKey(a)))).slice(0, 30);
+    // The rail must exclude exactly the stories the main column already shows (lead + grid + list),
+    // so no story appears both in the column and the rail — the same disjoint-set rule Home uses
+    // between Top Stories / SoP / feed. selectStateOfPlay then ranks its rows from what's left.
+    const sportsShownKeys = new Set();
+    if (lead) sportsShownKeys.add(storyKey(lead));
+    gridKeys.forEach(k => sportsShownKeys.add(k));
+    listItems.forEach(a => sportsShownKeys.add(storyKey(a)));
+    const sopRailItems = sportItems.filter(a => !sportsShownKeys.has(storyKey(a)));
 
     // League pills are text-only (Pass J item 7): lucide-react has no per-league
     // glyphs and emoji rendered inconsistently. Team pills below carry real icons
@@ -399,11 +425,9 @@ export function SportsPage({ ctx }) {
             )}
 
             {/* 3-column story grid — ESPN visual punch for top stories */}
-            {feedItems.length > 0 && !activeTeam && (
+            {showGrid && (
               <div className="gn-row" style={{marginBottom:'24px'}}>
-                {feedItems.slice(0, 6).filter(a=>a.img).slice(0, 3).concat(
-                  feedItems.slice(0, 6).filter(a=>!a.img)
-                ).slice(0, 3).map((a, i) => (
+                {gridCards.map((a, i) => (
                   <article key={i} className="gn-card" onClick={()=>onRead(a)}>
                     <div className="gn-card-img"><CoverImg src={a.img} label={a.source}/></div>
                     <h3 className="gn-card-title">{a.title}</h3>
@@ -425,7 +449,7 @@ export function SportsPage({ ctx }) {
                 ? <EmptyState
                     message={activeTeam ? `No stories for ${activeTeam.team} yet.` : `Couldn't load Sports. Try refresh.`}
                     actionLabel="Refresh" onAction={refreshAll}/>
-                : feedItems.slice(activeTeam?0:3, 30).map((a, i) => (
+                : listItems.map((a, i) => (
                     <FeedCard key={i} a={a} cat="sports" isSaved={isSavedFn(a)} onSave={onSave} onRead={onRead} relatedSources={getRelated(a,'sports')} isRead={isReadFn(a)} userKw={kw} userTeams={teams}/>
                   ))
             }
@@ -507,7 +531,7 @@ export function SportsPage({ ctx }) {
             onRead={onRead}
             showScoreboard={false} recommended={recommended}
             isTopicFollowed={isTopicFollowed} toggleTopic={toggleTopic}
-            sopItems={(sportTab === 'all' || activeTeam) && !activeSrc && !search ? sportItems : null}
+            sopItems={(sportTab === 'all' || activeTeam) && !activeSrc && !search ? sopRailItems : null}
             sopMeta={CATS.sports} sopCollapsed={sopCollapsed} onToggleSop={toggleSop} formatDate={fmtDate}/>
         </div>}
       </div>
