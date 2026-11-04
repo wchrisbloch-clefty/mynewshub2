@@ -1531,10 +1531,13 @@ body{
   background:var(--surface);border-bottom:1px solid var(--border2);
   font-family:var(--font-sans);
 }
-/* Contain the ticker to the same max-width as the nav/content below it. */
+/* S2: Band 2 is ONE grid — [MARKETS label auto][ticker 1fr][RIGHT NOW weather auto] — vertically
+   centered in a single row, so the label, the ticker values and the weather share one baseline and
+   no cell can push past the band. (The weather's left divider is its own border-left.) Contained to
+   the same max-width as the nav/content below it. */
 .status-strip-inner{
   max-width:1400px;margin:0 auto;height:100%;
-  display:flex;align-items:center;gap:var(--s3);padding:0 var(--s4);
+  display:grid;grid-template-columns:auto 1fr auto;align-items:center;gap:var(--s3);padding:0 var(--s4);
 }
 /* Home weather stacked under the ticker: full-bleed bar, content contained to the
    same max-width, flush (no card chrome). */
@@ -8186,6 +8189,26 @@ function TopBar({tab, setTab, search, setSearch, dark, setDark,
     const t = setTimeout(fit, 700);  // one late pass after quotes + weather settle (not a poll)
     return () => { ro.disconnect(); mo && mo.disconnect(); clearTimeout(t); };
   }, []);
+
+  // S2: publish the live heights of the header bands + the sticky block as CSS variables, so every
+  // sticky offset / reserve reads the REAL measured height instead of a hard-coded constant that
+  // drifts when touch rules change a band's height (the source of the phone-Sports "strip tucks
+  // under the chip bar" defect, S5c). ResizeObserver only — no timers, no polling.
+  useEffect(() => {
+    if (typeof ResizeObserver === 'undefined') return;
+    const root = document.documentElement;
+    const set = () => {
+      const h = sel => { const el = document.querySelector(sel); return el ? Math.round(el.getBoundingClientRect().height) : 0; };
+      root.style.setProperty('--band-scores-h', h('.topbar-scores') + 'px');
+      root.style.setProperty('--band-markets-h', h('.status-strip') + 'px');
+      root.style.setProperty('--sticky-h', h('.topbar-wrap') + 'px');
+    };
+    set();
+    const ro = new ResizeObserver(set);
+    ['.topbar-scores', '.status-strip', '.topbar-wrap'].forEach(s => { const el = document.querySelector(s); if (el) ro.observe(el); });
+    const t = setTimeout(set, 700);
+    return () => { ro.disconnect(); clearTimeout(t); };
+  }, [tab]);
 
   return (
     <>
