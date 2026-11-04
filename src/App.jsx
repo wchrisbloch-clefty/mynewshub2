@@ -1509,7 +1509,11 @@ body{
 /* Home weather stacked under the ticker: full-bleed bar, content contained to the
    same max-width, flush (no card chrome). */
 .topbar-wx{background:var(--surface);border-bottom:1px solid var(--border2);}
-.topbar-wx-reserve{min-height:49px;}  /* R2: matches the loaded weather band so it swaps in without a shift */
+/* N7c: reserve the EXACT loaded weather-band height per breakpoint — it wraps to ~45px on phones
+   but is a single 26px row at 641–899px, so the old flat 49px reserve over-reserved at tablet
+   widths and the band shrank ~23px when weather arrived (the 820 header shove). */
+.topbar-wx-reserve{min-height:45px;}
+@media(min-width:641px){ .topbar-wx-reserve{min-height:26px;} }
 .topbar-wx .rnw-card{max-width:1400px;margin:0 auto;padding:0 var(--s4);border:none;border-radius:0;background:none;}
 /* Scoreboard band in the top bar (below weather, above nav — Pass G item 3).
    Dark ESPN theme so the homepage strip matches the Sports-page strip (item 6). */
