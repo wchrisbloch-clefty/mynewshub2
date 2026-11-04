@@ -5,7 +5,7 @@
 // App). Lazy-loaded + idle/hover-prefetched; a skeleton is the Suspense fallback.
 import { useState, useEffect, useMemo, useRef, useCallback, Fragment } from 'react';
 import { ChevronDown, ExternalLink, Star, Trophy, X as XIcon } from 'lucide-react';
-import { StateOfPlay } from '../state-of-play';
+import { StateOfPlay, selectStateOfPlay } from '../state-of-play';
 import { SnapshotCard } from '../snapshot-card';
 import { XPulse } from '../x-pulse';
 import { dbgRender, dbgMount } from '../debug';
@@ -208,24 +208,24 @@ export function SportsPage({ ctx }) {
       return true;
     });
     if (feedItems.length === 0 && sportItems.length > 0) { feedItems = sportItems.filter(a => a !== lead); } // never blank when stories exist
-    // The hero grid (gn-row) and the list below it draw from the same feed, so they must be
-    // disjoint. The grid takes its 3 cards image-first from the top; the list then renders
-    // everything the grid didn't take. (Pre-O4 the list started at a fixed slice(3), which
-    // double-showed a story whenever an early row had no image and the grid reached past index 3.)
-    const showGrid = !activeTeam && feedItems.length > 0;
+    // T4: State of Play claims the heat-ranked TOP of the feed FIRST (so the up-front card shows the
+    // stories actually driving the day, not the low-heat leftovers O4 handed it), then the hero grid
+    // and the list render what SoP did NOT take — one story once per page, the same claim-order Home
+    // uses (SoP/Top Stories before the feed). The rail + the <=1100 hoist both rank from `feedItems`
+    // and so render exactly this same top set, disjoint from the grid/list below.
+    const sopRailItems = feedItems; // StateOfPlay selects its top from here
+    const sopTopList = selectStateOfPlay({ items: feedItems, breakingItems: [], gapItems: [] }).top;
+    const sopKeys = new Set(sopTopList.map(storyKey));
+    const sopHasRows = sopTopList.length >= 3; // the up-front card renders only with a real list
+    const feedAfterSop = feedItems.filter(a => !sopKeys.has(storyKey(a)));
+    // The hero grid (gn-row) and the list below it draw from the SoP-claimed remainder, so they are
+    // disjoint from each other AND from State of Play. The grid takes its 3 cards image-first.
+    const showGrid = !activeTeam && feedAfterSop.length > 0;
     const gridCards = showGrid
-      ? feedItems.slice(0, 6).filter(a => a.img).slice(0, 3).concat(feedItems.slice(0, 6).filter(a => !a.img)).slice(0, 3)
+      ? feedAfterSop.slice(0, 6).filter(a => a.img).slice(0, 3).concat(feedAfterSop.slice(0, 6).filter(a => !a.img)).slice(0, 3)
       : [];
     const gridKeys = new Set(gridCards.map(storyKey));
-    const listItems = (activeTeam ? feedItems : feedItems.filter(a => !gridKeys.has(storyKey(a)))).slice(0, 30);
-    // The rail must exclude exactly the stories the main column already shows (lead + grid + list),
-    // so no story appears both in the column and the rail — the same disjoint-set rule Home uses
-    // between Top Stories / SoP / feed. selectStateOfPlay then ranks its rows from what's left.
-    const sportsShownKeys = new Set();
-    if (lead) sportsShownKeys.add(storyKey(lead));
-    gridKeys.forEach(k => sportsShownKeys.add(k));
-    listItems.forEach(a => sportsShownKeys.add(storyKey(a)));
-    const sopRailItems = sportItems.filter(a => !sportsShownKeys.has(storyKey(a)));
+    const listItems = (activeTeam ? feedItems : feedAfterSop.filter(a => !gridKeys.has(storyKey(a)))).slice(0, 30);
 
     // League pills are text-only (Pass J item 7): lucide-react has no per-league
     // glyphs and emoji rendered inconsistently. Team pills below carry real icons
@@ -454,7 +454,7 @@ export function SportsPage({ ctx }) {
             {/* S4: State of Play up front on single-column widths (<=1100) — directly after the
                 lead, before the long feed. The rail copy (buried at the bottom when the rail
                 stacks) is hidden <=1100 via CSS. CB: State of Play is the draw on Sports. */}
-            {(sportTab === 'all' || activeTeam) && !activeSrc && !search && sopRailItems.length >= 3 && (
+            {(sportTab === 'all' || activeTeam) && !activeSrc && !search && sopHasRows && (
               <div className="sports-sop-hoist">
                 <StateOfPlay variant="sidebar" items={sopRailItems} meta={CATS.sports}
                   onRead={onRead} onAsk={setChatContext} formatDate={fmtDate}
