@@ -2017,6 +2017,16 @@ body:not(.dark) .pill-bar{
 .fc:last-child{border-bottom:none;}
 .fc:hover{background:var(--surface2);}
 .fc:active{transform:scale(0.999);}
+/* O5: on touch, :hover persists after a tap and left rows with a stuck grey tint / a raised
+   shadow card. These list rows all have a TRANSPARENT resting background, so clearing the hover
+   background (and the lead's shadow/transform, and the State-of-Play dim) on coarse pointers
+   restores the resting look. Real pointers keep the affordance (rules above, unchanged). */
+@media (hover:none){
+  .fc:hover,.today-item:hover,.hero-side-item:hover,.sb-across-item:hover,.bloom-strip-item:hover,
+  .hero-band-side-item:hover,.fin-wl-row:hover,.conn-row:hover,.pm-row:hover,.mh-compact:hover{background:none;}
+  .hero-lead:hover,.score-tile:hover,.social-handle:hover{box-shadow:none;transform:none;}
+  .sop-item:hover{opacity:1;}
+}
 
 .fc-meta{display:flex;align-items:center;gap:8px;margin-bottom:10px;flex-wrap:wrap;}
 .fc-source{
