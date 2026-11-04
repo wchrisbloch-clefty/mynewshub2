@@ -2164,6 +2164,17 @@ body:not(.dark) .pill-bar{
   /* Flows in normal document scroll along with the main column — no sticky/fixed
      positioning and no internal scroll container. */
 }
+/* P2 (AetherHub anatomy): every right-rail module is a light-bordered card in NORMAL FLOW.
+   flex-shrink:0 is the O1 overlap fix — the sticky rail's max-height + overflow let a tall
+   module shrink below its content and spill onto the next module; now each module keeps its
+   full height and pushes the next one down (reserved heights stay min-height FLOORS). */
+.sidebar > *{flex-shrink:0;}
+.sidebar-sop,.sidebar-section{
+  border:1px solid var(--border);border-radius:8px;background:var(--surface);
+  padding:12px 14px;min-width:0;
+}
+/* inside a card the header rule is a hairline, not the old heavy 2px rule */
+.sidebar-sop .sop-head,.sidebar-section > .sidebar-sec-head{border-bottom:1px solid var(--border2);}
 
 /* Ghost sidebar section */
 .gs-section{display:flex;flex-direction:column;gap:0;}
