@@ -80,3 +80,30 @@ These are the things CB saw on real hardware that emulation missed. Automated co
 24. **Honest source status + skeletons (P6).** The Sources rail reads `Sources · N/M live · K still
     loading` (the "still loading" clause disappears once everything resolves); loading placeholders
     are light-bordered cards at the row height, so nothing jumps when content swaps in.
+
+---
+
+## Batch S — root-cause touch fixes + the "State of Play up front / crisp white" polish
+
+These passed in Chromium **touch emulation** (`test/visual/touch-mode.test.mjs`); real iPad/iPhone
+Safari is **NEEDS-DEVICE**. Open with `?debug=1`.
+
+25. **iPad header bands line up (S1/S2).** At ~1194 landscape the MARKETS label, the ticker values
+    and the RIGHT NOW weather share one centre; no band bleeds into the one above/below; the ticker
+    shows whole items only.
+26. **State of Play rows are tight (S1/S3/S11).** No dead gap between a headline and its meta line;
+    every row is its own lightly-boxed row with no number and the same left edge; cluster rows
+    ("N sources") match.
+27. **No breaking red dot (S10).** Breaking rows show the red "BREAKING" word only.
+28. **State of Play is up front (S4).** On phone Home: breaking under the lead, then Top Stories,
+    then the State of Play card. On Sports/Energy it sits near the top, not the last block.
+29. **Chat launcher shows at rest (S6).** Visible at load on Home (iPad + iPhone); it tucks away
+    only while you scroll down and comes back at the top / on scroll-up / when you stop.
+30. **Phone weather never clips (S5a).** "HOUSTON 69° Clear" shows in full on the one-line band; the
+    other city is in the expand.
+31. **Phone hero is edge-to-edge (S5b).** The lead photo reaches both screen edges — no sliver.
+32. **Sports scores strip clears the chip bar (S5c).** The sticky strip sits fully below the chip
+    bar; the first team row of each card is visible.
+33. **Crisp white + topic labels (S12/S13).** Light mode is white with hairline dividers; every
+    Home headline carries its topic (ENERGY / SPORTS / …) in its colour at the head of the meta
+    line. Dark mode looks exactly as before.
