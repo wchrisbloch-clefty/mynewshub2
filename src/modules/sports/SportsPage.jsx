@@ -11,6 +11,19 @@ import { XPulse } from '../x-pulse';
 import { dbgRender, dbgMount } from '../debug';
 import { isPromoItem } from '../breaking'; // K3: promo filter for the team wide/gap scans
 
+// Per-league keyword sets (lifted to module scope, P5) so the feed filter AND the index-tile
+// counts share ONE source of truth — a tile's number is exactly what selecting it would show.
+const SPORT_KWS = {
+  nfl:   ['nfl','football','quarterback','touchdown','super bowl','running back','wide receiver','defensive end','nfc','afc','nfl draft'],
+  nba:   ['nba','basketball','lakers','celtics','warriors','knicks','heat','bulls','playoffs','nba draft','three-pointer','slam dunk'],
+  mlb:   ['mlb','baseball','world series','yankees','dodgers','cubs','home run','pitcher','bullpen','batting average','mlb draft'],
+  cfb:   ['cfb','college football','ncaa football','sec','big ten','acc','pac-12','big 12','cfp','bowl game','heisman'],
+  cbb:   ['cbb','college basketball','ncaa','march madness','final four','ncaa tournament','big east','sweet 16'],
+  cbase: ['college baseball','ncaa baseball','cws','college world series','super regional','sec baseball','acc baseball','big 12 baseball','d1baseball','college world'],
+  racing:['horse racing','thoroughbred','derby','stakes','jockey','paddock','furlong','harness racing','horse race','breeders cup','kentucky derby','preakness','belmont'],
+  golf:  ['golf','pga tour','masters','us open golf','british open','ryder cup','tiger woods','golfer','birdie','bogey','fairway','tee shot','pga championship','lpga'],
+};
+
 export function SportsPage({ ctx }) {
   const { tab, subcat, tertiary, arts, loading, kw, teams, myTeams, followedTeams, activeTeam, activeKw, activeSrc, breakingItems, feeds, health, lastUpdated, pendingNew, recommended, search, sorted, setActiveTeam, setActiveKw, setActiveSrc, setChatContext, setPerspArticle, setSearch, navigate, onRead, onSave, isSavedFn, isReadFn, isTeamFollowed, isTopicFollowed, followTeam, unfollowTeam, toggleTopic, loadCat, applyPending, refreshAll, openCustomize, getRelated, voicesStripFor, CATS, CoverImg, EmptyState, FeedCard, IconGear, LEAGUES, LastUpdated, Sidebar, SourceFooter, SourcesDisagree, SportsScoreStrip, TEAM_CHIPS, TeamLogo, TrendingPills, storyKey, fmtDate, teamSlug, teamScanKeyword, fetchDiscover, fetchWebSearch, ld, sv, opinionLabel } = ctx;
     dbgRender('SportsPage'); // D8: ?debug=1 render counter (no-op when off)
@@ -134,15 +147,7 @@ export function SportsPage({ ctx }) {
         // Sport-tab filter: keep articles mentioning any team in this sport,
         // OR keep any article from sport-specific kw (broad fallback).
         const teamsInSport = visibleTeams.map(t => (t.match||'').toLowerCase());
-        const sportKws = sportTab === 'nfl'    ? ['nfl','football','quarterback','touchdown','super bowl','running back','wide receiver','defensive end','nfc','afc','nfl draft']
-                       : sportTab === 'nba'    ? ['nba','basketball','lakers','celtics','warriors','knicks','heat','bulls','playoffs','nba draft','three-pointer','slam dunk']
-                       : sportTab === 'mlb'    ? ['mlb','baseball','world series','yankees','dodgers','cubs','home run','pitcher','bullpen','batting average','mlb draft']
-                       : sportTab === 'cfb'    ? ['cfb','college football','ncaa football','sec','big ten','acc','pac-12','big 12','cfp','bowl game','heisman']
-                       : sportTab === 'cbb'    ? ['cbb','college basketball','ncaa','march madness','final four','ncaa tournament','big east','sweet 16']
-                       : sportTab === 'cbase'  ? ['college baseball','ncaa baseball','cws','college world series','super regional','sec baseball','acc baseball','big 12 baseball','d1baseball','college world']
-                       : sportTab === 'racing' ? ['horse racing','thoroughbred','derby','stakes','jockey','paddock','furlong','harness racing','horse race','breeders cup','kentucky derby','preakness','belmont']
-                       : sportTab === 'golf'   ? ['golf','pga tour','masters','us open golf','british open','ryder cup','tiger woods','golfer','birdie','bogey','fairway','tee shot','pga championship','lpga']
-                       : [];
+        const sportKws = SPORT_KWS[sportTab] || [];
         items = items.filter(a => {
           const t = (a.title + ' ' + (a.desc||'')).toLowerCase();
           return teamsInSport.some(m => m && t.includes(m)) || sportKws.some(k => t.includes(k));
@@ -190,11 +195,37 @@ export function SportsPage({ ctx }) {
 
     const heroItems = sportItems.filter(a => a.img);
     const lead = heroItems[0] || null;
-    // Exclude the hero by object identity (not link equality): in sparse/out-of-
-    // season sets like NCAAF the lead's link can collide with or duplicate other
-    // entries, which previously collapsed the whole feed while the count stayed high.
-    let feedItems = lead ? sportItems.filter(a => a !== lead) : sportItems;
-    if (feedItems.length === 0 && sportItems.length > 0) feedItems = sportItems; // never blank when stories exist
+    // O4: one story once per PAGE. Dedupe the feed by storyKey (title-key, the same rule Home
+    // uses) so a syndicated copy of the lead — or of another story — can't reappear as a list
+    // row or a second grid card.
+    const feedSeen = new Set();
+    if (lead) feedSeen.add(storyKey(lead));
+    let feedItems = sportItems.filter(a => {
+      if (a === lead) return false;
+      const k = storyKey(a);
+      if (feedSeen.has(k)) return false;
+      feedSeen.add(k);
+      return true;
+    });
+    if (feedItems.length === 0 && sportItems.length > 0) { feedItems = sportItems.filter(a => a !== lead); } // never blank when stories exist
+    // The hero grid (gn-row) and the list below it draw from the same feed, so they must be
+    // disjoint. The grid takes its 3 cards image-first from the top; the list then renders
+    // everything the grid didn't take. (Pre-O4 the list started at a fixed slice(3), which
+    // double-showed a story whenever an early row had no image and the grid reached past index 3.)
+    const showGrid = !activeTeam && feedItems.length > 0;
+    const gridCards = showGrid
+      ? feedItems.slice(0, 6).filter(a => a.img).slice(0, 3).concat(feedItems.slice(0, 6).filter(a => !a.img)).slice(0, 3)
+      : [];
+    const gridKeys = new Set(gridCards.map(storyKey));
+    const listItems = (activeTeam ? feedItems : feedItems.filter(a => !gridKeys.has(storyKey(a)))).slice(0, 30);
+    // The rail must exclude exactly the stories the main column already shows (lead + grid + list),
+    // so no story appears both in the column and the rail — the same disjoint-set rule Home uses
+    // between Top Stories / SoP / feed. selectStateOfPlay then ranks its rows from what's left.
+    const sportsShownKeys = new Set();
+    if (lead) sportsShownKeys.add(storyKey(lead));
+    gridKeys.forEach(k => sportsShownKeys.add(k));
+    listItems.forEach(a => sportsShownKeys.add(storyKey(a)));
+    const sopRailItems = sportItems.filter(a => !sportsShownKeys.has(storyKey(a)));
 
     // League pills are text-only (Pass J item 7): lucide-react has no per-league
     // glyphs and emoji rendered inconsistently. Team pills below carry real icons
@@ -210,6 +241,21 @@ export function SportsPage({ ctx }) {
       { key:'racing', label:'Horse Racing' },
       { key:'golf',   label:'Golf' },
     ];
+
+    // P5: per-league story counts for the index tiles — the SAME keyword + team-name predicate
+    // the feed uses, so "NFL 12" means selecting NFL shows 12. Computed once over the sports pool.
+    const leagueCounts = useMemo(() => {
+      const counts = { all: allItems.length };
+      for (const key of Object.keys(SPORT_KWS)) {
+        const kws = SPORT_KWS[key];
+        const teamNames = ((TEAM_CHIPS && TEAM_CHIPS[key]) || []).map(n => (n || '').toLowerCase()).filter(Boolean);
+        counts[key] = allItems.filter(a => {
+          const t = (a.title + ' ' + (a.desc || '')).toLowerCase();
+          return kws.some(k => t.includes(k)) || teamNames.some(m => t.includes(m));
+        }).length;
+      }
+      return counts;
+    }, [allItems]);
 
     // Keep the active subcategory chip scrolled into view (on load + on change).
     const sportTabsRef = useRef(null);
@@ -239,16 +285,23 @@ export function SportsPage({ ctx }) {
         {/* ── SCORES — live scoreboard, anchored at the very top of the ribbon ── */}
         {!teamName && <SportsScoreStrip sportTab={sportTab} teams={[...teams, ...myTeams.map(t=>({match:t.name, league:t.league}))]}/>}
 
-        {/* ── LEAGUES — ESPN pill-style tab row ── */}
-        <div className="sport-tabs" data-no-swipe ref={sportTabsRef}>
-          {SPORT_TABS.map(t => (
-            <button key={t.key}
-              className={`sport-tab ${sportTab===t.key?'active':''}`}
-              onClick={()=>{setSportTab(t.key); setActiveTeam(null); setTimeout(scrollToFeed,80);}}>
-              {t.icon && <t.icon size={14} strokeWidth={2.2}/>}
-              {t.label}
-            </button>
-          ))}
+        {/* ── LEAGUES — phone: scrollable pill chips (unchanged). >=641 (P5): a wrapping grid of
+            equal outlined INDEX TILES carrying live counts ("NFL 12"); 0-count leagues are hidden
+            (except the selected one) and the selected tile is the filled navy pill. ── */}
+        <div className="sport-tabs sport-index" data-no-swipe ref={sportTabsRef}>
+          {SPORT_TABS.map(t => {
+            const n = leagueCounts[t.key] || 0;
+            const zero = n === 0 && t.key !== 'all';
+            return (
+              <button key={t.key}
+                className={`sport-tab ${sportTab===t.key?'active':''} ${zero?'is-zero':''}`}
+                onClick={()=>{setSportTab(t.key); setActiveTeam(null); setTimeout(scrollToFeed,80);}}>
+                {t.icon && <t.icon size={14} strokeWidth={2.2}/>}
+                <span className="sport-tab-label">{t.label}</span>
+                <span className="sport-tab-count" aria-label={`${n} stories`}>{n}</span>
+              </button>
+            );
+          })}
         </div>
 
         {/* ── MY TEAMS — followed teams as a pill ribbon (Yahoo Sports style). A pill
@@ -399,11 +452,9 @@ export function SportsPage({ ctx }) {
             )}
 
             {/* 3-column story grid — ESPN visual punch for top stories */}
-            {feedItems.length > 0 && !activeTeam && (
+            {showGrid && (
               <div className="gn-row" style={{marginBottom:'24px'}}>
-                {feedItems.slice(0, 6).filter(a=>a.img).slice(0, 3).concat(
-                  feedItems.slice(0, 6).filter(a=>!a.img)
-                ).slice(0, 3).map((a, i) => (
+                {gridCards.map((a, i) => (
                   <article key={i} className="gn-card" onClick={()=>onRead(a)}>
                     <div className="gn-card-img"><CoverImg src={a.img} label={a.source}/></div>
                     <h3 className="gn-card-title">{a.title}</h3>
@@ -425,7 +476,7 @@ export function SportsPage({ ctx }) {
                 ? <EmptyState
                     message={activeTeam ? `No stories for ${activeTeam.team} yet.` : `Couldn't load Sports. Try refresh.`}
                     actionLabel="Refresh" onAction={refreshAll}/>
-                : feedItems.slice(activeTeam?0:3, 30).map((a, i) => (
+                : listItems.map((a, i) => (
                     <FeedCard key={i} a={a} cat="sports" isSaved={isSavedFn(a)} onSave={onSave} onRead={onRead} relatedSources={getRelated(a,'sports')} isRead={isReadFn(a)} userKw={kw} userTeams={teams}/>
                   ))
             }
@@ -507,7 +558,7 @@ export function SportsPage({ ctx }) {
             onRead={onRead}
             showScoreboard={false} recommended={recommended}
             isTopicFollowed={isTopicFollowed} toggleTopic={toggleTopic}
-            sopItems={(sportTab === 'all' || activeTeam) && !activeSrc && !search ? sportItems : null}
+            sopItems={(sportTab === 'all' || activeTeam) && !activeSrc && !search ? sopRailItems : null}
             sopMeta={CATS.sports} sopCollapsed={sopCollapsed} onToggleSop={toggleSop} formatDate={fmtDate}/>
         </div>}
       </div>

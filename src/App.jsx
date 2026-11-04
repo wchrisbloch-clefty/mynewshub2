@@ -92,15 +92,20 @@ import { isCloudSyncEnabled, hasCloudSession, getUserId, signInWithEmail, signOu
 // One brand accent across all sections — hierarchy comes from type, not colour-coded
 // boxes (editorial-premium, FT/NBC). Section identity is the label text itself.
 const CATS = {
-  general:    { label:'News',         color:'var(--accent)', bg:'var(--accent-bg)', emoji:'' },
-  sports:     { label:'Sports',       color:'var(--accent)', bg:'var(--accent-bg)', emoji:'' },
-  business:   { label:'Business',     color:'var(--accent)', bg:'var(--accent-bg)', emoji:'' },
-  finance:    { label:'Markets',      color:'var(--accent)', bg:'var(--accent-bg)', emoji:'' },
-  bloom:      { label:'Energy',       color:'var(--accent)', bg:'var(--accent-bg)', emoji:'' },
-  tech:       { label:'AI & Tech',    color:'var(--accent)', bg:'var(--accent-bg)', emoji:'' },
-  popculture: { label:'Pop Culture',  color:'var(--accent)', bg:'var(--accent-bg)', emoji:'' },
-  comedy:     { label:'Comedy',       color:'var(--accent)', bg:'var(--accent-bg)', emoji:'' },
-  health:     { label:'Health & Longevity', color:'var(--accent)', bg:'var(--accent-bg)', emoji:'' },
+  // P1/P3: each category carries its own muted identity colour (the --cat-*-text token, >=4.5:1
+  // on surface) instead of the single brand accent. This colours the EXISTING category signals
+  // (source/eyebrow text, the SoP label rule, active trending chips) — no new elements — so the
+  // app reads by category the way the AetherHub look wants. The brand navy --accent stays on the
+  // nav pill, buttons, links and focus rings (those use var(--accent) directly, not cc.color).
+  general:    { label:'News',         color:'var(--cat-general-text)',    bg:'var(--accent-bg)', emoji:'' },
+  sports:     { label:'Sports',       color:'var(--cat-sports-text)',     bg:'var(--accent-bg)', emoji:'' },
+  business:   { label:'Business',     color:'var(--cat-business-text)',   bg:'var(--accent-bg)', emoji:'' },
+  finance:    { label:'Markets',      color:'var(--cat-finance-text)',    bg:'var(--accent-bg)', emoji:'' },
+  bloom:      { label:'Energy',       color:'var(--cat-bloom-text)',      bg:'var(--accent-bg)', emoji:'' },
+  tech:       { label:'AI & Tech',    color:'var(--cat-tech-text)',       bg:'var(--accent-bg)', emoji:'' },
+  popculture: { label:'Pop Culture',  color:'var(--cat-popculture-text)', bg:'var(--accent-bg)', emoji:'' },
+  comedy:     { label:'Comedy',       color:'var(--cat-comedy-text)',     bg:'var(--accent-bg)', emoji:'' },
+  health:     { label:'Health & Longevity', color:'var(--cat-health-text)', bg:'var(--accent-bg)', emoji:'' },
 };
 
 // ── Energy subsector tagging (Pass L item 3) — classify an Energy (bloom) story into
@@ -1537,7 +1542,7 @@ body{
 /* N7c: reserve the EXACT loaded weather-band height per breakpoint — it wraps to ~45px on phones
    but is a single 26px row at 641–899px, so the old flat 49px reserve over-reserved at tablet
    widths and the band shrank ~23px when weather arrived (the 820 header shove). */
-.topbar-wx-reserve{min-height:45px;}
+.topbar-wx-reserve{min-height:26px;}
 @media(min-width:641px){ .topbar-wx-reserve{min-height:26px;} }
 .topbar-wx .rnw-card{max-width:1400px;margin:0 auto;padding:0 var(--s4);border:none;border-radius:0;background:none;}
 /* Scoreboard band in the top bar (below weather, above nav — Pass G item 3).
@@ -1553,7 +1558,27 @@ body{
    (ActiveScoresBar in <MobileHome/>), so hide the header copy at <=640 to avoid showing
    it twice. The header strip only ever renders on General, so this is Home-only; desktop
    and mobile category pages are unaffected. */
-@media(max-width:640px){ .topbar-scores{display:none;} }
+/* O2: show the Live Scores strip at the TOP of the scrolling header on phone (match the iPad
+   order; M1 had moved it mid-page). Compact band <=64px — tighter head + one scrolling tile row;
+   the min-height reserves its slot so scores loading causes no CLS. It scrolls away with the
+   header; only the nav/chip bar stays pinned. */
+@media(max-width:640px){
+  .topbar-scores{min-height:60px;}
+  /* O2: one horizontal band — the "Live Scores / Scores" label sits at the LEFT, the tile row
+     scrolls to its right, so the whole strip is a single compact line (<=64px). */
+  .topbar-scores .home-scores{padding:4px var(--s3);display:flex;align-items:center;gap:10px;}
+  .topbar-scores .home-scores-head{margin:0;flex:0 0 auto;max-width:58px;}
+  .topbar-scores .home-scores-label{line-height:1.1;}
+  .topbar-scores .home-scores-scroll{flex:1;min-width:0;}
+  /* compact strip: the "Sports →" link is redundant with the bottom-bar Sports tab, and its
+     44px touch target would blow the 64px budget — drop it here (not elsewhere). */
+  .topbar-scores .home-scores-see-all{display:none;}
+  .topbar-scores .score-tile{min-width:104px;padding:2px 8px;}
+  .topbar-scores .score-tile-side{gap:4px;line-height:1.15;}
+  .topbar-scores .score-tile-team,.topbar-scores .score-tile-score{font-size:11px;}
+  .topbar-scores .score-tile-logo{width:13px;height:13px;}
+  .topbar-scores .score-tile-status{font-size:8px;margin-top:0;}
+}
 /* N5: when the iPad-portrait-sections flag is on, MobileHome shows scores in its own body, so
    hide the header copy there too (avoids showing scores twice). Inert while the flag is off. */
 .hub.ipad-sections .topbar-scores{display:none;}
@@ -1599,10 +1624,11 @@ body{
      +2…") fades out instead of being hard-cut by the weather divider at ~1180 — the
      last FULLY visible item reads whole, and the fade is the "more →" cue. The ticker
      clips only inside its own box (overflow:hidden), never under the weather. */
-  -webkit-mask-image:linear-gradient(90deg,#000 0,#000 calc(100% - 56px),transparent);
-          mask-image:linear-gradient(90deg,#000 0,#000 calc(100% - 56px),transparent);}
+  -webkit-mask-image:linear-gradient(90deg,#000 0,#000 calc(100% - 72px),transparent);
+          mask-image:linear-gradient(90deg,#000 0,#000 calc(100% - 72px),transparent);}
 .ss-ticker-inner{display:flex;align-items:center;gap:var(--s4);overflow-x:auto;scrollbar-width:none;padding-right:12px;}
 .ss-ticker-inner::-webkit-scrollbar{display:none;}
+.ss-tk-clipped{display:none;}  /* O6: items the right edge would cut are hidden (whole items only) */
 .ss-tk{display:inline-flex;align-items:baseline;gap:6px;flex-shrink:0;
   background:none;border:none;cursor:pointer;font-family:inherit;padding:0;white-space:nowrap;}
 /* D3: ticker + weather share one role scale.
@@ -1642,6 +1668,12 @@ body{
   .rnw-feels{display:none;}
   .rnw-row{flex-wrap:wrap;gap:var(--s2) var(--s3);}
   .rnw-cities{flex-wrap:wrap;gap:var(--s2) var(--s3);}
+  /* O8: the header "Right Now" band is ONE compact line (<=32px) — cities inline, tap the caret
+     to expand the forecast (unchanged). Only the header copy; the in-body weather card keeps wrap. */
+  .topbar-wx .rnw-row{flex-wrap:nowrap;gap:var(--s3);padding:5px var(--s3);overflow:hidden;align-items:center;min-height:0;position:relative;}
+  /* keep a 44px tap area (expand forecast) without inflating the 32px band — invisible ::after */
+  .topbar-wx .rnw-row::after{content:'';position:absolute;inset:-7px 0;}
+  .topbar-wx .rnw-cities{flex-wrap:nowrap;gap:var(--s3);overflow:hidden;}
 }
 .houston-row{margin-bottom:var(--s4);}
 .houston-head{display:flex;align-items:baseline;gap:8px;margin-bottom:10px;}
@@ -1859,18 +1891,31 @@ body:not(.dark) .pill-bar{
 }
 .nav-tabs::-webkit-scrollbar{display:none;}
 .nav-tab{
+  position:relative;z-index:0;display:inline-flex;align-items:center;
   background:transparent;border:none;color:var(--text3);
   padding:0 11px;height:54px;cursor:pointer; /* F7: tighter tab spacing (was 0 14px) */
   font-family:var(--font-sans);font-size:12px;font-weight:700;
   white-space:nowrap;border-bottom:3px solid transparent;
-  transition:color 0.12s,border-color 0.12s;letter-spacing:0.03em;
+  transition:color 0.12s;letter-spacing:0.03em;
   text-transform:uppercase;
 }
-/* F7: ONE accent for the active section, made decisive — accent ink, heavier weight and
-   a full-weight 3px underline. Identity is the label + the single accent, never a colour
-   per tab. */
-.nav-tab.active{color:var(--accent);border-bottom-color:var(--accent);font-weight:800;}
-.nav-tab:hover:not(.active){color:var(--text2);}
+/* P4: the active section is a filled brand-navy rounded pill with its tuned on-accent ink
+   (white in light, dark ink in dark — both >=4.5:1 by G1), not an underline. The pill is drawn
+   by a ::before inset inside the 54px tab so the row height and tab width are unchanged; z-index
+   keeps the label above the fill. Replaces the F7 accent-ink + 3px underline treatment. */
+.nav-tab.active{color:var(--on-accent);border-bottom-color:transparent;font-weight:800;}
+.nav-tab.active::before{content:'';position:absolute;inset:11px 2px;border-radius:999px;background:var(--accent);z-index:-1;}
+/* Hover only on real pointers (P4) — a quiet pill tint, never on touch where it would stick. */
+@media(hover:hover){
+  .nav-tab:hover:not(.active){color:var(--text);}
+  .nav-tab:hover:not(.active)::before{content:'';position:absolute;inset:11px 2px;border-radius:999px;background:var(--surface2);z-index:-1;}
+}
+/* P4: a thin vertical divider separates the primary category tabs from the secondary
+   destinations grouped under More (Sources / Saved / overflow). Nav tabs are hidden below
+   641px, so this only shows on the >=641 desktop/tablet nav. */
+@media(min-width:641px){
+  .nav-more::before{content:'';align-self:center;flex-shrink:0;width:1px;height:20px;background:var(--border);margin:0 10px 0 6px;}
+}
 .nav-right{display:flex;gap:8px;align-items:center;flex-shrink:0;padding-left:16px;border-left:1px solid var(--border);}
 /* D1: priority-overflow nav. The visible row is flex (no scroll); the hidden
    measuring row holds the full set at natural width for the fit calculation. */
@@ -1997,6 +2042,16 @@ body:not(.dark) .pill-bar{
 .fc:last-child{border-bottom:none;}
 .fc:hover{background:var(--surface2);}
 .fc:active{transform:scale(0.999);}
+/* O5: on touch, :hover persists after a tap and left rows with a stuck grey tint / a raised
+   shadow card. These list rows all have a TRANSPARENT resting background, so clearing the hover
+   background (and the lead's shadow/transform, and the State-of-Play dim) on coarse pointers
+   restores the resting look. Real pointers keep the affordance (rules above, unchanged). */
+@media (hover:none){
+  .fc:hover,.today-item:hover,.hero-side-item:hover,.sb-across-item:hover,.bloom-strip-item:hover,
+  .hero-band-side-item:hover,.fin-wl-row:hover,.conn-row:hover,.pm-row:hover,.mh-compact:hover{background:none;}
+  .hero-lead:hover,.score-tile:hover,.social-handle:hover{box-shadow:none;transform:none;}
+  .sop-item:hover{opacity:1;}
+}
 
 .fc-meta{display:flex;align-items:center;gap:8px;margin-bottom:10px;flex-wrap:wrap;}
 .fc-source{
@@ -2040,9 +2095,11 @@ body:not(.dark) .pill-bar{
   overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;}
 .fc-text{flex:1;min-width:0;}
 .fc-title{
-  /* TIME Magazine: Source Serif 4 bold serif headline — the definitive editorial signal */
-  font-family:var(--font-serif);
-  font-size:18px;font-weight:700;color:var(--text);line-height:1.25;
+  /* P3: the standard/compact feed row is a scannable list row, so it takes the sans at medium
+     weight (600). Serif stays on the editorial leads (hero, Top Stories, section leads, the
+     lead card). Same size/line-height/clamp as before, so the row geometry is unchanged. */
+  font-family:var(--font-sans);
+  font-size:18px;font-weight:600;color:var(--text);line-height:1.25;
   letter-spacing:-0.2px;margin-bottom:6px;
   display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden;
   overflow-wrap:break-word;
@@ -2164,6 +2221,17 @@ body:not(.dark) .pill-bar{
   /* Flows in normal document scroll along with the main column — no sticky/fixed
      positioning and no internal scroll container. */
 }
+/* P2 (AetherHub anatomy): every right-rail module is a light-bordered card in NORMAL FLOW.
+   flex-shrink:0 is the O1 overlap fix — the sticky rail's max-height + overflow let a tall
+   module shrink below its content and spill onto the next module; now each module keeps its
+   full height and pushes the next one down (reserved heights stay min-height FLOORS). */
+.sidebar > *{flex-shrink:0;}
+.sidebar-sop,.sidebar-section{
+  border:1px solid var(--border);border-radius:8px;background:var(--surface);
+  padding:12px 14px;min-width:0;
+}
+/* inside a card the header rule is a hairline, not the old heavy 2px rule */
+.sidebar-sop .sop-head,.sidebar-section > .sidebar-sec-head{border-bottom:1px solid var(--border2);}
 
 /* Ghost sidebar section */
 .gs-section{display:flex;flex-direction:column;gap:0;}
@@ -2908,6 +2976,8 @@ body:not(.dark) .pill-bar{
 .gn-lead-text{display:flex;flex-direction:column;}
 .gn-lead-title{
   /* Top-Stories-module hero — smaller than the page hero token, per Pass G addendum */
+  /* P3: Top Stories is an editorial lead, so its headline is serif (the dense rows go sans). */
+  font-family:var(--font-serif);
   font-size:20px;font-weight:700;line-height:1.2;
   letter-spacing:-0.3px;color:var(--text);margin:0 0 8px;
   display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden;
@@ -3246,6 +3316,19 @@ body:not(.dark) .pill-bar{
 /* Team icon inside a pill: keep it legible on the blue active pill. */
 .sport-tab .team-logo{width:16px;height:16px;border-radius:5px;}
 .sport-tab.active .team-logo-ph{background:rgba(255,255,255,0.9);}
+/* P5: the count lives on the >=641 index tiles only; the phone chip row stays label-only. */
+.sport-tab-count{display:none;}
+@media(min-width:641px){
+  /* Sports INDEX (the league row, not the My Teams ribbon): a wrapping grid of equal outlined
+     tiles — never a horizontal scroll. Each tile is "Label N"; the selected tile is the filled
+     navy pill (inherited from .sport-tab.active); 0-count leagues are hidden unless selected. */
+  .sport-index{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:8px;overflow:visible;padding-bottom:12px;}
+  .sport-index .sport-tab{border-radius:10px;justify-content:space-between;min-height:40px;padding:8px 12px;}
+  .sport-index .sport-tab-label{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0;}
+  .sport-index .sport-tab-count{display:inline-flex;align-items:center;justify-content:center;flex-shrink:0;min-width:20px;height:18px;padding:0 6px;border-radius:9px;background:var(--surface);border:1px solid var(--border);font-size:11px;font-weight:800;color:var(--text3);font-variant-numeric:tabular-nums;}
+  .sport-index .sport-tab.active .sport-tab-count{background:rgba(255,255,255,0.22);border-color:transparent;color:var(--on-accent);}
+  .sport-index .sport-tab.is-zero:not(.active){display:none;}
+}
 
 /* ── LEAGUE HEADER — ESPN-style hero banner ── */
 .sport-league-header{
@@ -3416,6 +3499,8 @@ body:not(.dark) .pill-bar{
 }
 .sports-hero-text{display:flex;flex-direction:column;justify-content:center;}
 .sports-hero-title{
+  /* P3: the Sports page hero is an editorial lead → serif (dense Sports rows go sans). */
+  font-family:var(--font-serif);
   font-size:26px;font-weight:900;line-height:1.18;
   letter-spacing:-0.5px;color:var(--text);margin:0 0 10px 0;
   display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden;
@@ -4437,7 +4522,7 @@ body{overscroll-behavior-y:contain;}
   .fc-body{flex-direction:row;gap:8px;align-items:flex-start;}
   .fc-thumb,.fc-thumb-ph{width:90px;height:68px;flex-shrink:0;border-radius:6px;}
   .fc-text{flex:1;min-width:0;}
-  .fc-title{font-size:15px;-webkit-line-clamp:3;letter-spacing:0;line-height:1.3;font-weight:700;}
+  .fc-title{font-size:15px;-webkit-line-clamp:3;letter-spacing:0;line-height:1.3;font-weight:600;}
   .fc-desc{display:none;}
   .fc-meta{margin-bottom:5px;order:-1;font-size:10px;}
   .fc-act{padding:6px 10px;font-size:var(--fs-meta);min-height:36px;border-radius:18px;}
@@ -4630,7 +4715,10 @@ body{overscroll-behavior-y:contain;}
 
 /* Skeleton loading shimmer for feed cards */
 @keyframes shimmer{0%{background-position:-200% 0;}100%{background-position:200% 0;}}
-.fc-skeleton{padding:20px 14px;border-bottom:1px solid var(--border2);}
+/* P6: loading placeholders are light-bordered cards (the AetherHub row anatomy — 1px border,
+   10px radius, 14px padding, 12px gap) at a row-matching min-height, so the skeleton previews
+   the loaded layout instead of a bare divider and nothing jumps when content swaps in. */
+.fc-skeleton{padding:14px;border:1px solid var(--border);border-radius:10px;background:var(--surface);margin-bottom:12px;min-height:92px;}
 .fc-skeleton-line{height:14px;border-radius:4px;background:linear-gradient(90deg,var(--surface2) 25%,var(--border) 50%,var(--surface2) 75%);background-size:200% 100%;animation:shimmer 1.4s infinite;margin-bottom:8px;}
 .fc-skeleton-title{height:18px;width:80%;border-radius:4px;background:linear-gradient(90deg,var(--surface2) 25%,var(--border) 50%,var(--surface2) 75%);background-size:200% 100%;animation:shimmer 1.4s infinite;margin-bottom:10px;}
 
@@ -5788,7 +5876,11 @@ kbd{display:inline-block;padding:1px 5px;border:1px solid var(--border);border-r
    desktop/iPad keep their compact controls (hover:hover), so this does not change their
    output. Each control named here measured <44px on a phone before this rule. */
 @media (max-width:640px), (hover:none){
-  .snap-ask,.snap-save{min-width:44px;min-height:44px;justify-content:center;}
+  /* O5/P2: .snap-ask and .snap-save already carry a 44px HIT target via their ::after inset
+     (SnapshotCard.css) while keeping a 32px VISUAL box, so they are NOT forced to a 44px box
+     here — a 44px box overflowed the short standard row and bled the "Ask" button 3px into the
+     next section's headline (a real text overlap). The ::after keeps the tap target >=44px. */
+  .snap-ask,.snap-save{min-width:44px;justify-content:center;}
   .mobile-icon-btn{min-width:44px;min-height:44px;}
   /* N1: controls that measured <44px on touch tablets/landscape (the phone-only rules didn't
      reach them). Desktop mouse (hover:hover) is unaffected. The market ticker (.ss-tk) is exempt —
@@ -6977,6 +7069,12 @@ function Sidebar({cat, arts, kw, health, activeKw, setActiveKw, activeSource, se
   const srcCounts = {};
   catArts.forEach(a=>{srcCounts[a.source]=(srcCounts[a.source]||0)+1;});
   const sources = [...new Set(catArts.map(a=>a.source))];
+  // P6: honest source status — how many of the user's sources have actually returned (green),
+  // and how many are still being fetched (no health reported yet). The rest responded stale or
+  // failed. The "still loading" clause disappears once everything has resolved.
+  const srcLive = sources.filter(n => health[n] === 'green').length;
+  const srcLoading = sources.filter(n => !health[n]).length;
+  const srcStatusLabel = `Sources · ${srcLive}/${sources.length} live${srcLoading ? ` · ${srcLoading} still loading` : ''}`;
 
   // L3: Sources collapsed by default AND remembered (persisted), like Trending / Following
   // / Prediction Markets. Still force-opens when a source filter is active.
@@ -7189,7 +7287,7 @@ function Sidebar({cat, arts, kw, health, activeKw, setActiveKw, activeSource, se
           <div className="sidebar-sec-head">
             <button className="sidebar-sec-collapse" onClick={()=>setShowSources(s=>!s)}>
               <span className="sidebar-sec-label">
-                {activeSource ? `Source: ${activeSource}` : `Sources · ${sources.length}`}
+                {activeSource ? `Source: ${activeSource}` : srcStatusLabel}
               </span>
               <span className="gs-collapse-chevron" style={{fontSize:'10px',color:'var(--text4)'}}><ChevronDown size={11} aria-hidden="true" style={{transform:showSources?'none':'rotate(-90deg)',transition:"transform .15s"}}/></span>
             </button>
@@ -8049,6 +8147,34 @@ function TopBar({tab, setTab, search, setSearch, dark, setDark,
     }
   }, [tab]);
 
+  // O6: show WHOLE market-ticker items only. Any item whose right edge is clipped by the
+  // container (the weather divider on iPad) is hidden, so nothing reads as cut mid-glyph
+  // ("BLOOM $201.06 −("). Re-fits on container resize AND when quote text changes width
+  // (ResizeObserver + MutationObserver — no timers). The fade mask stays as the "more" cue.
+  const tickerRef = useRef(null);
+  useEffect(() => {
+    const el = tickerRef.current;
+    if (!el || typeof ResizeObserver === 'undefined') return;
+    const clip = el.closest('.ss-ticker') || el;  // the overflow:hidden box (the visible edge)
+    const fit = () => {
+      // reveal all (so positions are the full flow), then hide the FIRST item the right edge cuts
+      // and every item after it — showing only the whole items that fit.
+      const items = [...el.querySelectorAll('.ss-tk')];
+      items.forEach(it => it.classList.remove('ss-tk-clipped'));
+      const right = clip.getBoundingClientRect().right - 6;
+      let hide = false;
+      for (const it of items) {
+        if (hide) { it.classList.add('ss-tk-clipped'); continue; }
+        if (it.getBoundingClientRect().right > right) { it.classList.add('ss-tk-clipped'); hide = true; }
+      }
+    };
+    fit();
+    const ro = new ResizeObserver(fit); ro.observe(el); ro.observe(clip);  // weather loading narrows `clip`
+    let mo; try { mo = new MutationObserver(fit); mo.observe(el, { subtree: true, characterData: true, childList: true }); } catch { /* noop */ }
+    const t = setTimeout(fit, 700);  // one late pass after quotes + weather settle (not a poll)
+    return () => { ro.disconnect(); mo && mo.disconnect(); clearTimeout(t); };
+  }, []);
+
   return (
     <>
     {/* L1: SCORES -> Markets/weather live in a NON-sticky block that scrolls away; only
@@ -8067,7 +8193,7 @@ function TopBar({tab, setTab, search, setSearch, dark, setDark,
               lives ONLY as tagged rows inside State of Play. The strip is markets-only. */}
           <span className="ss-flag ss-flag-markets">Markets</span>
           <div className="ss-ticker">
-            <div className="ss-ticker-inner" data-no-swipe>
+            <div className="ss-ticker-inner" data-no-swipe ref={tickerRef}>
               {INDICES.filter(idx=>!(hiddenIndices||[]).includes(idx.sym)).map(idx=>{
                 const q=quotes[idx.sym]; const up=q?q.chg>=0:null;
                 return (

@@ -11,8 +11,12 @@
 .snap-hero-media{position:relative;width:100%;aspect-ratio:16/9;overflow:hidden;border-radius:10px;}
 .snap-hero-img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;display:block;background:var(--surface2);}
 .snap-hero-overlay{position:absolute;inset:0;display:flex;flex-direction:column;justify-content:flex-end;padding:16px;
-  /* >=0.70 opacity across the whole text band (bottom ~45%) so white passes 4.5:1 even on a bright image */
-  background:linear-gradient(to top, rgba(0,0,0,0.88) 0%, rgba(0,0,0,0.80) 28%, rgba(0,0,0,0.45) 52%, rgba(0,0,0,0) 72%);}
+  /* O7: the scrim must hold white at >=4.5:1 across the ENTIRE text band — not just the very
+     bottom — even over a pure-white photo (the worst case). The band runs from the padding up
+     through the top of a 3-line title (~bottom 60% of the media), so the gradient stays >=0.62
+     black to 62% before fading to clear by 84% (the top ~16% of the image is left untinted so
+     the photo still reads). Verified by pixel sampling over a white image in o7-hero-contrast. */
+  background:linear-gradient(to top, rgba(0,0,0,0.92) 0%, rgba(0,0,0,0.78) 55%, rgba(0,0,0,0.58) 72%, rgba(0,0,0,0) 90%);}
 .snap-hero-meta{display:flex;align-items:center;gap:8px;margin-bottom:6px;}
 .snap-hero-overlay .snap-hero-source{font-family:var(--font-sans);font-size:var(--fs-meta);font-weight:800;text-transform:uppercase;letter-spacing:0.06em;color:#fff;}
 .snap-hero-overlay .snap-hero-time{font-family:var(--font-sans);font-size:var(--fs-meta);color:rgba(255,255,255,0.85);}
@@ -34,14 +38,15 @@
    padding token, and a min-height so a text-only row matches an image row (rhythm holds). */
 .snap-card{display:flex;align-items:flex-start;gap:14px;background:none;border:none;border-radius:0;
   border-bottom:1px solid var(--border2);cursor:pointer;transition:background 0.12s;}
-.snap-card:hover{background:var(--surface2);}
+/* O5: row tint only on real pointers — on touch it stuck as a grey tap-highlight. */
+@media (hover:hover){ .snap-card:hover{background:var(--surface2);} }
 /* K7: skip rendering rows that are off-screen (the browser keeps their reserved height
    via contain-intrinsic-size, so scrolling stays cheap and nothing shifts). */
 .snap-row{min-height:108px;content-visibility:auto;contain-intrinsic-size:auto 156px;}
 .snap-accent{display:none;}                 /* accent left bar removed */
 .snap-breaking .snap-accent{display:none;}
-.snap-main{flex:1;min-width:0;padding:12px 0;order:1;}
-.snap-meta{display:flex;align-items:center;gap:8px;margin-bottom:7px;flex-wrap:wrap;}
+.snap-main{flex:1;min-width:0;padding:10px 0;order:1;}
+.snap-meta{display:flex;align-items:center;gap:8px;margin-bottom:4px;flex-wrap:wrap;}
 .snap-source{font-family:var(--font-sans);font-size:var(--fs-meta);font-weight:700;text-transform:uppercase;letter-spacing:0.05em;}
 .snap-live{font-family:var(--font-sans);font-size:9px;font-weight:800;color:#fff;background:var(--red);border-radius:4px;padding:2px 6px;letter-spacing:0.06em;}
 .snap-tag{font-family:var(--font-sans);font-size:10px;font-weight:700;border-radius:20px;padding:2px 9px;text-transform:uppercase;letter-spacing:0.03em;}
@@ -52,10 +57,17 @@
 .snap-time{font-family:var(--font-sans);font-size:var(--fs-meta);color:var(--text3);}
 /* F3: single meta row — time (+ sources) left, actions right. */
 .snap-foot-left{display:inline-flex;align-items:center;gap:10px;min-width:0;flex-wrap:wrap;}
-.snap-title{font-family:var(--font-serif);font-weight:800;font-size:18px;line-height:1.22;letter-spacing:-0.2px;color:var(--text);margin:0 0 6px;overflow-wrap:anywhere;word-break:break-word;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden;}
+/* P3: the STANDARD row headline is a scannable list row, so it takes the sans at medium weight
+   (600). Serif is reserved for the editorial leads — .snap-lead .snap-title and the hero overlay
+   title both override this via higher specificity, so they stay serif. Same size/line-height/clamp
+   as before, so the row box geometry is unchanged. */
+.snap-title{font-family:var(--font-sans);font-weight:600;font-size:18px;line-height:1.22;letter-spacing:-0.2px;color:var(--text);margin:0 0 6px;overflow-wrap:anywhere;word-break:break-word;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden;}
 /* K6: the deck is clamped to 2 lines AND reserves 2 lines of height, so a short standfirst
    doesn't shorten the row — the list rhythm stays even across mixed content. */
-.snap-snippet{font-family:var(--font-sans);font-size:var(--fs-body);line-height:1.5;color:var(--text2);margin:0 0 10px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;overflow-wrap:anywhere;word-break:break-word;min-height:3em;}
+/* O5: no forced 3-line reserve (the excerpt ships with the item — no async, no CLS), one-line
+   clamp on dense list rows so a STANDARD row isn't padded out; the LEAD keeps its 2-line deck. */
+.snap-snippet{font-family:var(--font-sans);font-size:var(--fs-body);line-height:1.45;color:var(--text2);margin:0 0 7px;display:-webkit-box;-webkit-line-clamp:1;-webkit-box-orient:vertical;overflow:hidden;overflow-wrap:anywhere;word-break:break-word;}
+.snap-lead .snap-snippet,.snap-lead-hero .snap-snippet{-webkit-line-clamp:2;}
 /* F5: mobile deck/summary text = 14px / 1.5 (headlines unchanged, dense list rows unchanged). */
 @media(max-width:640px){ .snap-snippet{font-size:14px;line-height:1.5;} }
 .snap-byline{font-family:var(--font-sans);font-size:var(--fs-meta);color:var(--text3);}
@@ -98,7 +110,10 @@
 .snap-foot-actions{display:inline-flex;align-items:center;gap:8px;flex-shrink:0;}
 .snap-ask{background:none;border:1px solid var(--border);border-radius:8px;padding:5px 10px;cursor:pointer;color:var(--text3);display:inline-flex;align-items:center;gap:5px;font-family:var(--font-sans);font-size:var(--fs-meta);font-weight:700;transition:color 0.12s,border-color 0.12s;}
 .snap-ask:hover{color:var(--accent);border-color:var(--accent);}
-@media(max-width:640px){ .snap-ask{min-height:44px;} .snap-save{min-height:44px;} }
+/* O5: the Ask/Save buttons are 32px VISUAL but keep a 44px tap area via an invisible ::after
+   that extends the hit box without taking any layout height — so the foot row stays slim. */
+.snap-ask,.snap-save{position:relative;min-height:32px;}
+.snap-ask::after,.snap-save::after{content:'';position:absolute;inset:-6px;}
 /* Thumbnail is a FIXED size, capped regardless of the column/main-column width, so
    standard feed cards stay headline-forward and balanced against the sidebar. Height
    is capped too so a tall card can't stretch the image into a large square. (The
@@ -125,7 +140,7 @@
   .snap-main,.snap-skel-main{order:1;padding:12px 0;}
   .snap-thumb,.snap-skel-thumb{order:0;width:88px;height:66px;aspect-ratio:4/3;margin:12px 0;border-radius:8px;}
   .snap-row{min-height:90px;}
-  .snap-title{font-family:var(--font-serif);font-size:16px;line-height:1.25;-webkit-line-clamp:2;} /* K6: one consistent clamp for rhythm */
+  .snap-title{font-family:var(--font-sans);font-weight:600;font-size:16px;line-height:1.25;-webkit-line-clamp:2;} /* K6: one consistent clamp for rhythm; P3: sans on the standard row (lead stays serif below) */
   .snap-snippet{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;} /* K6: 2-line deck */
   .snap-meta{margin-bottom:4px;}
   /* THE LEAD — full-bleed image, large serif headline, one meta line. */

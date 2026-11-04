@@ -52,15 +52,18 @@
    0.08em tracking. Was weight 800 / --text2 / 0.14em / a hardcoded 10px. */
 .sop-sidebar .sop-label{border-left:none;padding-left:0;font-family:var(--font-sans);font-size:var(--fs-eyebrow);font-weight:700;color:var(--text3);letter-spacing:0.08em;}
 .sop-sidebar .sop-collapse{margin-left:auto;}
-.sop-sidebar .sop-item{flex-wrap:wrap;align-items:flex-start;padding:7px 0;gap:3px 8px;}
-/* D4: tokenized (was 13px) — sidebar rows track the main body scale. */
-.sop-sidebar .sop-num{font-size:var(--fs-body);min-width:18px;}
-.sop-sidebar .sop-item-title{font-size:var(--fs-body);line-height:1.32;}
-.sop-sidebar .sop-item-meta{width:100%;padding-left:26px;justify-content:flex-start;gap:6px;flex-shrink:1;}
+/* P2: one row anatomy — grid [number 24px][content]; the headline on line 1 and ONE meta
+   line directly under it (no wrap, no dead vertical gap). Breaking dot / num sit in column 1. */
+.sop-sidebar .sop-item{display:grid;grid-template-columns:24px 1fr;align-items:start;column-gap:8px;row-gap:2px;padding:9px 0;}
+.sop-sidebar .sop-num{grid-column:1;grid-row:1 / span 2;align-self:start;font-size:var(--fs-body);min-width:0;}
+.sop-sidebar .sop-brk-dot{grid-column:1;grid-row:1;align-self:center;margin:0;}
+/* P3: dense rail rows use the sans at medium weight (serif stays on the lead/hero). */
+.sop-sidebar .sop-item-title{grid-column:2;grid-row:1;font-family:var(--font-sans);font-weight:500;font-size:var(--fs-body);line-height:1.35;-webkit-line-clamp:3;}
+.sop-sidebar .sop-item-meta{grid-column:2;grid-row:2;width:auto;padding-left:0;justify-content:flex-start;gap:6px;flex-wrap:wrap;}
 .sop-sidebar .sop-item-time{font-size:10px;}
 .sop-sidebar .sop-item-sources{font-size:9px;padding:1px 6px;}
 /* Coverage-gap rows: badge + outlets under the headline; Follow on its own line. */
-.sop-item-gap-stacked{flex-direction:column;align-items:stretch!important;gap:5px!important;padding:9px 0!important;}
+.sop-item-gap-stacked{display:flex!important;flex-direction:column;align-items:stretch!important;gap:5px!important;padding:9px 0!important;}
 .sop-gap-headline{display:flex;gap:8px;align-items:flex-start;}
 .sop-gap-below{display:flex;flex-wrap:wrap;align-items:center;gap:6px;padding-left:26px;}
 .sop-gap-below .sop-item-time{white-space:normal;}

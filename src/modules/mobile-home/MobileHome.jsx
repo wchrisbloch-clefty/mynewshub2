@@ -244,10 +244,8 @@ export function MobileHome({ ctx }) {
           </section>
         : (!generalLoaded && <div className="mh-breaking mh-breaking-reserve" aria-hidden="true"><SectionSkeleton rows={3}/></div>)}
 
-      {/* LIVE SCORES — one slim row; ActiveScoresBar self-hides when nothing is live/today */}
-      {ActiveScoresBar && (
-        <div className="mh-scores"><ActiveScoresBar favTeams={favTeams} onGoToSports={() => navigate('sports')}/></div>
-      )}
+      {/* O2: Live Scores moved to the TOP of the scrolling header stack (match iPad order:
+          Scores → Markets/weather → nav), so it is no longer rendered here mid-page. */}
 
       {/* CATEGORY SECTIONS */}
       {model.sections.map((s, i) => (
