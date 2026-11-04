@@ -28,7 +28,11 @@
 .snap-lead-hero .snap-snippet{font-size:var(--fs-body);-webkit-line-clamp:2;}
 @media(max-width:640px){
   /* Mobile: hero image full-bleed; only the TEXT block keeps the 16px side padding. */
-  .snap-lead-hero .snap-hero-media{width:100vw;max-width:none;margin:0 -16px;border-radius:0;}
+  /* S5b: true full-bleed that does NOT depend on the page gutter. The old margin:0 -16px assumed a
+     16px gutter, but the mobile-home page gutter is 12px, so the hero overshot 4px left and fell
+     4px short of the right edge (the sliver CB saw). calc(50% - 50vw) always pins the element to
+     the viewport edges regardless of the (symmetric) gutter. */
+  .snap-lead-hero .snap-hero-media{width:100vw;max-width:none;margin-left:calc(50% - 50vw);margin-right:0;border-radius:0;}
   .snap-lead-hero .snap-main{padding:10px 0 14px;}
   .snap-hero-overlay .snap-hero-title{font-size:22px;}
 }
@@ -146,7 +150,7 @@
   /* THE LEAD — full-bleed image, large serif headline, one meta line. */
   .snap-lead{flex-direction:column;border-top:none;margin:0 0 6px;}
   .snap-lead .snap-accent{display:none;}
-  .snap-lead .snap-thumb{order:-1;width:100vw;max-width:100%;height:auto;aspect-ratio:3/2;margin:0 -16px;border-radius:0;align-self:stretch;}
+  .snap-lead .snap-thumb{order:-1;width:100vw;max-width:none;height:auto;aspect-ratio:3/2;margin-left:calc(50% - 50vw);margin-right:0;border-radius:0;align-self:stretch;} /* S5b: gutter-independent full-bleed */
   .snap-lead .snap-main{padding:14px 0 16px;}
   .snap-lead .snap-title{font-family:var(--font-serif);font-size:26px;line-height:1.12;letter-spacing:-0.3px;-webkit-line-clamp:4;}
   .snap-lead .snap-snippet{display:-webkit-box;font-size:14px;line-height:1.5;-webkit-line-clamp:2;margin-bottom:8px;}

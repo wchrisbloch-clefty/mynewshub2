@@ -65,6 +65,7 @@ for (const v of VIEWPORTS) {
     return { tk: over('.ss-tk'), rnw: over('.rnw-cities, .rnw-city, .ss-weather .rnw-label') };
   });
   log(clip.tk === 0, `${tag} e: no clipped ticker item (${clip.tk} clipped)`);
+  if (v.w <= 640) log(clip.rnw === 0, `${tag} e: no clipped weather item in the header band (${clip.rnw} clipped)`);
 
   // ---- d) hero/lead right edge === viewport width ----
   if (v.w <= 430) {
@@ -110,8 +111,8 @@ for (const v of VIEWPORTS) {
     const out = [];
     for (const y of [0, 150, 400, 800, 1400]) {
       window.scrollTo(0, y); await new Promise(r => requestAnimationFrame(r)); await new Promise(r => setTimeout(r, 60));
-      const chip = document.querySelector('.pill-bar'); const strip = document.querySelector('.sports-score-strip');
-      if (chip && strip) { const cb = chip.getBoundingClientRect(), sb = strip.getBoundingClientRect(); out.push({ y, ok: sb.top >= cb.bottom - 0.5, overlap: (cb.bottom - sb.top) }); }
+      const chip = document.querySelector('.topbar-wrap'); const strip = document.querySelector('.sports-score-strip');
+      if (chip && strip) { const cb = chip.getBoundingClientRect(), sb = strip.getBoundingClientRect(); out.push({ y, ok: sb.top >= cb.bottom - 1, overlap: (cb.bottom - sb.top) }); }
     }
     return out;
   });

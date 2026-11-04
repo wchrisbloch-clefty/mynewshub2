@@ -1677,6 +1677,11 @@ body{
   /* keep a 44px tap area (expand forecast) without inflating the 32px band — invisible ::after */
   .topbar-wx .rnw-row::after{content:'';position:absolute;inset:-7px 0;}
   .topbar-wx .rnw-cities{flex-wrap:nowrap;gap:var(--s3);overflow:hidden;}
+  /* S5a: in the one-line HEADER band, show only the FIRST city in full (HOUSTON 69° Clear) so it
+     never clips mid-word ("LOUISVILLE 6…"). The other cities stay one tap away in the forecast the
+     caret expands. The in-body Right Now card (not .topbar-wx) still shows every city. */
+  .topbar-wx .rnw-city-item{flex-shrink:0;}
+  .topbar-wx .rnw-city-item:not(:first-child){display:none;}
 }
 .houston-row{margin-bottom:var(--s4);}
 .houston-head{display:flex;align-items:baseline;gap:8px;margin-bottom:10px;}
@@ -5968,7 +5973,10 @@ kbd{display:inline-block;padding:1px 5px;border:1px solid var(--border);border-r
 /* ═══════════ v46 — STICKY SPORTS SCORE STRIP (mobile) ═══════════ */
 @media(max-width:640px){
   .sports-page .sports-score-strip{
-    position:sticky;top:env(safe-area-inset-top, 0);z-index:110;
+    /* S5c: stick BELOW the sticky header (nav + chips), not at viewport top — otherwise the
+       z:300 header covered the strip's top ~12-16px and hid each card's first team row. --sticky-h
+       is the header's live measured height (S2); it tracks the header shrinking on scroll. */
+    position:sticky;top:calc(var(--sticky-h, 56px) + env(safe-area-inset-top, 0));z-index:110;
     box-shadow:0 3px 10px rgba(0,0,0,0.25);
   }
 }
