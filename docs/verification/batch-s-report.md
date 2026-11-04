@@ -21,7 +21,7 @@ strip tucked under the chip bar. **S0** re-runs the geometry assertions under to
 | Gate | Result |
 |---|---|
 | `test/visual/touch-mode.test.mjs` (S0) at 390/430/834/1194 touch | **ALL PASS** (13 assertions failed on main → 0 after) |
-| `test/visual/text-overlap.test.mjs` (10 widths × 5 pages × light/dark) | _(filled below)_ |
+| `test/visual/text-overlap.test.mjs` (10 widths × 5 pages × light/dark) | **PASS — 0 overlaps** |
 | `sports-dedup`, `o7-hero-contrast`, `p5-sports-index` (Batch O) | **PASS** |
 | Unit tests (11): promo, connections, railDedup, opinion, satire, share, heldList, state-of-play select, swipe-gesture, **source-name (S3)**, **top-stories select (S7)** | **PASS** |
 | Hard constraints vs `main`: new `api/` files / new `setInterval` / new hex outside `tokens.css` / SW changed | **0 / 0 / 0 / 0** |
