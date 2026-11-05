@@ -2410,6 +2410,7 @@ body:not(.dark) .pill-bar{
 .ttp-chip.active .ttp-chip-star{color:rgba(255,255,255,0.85);}
 
 /* Across MyNewsHub — compact text list in the sidebar (Pass J item 4). */
+.sb-across{min-height:520px;} /* W2: reserve the loaded height as a FLOOR (O1: min, never cap; module stays in normal flow) so streaming items don't shift the rail siblings below */
 .sb-across-cat{margin-bottom:12px;}
 .sb-across-cat:last-child{margin-bottom:0;}
 .sb-across-clabel{background:none;border:none;cursor:pointer;font-family:inherit;padding:0 0 5px;font-size:var(--fs-label);font-weight:800;text-transform:uppercase;letter-spacing:0.08em;display:block;color:var(--text2);}  /* V2: neutral section label (was category colour) */
@@ -7293,7 +7294,12 @@ function Sidebar({cat, arts, kw, health, activeKw, setActiveKw, activeSource, se
 
       {/* 4) ACROSS MYNEWSHUB — cross-category recirculation, moved into the sidebar
             (Pass J item 4), General only. Text-only compact rows for the narrow column. */}
-      {acrossSections && acrossSections.length > 0 && !activeKw && !activeSource && (
+      {/* W2: render the reserved container whenever acrossSections is an array (incl. the
+          transient empty [] during load), so the module filling in does not push the rail
+          siblings below it (the dominant Energy-desktop shifter). The .sb-across min-height
+          floor (CSS) holds the slot; it collapses to nothing only when acrossSections is null
+          (Home / filtered views), so no idle whitespace where the module legitimately absent. */}
+      {Array.isArray(acrossSections) && !activeKw && !activeSource && (
         <div className="sidebar-section sb-across">
           <div className="sidebar-sec-head"><span className="sidebar-sec-label">Across MyNewsHub</span></div>
           {acrossSections.slice(0, 4).map(section => (
