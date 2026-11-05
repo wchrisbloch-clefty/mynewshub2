@@ -1,10 +1,10 @@
 /* Shared section loading/error states (M3). Consumes design tokens (src/styles/tokens.css). */
 .sect-skel{display:flex;flex-direction:column;gap:12px;}
-.sect-skel-lead{width:100%;aspect-ratio:16/9;border-radius:10px;background:linear-gradient(90deg,var(--surface2) 25%,var(--border) 50%,var(--surface2) 75%);background-size:200% 100%;animation:shimmer 1.4s infinite;}
+.sect-skel-lead{width:100%;aspect-ratio:16/9;border-radius:var(--radius-md);background:linear-gradient(90deg,var(--surface2) 25%,var(--border) 50%,var(--surface2) 75%);background-size:200% 100%;animation:shimmer 1.4s infinite;}
 .sect-skel-row{display:flex;gap:12px;align-items:flex-start;min-height:72px;}
 .sect-skel-thumb{width:96px;height:72px;flex-shrink:0;border-radius:8px;background:var(--surface2);}
 .sect-skel-lines{flex:1;display:flex;flex-direction:column;gap:9px;padding-top:4px;}
-.sect-skel-lines span{height:13px;border-radius:5px;background:linear-gradient(90deg,var(--surface2) 25%,var(--border) 50%,var(--surface2) 75%);background-size:200% 100%;animation:shimmer 1.4s infinite;}
+.sect-skel-lines span{height:13px;border-radius:var(--radius-md);background:linear-gradient(90deg,var(--surface2) 25%,var(--border) 50%,var(--surface2) 75%);background-size:200% 100%;animation:shimmer 1.4s infinite;}
 .sect-skel-lines span:first-child{width:92%;}
 .sect-skel-lines span:last-child{width:60%;}
 

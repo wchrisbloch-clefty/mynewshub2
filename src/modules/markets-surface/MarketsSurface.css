@@ -9,7 +9,7 @@
 .mkt-down{color:var(--neg);}
 /* (a) sticky ticker rail */
 .mkt-rail{position:sticky;top:0;z-index:80;background:var(--surface);border:1px solid var(--border);
-  border-radius:10px;margin-bottom:16px;overflow:hidden;}
+  border-radius:var(--radius-md);margin-bottom:16px;overflow:hidden;}
 /* ≤640px the header auto-hides on scroll (top:0 is correct); above that it stays,
    so offset the rail to sit just below the (shrunk) header. */
 @media(min-width:641px){ .mkt-rail{top:56px;} }
@@ -33,7 +33,7 @@
 .mkt-mover-tab:hover{background:var(--surface);color:var(--text);border-color:var(--text3);}
 .mkt-mover-tab.active{background:var(--accent);color:var(--on-accent);border-color:var(--accent);box-shadow:var(--shadow-sm);}
 .mkt-mover-cols{display:block;}
-.mkt-mover-col{display:none;background:var(--surface);border:1px solid var(--border);border-radius:10px;overflow:hidden;margin-bottom:12px;}
+.mkt-mover-col{display:none;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-md);overflow:hidden;margin-bottom:12px;}
 .mkt-mover-col.active{display:block;}
 .mkt-mover-head{font-family:var(--font-serif);font-weight:800;font-size:var(--fs-meta);text-transform:uppercase;
   letter-spacing:0.05em;color:var(--text2);padding:10px 14px;border-bottom:1px solid var(--border2);background:var(--surface2);}

@@ -442,7 +442,7 @@ export function CustomizePanel({feeds, kw, alerts, urgent, social, watchlist, te
               </div>
               <div className="cp-lbl" style={{marginTop:'12px'}}>Watchlist Tickers in Strip</div>
               <div className="cp-desc">Your watchlist tickers also appear — manage them in the Watchlist tab.</div>
-              <div style={{fontSize:'11px',color:'var(--text2)',background:'var(--surface2)',borderRadius:'6px',padding:'8px 10px'}}>
+              <div style={{fontSize:'11px',color:'var(--text2)',background:'var(--surface2)',borderRadius:'var(--radius-md)',padding:'8px 10px'}}>
                 Current watchlist: {lw.map(w=>w.sym).join(' · ') || 'none'}
               </div>
             </div>

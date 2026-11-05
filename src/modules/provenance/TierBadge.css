@@ -5,5 +5,5 @@
   text-transform:uppercase;border-radius:4px;padding:1px 6px;line-height:1.5;
   display:inline-flex;align-items:center;gap:3px;white-space:nowrap;flex-shrink:0;
 }
-.prov-verified{color:#16a34a;border:1px solid #16a34a;background:rgba(22,163,74,0.08);}
+.prov-verified{color:var(--green);border:1px solid var(--green);background:rgba(22,163,74,0.08);}
 .prov-inferred{color:var(--text3);border:1px solid var(--border);background:var(--surface);}

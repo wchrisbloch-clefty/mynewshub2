@@ -1,5 +1,5 @@
 /* Snapshot card — co-located styles. Consumes design tokens (src/styles/tokens.css).
-   `.snap-feed` is the list container consumers wrap cards in. `#fff` on the LIVE
+   `.snap-feed` is the list container consumers wrap cards in. `var(--on-media)` on the LIVE
    badge is an intentional contrast literal (white on the red badge in both themes). */
 .snap-feed{display:flex;flex-direction:column;gap:14px;}
 /* F2: standardized HERO (a lead with an image). 16:9 cover, bottom-up dark gradient,
@@ -8,7 +8,7 @@
 .snap-lead-hero{flex-direction:column;border:none;border-radius:0;background:none;box-shadow:none;}
 .snap-lead-hero:hover{transform:none;box-shadow:none;}
 .snap-lead-hero .snap-accent{display:none;}
-.snap-hero-media{position:relative;width:100%;aspect-ratio:16/9;overflow:hidden;border-radius:10px;}
+.snap-hero-media{position:relative;width:100%;aspect-ratio:16/9;overflow:hidden;border-radius:var(--radius-md);}
 .snap-hero-img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;display:block;background:var(--surface2);}
 .snap-hero-overlay{position:absolute;inset:0;display:flex;flex-direction:column;justify-content:flex-end;padding:16px;
   /* O7: the scrim must hold white at >=4.5:1 across the ENTIRE text band — not just the very
@@ -18,11 +18,11 @@
      the photo still reads). Verified by pixel sampling over a white image in o7-hero-contrast. */
   background:linear-gradient(to top, rgba(0,0,0,0.92) 0%, rgba(0,0,0,0.78) 55%, rgba(0,0,0,0.58) 72%, rgba(0,0,0,0) 90%);}
 .snap-hero-meta{display:flex;align-items:center;gap:8px;margin-bottom:6px;}
-.snap-hero-overlay .snap-hero-source{font-family:var(--font-sans);font-size:var(--fs-meta);font-weight:800;text-transform:uppercase;letter-spacing:0.06em;color:#fff;}
+.snap-hero-overlay .snap-hero-source{font-family:var(--font-sans);font-size:var(--fs-meta);font-weight:800;text-transform:uppercase;letter-spacing:0.06em;color:var(--on-media);}
 .snap-hero-overlay .snap-hero-time{font-family:var(--font-sans);font-size:var(--fs-meta);color:rgba(255,255,255,0.85);}
 /* Scoped under the overlay so white reliably beats the equal-specificity, later-in-source
    `.snap-title{color:var(--text)}` on this same element (the title carries both classes). */
-.snap-hero-overlay .snap-hero-title{color:#fff;font-family:var(--font-serif);font-weight:800;font-size:24px;line-height:1.14;letter-spacing:-0.3px;margin:0;
+.snap-hero-overlay .snap-hero-title{color:var(--on-media);font-family:var(--font-serif);font-weight:800;font-size:24px;line-height:1.14;letter-spacing:-0.3px;margin:0;
   display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden;text-shadow:0 1px 4px rgba(0,0,0,0.35);}
 .snap-lead-hero .snap-main{padding:10px 0 12px;}
 .snap-lead-hero .snap-snippet{font-size:var(--fs-body);-webkit-line-clamp:2;}
@@ -51,13 +51,13 @@
 .snap-breaking .snap-accent{display:none;}
 .snap-main{flex:1;min-width:0;padding:10px 0;order:1;}
 .snap-meta{display:flex;align-items:center;gap:8px;margin-bottom:4px;flex-wrap:wrap;}
-.snap-source{font-family:var(--font-sans);font-size:var(--fs-meta);font-weight:700;text-transform:uppercase;letter-spacing:0.05em;}
-.snap-live{font-family:var(--font-sans);font-size:var(--fs-label);font-weight:800;color:#fff;background:var(--red);border-radius:4px;padding:2px 6px;letter-spacing:0.06em;}
-.snap-tag{font-family:var(--font-sans);font-size:var(--fs-label);font-weight:700;border-radius:20px;padding:2px 9px;text-transform:uppercase;letter-spacing:0.03em;}
+.snap-source{font-family:var(--font-sans);font-size:var(--fs-meta);font-weight:700;text-transform:uppercase;letter-spacing:0.05em;color:var(--text3);}
+.snap-live{font-family:var(--font-sans);font-size:var(--fs-label);font-weight:800;color:var(--on-media);background:var(--red);border-radius:4px;padding:2px 6px;letter-spacing:0.06em;}
+.snap-tag{font-family:var(--font-sans);font-size:var(--fs-label);font-weight:700;padding:0;text-transform:uppercase;letter-spacing:0.03em;background:transparent;color:var(--text3);}
 /* F8: Opinion/Analysis label — rules-only metadata, styled as a neutral OUTLINE tag so it
    never reads as a trust tier/category (no fill, no accent). */
 .snap-opinion{font-family:var(--font-sans);font-size:var(--fs-label);font-weight:800;text-transform:uppercase;letter-spacing:0.06em;color:var(--text3);border:1px solid var(--border);border-radius:4px;padding:1px 6px;white-space:nowrap;}
-.snap-hero-overlay .snap-opinion{color:#fff;border-color:rgba(255,255,255,0.55);}
+.snap-hero-overlay .snap-opinion{color:var(--on-media);border-color:rgba(255,255,255,0.55);}
 .snap-time{font-family:var(--font-sans);font-size:var(--fs-meta);color:var(--text3);}
 /* F3: single meta row — time (+ sources) left, actions right. */
 .snap-foot-left{display:inline-flex;align-items:center;gap:10px;min-width:0;flex-wrap:wrap;}
@@ -134,7 +134,7 @@
 .snap-skel-main{flex:1;min-width:0;padding:12px 0;order:1;}
 .snap-skel-thumb{width:112px;height:84px;aspect-ratio:4/3;flex-shrink:0;background:var(--surface2);border-radius:8px;margin:12px 0;order:0;}
 @media(min-width:641px){ .snap-skel{min-height:151px;} }
-.snap-skel-line{border-radius:5px;margin-bottom:8px;background:linear-gradient(90deg,var(--surface2) 25%,var(--border) 50%,var(--surface2) 75%);background-size:200% 100%;animation:shimmer 1.4s infinite;}
+.snap-skel-line{border-radius:var(--radius-md);margin-bottom:8px;background:linear-gradient(90deg,var(--surface2) 25%,var(--border) 50%,var(--surface2) 75%);background-size:200% 100%;animation:shimmer 1.4s infinite;}
 @media(max-width:640px){
   /* D5 — NYT/Bloomberg mobile: ONE dominant lead, then a DIVIDED LIST (no boxes).
      Fewer boxes, more whitespace. Exactly one hero-weight element above the fold. */
@@ -171,7 +171,7 @@
 .snap-feed-divided .snap-snippet{-webkit-line-clamp:2;}
 /* D5 fix 3: the LEAD stays a prominent card on desktop even inside a divided feed. */
 @media(min-width:641px){
-  .snap-feed-divided .snap-lead{border:1px solid var(--border);border-radius:10px;background:var(--surface);margin-bottom:14px;}
+  .snap-feed-divided .snap-lead{border:1px solid var(--border);border-radius:var(--radius-md);background:var(--surface);margin-bottom:14px;}
   .snap-feed-divided .snap-lead .snap-accent{display:block;}
   .snap-feed-divided .snap-lead .snap-snippet{-webkit-line-clamp:2;}
 }

@@ -23,8 +23,7 @@ import './SnapshotCard.css';
 const defaultFormatDate = d => { try { return new Date(d).toLocaleString(); } catch { return ''; } };
 
 export function SnapshotCard({ a, meta = {}, isSaved, onSave, onRead, onPerspectives, onAsk, formatDate = defaultFormatDate, hideImage = false, lead = false, opinionLabel = null }) {
-  const color = meta.color;
-  const bg = meta.bg;
+  // V2: category colour no longer painted on the source name / topic tag (meta.color/.bg unused).
   const [imgErr, setImgErr] = useState(false);
   const topKw = a.matchedKw?.[0] || null;
   const multi = a._clusterSize > 1;
@@ -57,13 +56,13 @@ export function SnapshotCard({ a, meta = {}, isSaved, onSave, onRead, onPerspect
       <div className="snap-main">
         {!heroImg && (<>
         <div className="snap-meta">
-          <span className="snap-source" style={{ color }}>{a.source}</span>
+          <span className="snap-source">{a.source}</span>
           <FollowSourceChip name={a.source} url={a.sourceUrl}/>
           {a.author && <span className="snap-byline">{a.author}</span>}
           {a.isAlert && <span className="snap-live">● LIVE</span>}
           <TierBadge item={a}/>
           {opinionLabel && <span className="snap-opinion">{opinionLabel}</span>}
-          {topKw && <span className="snap-tag" style={{ background: bg, color }}>{topKw}</span>}
+          {topKw && <span className="snap-tag">{topKw}</span>}
         </div>
         <h3 className="snap-title">{a.title}</h3>
         </>)}
