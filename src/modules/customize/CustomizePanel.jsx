@@ -352,13 +352,13 @@ export function CustomizePanel({feeds, kw, alerts, urgent, social, watchlist, te
                     </span>
                     <span style={{fontSize:'18px'}}>{t.emoji}</span>
                     <strong style={{fontSize:'12px',color:'var(--text)',flex:1}}>{t.team}</strong>
-                    <span style={{fontSize:'10px',color:'var(--text3)'}}>{(t.sport||'').toUpperCase()} · {(t.league||'').toUpperCase()}</span>
+                    <span style={{fontSize:'var(--fs-label)',color:'var(--text3)'}}>{(t.sport||'').toUpperCase()} · {(t.league||'').toUpperCase()}</span>
                     <button className="cp-del" onClick={()=>setLt(prev=>prev.filter((_,j)=>j!==i))}><XIcon size={13} aria-hidden="true"/></button>
                   </div>
                   <div className="cp-team-row-body">
-                    <div style={{fontSize:'10px',color:'var(--text3)'}}>Match: <span style={{color:'var(--text2)'}}>{t.match||'(none)'}</span></div>
-                    {t.espnUrl && <div style={{fontSize:'10px',color:'var(--text3)'}}>ESPN: <a href={t.espnUrl} target="_blank" rel="noreferrer" style={{color:'var(--accent)'}}>{t.espnUrl.length>50?t.espnUrl.slice(0,50)+'…':t.espnUrl}</a></div>}
-                    {t.teamUrl && <div style={{fontSize:'10px',color:'var(--text3)'}}>Team: <a href={t.teamUrl} target="_blank" rel="noreferrer" style={{color:'var(--accent)'}}>{t.teamUrl.length>50?t.teamUrl.slice(0,50)+'…':t.teamUrl}</a></div>}
+                    <div style={{fontSize:'var(--fs-label)',color:'var(--text3)'}}>Match: <span style={{color:'var(--text2)'}}>{t.match||'(none)'}</span></div>
+                    {t.espnUrl && <div style={{fontSize:'var(--fs-label)',color:'var(--text3)'}}>ESPN: <a href={t.espnUrl} target="_blank" rel="noreferrer" style={{color:'var(--accent)'}}>{t.espnUrl.length>50?t.espnUrl.slice(0,50)+'…':t.espnUrl}</a></div>}
+                    {t.teamUrl && <div style={{fontSize:'var(--fs-label)',color:'var(--text3)'}}>Team: <a href={t.teamUrl} target="_blank" rel="noreferrer" style={{color:'var(--accent)'}}>{t.teamUrl.length>50?t.teamUrl.slice(0,50)+'…':t.teamUrl}</a></div>}
                   </div>
                 </div>
               ))}

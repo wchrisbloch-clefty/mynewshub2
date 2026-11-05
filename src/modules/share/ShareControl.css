@@ -40,6 +40,6 @@
     box-shadow:0 -8px 30px rgba(0,0,0,0.28);animation:share-sheet-up 0.2s ease-out;
   }
   .share-sheet-handle{display:block;width:36px;height:4px;border-radius:3px;background:var(--border);margin:4px auto 8px;}
-  .share-row{min-height:44px;font-size:15px;padding:10px 12px;}
+  .share-row{min-height:44px;font-size:var(--fs-title);padding:10px 12px;}
 }
 @keyframes share-sheet-up{from{transform:translateY(100%);}to{transform:translateY(0);}}

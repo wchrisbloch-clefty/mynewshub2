@@ -52,11 +52,11 @@
 .snap-main{flex:1;min-width:0;padding:10px 0;order:1;}
 .snap-meta{display:flex;align-items:center;gap:8px;margin-bottom:4px;flex-wrap:wrap;}
 .snap-source{font-family:var(--font-sans);font-size:var(--fs-meta);font-weight:700;text-transform:uppercase;letter-spacing:0.05em;}
-.snap-live{font-family:var(--font-sans);font-size:9px;font-weight:800;color:#fff;background:var(--red);border-radius:4px;padding:2px 6px;letter-spacing:0.06em;}
-.snap-tag{font-family:var(--font-sans);font-size:10px;font-weight:700;border-radius:20px;padding:2px 9px;text-transform:uppercase;letter-spacing:0.03em;}
+.snap-live{font-family:var(--font-sans);font-size:var(--fs-label);font-weight:800;color:#fff;background:var(--red);border-radius:4px;padding:2px 6px;letter-spacing:0.06em;}
+.snap-tag{font-family:var(--font-sans);font-size:var(--fs-label);font-weight:700;border-radius:20px;padding:2px 9px;text-transform:uppercase;letter-spacing:0.03em;}
 /* F8: Opinion/Analysis label — rules-only metadata, styled as a neutral OUTLINE tag so it
    never reads as a trust tier/category (no fill, no accent). */
-.snap-opinion{font-family:var(--font-sans);font-size:9px;font-weight:800;text-transform:uppercase;letter-spacing:0.06em;color:var(--text3);border:1px solid var(--border);border-radius:4px;padding:1px 6px;white-space:nowrap;}
+.snap-opinion{font-family:var(--font-sans);font-size:var(--fs-label);font-weight:800;text-transform:uppercase;letter-spacing:0.06em;color:var(--text3);border:1px solid var(--border);border-radius:4px;padding:1px 6px;white-space:nowrap;}
 .snap-hero-overlay .snap-opinion{color:#fff;border-color:rgba(255,255,255,0.55);}
 .snap-time{font-family:var(--font-sans);font-size:var(--fs-meta);color:var(--text3);}
 /* F3: single meta row — time (+ sources) left, actions right. */
@@ -86,7 +86,7 @@
 .snap-cov-caret.open{transform:rotate(180deg);}
 .snap-coverage{margin-top:10px;border-top:1px solid var(--border2);padding-top:10px;animation:fade-in 0.15s ease-out;}
 .snap-cov-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;}
-.snap-cov-title-lbl{font-family:var(--font-sans);font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:0.07em;color:var(--text3);}
+.snap-cov-title-lbl{font-family:var(--font-sans);font-size:var(--fs-label);font-weight:800;text-transform:uppercase;letter-spacing:0.07em;color:var(--text3);}
 .snap-cov-close{background:none;border:none;font-size:20px;line-height:1;color:var(--text3);cursor:pointer;display:none;}
 .snap-cov-list{display:flex;flex-direction:column;gap:2px;}
 .snap-cov-item{display:block;text-decoration:none;padding:8px;border-radius:8px;transition:background 0.12s;}
@@ -103,7 +103,7 @@
   .snap-coverage{position:fixed;inset:0;z-index:600;margin:0;background:var(--surface);overflow-y:auto;padding:18px 16px calc(24px + env(safe-area-inset-bottom,0));border-top:none;}
   .snap-cov-close{display:block;}
   .snap-cov-title-lbl{font-size:var(--fs-body);}
-  .snap-cov-hl{font-size:15px;}
+  .snap-cov-hl{font-size:var(--fs-title);}
 }
 .snap-sources{font-family:var(--font-sans);font-size:var(--fs-meta);color:var(--text3);min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
 .snap-sources strong{color:var(--accent);font-weight:700;}
@@ -157,7 +157,7 @@
   /* D5 fix 2: typographic lead fallback — no image box. Small-caps kicker (the source)
      + oversized serif headline + one meta line, filling a similar height budget. */
   .snap-lead-noimg{min-height:220px;justify-content:center;padding:8px 0 16px;border-bottom:2px solid var(--border);}
-  .snap-lead-noimg .snap-source{font-size:11px;letter-spacing:0.1em;}
+  .snap-lead-noimg .snap-source{font-size:var(--fs-label);letter-spacing:0.1em;}
   .snap-lead-noimg .snap-title{font-size:30px;line-height:1.08;-webkit-line-clamp:5;margin-top:4px;}
 }
 /* D5 — carry the DIVIDED-LIST treatment to DESKTOP SECONDARY lists only (not the main

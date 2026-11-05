@@ -125,3 +125,29 @@ Chromium touch emulation; real iPad/iPhone Safari = NEEDS-DEVICE. Open with `?de
 37. **State of Play is populated on Sports (T4).** On the Sports page (and Energy/Business/Health),
     the State of Play card near the top shows real rows (not an empty box) and never repeats a story
     that's also in the lead/grid/list.
+
+---
+
+## Batch U — one visual system (quiet category treatment, type floor, token guardrails)
+
+Chromium + Chromium-touch emulation (isMobile/hasTouch; `(hover:none)` true); real iPad/iPhone
+Safari = NEEDS-DEVICE. Open with `?debug=1`. The living reference is at `/design` (URL only).
+
+38. **Sub-topic chips are text-only (U3).** Energy / Pop-culture / Sports-league chips show the
+    word alone — no icon, 1px border, transparent, pill shape; the selected chip is the one accent
+    fill. One line flips them back: `SHOW_CHIP_ICONS = true` in `src/modules/cat-icon`.
+39. **Category colour only on the label (U3).** Source names read in neutral grey; the category
+    colour appears only on the small uppercase topic label (and on the hero photo it is white, not
+    a dark colour on a dark image). No source name is category-coloured.
+40. **Header speaks one button language (U4).** Search / refresh / theme / profile are borderless
+    quiet icons (44px touch target); Analyze and Customize share ONE bordered-transparent secondary
+    style; the only filled element in the header is the active nav pill (Customize lost its navy).
+41. **Rail has no box-in-box; one status pill (U5).** State of Play is a header + boxed rows on the
+    page (no outer card); every row shares one headline weight and breaking is only the red word;
+    the "N unavailable" pill is a plain bordered pill with amber text (no peach fill); "Updated"
+    has no dot.
+42. **No text below 11px (U6).** Every reading text is ≥ 11px on Home / Energy / Sports / Business /
+    Briefing / State-of-Play at 390 / 820 / 1194 (light + dark). Smallest labels read cleanly.
+43. **Living /design page (U7).** Visit `/design` (not linked anywhere): live colour swatches with
+    contrast, type roles, spacing, radii, the real labels / chips / buttons / State-of-Play rows /
+    pills / skeleton. It mirrors production because it renders the real tokens and components.
