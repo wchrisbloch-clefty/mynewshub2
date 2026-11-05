@@ -189,7 +189,7 @@ function DebugOverlayInner() {
       background: 'rgba(0,0,0,0.82)', color: '#0f0', font: '11px/1.5 ui-monospace,monospace',
       padding: '8px 10px', borderRadius: 8, minWidth: 190, maxWidth: '70vw',
     }}>
-      <div style={{ color: '#fff', fontWeight: 700, marginBottom: 4 }}>?debug — scroll/render</div>
+      <div style={{ color: 'var(--on-media)', fontWeight: 700, marginBottom: 4 }}>?debug — scroll/render</div>
       {row('App renders', `${dbg.renders.App || 0} (${perSec.current.App || 0}/s)`)}
       {row('SportsPage', `${dbg.renders.SportsPage || 0} (${perSec.current.SportsPage || 0}/s)`)}
       {row('SportsPage mounts', `${dbg.mounts.SportsPage || 0}`)}

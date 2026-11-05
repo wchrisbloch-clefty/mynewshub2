@@ -99,6 +99,14 @@
   --border-strong:#c4c4bf;  /* one step darker than --border (#d8d8d4) — hover edge */
   --on-media:#ffffff;       /* text over photos (full-opacity, not a category colour) */
   --dur-fast:150ms;--dur-base:200ms;
+  /* ── V4: centralised literals (brand, AI/syntax purple, gold tier, pale washes, fixed neutrals).
+     Moved out of components so the ratchet catches NEW ad-hoc hex; close shades merged (small
+     badge/chat areas). Fixed in both themes — same value the literals already rendered. */
+  --ai-accent:#6001d2;--ai-accent-light:#c4a5ff;
+  --gold:#b8893d;--gold-light:#d4b878;--gold-dark:#1f1505;--gold-wash:#fbf5e8;
+  --wash-warm:#fffbeb;--wash-cool:#f0f9ff;--wash-pink:#fdeff5;
+  --brand-linkedin:#0a66c2;--brand-instagram:#e1306c;--brand-reddit:#ff4500;--brand-hn:#ff6600;
+  --ink:#000;--c-gray:#9ca3af;--c-gray-line:#cbd5e1;--pink:#db2777;--navy-2:#1e2d42;--brown:#7c2d12;--chat-fg:#444;--chat-bg:#222;
   --rail-gap:12px;   /* L4: the ONE vertical gap between right-rail modules */
   /* Minimal shadow — structure comes from hairlines, not elevation. */
   --shadow-sm:0 1px 2px rgba(17,17,19,0.04);
@@ -176,6 +184,8 @@
 .media-img.wide{aspect-ratio:21/9;}
 .media-img-ph{width:100%;aspect-ratio:16/9;border-radius:var(--img-radius);display:flex;align-items:center;justify-content:center;background:var(--ph-field);color:var(--ph-ink);font-weight:800;}
 
+/* V4: one utility for the tiny inline-icon baseline nudge (was a repeated inline style). */
+.ic-nudge{vertical-align:-1px;}
 /* Numbers read as data everywhere — tickers, scores, prices, timestamps. */
 .tnum,time,[data-num]{font-variant-numeric:tabular-nums;font-feature-settings:"tnum" 1;}
 

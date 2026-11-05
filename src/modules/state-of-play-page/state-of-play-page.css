@@ -5,5 +5,5 @@
 .sop-page-sub{font-family:var(--font-sans);font-size:var(--fs-meta);color:var(--text3);}
 .sop-page-module{display:flex;flex-direction:column;}
 .sop-page-sources{display:flex;flex-wrap:wrap;gap:6px;}
-.sop-page-source{display:inline-flex;align-items:center;gap:6px;font-family:var(--font-sans);font-size:var(--fs-meta);font-weight:600;color:var(--text2);background:var(--surface2);border:1px solid var(--border);border-radius:14px;padding:4px 10px;}
+.sop-page-source{display:inline-flex;align-items:center;gap:6px;font-family:var(--font-sans);font-size:var(--fs-meta);font-weight:600;color:var(--text2);background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius-lg);padding:4px 10px;}
 .sop-page-source-n{font-weight:800;color:var(--text3);font-variant-numeric:tabular-nums;}

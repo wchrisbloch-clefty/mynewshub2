@@ -1,9 +1,9 @@
 {
-  "hexLiteralsOutsideTokens": 64,
-  "inlineStyleCount": 228,
-  "fontSizeDistinct": 21,
+  "hexLiteralsOutsideTokens": 0,
+  "inlineStyleCount": 224,
+  "fontSizeDistinct": 19,
   "fontSizeUnder11Distinct": 0,
-  "borderRadiusDistinct": 17,
-  "borderRadiusNonStandard": 13,
+  "borderRadiusDistinct": 8,
+  "borderRadiusNonStandard": 5,
   "importantCount": 18
 }

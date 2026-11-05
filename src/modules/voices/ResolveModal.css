@@ -1,6 +1,6 @@
 /* ResolveModal (E2) — consumes design tokens. */
 .vr-overlay{position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:700;display:flex;align-items:center;justify-content:center;padding:16px;}
-.vr-panel{background:var(--surface);border:1px solid var(--border);border-radius:14px;width:100%;max-width:560px;max-height:86vh;overflow-y:auto;padding:16px 18px calc(18px + env(safe-area-inset-bottom,0));box-shadow:var(--shadow-lg);}
+.vr-panel{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);width:100%;max-width:560px;max-height:86vh;overflow-y:auto;padding:16px 18px calc(18px + env(safe-area-inset-bottom,0));box-shadow:var(--shadow-lg);}
 .vr-head{display:flex;align-items:center;justify-content:space-between;gap:10px;}
 .vr-title{font-family:var(--font-sans);font-weight:800;font-size:var(--fs-subhead);color:var(--text);}
 .vr-x{background:none;border:none;font-size:20px;color:var(--text3);cursor:pointer;line-height:1;}
@@ -18,8 +18,8 @@
 .vr-cand-name{font-family:var(--font-sans);font-weight:700;font-size:var(--fs-body);color:var(--text);}
 .vr-verified{color:var(--accent);font-weight:800;}
 .vr-conf{font-size:var(--fs-label);font-weight:800;text-transform:uppercase;letter-spacing:0.04em;border-radius:8px;padding:1px 6px;}
-.vr-conf-high{color:#0f9d58;background:rgba(15,157,88,0.12);}
-.vr-conf-medium{color:#b45309;background:rgba(217,119,6,0.12);}
+.vr-conf-high{color:var(--pos);background:rgba(15,157,88,0.12);}
+.vr-conf-medium{color:var(--amber);background:rgba(217,119,6,0.12);}
 .vr-conf-low{color:var(--text3);background:var(--surface2);}
 .vr-foll{font-size:var(--fs-meta);color:var(--text3);}
 .vr-handle{font-family:var(--font-sans);font-size:var(--fs-meta);color:var(--accent);text-decoration:none;display:inline-block;margin:1px 0;}
