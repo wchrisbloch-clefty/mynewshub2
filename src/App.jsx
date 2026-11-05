@@ -1508,7 +1508,7 @@ body{
   font-family:var(--font-sans);
   -webkit-font-smoothing:antialiased;
   -moz-osx-font-smoothing:grayscale;
-  color:var(--text);font-size:15px;line-height:1.5;
+  color:var(--text);font-size:var(--fs-title);line-height:1.5;
 }
 .hub{background:var(--bg);min-height:100vh;}
 .hub-main{display:block;}  /* M4.1: page-content wrapper that carries the swipe handlers (keeps fixed chrome out of the swipe region) */
@@ -1586,7 +1586,7 @@ body:not(.dark) .topbar-scores{background:var(--surface);}
   .topbar-scores .home-scores-see-all{display:none;}
   .topbar-scores .score-tile{min-width:104px;padding:2px 8px;}
   .topbar-scores .score-tile-side{gap:4px;line-height:1.15;}
-  .topbar-scores .score-tile-team,.topbar-scores .score-tile-score{font-size:11px;}
+  .topbar-scores .score-tile-team,.topbar-scores .score-tile-score{font-size:var(--fs-label);}
   .topbar-scores .score-tile-logo{width:13px;height:13px;}
   .topbar-scores .score-tile-status{font-size:8px;margin-top:0;}
 }
@@ -1736,7 +1736,7 @@ body:not(.dark) .topbar-scores{background:var(--surface);}
 .entity-hub-btn.on{color:var(--amber);border-color:var(--amber);}
 .following-chip:hover{border-color:var(--accent);}
 .following-chip-name{font-size:var(--fs-meta);font-weight:600;color:var(--accent);}/* D4: tokenized (was 12px) */
-.following-chip-x{background:none;border:none;color:var(--text3);cursor:pointer;font-size:15px;line-height:1;padding:0 2px;border-radius:50%;}
+.following-chip-x{background:none;border:none;color:var(--text3);cursor:pointer;font-size:var(--fs-title);line-height:1;padding:0 2px;border-radius:50%;}
 .following-chip-x:hover{color:var(--neg);}
 .following-chip-x:focus-visible{outline:2px solid var(--accent);outline-offset:1px;}
 .following-empty{font-size:12px;color:var(--text3);font-style:italic;}
@@ -2218,7 +2218,7 @@ body:not(.dark) .pill-bar{
 .ghs-head{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:8px;}
 .ghs-note{font-family:var(--font-sans);font-size:10px;color:var(--text4);font-style:italic;margin-left:auto;}
 .ghs-close{background:none;border:none;color:var(--text3);font-size:18px;line-height:1;cursor:pointer;}
-.ghs-loading,.ghs-empty{font-size:11px;color:var(--text3);font-style:italic;}
+.ghs-loading,.ghs-empty{font-size:var(--fs-label);color:var(--text3);font-style:italic;}
 .ghs-list{display:flex;flex-direction:column;}
 .ghs-item{display:flex;align-items:center;gap:8px;padding:6px 0;text-decoration:none;color:var(--text);font-size:var(--fs-meta);border-top:1px solid var(--border2);}
 .ghs-item:first-child{border-top:none;}
@@ -2357,7 +2357,7 @@ body:not(.dark) .pill-bar{
 .pm-row{display:flex;align-items:flex-start;gap:10px;padding:9px 0;border-top:1px solid var(--border2);text-decoration:none;}
 .pm-row:first-of-type{border-top:none;}
 .pm-row:hover .pm-q{color:var(--accent);}
-.pm-prob{flex-shrink:0;min-width:38px;text-align:right;font-family:var(--font-serif);font-weight:800;font-size:15px;font-variant-numeric:tabular-nums;line-height:1.15;}
+.pm-prob{flex-shrink:0;min-width:38px;text-align:right;font-family:var(--font-serif);font-weight:800;font-size:var(--fs-title);font-variant-numeric:tabular-nums;line-height:1.15;}
 .pm-prob.pm-hi{color:var(--pos);}
 .pm-prob.pm-lo{color:var(--neg);}
 .pm-prob.pm-mid{color:var(--text2);}
@@ -2384,7 +2384,7 @@ body:not(.dark) .pill-bar{
 .ttp-count{font-size:9px;font-weight:700;color:var(--text4);font-variant-numeric:tabular-nums;}
 .ttp-chip.active .ttp-count{color:rgba(255,255,255,0.7);}
 /* Follow star — sibling button on the merged Trending chips (Pass J item 3). */
-.ttp-chip-star{background:none;border:none;cursor:pointer;font-size:11px;line-height:1;color:var(--text4);padding:0 0 0 1px;margin-left:1px;}
+.ttp-chip-star{background:none;border:none;cursor:pointer;font-size:var(--fs-label);line-height:1;color:var(--text4);padding:0 0 0 1px;margin-left:1px;}
 .ttp-chip-star.on{color:var(--amber);}
 .ttp-chip-star:hover{color:var(--amber);}
 .ttp-chip-star:focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:50%;}
@@ -2423,7 +2423,7 @@ body:not(.dark) .pill-bar{
 }
 .trend-row:hover{opacity:0.7;}
 .trend-num{
-  font-size:15px;font-weight:900;color:var(--accent);
+  font-size:var(--fs-title);font-weight:900;color:var(--accent);
   min-width:18px;line-height:1.3;flex-shrink:0;font-variant-numeric:tabular-nums;
 }
 .trend-body{flex:1;min-width:0;}
@@ -2524,7 +2524,7 @@ body:not(.dark) .pill-bar{
 .briefing-icon{font-size:18px;}
 .briefing-title{
   font-family:var(--font-serif);
-  font-size:15px;font-weight:700;color:var(--text);letter-spacing:0;
+  font-size:var(--fs-title);font-weight:700;color:var(--text);letter-spacing:0;
 }
 .briefing-date{
   font-family:var(--font-sans);
@@ -2844,7 +2844,7 @@ body:not(.dark) .pill-bar{
 }
 .pod-card:hover{border-color:var(--accent);}
 .pod-card-top{display:flex;gap:12px;align-items:flex-start;margin-bottom:10px;}
-.pod-num{font-size:15px;font-weight:800;color:var(--text4);min-width:22px;line-height:1.3;flex-shrink:0;font-variant-numeric:tabular-nums;}
+.pod-num{font-size:var(--fs-title);font-weight:800;color:var(--text4);min-width:22px;line-height:1.3;flex-shrink:0;font-variant-numeric:tabular-nums;}
 .pod-body{flex:1;min-width:0;}
 .pod-show{font-size:10px;font-weight:600;color:var(--accent);margin-bottom:2px;}
 .pod-title{font-size:var(--fs-body);font-weight:700;color:var(--text);line-height:1.35;margin-bottom:4px;cursor:pointer;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;overflow-wrap:anywhere;word-break:break-word;}
@@ -2922,7 +2922,7 @@ body:not(.dark) .pill-bar{
 .cp-voice-rm:hover{border-color:var(--red);color:var(--red);}
 /* E4: seed review queue */
 .cp-seed-wrap{margin:4px 0 12px;border:1px solid var(--border2);border-radius:8px;padding:6px 10px;background:var(--surface2);}
-.cp-seed-toggle{background:none;border:none;cursor:pointer;font-family:var(--font-sans);font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:0.06em;color:var(--text3);padding:4px 0;}
+.cp-seed-toggle{background:none;border:none;cursor:pointer;font-family:var(--font-sans);font-size:var(--fs-label);font-weight:800;text-transform:uppercase;letter-spacing:0.06em;color:var(--text3);padding:4px 0;}
 .cp-seed-list{display:flex;flex-direction:column;}
 .cp-seed-row{display:flex;flex-wrap:wrap;align-items:center;gap:8px;padding:7px 0;border-top:1px solid var(--border2);}
 .cp-seed-name{font-family:var(--font-sans);font-weight:700;font-size:var(--fs-body);color:var(--text);}
@@ -3043,7 +3043,7 @@ body:not(.dark) .pill-bar{
 }
 .gn-card-title{
   grid-column:2;grid-row:1;
-  font-size:15px;font-weight:600;line-height:1.28;
+  font-size:var(--fs-title);font-weight:600;line-height:1.28;
   letter-spacing:-0.1px;color:var(--text);margin:0;overflow-wrap:break-word;
   display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden;
 }
@@ -3054,7 +3054,7 @@ body:not(.dark) .pill-bar{
 }
 .gn-card-source{
   font-weight:800;color:var(--text2);
-  text-transform:uppercase;letter-spacing:0.05em;font-size:11px;
+  text-transform:uppercase;letter-spacing:0.05em;font-size:var(--fs-label);
 }
 
 /* Per-vertical card top-border accents */
@@ -3355,7 +3355,7 @@ body:not(.dark) .pill-bar{
   .sport-index{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:8px;overflow:visible;padding-bottom:12px;}
   .sport-index .sport-tab{border-radius:10px;justify-content:space-between;min-height:40px;padding:8px 12px;}
   .sport-index .sport-tab-label{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0;}
-  .sport-index .sport-tab-count{display:inline-flex;align-items:center;justify-content:center;flex-shrink:0;min-width:20px;height:18px;padding:0 6px;border-radius:9px;background:var(--surface);border:1px solid var(--border);font-size:11px;font-weight:800;color:var(--text3);font-variant-numeric:tabular-nums;}
+  .sport-index .sport-tab-count{display:inline-flex;align-items:center;justify-content:center;flex-shrink:0;min-width:20px;height:18px;padding:0 6px;border-radius:9px;background:var(--surface);border:1px solid var(--border);font-size:var(--fs-label);font-weight:800;color:var(--text3);font-variant-numeric:tabular-nums;}
   .sport-index .sport-tab.active .sport-tab-count{background:rgba(255,255,255,0.22);border-color:transparent;color:var(--on-accent);}
   .sport-index .sport-tab.is-zero:not(.active){display:none;}
 }
@@ -3563,7 +3563,7 @@ body:not(.dark) .pill-bar{
 .cp-reorder{
   min-width:44px;min-height:44px;display:inline-flex;align-items:center;justify-content:center;
   background:none;border:1px solid var(--border);border-radius:8px;color:var(--text2);
-  font-size:15px;line-height:1;cursor:pointer;padding:0;margin-right:4px;
+  font-size:var(--fs-title);line-height:1;cursor:pointer;padding:0;margin-right:4px;
 }
 .cp-reorder:hover:not(:disabled){border-color:var(--accent);color:var(--accent);}
 .cp-reorder:disabled{opacity:0.3;cursor:default;}
@@ -3811,7 +3811,7 @@ body:not(.dark) .pill-bar{
   text-shadow: 0 2px 8px rgba(0,0,0,0.5);
 }
 .hero-band-desc{
-  font-size:15px;line-height:1.5;
+  font-size:var(--fs-title);line-height:1.5;
   color:rgba(255,255,255,0.92);margin:0 0 12px 0;
   display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;
   text-shadow: 0 1px 3px rgba(0,0,0,0.5);
@@ -4168,7 +4168,7 @@ body{overscroll-behavior-y:contain;}
 .more-sheet-close{background:none;border:none;font-size:26px;line-height:1;color:var(--text3);cursor:pointer;padding:0 6px;}
 .more-sheet-item{display:flex;align-items:center;width:100%;min-height:52px;
   background:none;border:none;border-bottom:1px solid var(--border2);cursor:pointer;
-  font-family:var(--font-sans);font-size:15px;font-weight:700;color:var(--text);text-align:left;padding:0 8px;}
+  font-family:var(--font-sans);font-size:var(--fs-title);font-weight:700;color:var(--text);text-align:left;padding:0 8px;}
 .more-sheet-item:last-child{border-bottom:none;}
 .more-sheet-item.active{color:var(--accent);}
 
@@ -4200,7 +4200,7 @@ body{overscroll-behavior-y:contain;}
 }
 .bottom-tab:active{background:var(--surface2);}
 .bottom-tab-icon{width:22px;height:22px;flex-shrink:0;}
-.bottom-tab-label{font-size:11px;font-weight:600;letter-spacing:0.01em;}
+.bottom-tab-label{font-size:var(--fs-label);font-weight:600;letter-spacing:0.01em;}
 .bottom-tab.active{color:var(--accent);}
 
 /* ─── MENU SHEET (bottom-sheet for overflow nav) ─── */
@@ -4223,7 +4223,7 @@ body{overscroll-behavior-y:contain;}
 .menu-sheet-item{
   display:flex;align-items:center;gap:14px;
   padding:14px 20px;cursor:pointer;
-  color:var(--text);font-size:15px;font-weight:600;
+  color:var(--text);font-size:var(--fs-title);font-weight:600;
   transition:background 0.1s;min-height:52px;
   border:none;background:none;width:100%;text-align:left;font-family:inherit;
   -webkit-tap-highlight-color:transparent;
@@ -4562,7 +4562,7 @@ body{overscroll-behavior-y:contain;}
   /* Morning briefing */
   .briefing{margin-bottom:18px;border-radius:var(--radius);}
   .briefing-head{padding:13px 16px 11px;}
-  .briefing-title{font-size:15px;}
+  .briefing-title{font-size:var(--fs-title);}
   .briefing-body{padding:13px 16px 15px;}
   .briefing-overview{font-size:var(--fs-body);line-height:1.7;}
 
@@ -4667,7 +4667,7 @@ body{overscroll-behavior-y:contain;}
   display:flex;align-items:center;justify-content:center;
   background:var(--ph-field);
 }
-.gn-card-img-ph .ph-label{font-size:15px;-webkit-line-clamp:2;}
+.gn-card-img-ph .ph-label{font-size:var(--fs-title);-webkit-line-clamp:2;}
 
 /* v26: Why It Matters — gold callout under AI panel */
 .fc-why{background:linear-gradient(135deg,#fbf5e8 0%,#f9eed2 100%);border-left:3px solid #b8893d;border-radius:0 8px 8px 0;padding:10px 12px;margin-top:8px;}
@@ -4693,7 +4693,7 @@ body{overscroll-behavior-y:contain;}
 }
 .gn-lead-solo .gn-lead-desc{
   font-family:var(--font-sans);
-  font-size:15px;line-height:1.6;color:var(--text2);margin:0 0 12px;
+  font-size:var(--fs-title);line-height:1.6;color:var(--text2);margin:0 0 12px;
   display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;
 }
 .gn-lead-solo .gn-lead-meta{font-size:var(--fs-meta);color:var(--text3);display:flex;align-items:center;gap:6px;font-family:var(--font-sans);}
@@ -4981,7 +4981,7 @@ kbd{display:inline-block;padding:1px 5px;border:1px solid var(--border);border-r
 }
 .gn-card-title{
   font-family:var(--font-serif);
-  font-size:15px;font-weight:600;line-height:1.3;color:var(--text);
+  font-size:var(--fs-title);font-weight:600;line-height:1.3;color:var(--text);
   display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden;
   margin-bottom:8px;letter-spacing:-0.1px;overflow-wrap:break-word;
 }
@@ -5245,7 +5245,7 @@ kbd{display:inline-block;padding:1px 5px;border:1px solid var(--border);border-r
   .gn-card{flex-direction:row;gap:12px;padding:12px 0;border-bottom:1px solid var(--border2);border-radius:0;}
   .gn-card:last-child{border-bottom:none;}
   .gn-card-img,.gn-card-img-ph{width:100px;height:72px;aspect-ratio:auto;flex-shrink:0;border-radius:6px;}
-  .gn-card-title{font-size:15px;-webkit-line-clamp:3;font-weight:600;}
+  .gn-card-title{font-size:var(--fs-title);-webkit-line-clamp:3;font-weight:600;}
   .gn-card-meta{font-size:10px;}
   /* gn-grid on mobile: single column lead only, no grid */
   .gn-grid{grid-template-columns:1fr;}
@@ -5364,7 +5364,7 @@ kbd{display:inline-block;padding:1px 5px;border:1px solid var(--border);border-r
   font-weight:800;line-height:1.25;color:var(--text1);margin:0 0 12px;
 }
 .article-reader-desc{
-  font-size:15px;line-height:1.65;color:var(--text2);
+  font-size:var(--fs-title);line-height:1.65;color:var(--text2);
   border-left:3px solid var(--accent);padding-left:14px;
   margin:0 0 20px;
 }
@@ -5401,7 +5401,7 @@ kbd{display:inline-block;padding:1px 5px;border:1px solid var(--border);border-r
 /* F9: header Ask — compact, sits after source · time. */
 .article-reader-ask{
   display:inline-flex;align-items:center;gap:4px;margin-left:auto;
-  font-family:var(--font-sans);font-size:11px;font-weight:700;letter-spacing:0;text-transform:none;
+  font-family:var(--font-sans);font-size:var(--fs-label);font-weight:700;letter-spacing:0;text-transform:none;
   color:var(--accent);background:var(--accent-bg);border:1px solid transparent;border-radius:14px;
   padding:3px 10px;cursor:pointer;transition:background 0.12s;
 }
@@ -5769,7 +5769,7 @@ kbd{display:inline-block;padding:1px 5px;border:1px solid var(--border);border-r
   color:#fff;border:1px solid rgba(255,255,255,0.25);
 }
 .briefing-teaser-cta:hover{background:rgba(255,255,255,0.3);opacity:1;}
-.briefing-teaser-body{color:rgba(255,255,255,0.9);font-size:15px;line-height:1.6;}
+.briefing-teaser-body{color:rgba(255,255,255,0.9);font-size:var(--fs-title);line-height:1.6;}
 .briefing-teaser-body strong{color:#fff;}
 .briefing-teaser-empty{color:rgba(255,255,255,0.4);}
 .briefing-teaser-bullets{margin-top:14px;}
@@ -5897,7 +5897,7 @@ kbd{display:inline-block;padding:1px 5px;border:1px solid var(--border);border-r
   .mobile-icon-btn{padding:7px;}
   .chip-bar{height:44px;}
   .chip{padding:6px 13px;min-height:44px;display:inline-flex;align-items:center;} /* Pass M 1a: 44 hit area */
-  .bottom-tab-label{font-size:11px;}  /* M2: >=11px labels */
+  .bottom-tab-label{font-size:var(--fs-label);}  /* M2: >=11px labels */
   .bottom-tab-icon{width:22px;height:22px;}
   .sources-title{font-size:24px;}
   .sources-cat-grid{grid-template-columns:1fr;gap:14px;}
