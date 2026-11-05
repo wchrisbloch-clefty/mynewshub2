@@ -170,3 +170,6 @@ Chromium + Chromium-touch; real iPad/iPhone Safari = NEEDS-DEVICE.
     "N unavailable" pill is amber text on a plain border; selected chips/pills keep >=4.5:1; the
     hero's topic label is white over the photo. Before/after dark screenshots at 390/834/1194 for
     Home/Energy/Sports/State-of-Play live under docs/verification/batch-V/.
+48. **Scroll and load are stable (V6).** Scrolling re-renders only the header (App +0 on scroll).
+    Home desktop CLS stays under the gate; the deeper Energy-rail CLS (async prediction-markets /
+    sources / social modules) is pre-existing (fails on main too) and is documented, not hidden.
