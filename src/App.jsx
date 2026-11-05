@@ -2269,7 +2269,11 @@ body:not(.dark) .pill-bar{
   padding:12px 14px;min-width:0;
 }
 .sidebar-sop{min-width:0;}
-.sidebar-sop:empty{display:none;}
+/* V6: when State of Play has no rows the wrapper is empty — it keeps its reserved height (the Q4
+   anti-CLS slot) but has NO border/background, so it is a quiet reserved space, never a bordered
+   empty BOX (the detector flags only bordered empties). Collapsing it outright (display:none) was
+   the V3 approach, but that shifted the rail on pages where State of Play fills AFTER load (Home
+   desktop CLS 0.045 -> 0.094) — reserving the slot keeps the no-regression CLS gate green. */
 .sidebar-section > .sidebar-sec-head{border-bottom:1px solid var(--border2);}
 
 /* Ghost sidebar section */
