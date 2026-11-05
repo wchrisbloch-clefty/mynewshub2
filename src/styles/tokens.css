@@ -27,7 +27,7 @@
   --border2:#e6e6e3;     /* faintest divider */
   --text:#111113;        /* near-black ink (17:1 on canvas) */
   --text2:#4a4c52;       /* secondary body (7.8:1) */
-  --text3:#6b6e75;       /* meta: source / timestamp (4.6:1) */
+  --text3:#64676e;       /* W1: meta source/timestamp — nudged #6b6e75->#64676e to clear 4.5:1 on --surface2 */
   --text4:#b0b0ad;       /* faint */
 
   /* The ONE brand accent — deep editorial blue. Links, selected states, active nav. */
@@ -140,7 +140,7 @@
   --border2:#202024;     /* faintest divider */
   --text:#f2f2ee;        /* pearl — avoids glare on black (17.5:1 on canvas) */
   --text2:#a3a5ab;       /* secondary (8:1) */
-  --text3:#7e8088;       /* meta (4.7:1 on surface) */
+  --text3:#868892;       /* W1: meta — nudged #7e8088->#868892 to clear 4.5:1 on dark --surface2 */
   --text4:#44464d;       /* faint */
 
   --accent:#5aa2e6;      /* luminous editorial blue — 7.3:1 on canvas */

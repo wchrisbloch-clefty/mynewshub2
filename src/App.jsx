@@ -1900,7 +1900,7 @@ body:not(.dark) .pill-bar{
 /* U4/U6: tagline raised off the sub-11px floor to --fs-label; tighter tracking so the raised
    size does not widen .logo-wrap (verified: header height and logo column unchanged). */
 .logo-tag{
-  font-family:var(--font-sans);font-size:var(--fs-label);color:var(--text4);
+  font-family:var(--font-sans);font-size:var(--fs-label);color:var(--text3); /* W1: --text4 -> --text3 (1.95:1 -> >=4.5:1 on dark surface) */
   letter-spacing:var(--tracking-label);text-transform:uppercase;font-weight:var(--fw-medium);margin-top:2px;
 }
 /* BBC-clean section tabs: no box, strong underline on active */
@@ -4179,7 +4179,7 @@ body{overscroll-behavior-y:contain;}
 .chip.active{color:var(--on-accent);font-weight:700;background:var(--accent);}
 /* D1: "More ▾" chip opens the mobile overflow sheet (Briefing/Podcasts/Sources/Saved). */
 .chip-more{font-weight:700;color:var(--text2);}
-.chip-more.active{color:var(--on-media);}
+.chip-more.active{color:var(--on-accent);} /* W1: --on-media -> --on-accent (white on accent pill, >=4.5:1) */
 .more-sheet-overlay{position:fixed;inset:0;background:rgba(0,0,0,0.45);z-index:650;display:flex;align-items:flex-end;}
 .more-sheet{background:var(--surface);width:100%;border-radius:16px 16px 0 0;
   padding:8px 10px calc(14px + env(safe-area-inset-bottom,0));box-shadow:0 -8px 30px rgba(0,0,0,0.22);
@@ -7434,8 +7434,11 @@ function SocialFollows({cat, social}) {
                 <span className="social-plat-count">{handles.length}</span>
               </div>
               <div className="social-handles">
+                {/* W1: no inline brand colour on the handle text — the brand colour is
+                    kept on the ICON badge only (.social-plat-icon). The handle pill uses
+                    --text2 on --surface with the chip border, readable in dark + light. */}
                 {handles.map((h,i)=>(
-                  <a key={i} className="social-handle" href={socialUrl(p,h)} target="_blank" rel="noreferrer" style={{color:meta.color}}>{h}</a>
+                  <a key={i} className="social-handle" href={socialUrl(p,h)} target="_blank" rel="noreferrer">{h}</a>
                 ))}
               </div>
             </div>
