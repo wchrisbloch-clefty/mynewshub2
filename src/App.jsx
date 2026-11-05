@@ -4118,13 +4118,17 @@ body{overscroll-behavior-y:contain;}
 .mobile-strip-chg.up{color:var(--green);}
 .mobile-strip-chg.down{color:var(--red);}
 .mobile-strip-div{width:1px;height:14px;background:var(--border);flex-shrink:0;}
+/* V1: phone header icons use the SAME quiet language as the >=641 header (U4) — no border/fill
+   at rest, 36px visual box, 44px touch target via ::after, focus ring, :active tint for touch. */
 .mobile-icon-btn{
-  background:none;border:none;width:40px;height:40px;border-radius:8px;
+  background:transparent;border:none;width:36px;height:36px;border-radius:var(--radius-sm);position:relative;
   display:flex;align-items:center;justify-content:center;
-  cursor:pointer;color:var(--text2);font-size:18px;
-  transition:background 0.12s;padding:0;
+  cursor:pointer;color:var(--text3);
+  transition:color var(--dur-fast),background var(--dur-fast);padding:0;
   -webkit-tap-highlight-color:transparent;
 }
+.mobile-icon-btn::after{content:'';position:absolute;inset:-4px;}  /* 36 + 8 = 44px touch target */
+.mobile-icon-btn:focus-visible{outline:2px solid var(--accent);outline-offset:2px;}
 .mobile-icon-btn:active{background:var(--surface2);}
 
 /* Horizontal chip bar — Yahoo News scrollable pills */
@@ -4901,12 +4905,14 @@ kbd{display:inline-block;padding:1px 5px;border:1px solid var(--border);border-r
   font-family:var(--font-sans);
   font-size:var(--fs-label);color:var(--text3);letter-spacing:0.16em;text-transform:uppercase;margin-top:2px;
 }
+/* V1: borderless to match the base .mobile-icon-btn (was a 1px bordered square — the old look
+   U4 only removed at >=641). Hover tint only on real pointers. */
 .mobile-icon-btn{
-  background:transparent;border:1px solid var(--border);color:var(--text3);
-  border-radius:var(--radius-sm);padding:6px 10px;
-  font-size:var(--fs-subhead);cursor:pointer;font-family:var(--font-sans);transition:all 0.12s;
+  background:transparent;border:none;color:var(--text3);
+  border-radius:var(--radius-sm);
+  cursor:pointer;font-family:var(--font-sans);transition:color var(--dur-fast),background var(--dur-fast);
 }
-.mobile-icon-btn:hover{color:var(--text);border-color:var(--text3);}
+@media(hover:hover){ .mobile-icon-btn:hover{color:var(--text);background:var(--surface2);} }
 .mobile-actions{display:flex;gap:6px;}
 
 /* BOTTOM TABS — editorial section icons */
@@ -5914,7 +5920,8 @@ kbd{display:inline-block;padding:1px 5px;border:1px solid var(--border);border-r
      here — a 44px box overflowed the short standard row and bled the "Ask" button 3px into the
      next section's headline (a real text overlap). The ::after keeps the tap target >=44px. */
   .snap-ask,.snap-save{min-width:44px;justify-content:center;}
-  .mobile-icon-btn{min-width:44px;min-height:44px;}
+  /* V1: .mobile-icon-btn is NOT forced to a 44px box — it keeps a 36px VISUAL box and gets its
+     44px tap target from the ::after inset (same S1 pattern as .snap-ask above). */
   /* N1: controls that measured <44px on touch tablets/landscape (the phone-only rules didn't
      reach them). Desktop mouse (hover:hover) is unaffected. The market ticker (.ss-tk) is exempt —
      it lives in the 30px status strip and can't grow without a header redesign (deferred). */
@@ -8401,16 +8408,16 @@ function TopBar({tab, setTab, search, setSearch, dark, setDark,
             {/* F7: toggles the default-collapsed market ticker (mobile only). */}
             <button className={`mobile-icon-btn mobile-ticker-toggle${tickerOpen?' on':''}`} onClick={()=>setTickerOpen(o=>!o)}
               title={tickerOpen?'Hide markets':'Show markets'} aria-label={tickerOpen?'Hide market ticker':'Show market ticker'} aria-pressed={tickerOpen}>
-              <TrendingUp size={18} strokeWidth={2}/>
+              <TrendingUp size={20} strokeWidth={2}/>
             </button>
-            <button className="mobile-icon-btn" onClick={onAnalyze} title="Analyze">
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><rect x="8" y="2" width="8" height="4" rx="1"/><line x1="9" y1="12" x2="15" y2="12"/><line x1="9" y1="16" x2="13" y2="16"/></svg>
+            <button className="mobile-icon-btn" onClick={onAnalyze} title="Analyze" aria-label="Paste & Analyze">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><rect x="8" y="2" width="8" height="4" rx="1"/><line x1="9" y1="12" x2="15" y2="12"/><line x1="9" y1="16" x2="13" y2="16"/></svg>
             </button>
             {/* M2: the header search icon is removed on mobile — Search now lives in the
                 bottom tab bar (which opens this same .mobile-search input), so the two
                 would otherwise duplicate. */}
-            <button className="mobile-icon-btn" onClick={onRefresh} title="Refresh">
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
+            <button className="mobile-icon-btn" onClick={onRefresh} title="Refresh" aria-label="Refresh">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
             </button>
           </div>
         </div>
