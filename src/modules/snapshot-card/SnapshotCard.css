@@ -51,9 +51,9 @@
 .snap-breaking .snap-accent{display:none;}
 .snap-main{flex:1;min-width:0;padding:10px 0;order:1;}
 .snap-meta{display:flex;align-items:center;gap:8px;margin-bottom:4px;flex-wrap:wrap;}
-.snap-source{font-family:var(--font-sans);font-size:var(--fs-meta);font-weight:700;text-transform:uppercase;letter-spacing:0.05em;}
+.snap-source{font-family:var(--font-sans);font-size:var(--fs-meta);font-weight:700;text-transform:uppercase;letter-spacing:0.05em;color:var(--text3);}
 .snap-live{font-family:var(--font-sans);font-size:var(--fs-label);font-weight:800;color:#fff;background:var(--red);border-radius:4px;padding:2px 6px;letter-spacing:0.06em;}
-.snap-tag{font-family:var(--font-sans);font-size:var(--fs-label);font-weight:700;border-radius:20px;padding:2px 9px;text-transform:uppercase;letter-spacing:0.03em;}
+.snap-tag{font-family:var(--font-sans);font-size:var(--fs-label);font-weight:700;padding:0;text-transform:uppercase;letter-spacing:0.03em;background:transparent;color:var(--text3);}
 /* F8: Opinion/Analysis label — rules-only metadata, styled as a neutral OUTLINE tag so it
    never reads as a trust tier/category (no fill, no accent). */
 .snap-opinion{font-family:var(--font-sans);font-size:var(--fs-label);font-weight:800;text-transform:uppercase;letter-spacing:0.06em;color:var(--text3);border:1px solid var(--border);border-radius:4px;padding:1px 6px;white-space:nowrap;}

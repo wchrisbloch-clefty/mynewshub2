@@ -472,7 +472,7 @@ export function SportsPage({ ctx }) {
                     <div className="gn-card-img"><CoverImg src={a.img} label={a.source}/></div>
                     <h3 className="gn-card-title">{a.title}</h3>
                     <div className="gn-card-meta">
-                      <span className="gn-card-source" style={{color:cc.color}}>{a.source}</span>
+                      <span className="gn-card-source">{a.source}</span>
                       <span>·</span><span>{fmtDate(a.pubDate)}</span>
                       {a._favScore > 0 && <Star size={11} aria-hidden="true" style={{marginLeft:'4px',color:'var(--amber)'}} fill="currentColor"/>}
                     </div>

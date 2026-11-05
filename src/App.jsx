@@ -2092,9 +2092,11 @@ body:not(.dark) .pill-bar{
 .fc-date{font-size:var(--fs-meta);color:var(--text3);font-variant-numeric:tabular-nums;margin-left:auto;white-space:nowrap;}
 .fc-date-fresh{color:#16a34a;font-weight:700;}
 .fc-date-recent{color:var(--accent);}
+/* V2: the keyword topic tag is quiet neutral meta — no category colour, no tinted fill. */
 .fc-topic{
-  font-size:var(--fs-label);font-weight:700;border-radius:20px;padding:2px 9px;
+  font-size:var(--fs-label);font-weight:700;padding:0;
   letter-spacing:0.03em;text-transform:uppercase;font-family:var(--font-sans);
+  background:transparent;color:var(--text3);
 }
 /* F8: Opinion/Analysis — rules-only neutral OUTLINE tag (never a tier/category). */
 .fc-opinion{
@@ -2302,17 +2304,19 @@ body:not(.dark) .pill-bar{
   background:var(--accent-bg);border-radius:6px;padding:6px 10px;
   display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:4px;
 }
-.gs-filter-label{font-size:var(--fs-meta);font-weight:600;color:var(--accent);}
-.gs-filter-x{background:none;border:none;color:var(--accent);cursor:pointer;font-size:var(--fs-body);line-height:1;padding:0;}
+.gs-filter-label{font-size:var(--fs-meta);font-weight:600;color:var(--text2);}  /* V2: source filter name is neutral, never category/accent coloured */
+.gs-filter-x{background:none;border:none;color:var(--text3);cursor:pointer;font-size:var(--fs-body);line-height:1;padding:0;}
 
 /* Keyword chips */
 .kw-chips{display:flex;flex-wrap:wrap;gap:4px;}
+/* V2: keyword chips use the one chip language — transparent, 1px --border, neutral text;
+   selected = the single accent fill. */
 .kw-chip{
-  font-size:var(--fs-label);font-weight:600;border-radius:20px;padding:3px 10px;cursor:pointer;
-  border:1px solid transparent;display:inline-block;transition:opacity 0.12s;
+  font-size:var(--fs-label);font-weight:var(--fw-medium);border-radius:var(--radius-full);padding:4px 11px;cursor:pointer;
+  border:1px solid var(--border);background:transparent;color:var(--text2);display:inline-block;transition:border-color var(--dur-fast),color var(--dur-fast),background var(--dur-fast);
 }
-.kw-chip:hover{opacity:0.75;}
-.kw-chip.active{border-color:currentColor;}
+@media(hover:hover){ .kw-chip:hover{border-color:var(--border-strong);color:var(--text);} }
+.kw-chip.active{background:var(--accent);color:var(--on-accent);border-color:var(--accent);}
 
 /* ── Redesigned sidebar sections ─────────────────────────────── */
 .sidebar-section{display:flex;flex-direction:column;gap:0;}
@@ -2370,20 +2374,24 @@ body:not(.dark) .pill-bar{
 /* a11y (row 117): the pill is a non-interactive wrapper; the primary "filter by topic"
    action is the inner .ttp-chip-main <button> (aria-pressed = active), and the follow
    star is a SIBLING <button> — never a <button> nested inside a <button>. */
+/* V2: the "Filter by topic" keyword pills use the SAME chip language as U4 — 1px --border,
+   transparent, pill radius, body/medium, neutral --text2; no category colour, no tinted fill.
+   Selected = the single accent fill + on-accent text. (Touch gets a 44px box via the global
+   chip rule; desktop stays 32px visual.) */
 .ttp-chip{
-  display:inline-flex;align-items:center;gap:5px;min-height:28px;
-  font-size:var(--fs-meta);font-weight:600;padding:4px 11px;border-radius:16px;
-  border:1px solid var(--border2);background:var(--surface2);color:var(--text2);
-  transition:background 0.14s,border-color 0.14s,color 0.14s;white-space:nowrap;
+  display:inline-flex;align-items:center;gap:5px;min-height:32px;
+  font-size:var(--fs-body);font-weight:var(--fw-medium);padding:5px 12px;border-radius:var(--radius-full);
+  border:1px solid var(--border);background:transparent;color:var(--text2);
+  transition:border-color var(--dur-fast),color var(--dur-fast),background var(--dur-fast);white-space:nowrap;
 }
-.ttp-chip:hover{border-color:var(--border);color:var(--text);background:var(--surface);}
-.ttp-chip.active{color:#fff !important;border-color:transparent !important;}
+@media(hover:hover){ .ttp-chip:hover{border-color:var(--border-strong);color:var(--text);} }
+.ttp-chip.active{background:var(--accent);color:var(--on-accent);border-color:var(--accent);}
 .ttp-chip.saved{border-style:dashed;}
 .ttp-chip-main{display:inline-flex;align-items:center;gap:5px;background:none;border:none;padding:0;margin:0;font:inherit;color:inherit;letter-spacing:inherit;cursor:pointer;}
 .ttp-chip-main:focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:8px;}
-.ttp-chip.active .ttp-chip-main:focus-visible{outline-color:#fff;}
+.ttp-chip.active .ttp-chip-main:focus-visible{outline-color:var(--on-accent);}
 .ttp-count{font-size:var(--fs-label);font-weight:700;color:var(--text4);font-variant-numeric:tabular-nums;}
-.ttp-chip.active .ttp-count{color:rgba(255,255,255,0.7);}
+.ttp-chip.active .ttp-count{color:var(--on-accent);opacity:0.7;}
 /* Follow star — sibling button on the merged Trending chips (Pass J item 3). */
 .ttp-chip-star{background:none;border:none;cursor:pointer;font-size:var(--fs-label);line-height:1;color:var(--text4);padding:0 0 0 1px;margin-left:1px;}
 .ttp-chip-star.on{color:var(--amber);}
@@ -2394,7 +2402,7 @@ body:not(.dark) .pill-bar{
 /* Across MyNewsHub — compact text list in the sidebar (Pass J item 4). */
 .sb-across-cat{margin-bottom:12px;}
 .sb-across-cat:last-child{margin-bottom:0;}
-.sb-across-clabel{background:none;border:none;cursor:pointer;font-family:inherit;padding:0 0 5px;font-size:var(--fs-label);font-weight:800;text-transform:uppercase;letter-spacing:0.08em;display:block;}
+.sb-across-clabel{background:none;border:none;cursor:pointer;font-family:inherit;padding:0 0 5px;font-size:var(--fs-label);font-weight:800;text-transform:uppercase;letter-spacing:0.08em;display:block;color:var(--text2);}  /* V2: neutral section label (was category colour) */
 .sb-across-clabel:hover{text-decoration:underline;}
 .sb-across-item{cursor:pointer;padding:5px 0;border-top:1px solid var(--border2);}
 .sb-across-cat .sb-across-item:first-of-type{border-top:none;}
@@ -3198,7 +3206,7 @@ body:not(.dark) .pill-bar{
   margin-bottom: 12px;
 }
 .other-cat-label{
-  font-size: 12px;font-weight: 800;
+  font-size: var(--fs-label);font-weight: 800;color:var(--text3);
   text-transform: uppercase;letter-spacing: 0.08em;
 }
 .other-cat-link{
@@ -4369,8 +4377,9 @@ body{overscroll-behavior-y:contain;}
 .trending-card:hover{border-color:var(--accent);transform:translateY(-1px);}
 .trending-card-meta{display:flex;align-items:center;gap:6px;}
 .trending-card-badge{
-  font-size:var(--fs-label);font-weight:700;border-radius:4px;padding:1px 6px;
+  font-size:var(--fs-label);font-weight:700;padding:0;
   letter-spacing:0.04em;text-transform:uppercase;
+  background:transparent;color:var(--text3);  /* V2: neutral, no category fill/colour */
 }
 .trending-card-num{font-size:var(--fs-subhead);font-weight:900;color:var(--text4);font-variant-numeric:tabular-nums;}
 .trending-card-title{
@@ -4708,6 +4717,12 @@ body{overscroll-behavior-y:contain;}
 /* v26: Sticky filter pill */
 .sticky-filter{position:sticky;top:96px;z-index:5;background:var(--bg);padding:8px 0;border-bottom:1px solid var(--border2);}
 @media (max-width:640px){.sticky-filter{top:88px;}}
+/* V2: the active keyword / source filter chips — the one chip language, neutral at rest (these
+   were two one-off inline-style objects with a category fill). */
+.active-filter-row{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px;}
+.active-filter-chip{display:inline-flex;align-items:center;gap:5px;background:transparent;border:1px solid var(--border);color:var(--text2);border-radius:var(--radius-full);padding:4px 11px;font-size:var(--fs-label);font-weight:var(--fw-semibold);}
+.active-filter-x{background:none;border:none;cursor:pointer;color:var(--text3);font-size:var(--fs-body);line-height:1;padding:0;display:inline-flex;align-items:center;}
+@media(hover:hover){ .active-filter-x:hover{color:var(--text);} }
 
 /* v26: Web search fallback + source recommendations */
 .web-fallback{margin-top:20px;}
@@ -4738,7 +4753,7 @@ body{overscroll-behavior-y:contain;}
 .stats-source-cnt{font-size:var(--fs-meta);color:var(--text3);font-variant-numeric:tabular-nums;margin-left:4px;}
 .stats-cats{}
 .stats-cat-chips{display:flex;gap:6px;flex-wrap:wrap;}
-.stats-cat-chip{font-size:var(--fs-meta);font-weight:600;border-radius:12px;padding:3px 10px;}
+.stats-cat-chip{font-size:var(--fs-meta);font-weight:600;border-radius:var(--radius-full);padding:4px 11px;background:transparent;border:1px solid var(--border);color:var(--text2);}  /* V2: one chip language, no category fill */
 
 /* v26: Business + Finance card terminal-feel source label */
 .gn-card.business .gn-card-source,.gn-card.finance .gn-card-source{
@@ -5329,7 +5344,7 @@ kbd{display:inline-block;padding:1px 5px;border:1px solid var(--border);border-r
 @keyframes persp-slide-in{from{transform:translateX(100%);}to{transform:translateX(0);}}
 .persp-head{display:flex;align-items:flex-start;gap:12px;padding:var(--s4);border-bottom:1px solid var(--border2);position:sticky;top:0;background:var(--surface);z-index:1;}
 .persp-head-text{flex:1;min-width:0;}
-.persp-kicker{font-family:var(--font-sans);font-size:var(--fs-label);font-weight:800;text-transform:uppercase;letter-spacing:0.08em;margin-bottom:4px;}
+.persp-kicker{font-family:var(--font-sans);font-size:var(--fs-label);font-weight:800;text-transform:uppercase;letter-spacing:0.08em;margin-bottom:4px;color:var(--text3);}  /* V2: neutral kicker (not a category name) */
 .persp-title{font-family:var(--font-serif);font-weight:800;font-size:17px;line-height:1.25;color:var(--text);letter-spacing:-0.2px;overflow-wrap:anywhere;}
 .persp-close{background:none;border:none;font-size:24px;line-height:1;color:var(--text3);cursor:pointer;flex-shrink:0;padding:0 2px;}
 .persp-close:hover{color:var(--text);}
@@ -6376,7 +6391,7 @@ function FeedCard({a, cat, isSaved, onSave, onRead, relatedSources, isRead, user
             appears ONLY as tagged rows in State of Play. */}
         <TierBadge item={a}/>
         {opinionLabel(a) && <span className="fc-opinion">{opinionLabel(a)}</span>}
-        {topKw && <span className="fc-topic" style={{background:cc.bg,color:cc.color}}>{topKw}</span>}
+        {topKw && <span className="fc-topic">{topKw}</span>}
         {clusterCount > 1 && (
           <span className="sources-tag" title={`Also covered by: ${a._clusterSources?.join(', ')}`}>
             {clusterCount} sources
@@ -7203,7 +7218,7 @@ function Sidebar({cat, arts, kw, health, activeKw, setActiveKw, activeSource, se
       {(activeKw||activeSource) && (
         <div className="gs-filter">
           {activeKw && <><span className="gs-filter-label">{activeKw}</span><button className="gs-filter-x" onClick={()=>setActiveKw(null)}><XIcon size={13} aria-hidden="true"/></button></>}
-          {activeSource && <><span className="gs-filter-label" style={{color:cc.color}}>{activeSource}</span><button className="gs-filter-x" style={{color:cc.color}} onClick={()=>setActiveSource(null)}><XIcon size={13} aria-hidden="true"/></button></>}
+          {activeSource && <><span className="gs-filter-label">{activeSource}</span><button className="gs-filter-x" onClick={()=>setActiveSource(null)}><XIcon size={13} aria-hidden="true"/></button></>}
         </div>
       )}
 
@@ -7273,7 +7288,7 @@ function Sidebar({cat, arts, kw, health, activeKw, setActiveKw, activeSource, se
           <div className="sidebar-sec-head"><span className="sidebar-sec-label">Across MyNewsHub</span></div>
           {acrossSections.slice(0, 4).map(section => (
             <div key={section.cat} className="sb-across-cat">
-              <button className="sb-across-clabel" style={{color:section.cc.color}} onClick={()=>onAcrossSeeAll(section.cat)}>
+              <button className="sb-across-clabel" onClick={()=>onAcrossSeeAll(section.cat)}>
                 {section.cc.label} →
               </button>
               {section.items.slice(0, 2).map((a, i) => (
@@ -7309,8 +7324,7 @@ function Sidebar({cat, arts, kw, health, activeKw, setActiveKw, activeSource, se
               const followed = isTopicFollowed?.(t.label);
               return (
                 <span key={i}
-                  className={`ttp-chip${activeKw===t.label?' active':''}${t.isSaved?' saved':''}`}
-                  style={activeKw===t.label ? {background:cc.color} : {}}>
+                  className={`ttp-chip${activeKw===t.label?' active':''}${t.isSaved?' saved':''}`}>
                   <button type="button" className="ttp-chip-main"
                     aria-pressed={activeKw===t.label}
                     onClick={()=>handleTopicClick(t.label)}>
@@ -7671,7 +7685,7 @@ function TrendingCarousel({ arts, kw, onRead }) {
             <div key={i} className="trending-card" onClick={() => onRead(a)}>
               <div className="trending-card-meta">
                 <span className="trending-card-num">{i+1}</span>
-                <span className="trending-card-badge" style={{background:cc.bg,color:badge.color}}>{badge.label}</span>
+                <span className="trending-card-badge">{badge.label}</span>
               </div>
               <div className="trending-card-title">{a.title}</div>
               <div className="trending-card-src">{a.source} · {fmtDate(a.pubDate)}</div>
@@ -8611,8 +8625,8 @@ function AcrossHub({ sections, onRead, onSeeAll, formatDate }) {
       {sections.map(section => (
         <section key={section.cat} className="other-cat-section">
           <div className="other-cat-head">
-            <span className="other-cat-label" style={{ color: section.cc.color }}>
-              {section.cc.emoji} {section.cc.label}
+            <span className="other-cat-label">
+              {section.cc.label}
             </span>
             <button className="other-cat-link" onClick={() => onSeeAll(section.cat)}>
               See all in {section.cc.label} →
@@ -8758,7 +8772,7 @@ function PerspectivesPanel({ article, onClose }) {
       <div className="persp-panel" onClick={e => e.stopPropagation()}>
         <div className="persp-head">
           <div className="persp-head-text">
-            <div className="persp-kicker" style={{ color: cc.color }}>Perspectives</div>
+            <div className="persp-kicker">Perspectives</div>
             <div className="persp-title">{article.title}</div>
           </div>
           <button className="persp-close" onClick={onClose} aria-label="Close"><XIcon size={16} aria-hidden="true"/></button>
@@ -9347,9 +9361,9 @@ function FeedPage({ cat, ctx }) {
               </div>
             )}
             {(activeKw||activeSrc)&&(
-              <div className="sticky-filter" style={{display:'flex',gap:'6px',flexWrap:'wrap',marginBottom:'12px'}}>
-                {activeKw&&<span style={{background:cc.bg,color:cc.color,borderRadius:'20px',padding:'3px 10px',fontSize:'var(--fs-label)',fontWeight:'600',display:'inline-flex',alignItems:'center',gap:'5px'}}>{activeKw}<button onClick={()=>setActiveKw(null)} style={{background:'none',border:'none',cursor:'pointer',color:'inherit',fontSize:'12px',padding:0}}><XIcon size={13} aria-hidden="true"/></button></span>}
-                {activeSrc&&<span style={{background:'var(--surface2)',color:'var(--text2)',borderRadius:'20px',padding:'3px 10px',fontSize:'var(--fs-label)',fontWeight:'600',border:'1px solid var(--border)',display:'inline-flex',alignItems:'center',gap:'5px'}}>{activeSrc}<button onClick={()=>setActiveSrc(null)} style={{background:'none',border:'none',cursor:'pointer',color:'inherit',fontSize:'12px',padding:0}}><XIcon size={13} aria-hidden="true"/></button></span>}
+              <div className="sticky-filter active-filter-row">
+                {activeKw&&<span className="active-filter-chip">{activeKw}<button className="active-filter-x" onClick={()=>setActiveKw(null)} aria-label="Clear keyword filter"><XIcon size={13} aria-hidden="true"/></button></span>}
+                {activeSrc&&<span className="active-filter-chip">{activeSrc}<button className="active-filter-x" onClick={()=>setActiveSrc(null)} aria-label="Clear source filter"><XIcon size={13} aria-hidden="true"/></button></span>}
               </div>
             )}
             {isLoading&&!feedItems.length
@@ -9512,7 +9526,6 @@ function FeedPage({ cat, ctx }) {
                   {catKws.map((k, i) => (
                     <span key={i}
                       className="kw-chip"
-                      style={{background:cc.bg,color:cc.color}}
                       onClick={()=>{setActiveKw(k); window.scrollTo({top:0, behavior:'smooth'});}}>
                       {k}
                     </span>
@@ -10517,7 +10530,7 @@ export default function App() {
               <div className="stats-cat-chips">
                 {readingStats.topCats.map(([c,cnt]) => {
                   const cc=CATS[c]||CATS.general;
-                  return <span key={c} className="stats-cat-chip" style={{background:cc.bg,color:cc.color}}>{cc.label} ({cnt})</span>;
+                  return <span key={c} className="stats-cat-chip">{cc.label} ({cnt})</span>;
                 })}
               </div>
             </div>
