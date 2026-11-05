@@ -12,7 +12,7 @@
 }
 /* O5: hover scale only on real pointers (it was sticking after a tap on touch). */
 @media (hover:hover){ .chat-fab:hover{transform:scale(1.08);box-shadow:var(--shadow-lg);} }
-.chat-fab.open{background:linear-gradient(135deg,var(--chat-fg),var(--chat-bg));}
+.chat-fab.open{background:linear-gradient(135deg,var(--chat-text),var(--chat-surface));}
 /* O3: hidden while scrolling DOWN (returns on scroll-up / at top / idle). Slides off-screen and
    stops taking taps so it never covers a headline or section header mid-scroll. */
 .chat-fab-hidden{transform:translateY(130%);opacity:0;pointer-events:none;}

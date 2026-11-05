@@ -18,7 +18,7 @@
 //  • General: neutral (homepage baseline, no extra accent)
 //  • Sports: dark navy score strip + purple sport tabs preserved (signature)
 //  • Markets: orange Bloomberg accent preserved + extended to Business
-//  • Pop Culture: pink var(--pink) top-border on cards, slightly bigger images
+//  • Pop Culture: pink var(--accent-pink) top-border on cards, slightly bigger images
 //  • Briefing: left-bar Morning Brew style (kept from v22b)
 //  • Bloom Energy: blue var(--accent) light accent
 //
@@ -918,7 +918,7 @@ function socialUrl(platform, handle) {
   }
 }
 const SOCIAL_META = {
-  twitter:   {label:'X / Twitter', color:'var(--ink)', bg:'var(--wash-cool)', icon:'𝕏'},
+  twitter:   {label:'X / Twitter', color:'var(--black)', bg:'var(--wash-cool)', icon:'𝕏'},
   linkedin:  {label:'LinkedIn',    color:'var(--brand-linkedin)', bg:'var(--wash-cool)', icon:'in'},
   instagram: {label:'Instagram',   color:'var(--brand-instagram)', bg:'var(--wash-pink)', icon:'IG'},
   youtube:   {label:'YouTube',     color:'var(--text2)', bg:'var(--surface2)',    icon:'▶'},
@@ -1636,8 +1636,8 @@ body:not(.dark) .topbar-scores{background:var(--surface);}
      +2…") fades out instead of being hard-cut by the weather divider at ~1180 — the
      last FULLY visible item reads whole, and the fade is the "more →" cue. The ticker
      clips only inside its own box (overflow:hidden), never under the weather. */
-  -webkit-mask-image:linear-gradient(90deg,var(--ink) 0,var(--ink) calc(100% - 72px),transparent);
-          mask-image:linear-gradient(90deg,var(--ink) 0,var(--ink) calc(100% - 72px),transparent);}
+  -webkit-mask-image:linear-gradient(90deg,var(--black) 0,var(--black) calc(100% - 72px),transparent);
+          mask-image:linear-gradient(90deg,var(--black) 0,var(--black) calc(100% - 72px),transparent);}
 .ss-ticker-inner{display:flex;align-items:center;gap:var(--s4);overflow-x:auto;scrollbar-width:none;padding-right:12px;}
 .ss-ticker-inner::-webkit-scrollbar{display:none;}
 .ss-tk-clipped{display:none;}  /* O6: items the right edge would cut are hidden (whole items only) */
@@ -1776,7 +1776,7 @@ body:not(.dark) .topbar-scores{background:var(--surface);}
 }
 /* Light mode: softer data strip — still readable but not jarring */
 body:not(.dark) .pill-bar{
-  background:var(--navy-2);
+  background:var(--accent-deep);
 }
 .pill-bar-inner{
   max-width:1400px;margin:0 auto;width:100%;
@@ -2465,7 +2465,7 @@ body:not(.dark) .pill-bar{
 .src-row:hover{opacity:0.7;}
 .src-row.active-src{opacity:1;}
 .health-dot{width:6px;height:6px;border-radius:50%;flex-shrink:0;}
-.h-green{background:var(--green);}.h-yellow{background:var(--amber);}.h-red{background:var(--red);}.h-gray{background:var(--c-gray);}
+.h-green{background:var(--green);}.h-yellow{background:var(--amber);}.h-red{background:var(--red);}.h-gray{background:var(--gray-mid);}
 .src-name{font-size:var(--fs-meta);font-weight:500;color:var(--text);flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
 .src-count{font-size:var(--fs-label);color:var(--text3);}
 
@@ -2963,12 +2963,12 @@ body:not(.dark) .pill-bar{
 .cp-src-row{display:flex;align-items:center;gap:8px;padding:7px 0;border-bottom:1px solid var(--border2);}
 .cp-src-row:last-child{border-bottom:none;}
 .cp-health{width:6px;height:6px;border-radius:50%;flex-shrink:0;}
-.cp-h-green{background:var(--green);}.cp-h-yellow{background:var(--amber);}.cp-h-red{background:var(--red);}.cp-h-gray{background:var(--c-gray);}
+.cp-h-green{background:var(--green);}.cp-h-yellow{background:var(--amber);}.cp-h-red{background:var(--red);}.cp-h-gray{background:var(--gray-mid);}
 .cp-src-name{flex:1;font-size:12px;color:var(--text);}
 .cp-src-count{font-size:var(--fs-label);color:var(--text3);}
 .cp-test-btn{background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius-md);padding:3px 8px;font-size:var(--fs-label);cursor:pointer;font-family:inherit;color:var(--text2);white-space:nowrap;}
 .cp-tog{width:30px;height:17px;border-radius:var(--radius-md);border:none;cursor:pointer;position:relative;transition:background 0.2s;flex-shrink:0;}
-.cp-tog.on{background:var(--accent);}.cp-tog.off{background:var(--c-gray-line);}
+.cp-tog.on{background:var(--accent);}.cp-tog.off{background:var(--line-muted);}
 .cp-tog::after{content:'';width:13px;height:13px;background:var(--on-media);border-radius:50%;position:absolute;top:2px;transition:left 0.15s;}
 .cp-tog.on::after{left:15px;}.cp-tog.off::after{left:2px;}
 .cp-del{background:none;border:none;color:var(--text3);cursor:pointer;font-size:var(--fs-body);padding:0 1px;line-height:1;}
@@ -3078,7 +3078,7 @@ body:not(.dark) .pill-bar{
 }
 
 /* Per-vertical card top-border accents */
-.gn-card.popculture{border-top:3px solid var(--pink);padding-top:8px;}
+.gn-card.popculture{border-top:3px solid var(--accent-pink);padding-top:8px;}
 .gn-card.business{border-top:3px solid var(--amber);padding-top:8px;}
 .gn-card.finance{border-top:3px solid var(--amber);padding-top:8px;}
 
@@ -3542,7 +3542,7 @@ body:not(.dark) .pill-bar{
 }
 .sports-hero-fav{
   position:absolute;top:12px;left:12px;
-  background:var(--amber);color:var(--brown);
+  background:var(--amber);color:var(--accent-brown);
   font-size:var(--fs-label);font-weight:900;letter-spacing:0.1em;
   padding:4px 10px;border-radius:var(--radius-sm);
   box-shadow:0 2px 8px rgba(0,0,0,0.2);
@@ -4176,7 +4176,7 @@ body{overscroll-behavior-y:contain;}
   -webkit-tap-highlight-color:transparent;
 }
 .chip:active{background:var(--surface2);}
-/* F5: active chip uses the single accent token (was var(--ink) / per-category color). */
+/* F5: active chip uses the single accent token (was var(--black) / per-category color). */
 .chip.active{color:var(--on-accent);font-weight:700;background:var(--accent);}
 /* D1: "More ▾" chip opens the mobile overflow sheet (Briefing/Podcasts/Sources/Saved). */
 .chip-more{font-weight:700;color:var(--text2);}
@@ -5194,7 +5194,7 @@ kbd{display:inline-block;padding:1px 5px;border:1px solid var(--border);border-r
 }
 .pc-subtab svg{flex-shrink:0;}
 @media(hover:hover){ .pc-subtab:hover{color:var(--text);border-color:var(--border-strong);} }
-/* U3: ONE active chip look — the single brand accent (was a hardcoded Pop-culture pink var(--pink)).
+/* U3: ONE active chip look — the single brand accent (was a hardcoded Pop-culture pink var(--accent-pink)).
    Energy and Pop-culture now share it; no per-section chip colour. */
 .pc-subtab.active{background:var(--accent);color:var(--on-accent);border-color:var(--accent);}
 @media(max-width:640px){
@@ -5498,7 +5498,7 @@ kbd{display:inline-block;padding:1px 5px;border:1px solid var(--border);border-r
 .analyze-url-input:focus{outline:none;border-color:var(--accent);}
 .analyze-yt-embed{
   width:100%;aspect-ratio:16/9;border:none;border-radius:8px;
-  background:var(--ink);margin-bottom:10px;
+  background:var(--black);margin-bottom:10px;
 }
 .analyze-yt-note{font-size:var(--fs-meta);color:var(--text3);margin-bottom:12px;font-style:italic;}
 .analyze-modes{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px;}
@@ -8822,8 +8822,8 @@ function PerspectivesPanel({ article, onClose }) {
 // clicking it establishes a session, which onAuthStateChange picks up in App.
 function AuthModal({ onClose, onSend, status, email, setEmail, userId, onSignOut }) {
   const overlay = {position:'fixed',inset:0,background:'rgba(0,0,0,.45)',display:'flex',alignItems:'center',justifyContent:'center',zIndex:9999,padding:16};
-  const card = {position:'relative',background:'var(--surface,var(--on-media))',color:'var(--text,var(--ink))',width:'min(94vw,380px)',borderRadius:14,padding:'26px 24px',boxShadow:'0 12px 40px rgba(0,0,0,.28)',border:'1px solid var(--border,var(--c-gray-line))'};
-  const input = {width:'100%',padding:'11px 12px',border:'1px solid var(--border,var(--c-gray-line))',borderRadius:9,fontSize:15,margin:'0 0 12px',boxSizing:'border-box',background:'var(--surface2,var(--on-media))',color:'inherit'};
+  const card = {position:'relative',background:'var(--surface,var(--on-media))',color:'var(--text,var(--black))',width:'min(94vw,380px)',borderRadius:14,padding:'26px 24px',boxShadow:'0 12px 40px rgba(0,0,0,.28)',border:'1px solid var(--border,var(--line-muted))'};
+  const input = {width:'100%',padding:'11px 12px',border:'1px solid var(--border,var(--line-muted))',borderRadius:9,fontSize:15,margin:'0 0 12px',boxSizing:'border-box',background:'var(--surface2,var(--on-media))',color:'inherit'};
   const btn = {width:'100%',padding:'11px 12px',border:'none',borderRadius:9,background:'var(--accent)',color:'var(--on-media)',fontSize:15,fontWeight:600,cursor:'pointer',opacity:(status==='sending')?0.6:1};
   return (
     <div style={overlay} onClick={onClose}>
