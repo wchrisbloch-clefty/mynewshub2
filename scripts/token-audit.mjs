@@ -57,6 +57,9 @@ export function audit() {
     for (const _ of txt.matchAll(/!important/g)) importantCount++;
   }
   for (const [k, v] of fontSizePx) { if (parseFloat(k) < 11) fontSizeUnder11.set(k, v); }
+  // allowed radii per the Batch U scale: sm 4 / md 8 / lg 12 / full pill (999 or 9999) / 0.
+  const ALLOWED_RADII = new Set(['0px', '4px', '8px', '12px', '999px', '9999px']);
+  const borderRadiusNonStandardList = [...borderRadiusPx.keys()].filter(k => !ALLOWED_RADII.has(k)).sort((a, b) => parseFloat(a) - parseFloat(b));
 
   function rec(map, k) { const key = k + 'px'; map.set(key, (map.get(key) || 0) + 1); }
 
@@ -70,6 +73,8 @@ export function audit() {
     fontSizeUnder11List: [...fontSizeUnder11.entries()].sort((a, b) => parseFloat(a[0]) - parseFloat(b[0])),
     borderRadiusDistinct: borderRadiusPx.size,
     borderRadiusList: [...borderRadiusPx.keys()].sort((a, b) => parseFloat(a) - parseFloat(b)),
+    borderRadiusNonStandard: borderRadiusNonStandardList.length,
+    borderRadiusNonStandardList,
     fontWeightDistinct: fontWeights.size,
     fontWeightList: [...fontWeights.entries()].sort(),
     importantCount,
@@ -86,6 +91,7 @@ if (process.argv.includes('--json')) {
     fontSizeDistinct: a.fontSizeDistinct,
     fontSizeUnder11Distinct: a.fontSizeUnder11Distinct,
     borderRadiusDistinct: a.borderRadiusDistinct,
+    borderRadiusNonStandard: a.borderRadiusNonStandard,
     importantCount: a.importantCount,
   }, null, 2));
 } else if (process.argv.includes('--summary')) {

@@ -4,5 +4,6 @@
   "fontSizeDistinct": 26,
   "fontSizeUnder11Distinct": 5,
   "borderRadiusDistinct": 17,
+  "borderRadiusNonStandard": 13,
   "importantCount": 20
 }

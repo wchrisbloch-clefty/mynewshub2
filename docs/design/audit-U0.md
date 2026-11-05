@@ -72,3 +72,13 @@ Chip icon sizes/strokes are ad-hoc (`size=14 strokeWidth=2.2`, `size=13`, `size=
 5. status line: three pill styles, peach fill, second Customize → U5.
 6. a feed-row headline renders ~26px sans bold, larger than the ~20px serif Top Stories → U5 (hierarchy).
 7. sub-11px uppercase (tagline, markets label) → U6 floor.
+
+## U1 — the ratchet (`npm run check:tokens`)
+
+`npm run check:tokens` (and `npm run verify` = check:tokens + build) runs `scripts/check-tokens.mjs`:
+it re-audits `src/` and FAILS (exit 1) if any guarded count rises above `scripts/token-baseline.json`
+— distinct hex outside tokens.css, inline `style={{`, distinct font-size px literals, font-size
+literals < 11px, border-radius literals outside {0,4,8,12,pill}, and `!important`. To lock in a
+reduction, lower the real count and regenerate the baseline in the SAME commit:
+`node scripts/token-audit.mjs --json > scripts/token-baseline.json`. Runtime ~90ms. Proven: a diff
+adding one stray `#abcdef` exits 1; reverting exits 0.
