@@ -2029,12 +2029,14 @@ body:not(.dark) .pill-bar{
   display:flex;align-items:center;justify-content:space-between;
   margin-bottom:28px;
 }
+/* U5.4: ONE status-line pill style (same shape as .last-updated) — 1px --border, no tinted fill.
+   The "N sources unavailable" warning is carried by the TEXT colour (--amber), not a peach fill. */
 .feed-degraded{
-  font-size:10px;font-weight:700;color:var(--amber,#b45309);font-family:var(--font-sans);
-  background:rgba(180,83,9,0.1);border:1px solid rgba(180,83,9,0.3);border-radius:14px;
-  padding:3px 10px;cursor:pointer;white-space:nowrap;
+  font-size:var(--fs-meta);font-weight:600;color:var(--amber);font-family:var(--font-sans);
+  background:none;border:1px solid var(--border);border-radius:16px;
+  padding:4px 10px;cursor:pointer;white-space:nowrap;line-height:1;
 }
-.feed-degraded:hover{background:rgba(180,83,9,0.18);}
+@media(hover:hover){ .feed-degraded:hover{border-color:var(--border-strong);} }
 .page-header{
   font-size:var(--fs-meta);font-weight:700;color:var(--text3);
   text-transform:uppercase;letter-spacing:0.1em;
@@ -2122,11 +2124,12 @@ body:not(.dark) .pill-bar{
   overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;}
 .fc-text{flex:1;min-width:0;}
 .fc-title{
-  /* P3: the standard/compact feed row is a scannable list row, so it takes the sans at medium
-     weight (600). Serif stays on the editorial leads (hero, Top Stories, section leads, the
-     lead card). Same size/line-height/clamp as before, so the row geometry is unchanged. */
+  /* P3: the standard/compact feed row is a scannable list row, so it takes the sans. U5 defect #6:
+     it was 18px/600 — larger than the Top Stories SECONDARY serif headlines (--fs-subhead, <=16px)
+     at >=1101, so a feed row out-weighed Top Stories. Now the row-title token (--fs-title 15 / 500),
+     so no feed row headline is larger than Top Stories. Serif stays on the editorial leads. */
   font-family:var(--font-sans);
-  font-size:18px;font-weight:600;color:var(--text);line-height:1.25;
+  font-size:var(--fs-title);font-weight:var(--fw-medium);color:var(--text);line-height:1.33;
   letter-spacing:-0.2px;margin-bottom:6px;
   display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden;
   overflow-wrap:break-word;
@@ -4383,8 +4386,7 @@ body{overscroll-behavior-y:contain;}
 .last-updated:hover:not(:disabled){color:var(--text);border-color:var(--text3);}
 .last-updated:disabled{cursor:default;opacity:0.7;}
 .last-updated-icon{flex-shrink:0;}
-.last-updated-dot{width:5px;height:5px;border-radius:50%;background:var(--green);}
-.last-updated-dot.stale{background:var(--amber);}
+/* U5.4: .last-updated-dot removed — no status dot on the "Updated" pill. */
 @media(max-width:640px){ .last-updated{min-height:36px;padding:6px 12px;} }
 
 /* Swipe hint — brief toast when user changes category on mobile */
@@ -4549,7 +4551,7 @@ body{overscroll-behavior-y:contain;}
   .fc-body{flex-direction:row;gap:8px;align-items:flex-start;}
   .fc-thumb,.fc-thumb-ph{width:90px;height:68px;flex-shrink:0;border-radius:6px;}
   .fc-text{flex:1;min-width:0;}
-  .fc-title{font-size:15px;-webkit-line-clamp:3;letter-spacing:0;line-height:1.3;font-weight:600;}
+  .fc-title{font-size:var(--fs-title);-webkit-line-clamp:3;letter-spacing:0;line-height:1.33;font-weight:var(--fw-medium);}  /* U5 #6: one row-title token/weight on mobile too */
   .fc-desc{display:none;}
   .fc-meta{margin-bottom:5px;order:-1;font-size:10px;}
   .fc-act{padding:6px 10px;font-size:var(--fs-meta);min-height:36px;border-radius:18px;}
@@ -4623,7 +4625,7 @@ body{overscroll-behavior-y:contain;}
   .gn-lead-img{aspect-ratio:16/9;height:auto;max-height:300px;}
   .gn-lead-title{font-size:20px;}
   .gn-lead-solo .gn-lead-title{font-size:28px;}
-  .fc-title{font-size:var(--fs-headline);}
+  .fc-title{font-size:var(--fs-title);}  /* U5 #6: row-title token, not --fs-headline (was larger than Top Stories secondary) */
   .fc-thumb,.fc-thumb-ph{width:120px;height:90px;}
   .sport-tabs{gap:6px;}
   .sport-tab{padding:7px 12px;font-size:var(--fs-body);}
@@ -4943,7 +4945,7 @@ kbd{display:inline-block;padding:1px 5px;border:1px solid var(--border);border-r
      readable 2-column card grid instead of a crushed column beside the sidebar. */
   .page-grid{grid-template-columns:1fr!important;gap:28px!important;}
   .hero-lead-title{font-size:var(--fs-lead);}
-  .fc-title{font-size:17px;}
+  .fc-title{font-size:var(--fs-title);}  /* U5 #6: row-title token (was 17px — larger than Top Stories secondary at 641–1100) */
   .gn-lead-solo .gn-lead-title{font-size:28px;}
 }
 
@@ -5566,7 +5568,7 @@ kbd{display:inline-block;padding:1px 5px;border:1px solid var(--border);border-r
 @media(max-width:640px){
   .fc-read-link{padding:7px 0;font-size:var(--fs-meta);}
   .nav-btn,.nav-btn-blue{min-height:36px;}
-  .fc-title{font-size:15px;line-height:1.35;}
+  .fc-title{font-size:var(--fs-title);line-height:1.35;}
   .fc-thumb,.fc-thumb-ph{width:96px;height:72px;border-radius:4px;float:right;margin-left:12px;margin-bottom:4px;}
   .fc-body{display:block;overflow:hidden;}
   .fc-body::after{content:'';display:table;clear:both;}
@@ -7963,7 +7965,7 @@ function LastUpdated({ timestamp, onRefresh }) {
     <button type="button" className="last-updated" onClick={onRefresh} disabled={!onRefresh}
       title="Refresh this page" aria-label={`Refresh this page — ${label}`}>
       <RefreshCw size={12} strokeWidth={2.4} className="last-updated-icon"/>
-      {timestamp && <span className={`last-updated-dot ${stale?'stale':''}`}/>}
+      {/* U5.4: the green/amber dot is dropped — "Updated just now" needs no status dot. */}
       {label}
     </button>
   );

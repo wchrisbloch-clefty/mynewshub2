@@ -14,13 +14,16 @@
 .sop-list{display:flex;flex-direction:column;gap:8px;}
 .sop-item{display:flex;flex-direction:column;align-items:stretch;gap:4px;padding:12px;border:1px solid var(--border);border-radius:8px;background:var(--surface);cursor:pointer;text-align:left;font-family:inherit;width:100%;transition:border-color 0.12s,background 0.12s;}
 @media(hover:hover){ .sop-item:hover{border-color:var(--text3);} }
-.sop-item-title{font-family:var(--font-sans);font-weight:500;font-size:var(--fs-body);line-height:1.35;color:var(--text);min-width:0;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden;overflow-wrap:anywhere;word-break:break-word;}
+/* U5.2: ONE headline weight for every row (ranked, cluster, breaking, gap). */
+.sop-item-title{font-family:var(--font-sans);font-weight:var(--fw-medium);font-size:var(--fs-body);line-height:1.35;color:var(--text);min-width:0;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden;overflow-wrap:anywhere;word-break:break-word;}
 .sop-item-meta{display:flex;align-items:center;flex-wrap:wrap;gap:6px;}
 .sop-item-sources{font-family:var(--font-sans);font-size:10px;font-weight:700;color:var(--accent);background:var(--surface2);border-radius:10px;padding:2px 8px;white-space:nowrap;}
 .sop-item-time{font-family:var(--font-sans);font-size:var(--fs-meta);color:var(--text3);white-space:nowrap;}
 /* G7f item 4: quiet icon-only Ask — the "Ask" word appears only on hover/focus. */
+/* U5.3: the per-row comment/Ask control — a 16px ghost icon, pushed to the right of the meta
+   line (margin-left:auto); 44px touch target via the global ::after (M5 block). No new element. */
 .sop-ask{background:none;border:none;border-radius:var(--radius);padding:3px;cursor:pointer;
-  display:inline-flex;align-items:center;gap:4px;color:var(--text3);
+  display:inline-flex;align-items:center;gap:4px;color:var(--text3);margin-left:auto;
   transition:color 0.12s;}
 .sop-ask:hover,.sop-ask:focus-visible{color:var(--accent);}
 .sop-ask-label{display:none;font-family:var(--font-sans);font-size:var(--fs-eyebrow);font-weight:700;text-transform:uppercase;letter-spacing:0.06em;}
@@ -32,11 +35,12 @@
 /* Coverage-gap rows folded into the list: dimmer number + "Not in your sources" tag. */
 .sop-item-gap{text-decoration:none;}
 .sop-num-gap{opacity:0.5;}
-.sop-item-gap .sop-item-title{font-weight:600;}
+/* U5.2: gap rows share the one headline weight (was 600). */
 .sop-gap-tag{font-family:var(--font-sans);font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.03em;border:1px solid;border-radius:10px;padding:2px 8px;white-space:nowrap;opacity:0.9;}
 /* Breaking rows folded in at the top (Pass L item 3): red pulse dot in place of the
    number + a "Breaking" tag, replacing the cramped status-strip marquee. */
-.sop-item-breaking .sop-item-title{font-weight:800;}
+/* U5.2: breaking rows share the one headline weight (was 800). Breaking is signalled ONLY by
+   the red "Breaking" word below — not a heavier headline, not a dot. */
 /* S10: the breaking red DOT is removed — the red "BREAKING" word is the only marker. */
 .sop-brk-tag{font-family:var(--font-sans);font-size:var(--fs-eyebrow);font-weight:700;text-transform:uppercase;letter-spacing:0.08em;color:var(--red);background:none;padding:0;white-space:nowrap;}
 @media(max-width:640px){ .sop-strip{padding:12px 14px;} .sop-strip:not(.sop-sidebar) .sop-gap-tag{display:none;} }
