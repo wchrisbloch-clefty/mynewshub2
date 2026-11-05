@@ -9,7 +9,9 @@
 //   parseRoute(pathname?)            -> { category, subcategory, tertiary }
 //   buildPath(category, sub?, tert?) -> string  (a leading-slash URL path)
 
-export const ROUTE_CATS = ['general','business','finance','bloom','tech','sports','health','popculture','comedy','briefing','podcasts','sources','saved','stateofplay'];
+// 'design' is the U7 living design-system reference — reachable by URL only (never added to nav
+// or the More sheet), but a valid route so /design resolves instead of falling back to general.
+export const ROUTE_CATS = ['general','business','finance','bloom','tech','sports','health','popculture','comedy','briefing','podcasts','sources','saved','stateofplay','design'];
 
 export function parseRoute(pathname) {
   const path = pathname != null ? pathname

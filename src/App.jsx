@@ -82,6 +82,7 @@ const CustomizePanel = lazy(() => import('./modules/customize/CustomizePanel').t
 const BriefingPage = lazy(() => import('./modules/briefing/BriefingPage').then(m => ({ default: m.BriefingPage })));
 const SportsPage = lazy(() => import('./modules/sports/SportsPage').then(m => ({ default: m.SportsPage })));
 const StateOfPlayPage = lazy(() => import('./modules/state-of-play-page/StateOfPlayPage').then(m => ({ default: m.StateOfPlayPage })));
+const DesignPage = lazy(() => import('./modules/design-page/DesignPage').then(m => ({ default: m.DesignPage }))); // U7: URL-only /design
 const PAGE_IMPORTERS = { podcasts: () => import('./modules/podcasts/PodcastsPage'), sources: () => import('./modules/sources/SourcesPage'), briefing: () => import('./modules/briefing/BriefingPage'), sports: () => import('./modules/sports/SportsPage') };
 export const prefetchPage = (name) => { const f = PAGE_IMPORTERS[name]; if (f) f(); };
 const prefetchCustomize = () => import('./modules/customize/CustomizePanel');
@@ -10829,6 +10830,12 @@ export default function App() {
                     isTopicFollowed, toggleTopic, isPromoItem, storyKey, CATS,
                     TrendingPills, PredictionMarkets, cleanSourceName,
                   }}/>
+                </Suspense>
+              )}
+              {/* U7: URL-only living design-system reference (not in nav / More sheet). */}
+              {tab==='design'&&(
+                <Suspense fallback={<SourcesSkeleton/>}>
+                  <DesignPage/>
                 </Suspense>
               )}
             </>
