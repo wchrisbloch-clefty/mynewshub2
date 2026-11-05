@@ -17,7 +17,7 @@
 /* U5.2: ONE headline weight for every row (ranked, cluster, breaking, gap). */
 .sop-item-title{font-family:var(--font-sans);font-weight:var(--fw-medium);font-size:var(--fs-body);line-height:1.35;color:var(--text);min-width:0;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden;overflow-wrap:anywhere;word-break:break-word;}
 .sop-item-meta{display:flex;align-items:center;flex-wrap:wrap;gap:6px;}
-.sop-item-sources{font-family:var(--font-sans);font-size:10px;font-weight:700;color:var(--accent);background:var(--surface2);border-radius:10px;padding:2px 8px;white-space:nowrap;}
+.sop-item-sources{font-family:var(--font-sans);font-size:var(--fs-label);font-weight:700;color:var(--accent);background:var(--surface2);border-radius:10px;padding:2px 8px;white-space:nowrap;}
 .sop-item-time{font-family:var(--font-sans);font-size:var(--fs-meta);color:var(--text3);white-space:nowrap;}
 /* G7f item 4: quiet icon-only Ask — the "Ask" word appears only on hover/focus. */
 /* U5.3: the per-row comment/Ask control — a 16px ghost icon, pushed to the right of the meta
@@ -36,7 +36,7 @@
 .sop-item-gap{text-decoration:none;}
 .sop-num-gap{opacity:0.5;}
 /* U5.2: gap rows share the one headline weight (was 600). */
-.sop-gap-tag{font-family:var(--font-sans);font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.03em;border:1px solid;border-radius:10px;padding:2px 8px;white-space:nowrap;opacity:0.9;}
+.sop-gap-tag{font-family:var(--font-sans);font-size:var(--fs-label);font-weight:700;text-transform:uppercase;letter-spacing:0.03em;border:1px solid;border-radius:10px;padding:2px 8px;white-space:nowrap;opacity:0.9;}
 /* Breaking rows folded in at the top (Pass L item 3): red pulse dot in place of the
    number + a "Breaking" tag, replacing the cramped status-strip marquee. */
 /* U5.2: breaking rows share the one headline weight (was 800). Breaking is signalled ONLY by
@@ -59,8 +59,8 @@
 .sop-sidebar .sop-collapse{margin-left:auto;}
 /* S11: the rail uses the SAME boxed row anatomy as everywhere else (the base .sop-item box).
    No grid, no number column — just tighter type for the narrow column. */
-.sop-sidebar .sop-item-time{font-size:10px;}
-.sop-sidebar .sop-item-sources{font-size:9px;padding:1px 6px;}
+.sop-sidebar .sop-item-time{font-size:var(--fs-label);}
+.sop-sidebar .sop-item-sources{font-size:var(--fs-label);padding:1px 6px;}
 /* Coverage-gap rows: the headline, then outlets + a quiet Follow menu — inside the same box. */
 .sop-gap-headline{display:flex;gap:8px;align-items:flex-start;}
 .sop-gap-below{display:flex;flex-wrap:wrap;align-items:center;gap:6px;}

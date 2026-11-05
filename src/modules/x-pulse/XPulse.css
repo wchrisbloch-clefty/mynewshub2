@@ -6,12 +6,12 @@
 .xp-head{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:9px;}
 .xp-badge{font-family:var(--font-serif);font-weight:800;font-size:var(--fs-meta);letter-spacing:0.03em;color:var(--text);
   background:var(--surface2);border:1px solid var(--border2);border-radius:6px;padding:2px 8px;}
-.xp-sent{font-family:var(--font-sans);font-size:10px;font-weight:800;text-transform:uppercase;
+.xp-sent{font-family:var(--font-sans);font-size:var(--fs-label);font-weight:800;text-transform:uppercase;
   letter-spacing:0.05em;border-radius:20px;padding:2px 9px;}
 .xp-bull{color:var(--pos);background:rgba(22,163,74,0.12);}
 .xp-bear{color:var(--neg);background:rgba(220,38,38,0.12);}
 .xp-neutral{color:var(--text3);background:var(--surface2);}
-.xp-note{font-family:var(--font-sans);font-size:10px;color:var(--text4);margin-left:auto;font-style:italic;}
+.xp-note{font-family:var(--font-sans);font-size:var(--fs-label);color:var(--text4);margin-left:auto;font-style:italic;}
 .xp-takes{display:flex;flex-direction:column;gap:7px;}
 .xp-take{display:flex;flex-direction:column;gap:2px;text-decoration:none;padding:7px 10px;border-radius:8px;
   background:var(--bg);border:1px solid var(--border2);transition:border-color 0.12s;}

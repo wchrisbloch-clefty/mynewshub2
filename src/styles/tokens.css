@@ -80,7 +80,7 @@
   --fs-subhead:14px; /* secondary headline / strong label */
   --fs-body:13px;    /* body copy */
   --fs-meta:11px;    /* source, timestamp, small meta */
-  --fs-eyebrow:10px; /* one eyebrow label size (G7c) */
+  --fs-eyebrow:var(--fs-label); /* one eyebrow label size (G7c) */
 
   --radius:4px;--radius-sm:3px;  /* crisp, minimal radii (G7) */
   --img-radius:4px;
