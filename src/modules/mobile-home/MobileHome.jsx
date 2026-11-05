@@ -239,20 +239,26 @@ export function MobileHome({ ctx }) {
           1-line headline + age; the whole row opens the story, with a >=44px hit area via ::after.
           Max 3 (breaking rules); these stories are seeded into the dedupe set, so they never repeat
           in the State of Play card below. While General loads, reserve the slot (no shove). */}
-      {hasBreaking
-        ? <section className="mh-section mh-breaking">
-            <div className="mh-brk-strip" role="list">
-              {model.breaking.slice(0, 3).map((b, i) => (
-                <button key={b.link || i} className="mh-brk-row" role="listitem" onClick={() => onRead(b)}
-                  title={b._breakingWhy ? `Breaking — ${b._breakingWhy}` : 'Breaking'}>
-                  <span className="mh-brk-tag">Breaking</span>
-                  <span className="mh-brk-title">{b.title}</span>
-                  <span className="mh-brk-age">{fmtDate(b.pubDate)}</span>
-                </button>
-              ))}
-            </div>
-          </section>
-        : (!generalLoaded && <div className="mh-breaking mh-breaking-reserve" aria-hidden="true"/>)}
+      {/* W3: the breaking slot is ALWAYS in the flow on the phone Home (a general-only,
+          recurring section), reserved at its 108px floor (3 rows max). It fills with rows
+          when breaking exists and sits as an empty borderless reserve otherwise — it never
+          toggles in/out of the DOM, so the breaking row count streaming in (1->3->2, or a
+          transient empty while feeds recompute, even across a subtree remount) can never
+          resize it or shove the sections below. This was the ~0.09 mobile-Home CLS spike. */}
+      <section className={`mh-section mh-breaking${hasBreaking ? '' : ' mh-breaking-reserve'}`} aria-hidden={hasBreaking ? undefined : true}>
+        {hasBreaking && (
+          <div className="mh-brk-strip" role="list">
+            {model.breaking.slice(0, 3).map((b, i) => (
+              <button key={b.link || i} className="mh-brk-row" role="listitem" onClick={() => onRead(b)}
+                title={b._breakingWhy ? `Breaking — ${b._breakingWhy}` : 'Breaking'}>
+                <span className="mh-brk-tag">Breaking</span>
+                <span className="mh-brk-title">{b.title}</span>
+                <span className="mh-brk-age">{fmtDate(b.pubDate)}</span>
+              </button>
+            ))}
+          </div>
+        )}
+      </section>
 
       {/* TOP STORIES — 4 compact cross-category headlines (always present once loaded) */}
       <section className="mh-section mh-topstories">
