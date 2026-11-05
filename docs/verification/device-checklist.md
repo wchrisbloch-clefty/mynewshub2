@@ -151,3 +151,22 @@ Safari = NEEDS-DEVICE. Open with `?debug=1`. The living reference is at `/design
 43. **Living /design page (U7).** Visit `/design` (not linked anywhere): live colour swatches with
     contrast, type roles, spacing, radii, the real labels / chips / buttons / State-of-Play rows /
     pills / skeleton. It mirrors production because it renders the real tokens and components.
+
+---
+
+## Batch V — close out Batch U (phone parity, pills, empty box, debt, dark proof)
+
+Chromium + Chromium-touch; real iPad/iPhone Safari = NEEDS-DEVICE.
+
+44. **Phone header is quiet too (V1).** On iPhone the three header icons (markets toggle, Analyze,
+    refresh) are borderless 20px glyphs with a 44px tap target — the same quiet language as the
+    desktop header (U4 only reached >=641 before).
+45. **Topic-filter pills match the chips (V2).** The "Filter by topic" pills are 1px-border,
+    transparent, pill-shaped, neutral text; selected is the one accent fill. No category colour on
+    any pill — category colour now lives only on the small TopicLabel.
+46. **No empty box in the rail (V3).** When State of Play has nothing to show it collapses
+    completely; there is no bordered empty rectangle at the top of the right rail.
+47. **Dark mode reads cleanly (V5).** Borderless header icons are visible on the dark header; the
+    "N unavailable" pill is amber text on a plain border; selected chips/pills keep >=4.5:1; the
+    hero's topic label is white over the photo. Before/after dark screenshots at 390/834/1194 for
+    Home/Energy/Sports/State-of-Play live under docs/verification/batch-V/.
