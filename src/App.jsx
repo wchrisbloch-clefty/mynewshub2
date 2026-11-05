@@ -2410,7 +2410,12 @@ body:not(.dark) .pill-bar{
 .ttp-chip.active .ttp-chip-star{color:rgba(255,255,255,0.85);}
 
 /* Across MyNewsHub — compact text list in the sidebar (Pass J item 4). */
-.sb-across{min-height:520px;} /* W2: reserve the loaded height as a FLOOR (O1: min, never cap; module stays in normal flow) so streaming items don't shift the rail siblings below */
+/* W7: no permanent floor (that left idle whitespace when content was shorter than 520px). The
+   floor applies ONLY while loading, sized to the real loaded content per width band (measured:
+   ~416px at <=1100, ~525–549px at >=1180) so dropping it once known does not shrink the box. The
+   borderless reserve holds the slot during the brief loading-empty window with the same floor. */
+.sb-across-loading, .sb-across-reserve{min-height:416px;}
+@media(min-width:1160px){ .sb-across-loading, .sb-across-reserve{min-height:530px;} }
 .sb-across-cat{margin-bottom:12px;}
 .sb-across-cat:last-child{margin-bottom:0;}
 .sb-across-clabel{background:none;border:none;cursor:pointer;font-family:inherit;padding:0 0 5px;font-size:var(--fs-label);font-weight:800;text-transform:uppercase;letter-spacing:0.08em;display:block;color:var(--text2);}  /* V2: neutral section label (was category colour) */
@@ -7151,7 +7156,7 @@ function GithubSignal() {
 
 // ─── GHOST SIDEBAR ────────────────────────────────────────────────────────────
 function Sidebar({cat, arts, kw, health, activeKw, setActiveKw, activeSource, setActiveSource, onRead, showScoreboard, recommended, showBriefing, onOpenBriefing, briefingExcludeCats, onTopicOpen, trendingItems, isTopicFollowed, toggleTopic, onTrendingOpen,
-  sopItems, sopGapItems, sopMeta, sopCollapsed, onToggleSop, formatDate, acrossSections, onAcrossSeeAll, followingModule, sopBreakingItems, feeds, onToggleFeed, favTeams, onAsk, hideSopMobile, voicesNode, connItems: connItemsProp}) {
+  sopItems, sopGapItems, sopMeta, sopCollapsed, onToggleSop, formatDate, acrossSections, acrossLoading, onAcrossSeeAll, followingModule, sopBreakingItems, feeds, onToggleFeed, favTeams, onAsk, hideSopMobile, voicesNode, connItems: connItemsProp}) {
   const cc = CATS[cat]||CATS.general;
   const catKws = kw[cat]||[];
   const catArts = arts[cat]||[];
@@ -7294,28 +7299,33 @@ function Sidebar({cat, arts, kw, health, activeKw, setActiveKw, activeSource, se
 
       {/* 4) ACROSS MYNEWSHUB — cross-category recirculation, moved into the sidebar
             (Pass J item 4), General only. Text-only compact rows for the narrow column. */}
-      {/* W2: render the reserved container whenever acrossSections is an array (incl. the
-          transient empty [] during load), so the module filling in does not push the rail
-          siblings below it (the dominant Energy-desktop shifter). The .sb-across min-height
-          floor (CSS) holds the slot; it collapses to nothing only when acrossSections is null
-          (Home / filtered views), so no idle whitespace where the module legitimately absent. */}
+      {/* W7: Across MyNewsHub reserves a min-height FLOOR only WHILE its source categories are
+          still loading (`.sb-across-loading`), so the sections streaming in (0->N) do not shove the
+          rail; once the data is KNOWN the floor is dropped and it sizes to content. If it resolves
+          empty it renders NOTHING (never a bordered box whose only text is its header — that is what
+          the extended empty-box detector now flags). During the brief loading-empty window the slot
+          is held by a BORDERLESS reserve so the first section arriving does not shove the rail. */}
       {Array.isArray(acrossSections) && !activeKw && !activeSource && (
-        <div className="sidebar-section sb-across">
-          <div className="sidebar-sec-head"><span className="sidebar-sec-label">Across MyNewsHub</span></div>
-          {acrossSections.slice(0, 4).map(section => (
-            <div key={section.cat} className="sb-across-cat">
-              <button className="sb-across-clabel" onClick={()=>onAcrossSeeAll(section.cat)}>
-                {section.cc.label} →
-              </button>
-              {section.items.slice(0, 2).map((a, i) => (
-                <div key={i} className="sb-across-item" onClick={()=>onRead(a)}>
-                  <div className="sb-across-title">{a.title}</div>
-                  <div className="sb-across-src">{a.source} · {(formatDate||fmtDate)(a.pubDate)}</div>
+        acrossSections.length > 0
+          ? <div className={`sidebar-section sb-across${acrossLoading ? ' sb-across-loading' : ''}`}>
+              <div className="sidebar-sec-head"><span className="sidebar-sec-label">Across MyNewsHub</span></div>
+              {acrossSections.slice(0, 4).map(section => (
+                <div key={section.cat} className="sb-across-cat">
+                  <button className="sb-across-clabel" onClick={()=>onAcrossSeeAll(section.cat)}>
+                    {section.cc.label} →
+                  </button>
+                  {section.items.slice(0, 2).map((a, i) => (
+                    <div key={i} className="sb-across-item" onClick={()=>onRead(a)}>
+                      <div className="sb-across-title">{a.title}</div>
+                      <div className="sb-across-src">{a.source} · {(formatDate||fmtDate)(a.pubDate)}</div>
+                    </div>
+                  ))}
                 </div>
               ))}
             </div>
-          ))}
-        </div>
+          : (acrossLoading
+              ? <div className="sb-across-reserve" aria-hidden="true"/>
+              : null)
       )}
 
       {/* 4b) FOLLOWING — relocated out of the General-page full-width banner into the
@@ -9195,6 +9205,12 @@ function FeedPage({ cat, ctx }) {
         .map(s => ({ ...s, items: s.items.slice(0, 3) })).filter(s => s.items.length > 0).slice(0, 4);
       return { railConnections, otherCatSections };
     }, [topStoryKeys, catBreakingKeys, sopShownKeys, houstonKeys, dedupedFeed, railConnCandidates, isHome, arts, cat]);
+    // W7: "Across MyNewsHub" is still LOADING while any of its source categories is fetching. While
+    // loading we reserve a floor so the streaming sections (0->N) do not shove the rail; once this is
+    // false the module is KNOWN and sizes to content (and renders nothing if it resolved empty).
+    const acrossLoading = !isHome &&
+      ['general','business','finance','bloom','sports','popculture','tech']
+        .filter(c => c !== cat).some(c => loading[c]);
 
     // K5: Following — sidebar module on General. It now shows FOLLOWED TOPICS only;
     // followed TEAMS live as pinned chips on the Sports page (the my-teams ribbon) and
@@ -9571,6 +9587,7 @@ function FeedPage({ cat, ctx }) {
             sopGapItems={gapItems} sopBreakingItems={!activeKw && !activeSrc && !search ? catBreaking : []} sopMeta={CATS[cat]||CATS.general}
             sopCollapsed={sopCollapsed} onToggleSop={toggleSop} formatDate={fmtDate}
             acrossSections={!isHome && !activeKw && !activeSrc && !search ? otherCatSections : null}
+            acrossLoading={acrossLoading}
             connItems={!activeKw && !activeSrc && !search ? railConnections : null}
             onAcrossSeeAll={handleTabChange}
             followingModule={followingModule}
