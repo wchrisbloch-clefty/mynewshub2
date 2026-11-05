@@ -84,6 +84,21 @@
 
   --radius:4px;--radius-sm:3px;  /* crisp, minimal radii (G7) */
   --img-radius:4px;
+  /* ── U2: design vocabulary (ADDITIVE — nothing above changes; --s1..5/--radius/--fs-* stay) ──
+     Spacing on a 4px grid, named radii, type roles, weights, motion. New/refactored UI consumes
+     these; this commit adds them unused, so it is a visual no-op. */
+  --space-1:4px;--space-2:6px;--space-3:8px;--space-4:12px;--space-5:16px;--space-6:20px;
+  --space-7:24px;--space-8:32px;--space-10:40px;--space-12:48px;--space-16:64px;
+  --radius-md:8px;--radius-lg:12px;--radius-full:9999px;
+  /* type roles (names for sizes we already use; --fs-meta stays 11 = the floor, already defined) */
+  --fs-label:11px;   /* 11/14 w600 uppercase +0.06em — category labels */
+  --fs-title:15px;   /* 15/20 w500 — list-row title */
+  --lh-label:14px;--lh-meta:16px;--lh-title:20px;
+  --fw-regular:400;--fw-medium:500;--fw-semibold:600;
+  --tracking-label:0.06em;
+  --border-strong:#c4c4bf;  /* one step darker than --border (#d8d8d4) — hover edge */
+  --on-media:#ffffff;       /* text over photos (full-opacity, not a category colour) */
+  --dur-fast:150ms;--dur-base:200ms;
   --rail-gap:12px;   /* L4: the ONE vertical gap between right-rail modules */
   /* Minimal shadow — structure comes from hairlines, not elevation. */
   --shadow-sm:0 1px 2px rgba(17,17,19,0.04);
@@ -111,6 +126,8 @@
   --bg:#0b0b0c;          /* near-black canvas */
   --surface:#141416;     /* raised surface */
   --surface2:#1b1b1f;    /* hover / raised-2 */
+  --border-strong:#44444b; /* U2: hover edge in dark — one step LIGHTER than --border (#2e2e33) */
+  --on-media:#ffffff;      /* U2 */
   --border:#2e2e33;      /* hairline (1.36:1 on surface) */
   --border2:#202024;     /* faintest divider */
   --text:#f2f2ee;        /* pearl — avoids glare on black (17.5:1 on canvas) */
