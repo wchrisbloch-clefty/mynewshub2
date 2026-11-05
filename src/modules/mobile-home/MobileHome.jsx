@@ -161,7 +161,22 @@ export function MobileHome({ ctx }) {
     // TOP_ORDER set is still loading (thin data). Re-pick on refresh (lastUpdated.general change).
   const refreshKey = (lastUpdated && lastUpdated.general != null) ? lastUpdated.general : 0;
   const [frozenHead, setFrozenHead] = useState(null);
-  useEffect(() => { setFrozenHead(null); }, [refreshKey]);
+  // W6: coalesce the INITIAL-LOAD burst. `lastUpdated.general` ticks 2–3 times within ~1s as the
+  // general feed commits in passes; each tick used to reset the frozen head and re-pick. Re-picking
+  // after the head first froze flips the variable-height breaking slot 0->N once the load reserve
+  // is gone (reserve is only up while !generalLoaded) and shoves the page — the ~0.09 mobile-Home
+  // CLS spike (cause: `model.breaking` <- `head.breaking`, reset by this effect; selector
+  // `.mh-breaking` / `.mh-brk-row`). A genuine later refresh (refreshKey quiet for > 2.5s) still
+  // re-picks; the initial burst does not. The lead + Top Stories are height-reserved, so a re-pick
+  // never shifts them — only breaking needs this guard.
+  const lastRefreshAtRef = useRef(0);
+  useEffect(() => {
+    const now = Date.now();
+    const sinceLast = now - lastRefreshAtRef.current;
+    lastRefreshAtRef.current = now;
+    if (sinceLast < 2500 && frozenHead) return; // initial-load burst: keep the first frozen head
+    setFrozenHead(null);
+  }, [refreshKey]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
     if (!refreshKey || frozenHead) return;
     const settled = !TOP_ORDER.some(c => loading && loading[c]);
@@ -239,26 +254,26 @@ export function MobileHome({ ctx }) {
           1-line headline + age; the whole row opens the story, with a >=44px hit area via ::after.
           Max 3 (breaking rules); these stories are seeded into the dedupe set, so they never repeat
           in the State of Play card below. While General loads, reserve the slot (no shove). */}
-      {/* W3: the breaking slot is ALWAYS in the flow on the phone Home (a general-only,
-          recurring section), reserved at its 108px floor (3 rows max). It fills with rows
-          when breaking exists and sits as an empty borderless reserve otherwise — it never
-          toggles in/out of the DOM, so the breaking row count streaming in (1->3->2, or a
-          transient empty while feeds recompute, even across a subtree remount) can never
-          resize it or shove the sections below. This was the ~0.09 mobile-Home CLS spike. */}
-      <section className={`mh-section mh-breaking${hasBreaking ? '' : ' mh-breaking-reserve'}`} aria-hidden={hasBreaking ? undefined : true}>
-        {hasBreaking && (
-          <div className="mh-brk-strip" role="list">
-            {model.breaking.slice(0, 3).map((b, i) => (
-              <button key={b.link || i} className="mh-brk-row" role="listitem" onClick={() => onRead(b)}
-                title={b._breakingWhy ? `Breaking — ${b._breakingWhy}` : 'Breaking'}>
-                <span className="mh-brk-tag">Breaking</span>
-                <span className="mh-brk-title">{b.title}</span>
-                <span className="mh-brk-age">{fmtDate(b.pubDate)}</span>
-              </button>
-            ))}
-          </div>
-        )}
-      </section>
+      {/* W6: breaking collapses to 0px when there is nothing breaking (Batch T rule). The slot is
+          reserved ONLY while General is still loading (so it does not shove content when breaking
+          arrives), then collapses. The ~0.09 CLS spike that W3 masked with a permanent floor is
+          fixed at the source — the held head no longer re-picks on the initial-load refreshKey
+          burst (see the coalescing effect above), so `model.breaking` no longer flips 0->N after
+          `generalLoaded`. */}
+      {hasBreaking
+        ? <section className="mh-section mh-breaking">
+            <div className="mh-brk-strip" role="list">
+              {model.breaking.slice(0, 3).map((b, i) => (
+                <button key={b.link || i} className="mh-brk-row" role="listitem" onClick={() => onRead(b)}
+                  title={b._breakingWhy ? `Breaking — ${b._breakingWhy}` : 'Breaking'}>
+                  <span className="mh-brk-tag">Breaking</span>
+                  <span className="mh-brk-title">{b.title}</span>
+                  <span className="mh-brk-age">{fmtDate(b.pubDate)}</span>
+                </button>
+              ))}
+            </div>
+          </section>
+        : (!generalLoaded && <div className="mh-breaking mh-breaking-reserve" aria-hidden="true"/>)}
 
       {/* TOP STORIES — 4 compact cross-category headlines (always present once loaded) */}
       <section className="mh-section mh-topstories">

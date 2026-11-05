@@ -45,8 +45,8 @@
    shove content when it arrives, then it collapses if there is nothing breaking. T1: sized to the
    one-line strip (~2 rows) — the old 300px reserve was for the retired breaking CARD and collapsing
    it to the lean strip was the Home CLS. */
-.mh-breaking{min-height:108px;} /* W3: floor = 3 rows max (36px each); holds the slot steady while the breaking row count streams in, so it never shoves the sections below */
-.mh-breaking-reserve{min-height:108px;}
+.mh-breaking{min-height:0;} /* W6: collapses to 0px when nothing is breaking (Batch T). The real fix for the load-shove is the held-head coalescing in MobileHome.jsx, not a permanent floor. */
+.mh-breaking-reserve{min-height:108px;} /* reserve the slot only while General is still loading (see the JSX gate) so breaking arriving does not shove content */
 
 /* Live scores strip — ActiveScoresBar styles itself (.home-scores); just spacing. */
 .mh-scores{min-height:0;}
