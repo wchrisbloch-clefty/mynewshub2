@@ -2259,12 +2259,18 @@ body:not(.dark) .pill-bar{
    module shrink below its content and spill onto the next module; now each module keeps its
    full height and pushes the next one down (reserved heights stay min-height FLOORS). */
 .sidebar > *{flex-shrink:0;}
-.sidebar-sop,.sidebar-section{
+/* V3/U5: other rail modules keep their P2 bordered card; State of Play does NOT — it is a header
+   (hairline rule) + boxed rows directly on the rail background (U5.1; the App wrapper, not just
+   StateOfPlay.css, was still drawing the outer card). When StateOfPlay renders nothing (fewer than
+   3 ranked rows and no breaking) the wrapper is empty and collapses completely — no border, no
+   reserved height, no gap (T4: never an empty box). */
+.sidebar-section{
   border:1px solid var(--border);border-radius:8px;background:var(--surface);
   padding:12px 14px;min-width:0;
 }
-/* inside a card the header rule is a hairline, not the old heavy 2px rule */
-.sidebar-sop .sop-head,.sidebar-section > .sidebar-sec-head{border-bottom:1px solid var(--border2);}
+.sidebar-sop{min-width:0;}
+.sidebar-sop:empty{display:none;}
+.sidebar-section > .sidebar-sec-head{border-bottom:1px solid var(--border2);}
 
 /* Ghost sidebar section */
 .gs-section{display:flex;flex-direction:column;gap:0;}
