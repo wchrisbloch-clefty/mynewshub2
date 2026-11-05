@@ -161,7 +161,7 @@ function CoverImg({ src, label, alt = '' }) {
 // inherits text colour, single stroke weight. Replaces the old gear emoji in chrome.
 // Icon sizing scale — one fixed size per context (item 7). Nav/action icons in the
 // top bar, action icons on buttons, and small inline meta icons each get one size.
-const ICON = { nav: 16, action: 15, meta: 13 };
+const ICON = { nav: 16, action: 15, meta: 13, header: 20 }; // U4: header utility icons render at 20
 const IconGear = ({size=ICON.meta}) => (
   <Settings size={size} strokeWidth={1.9} style={{flexShrink:0,verticalAlign:'-2px'}} aria-hidden="true"/>
 );
@@ -1896,9 +1896,11 @@ body:not(.dark) .pill-bar{
 .logo span{color:var(--accent);}
 /* F5: lighter wordmark tagline (weight 500, muted) — integrated under the name; still
    hidden when the header shrinks on scroll, and the header height is unchanged. */
+/* U4/U6: tagline raised off the sub-11px floor to --fs-label; tighter tracking so the raised
+   size does not widen .logo-wrap (verified: header height and logo column unchanged). */
 .logo-tag{
-  font-family:var(--font-sans);font-size:7px;color:var(--text4);
-  letter-spacing:0.16em;text-transform:uppercase;font-weight:500;margin-top:2px;
+  font-family:var(--font-sans);font-size:var(--fs-label);color:var(--text4);
+  letter-spacing:var(--tracking-label);text-transform:uppercase;font-weight:var(--fw-medium);margin-top:2px;
 }
 /* BBC-clean section tabs: no box, strong underline on active */
 .nav-tabs{
@@ -1959,20 +1961,28 @@ body:not(.dark) .pill-bar{
   font-size:12px;font-family:var(--font-sans);font-weight:600;transition:all 0.12s;
 }
 .nav-btn:hover{border-color:var(--text3);color:var(--text);}
+/* U4: header utility icons are quiet — no border/fill at rest, 36px visual, 44px hit via the
+   S1 ::after pattern, hover tint only on real pointers, a visible focus-visible ring. */
 .nav-icon-btn{
-  background:transparent;border:1px solid var(--border);color:var(--text);
-  border-radius:var(--radius-sm);width:32px;height:32px;cursor:pointer;
+  background:transparent;border:none;color:var(--text3);position:relative;
+  border-radius:var(--radius-sm);width:36px;height:36px;cursor:pointer;
   display:flex;align-items:center;justify-content:center;
-  transition:all 0.12s;flex-shrink:0;
+  transition:color var(--dur-fast),background var(--dur-fast);flex-shrink:0;
 }
-.nav-icon-btn:hover{border-color:var(--text3);color:var(--text);background:var(--surface2);}
+.nav-icon-btn::after{content:'';position:absolute;inset:-4px;}  /* 36 + 8 = 44px touch target */
+.nav-icon-btn:focus-visible{outline:2px solid var(--accent);outline-offset:2px;}
+@media(hover:hover){ .nav-icon-btn:hover{color:var(--text);background:var(--surface2);} }
+/* U4: ONE secondary button language — Analyze (.nav-btn-brief) and Customize (.nav-btn-blue)
+   share it: 1px --border, transparent, --radius-md, body/medium. Customize loses its navy fill;
+   the ONLY accent-filled element in the header is now the active nav pill. See .nav-btn-brief. */
 .nav-btn-blue{
-  background:var(--accent);border:none;color:var(--on-accent);
-  border-radius:var(--radius-sm);padding:6px 13px;cursor:pointer;
-  font-size:12px;font-weight:700;font-family:var(--font-sans);transition:opacity 0.12s;letter-spacing:0.02em;
-  display:flex;align-items:center;gap:5px;
+  background:transparent;border:1px solid var(--border);color:var(--text2);
+  border-radius:var(--radius-md);padding:7px 13px;cursor:pointer;
+  font-size:var(--fs-body);font-weight:var(--fw-medium);font-family:var(--font-sans);
+  transition:border-color var(--dur-fast),color var(--dur-fast);
+  display:flex;align-items:center;gap:6px;white-space:nowrap;
 }
-.nav-btn-blue:hover{opacity:0.88;}
+@media(hover:hover){ .nav-btn-blue:hover{border-color:var(--border-strong);color:var(--text);} }
 
 /* ═══════════════════════════════════════════
    PAGE SHELL
@@ -5137,16 +5147,18 @@ kbd{display:inline-block;padding:1px 5px;border:1px solid var(--border);border-r
   -webkit-overflow-scrolling:touch;
 }
 .pc-subtabs::-webkit-scrollbar{display:none;}
+/* U4: ONE chip language — 1px --border, transparent fill, pill radius, body/medium, 32px visual
+   height. Selected = the single accent fill + on-accent text (set on .active below). */
 .pc-subtab{
   display:inline-flex;align-items:center;gap:5px;
-  padding:5px 12px;border-radius:16px;
-  background:var(--surface2);border:1.5px solid var(--border);
-  font-size:12px;font-weight:700;color:var(--text2);
+  padding:5px 12px;border-radius:var(--radius-full);
+  background:transparent;border:1px solid var(--border);
+  font-size:var(--fs-body);font-weight:var(--fw-medium);color:var(--text2);
   cursor:pointer;white-space:nowrap;flex-shrink:0;transition:all 0.14s;
-  font-family:var(--font-sans);min-height:30px;
+  font-family:var(--font-sans);min-height:32px;
 }
 .pc-subtab svg{flex-shrink:0;}
-.pc-subtab:hover{background:var(--surface);color:var(--text);border-color:var(--text3);}
+@media(hover:hover){ .pc-subtab:hover{color:var(--text);border-color:var(--border-strong);} }
 /* U3: ONE active chip look — the single brand accent (was a hardcoded Pop-culture pink #db2777).
    Energy and Pop-culture now share it; no per-section chip colour. */
 .pc-subtab.active{background:var(--accent);color:var(--on-accent);border-color:var(--accent);}
@@ -5484,14 +5496,15 @@ kbd{display:inline-block;padding:1px 5px;border:1px solid var(--border);border-r
 }
 .analyze-result-clear:hover{color:var(--accent);border-color:var(--accent);}
 /* Brief button in nav */
+/* U4: the ONE secondary button style (shared with Customize = .nav-btn-blue). */
 .nav-btn-brief{
-  background:var(--surface2);border:1px solid var(--border);color:var(--text2);
-  border-radius:var(--radius-sm);padding:6px 11px;cursor:pointer;
-  font-size:12px;font-weight:700;font-family:var(--font-sans);
-  transition:all 0.15s;white-space:nowrap;
-  display:flex;align-items:center;gap:5px;
+  background:transparent;border:1px solid var(--border);color:var(--text2);
+  border-radius:var(--radius-md);padding:7px 13px;cursor:pointer;
+  font-size:var(--fs-body);font-weight:var(--fw-medium);font-family:var(--font-sans);
+  transition:border-color var(--dur-fast),color var(--dur-fast);white-space:nowrap;
+  display:flex;align-items:center;gap:6px;
 }
-.nav-btn-brief:hover{border-color:var(--accent);color:var(--accent);}
+@media(hover:hover){ .nav-btn-brief:hover{border-color:var(--border-strong);color:var(--text);} }
 @media(max-width:640px){
   .analyze-overlay{padding:0;}
   .analyze-panel{border-radius:0;min-height:100dvh;}
@@ -8316,7 +8329,7 @@ function TopBar({tab, setTab, search, setSearch, dark, setDark,
               {!searchOpenDesktop && (
                 <button className="nav-icon-btn" title="Search" aria-label="Open search"
                   onClick={()=>{ setSearchOpenDesktop(true); setSearchFocused(true); }}>
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
                 </button>
               )}
               {searchOpenDesktop && (
@@ -8358,13 +8371,13 @@ function TopBar({tab, setTab, search, setSearch, dark, setDark,
               Analyze
             </button>
             <button className="nav-icon-btn" onClick={onRefresh} title="Refresh">
-              <RefreshCw size={ICON.action} strokeWidth={2.2}/>
+              <RefreshCw size={ICON.header} strokeWidth={2}/>
             </button>
             <button className="nav-icon-btn" onClick={()=>setDark(d=>!d)} title="Toggle theme">
-              {dark ? <Sun size={ICON.action}/> : <Moon size={ICON.action}/>}
+              {dark ? <Sun size={ICON.header}/> : <Moon size={ICON.header}/>}
             </button>
             <button className="nav-icon-btn" onClick={onAccount} title={signedIn?'Account — synced':'Sign in to sync'} style={signedIn?{color:'#16a34a'}:undefined}>
-              <User size={ICON.action}/>
+              <User size={ICON.header}/>
             </button>
             <button className="nav-btn-blue" onClick={onCustomize}>
               <Settings size={ICON.meta} strokeWidth={2} style={{flexShrink:0}}/>
