@@ -62,6 +62,7 @@ import { XPulse } from './modules/x-pulse';
 import { StateOfPlay, selectStateOfPlay } from './modules/state-of-play';
 import { rankHomeTop } from './modules/top-stories/select';
 import { TopicTag } from './modules/topic-tag';
+import { CatIcon, SHOW_CHIP_ICONS } from './modules/cat-icon';
 import { cleanSourceName } from './modules/source-name';
 import { SnapshotCard, CoverageList } from './modules/snapshot-card';
 import { MobileHome } from './modules/mobile-home';
@@ -2071,7 +2072,8 @@ body:not(.dark) .pill-bar{
 .fc-meta{display:flex;align-items:center;gap:8px;margin-bottom:10px;flex-wrap:wrap;}
 .fc-source{
   font-family:var(--font-sans);
-  font-size:var(--fs-meta);font-weight:700;letter-spacing:0.06em;text-transform:uppercase;
+  font-size:var(--fs-meta);font-weight:var(--fw-regular);
+  color:var(--text3);  /* U3: source name is quiet neutral meta — regular weight, natural case, never a category colour (identity lives in the topic label) */
 }
 .fc-dot{color:var(--text4);font-size:10px;}
 .fc-date{font-size:var(--fs-meta);color:var(--text3);font-variant-numeric:tabular-nums;margin-left:auto;white-space:nowrap;}
@@ -5145,9 +5147,9 @@ kbd{display:inline-block;padding:1px 5px;border:1px solid var(--border);border-r
 }
 .pc-subtab svg{flex-shrink:0;}
 .pc-subtab:hover{background:var(--surface);color:var(--text);border-color:var(--text3);}
-.pc-subtab.active{background:#db2777;color:#fff;border-color:#db2777;box-shadow:0 2px 8px rgba(219,39,119,0.35);}
-/* Energy reuses the pill component but with its own accent (not Pop Culture pink). */
-.en-subtabs .pc-subtab.active{background:var(--accent);color:var(--on-accent);border-color:var(--accent);box-shadow:0 2px 8px var(--accent-bg);}
+/* U3: ONE active chip look — the single brand accent (was a hardcoded Pop-culture pink #db2777).
+   Energy and Pop-culture now share it; no per-section chip colour. */
+.pc-subtab.active{background:var(--accent);color:var(--on-accent);border-color:var(--accent);}
 @media(max-width:640px){
   .pc-subtab{padding:8px 12px;font-size:12px;min-height:44px;}
 }
@@ -6344,7 +6346,7 @@ function FeedCard({a, cat, isSaved, onSave, onRead, relatedSources, isRead, user
   return (
     <div className={`fc ${cat}${isRead?' fc-read':''}`} onClick={() => onRead(a)}>
       <div className="fc-meta">
-        <span className="fc-source" style={{color:cc.color}}>{a.source}</span>
+        <span className="fc-source">{a.source}</span>
         {paywall && <span className="fc-paywall-badge" title="Subscription may be required"></span>}
         {/* D2: the per-card "● BREAKING" badge is removed — it came from the old broad
             title+desc keyword match that mis-tagged previews/interviews. Breaking now
@@ -8666,7 +8668,7 @@ function TopOfHourStrip({ catLead, arts, onRead, stories: storiesProp }) {
                   separate eyebrow, so every Top Stories row shows its topic in one consistent place
                   and the element count per row does not grow. */}
               <h3 className="toh-title">{hero.title}</h3>
-              <div className="toh-meta"><TopicTag cat={hero.cat}/> · {hero.source} · {fmtDate(hero.pubDate)}</div>
+              <div className="toh-meta"><TopicTag cat={hero.cat} onMedia={!!hero.img}/> · {hero.source} · {fmtDate(hero.pubDate)}</div>
             </div>
           </article>
           {textHeads.length > 0 && (
@@ -9213,7 +9215,7 @@ function FeedPage({ cat, ctx }) {
             {EN_SUBTABS.map(t => (
               <button key={t.key} className={`pc-subtab ${enSubTab===t.key?'active':''}`}
                 onClick={()=>{setEnSubTab(t.key);window.scrollTo({top:0,behavior:'instant'});}}>
-                <t.icon size={14} strokeWidth={2.2}/>{t.label}
+                {SHOW_CHIP_ICONS && <CatIcon icon={t.icon}/>}{t.label}
               </button>
             ))}
           </div>
@@ -9267,7 +9269,7 @@ function FeedPage({ cat, ctx }) {
             {PC_SUBTABS.map(t => (
               <button key={t.key} className={`pc-subtab ${pcSubTab===t.key?'active':''}`}
                 onClick={()=>{setPcSubTab(t.key);window.scrollTo({top:0,behavior:'instant'});}}>
-                <t.icon size={14} strokeWidth={2.2}/>{t.label}
+                {SHOW_CHIP_ICONS && <CatIcon icon={t.icon}/>}{t.label}
               </button>
             ))}
           </div>

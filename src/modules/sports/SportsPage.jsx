@@ -10,6 +10,7 @@ import { SnapshotCard } from '../snapshot-card';
 import { XPulse } from '../x-pulse';
 import { dbgRender, dbgMount } from '../debug';
 import { isPromoItem } from '../breaking'; // K3: promo filter for the team wide/gap scans
+import { CatIcon, SHOW_CHIP_ICONS } from '../cat-icon'; // U3: one quiet chip-icon treatment (off in Batch U)
 
 // Per-league keyword sets (lifted to module scope, P5) so the feed filter AND the index-tile
 // counts share ONE source of truth — a tile's number is exactly what selecting it would show.
@@ -296,7 +297,7 @@ export function SportsPage({ ctx }) {
               <button key={t.key}
                 className={`sport-tab ${sportTab===t.key?'active':''} ${zero?'is-zero':''}`}
                 onClick={()=>{setSportTab(t.key); setActiveTeam(null); setTimeout(scrollToFeed,80);}}>
-                {t.icon && <t.icon size={14} strokeWidth={2.2}/>}
+                {SHOW_CHIP_ICONS && t.icon && <CatIcon icon={t.icon}/>}
                 <span className="sport-tab-label">{t.label}</span>
                 <span className="sport-tab-count" aria-label={`${n} stories`}>{n}</span>
               </button>
