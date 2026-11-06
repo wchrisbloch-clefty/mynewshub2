@@ -6,7 +6,9 @@ import { installRealFixtures } from './realfix.mjs';
 const BASE=(process.env.BASE||'http://localhost:8137')+'/?debug=1';
 const WIDTHS = [[390,844],[430,932],[820,1180],[1024,1366],[1100,900],[1101,900],[1180,900],[1194,834],[1280,900],[1440,900]];
 const PAGES = ['general','business','bloom','sports','briefing','stateofplay'];
-const b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium-1194/chrome-linux/chrome' });
+// Y1: use Playwright's own browser resolution (the pinned chromium-1194 path drifted away in the
+// sandbox); matches every other suite's bare chromium.launch().
+const b = await chromium.launch();
 let totalFails = 0, railTotal = 0; const railSample = [];
 async function run(w,h,route,dark) {
   const ctx = await b.newContext({ viewport:{width:w,height:h}, isMobile:w<=430, hasTouch:w<=430, colorScheme:dark?'dark':'light' });

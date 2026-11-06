@@ -49,6 +49,11 @@ function SeeAll({ label, onClick }) {
 }
 
 // COMPACT row — text-only headline + source · time (the K6 COMPACT type). No image.
+// Y4 (audit outcome): we measured extending the desktop label-confirmation rule (labelConfirmed via
+// kwMatch) to the phone Home mixed surfaces and it suppressed 64–78% of category labels in the
+// fixtures — far over the 20% STOP threshold — because kwMatch needs an exact DEFAULT_KW keyword hit
+// that most genuine headlines lack. Per the spec's "if >20% disappear, STOP and report (no new
+// classifier)" clause, the label is NOT gated here; see docs/verification/batch-Y-report.md (Y4).
 function CompactRow({ a, fmtDate, onRead }) {
   return (
     <button className="mh-compact" type="button" onClick={() => onRead(a)}>
@@ -244,10 +249,16 @@ export function MobileHome({ ctx }) {
 
   return (
     <div className="page mobile-home" data-mobile-home="1">
-      {/* LEAD 16:9 (reserved height so the deck/actions don't shift it in) */}
+      {/* LEAD 16:9 + deck/actions. Y1.1 SKELETON PARITY: the loading skeleton now mirrors the
+          committed card's full shape — a 16:9 media block AND a .snap-main-height deck/actions
+          placeholder — so skeleton height (~325) == committed height (~325) instead of a bare 219px
+          block. The .mh-lead floor is HELD at 360 (not dropped): dropping it moves content up and
+          amplifies the out-of-scope breaking-slot CLS spike (see mobile-home.css + batch-Y-report Y1).
+          Skeleton parity still improves the loading view and lets the floor drop for free once the
+          breaking reserve is made atomic. */}
       {model.lead
         ? <div className="mh-lead"><SnapshotCard a={model.lead} meta={sopMeta} isSaved={isSavedFn(model.lead)} onSave={onSave} onRead={onRead} onAsk={setChatContext} formatDate={fmtDate} opinionLabel={opinionLabel(model.lead)} lead={true}/></div>
-        : <div className="mh-lead"><SectionSkeleton lead rows={0} label="Top story"/></div>}
+        : <div className="mh-lead"><div className="mh-lead-skel" aria-busy="true" aria-label="Loading top story"><div className="mh-lead-skel-img"/><div className="mh-lead-skel-main"><span className="mh-lead-skel-ln1"/><span className="mh-lead-skel-ln2"/><span className="mh-lead-skel-deck"/></div></div></div>}
 
       {/* T1: BREAKING strip — directly under the LEAD, above Top Stories (CB: the "what is
           happening" signal is the draw). ONE line per row: red BREAKING word (no dot, S10) +

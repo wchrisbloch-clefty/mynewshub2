@@ -5,7 +5,33 @@
 
 /* LEAD 16:9 — SnapshotCard renders its own .snap-lead-hero (16:9 + a deck/actions block).
    Reserve its full height so the skeleton and the loaded lead occupy the same space (CLS). */
-.mh-lead{margin:0;min-height:360px;} /* X5a: kept at 360 — tightening to the ~331 content regressed mobile CLS 0.015->0.05 (the floor absorbs held-lead height variance, the W3-W7 CLS architecture); the ~29px is the smallest floor that holds CLS */
+/* Y1.1: SKELETON PARITY is implemented (see .mh-lead-skel below — the loading skeleton now mirrors
+   the committed card's full shape, 16:9 media + a ~91px deck/actions block, so the skeleton and the
+   card are the same ~325px height). The floor is nonetheless HELD at 360, not dropped to ~325,
+   because dropping it moves ALL content upward and that amplifies the pre-existing breaking-slot CLS
+   spike: the breaking strip's committed row count is load-timing dependent (see MobileHome.jsx), so a
+   blind reserve cannot match it, and the real fix is the atomic head reserve flagged R2 / out of
+   scope in the X report. Measured (15 runs, vs main 390 max 0.0499 / 375 0.0477): floor 344 -> 390
+   max 0.0538 (regression), floor 330 -> 0.0541. Per the spec's "keep the smallest floor that meets
+   CLS and report" clause, the floor stays at 360 (CLS == main). The dead gap (~35px) is thus
+   unchanged and reported as breaking-R2-limited; skeleton parity still improves the loading view and
+   lets the floor drop for free once the breaking reserve is made atomic in a future batch. */
+.mh-lead{margin:0;min-height:360px;}
+/* Lead loading skeleton — PARITY with the committed SnapshotCard lead: a 16:9 media block (219px)
+   plus a ~91px deck/actions placeholder (two headline lines + a deck/actions bar), so the skeleton
+   and the loaded card occupy the same height and the swap-in causes no layout shift. */
+.mh-lead-skel{display:flex;flex-direction:column;}
+.mh-lead-skel-img{width:100%;aspect-ratio:16/9;border-radius:var(--radius-md);
+  background:linear-gradient(90deg,var(--surface2) 25%,var(--border) 50%,var(--surface2) 75%);
+  background-size:200% 100%;animation:shimmer 1.4s infinite;}
+.mh-lead-skel-main{display:flex;flex-direction:column;gap:11px;padding-top:12px;min-height:79px;}
+.mh-lead-skel-main span{height:15px;border-radius:var(--radius-md);
+  background:linear-gradient(90deg,var(--surface2) 25%,var(--border) 50%,var(--surface2) 75%);
+  background-size:200% 100%;animation:shimmer 1.4s infinite;}
+.mh-lead-skel-ln1{width:94%;}
+.mh-lead-skel-ln2{width:72%;}
+.mh-lead-skel-deck{width:40%;margin-top:4px;}
+@media(prefers-reduced-motion:reduce){.mh-lead-skel-img,.mh-lead-skel-main span{animation:none;}}
 
 /* Section shell: one shared header (eyebrow + See all) then its rows. Reserve a min-height
    that matches a loaded 3-row section (one STANDARD ~188px + two COMPACT ~75px + header),

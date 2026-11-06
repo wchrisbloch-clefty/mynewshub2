@@ -37,7 +37,7 @@ const SEL = {
   tile: ['.sport-tab'],
   // bordered secondary buttons (the "See all >" / Open-full-view link is excluded — it is a link, not a bordered button)
   button: ['.snap-ask', '.snap-save', '.sop-showall', '.nav-btn-blue', '.nav-btn-brief', '.page-customize-btn', '.sport-league-all-btn', '.load-more'],
-  band: ['.status-strip', '.ss-ticker', '.topbar-scores'],
+  band: ['.status-strip', '.ss-ticker', '.topbar-scores', '.sports-score-strip', '.home-scores', '.score-strip-scroll'],
   status: ['.last-updated', '.feed-degraded'],
 };
 
@@ -106,12 +106,30 @@ async function scan(band, name, route, dark) {
       const fs = Math.round(px(cs.fontSize));
       if (fs && !fsTokens.includes(fs)) push(el, 'font-size-off-scale', fs + ' not in ' + fsTokens.join('/'));
     }
-    // (c) bands: no fill, no shadow
-    for (const el of uniq(SEL.band)) {
+    // (c) bands. Enumerated two ways so a new class cannot slip past: the curated selectors AND by
+    // COMPUTED STYLE/ROLE — any element that is a SCORES band (contains a .score-tile card) or a
+    // sticky/fixed horizontal strip. No band may carry a box-shadow or a gradient. A SCORES band must
+    // additionally read FLAT: transparent or the page canvas (a sticky band needs an opaque bg to
+    // occlude scrolled content, so a distinct grey --surface2 fill — not the canvas — is the
+    // violation). The markets ticker's subtle raised surface is allowed (not a scores band).
+    const canvas = parseC(getComputedStyle(document.body).backgroundColor) || { r: 255, g: 255, b: 255, a: 1 };
+    const scoresNamed = ['.sports-score-strip', '.home-scores', '.topbar-scores', '.score-strip-scroll'];
+    const bandSet = new Set(uniq(SEL.band));
+    const scoresSet = new Set(uniq(scoresNamed));
+    for (const el of document.querySelectorAll('*')) {
+      const cs0 = getComputedStyle(el);
+      const horiz = (cs0.overflowX === 'auto' || cs0.overflowX === 'scroll');
+      const sticky = (cs0.position === 'sticky' || cs0.position === 'fixed');
+      const hasScoreTile = !!el.querySelector(':scope .score-tile');
+      if (hasScoreTile && (horiz || sticky || /score|strip|band/.test(String(el.className)))) { bandSet.add(el); scoresSet.add(el); }
+      else if (sticky && horiz) bandSet.add(el);
+    }
+    for (const el of bandSet) {
       if (!vis(el)) continue;
       const cs = getComputedStyle(el);
       if (cs.boxShadow !== 'none') push(el, 'band-shadow', cs.boxShadow.slice(0, 24));
       if (cs.backgroundImage !== 'none') push(el, 'band-gradient', cs.backgroundImage.slice(0, 24));
+      if (scoresSet.has(el)) { const bbg = parseC(cs.backgroundColor); if (bbg && bbg.a > 0.02 && !close(bbg, canvas, 8)) push(el, 'band-fill-not-canvas', cs.backgroundColor); }
     }
     // (e) status pills ~ chip height (<=34 visual)
     for (const el of uniq(SEL.status)) {
