@@ -155,3 +155,69 @@ grey, while the platform badges keep their brand colour.
    still settles a little as the "updated" line and the Social Follows block fill in (documented).
 3. **The phone top stays still** — the weather band and the breaking strip no longer shove the lead or
    the sections as they load; no sudden jump a second after opening Home.
+
+---
+
+## Addendum — W6 & W7 (booth follow-ups)
+
+Two follow-ups that fix the real causes W3/W2 had masked with permanent reserves, instead of the
+reserves themselves.
+
+### W6 — phone Home breaking slot (fix the churn, drop the floor)
+
+W3 had masked the ~0.09 spike with a permanent 108px breaking floor (idle whitespace when nothing
+was breaking). W6 undoes that and fixes the source.
+
+**Cause (measured, with selector):** `lastUpdated.general` ticks 2–3 times within ~1s as the general
+feed commits in passes. Each tick ran `useEffect(() => setFrozenHead(null), [refreshKey])`, re-picking
+the held head AFTER it first froze. Because the reserve is only up while `!generalLoaded`, that
+re-pick flipped the variable-height breaking slot **0→N once the reserve was gone** and shoved the
+page. Selector: `.mh-breaking` / `.mh-brk-row`, value `model.breaking ← head.breaking`.
+
+**Fix:** coalesce the initial-load refreshKey burst (a change within 2.5s of the previous one, while
+the head is already frozen, no longer re-picks; a genuine later refresh still does). Breaking
+collapses to 0px when there is nothing breaking (Batch T); the slot is reserved only while General is
+still loading (`.mh-breaking` min-height 108→0; the borderless `.mh-breaking-reserve` shows only while
+`!generalLoaded`). Weather band reserve stays 27px.
+
+**Result:** the named ~0.09 churn spike is gone. Mobile Home CLS (10 runs): **390** max 0.050 / avg
+0.023; **375** max 0.048 / avg 0.018. The residual (~0.05 on ~30% of runs) is the inherent
+"breaking is cross-category and lags general" handoff (reserve→section when breaking isn't ready by
+`generalLoaded`), not churn — half of main's 0.096, reported per the acceptance (report 10/10).
+
+**356px Top Stories floor, re-justified at 390×844 and 375×667:** hero headline top (283 / 275 px) and
+the gap above Top Stories (22 px) are byte-identical to main; first-Top-Story visibility matches main
+(visible at 390, below the fold at 375 in both). The floor reserves height INSIDE the section (below
+the first row), so it never pushes the hero or first story down. renders-on-scroll App **+0**.
+
+### W7 — Energy rail "Across MyNewsHub" (floor only while loading)
+
+W2 gave `.sb-across` a permanent 520px floor and rendered the container even when empty — idle
+whitespace (loaded content is ~416px at ≤1100) and, during empty-load, a bordered box showing only
+its header.
+
+**Fix:** the floor applies only while the module's source categories are loading (`acrossLoading` =
+any across-cat in `loading`), sized to the real loaded height per width band (416px ≤1100, 530px
+≥1160, measured) so dropping it never shrinks the box. If it resolves empty it renders nothing; the
+brief loading-empty window is held by a borderless `.sb-across-reserve`.
+
+**Empty-box detector extended:** besides an empty bordered box, it now flags a bordered box whose only
+text is its own header, while excluding genuinely collapsed sections (an `aria-expanded` toggle is
+content behind a toggle). Verified: FLAGS a synthetic header-only "Across MyNewsHub" box (332×60);
+PASSES on the real rail (collapsed Prediction Markets / Sources / Trending are not false-flagged).
+
+**Energy desktop CLS, before (W6 permanent floor) → after (W7), 10 runs (max / avg):**
+
+| width | before max/avg | after max/avg | verdict |
+|---|---|---|---|
+| 1024 | 0.017 / 0.013 | 0.017 / 0.014 | ✅ PASS |
+| 1100 | 0.014 / 0.013 | 0.028 / 0.015 | ✅ PASS |
+| 1180 | 0.073 / 0.063 | 0.099 / 0.064 | ❌ (pre-existing main-column cascade) |
+| 1194 | 0.111 / 0.070 | 0.111 / 0.063 | ❌ (pre-existing) |
+| 1280 | 0.073 / 0.057 | 0.074 / 0.054 | ❌ (pre-existing) |
+| 1440 | 0.077 / 0.063 | 0.118 / 0.073 | ❌ (pre-existing) |
+
+Averages are within run-to-run noise; 1024/1100 hold PASS. The wide-width failures are unchanged in
+character — the main-column cascade (the "updated" line + Social Follows block), not the rail. No gate
+weakened (empty-box / contrast / text-overlap / touch-mode / sports-dedup / P5 / hero / SoP / unit all
+PASS; renders-on-scroll App +0; `check:tokens` green; initial JS gzip unchanged).

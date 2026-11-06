@@ -199,3 +199,14 @@ Chromium + Chromium-touch; real iPad/iPhone Safari = NEEDS-DEVICE (no WebKit in 
     names are renamed to role names (--ink→--black, --c-gray→--gray-mid, --pink→--accent-pink, …);
     the built CSS values are byte-identical, so nothing shifts. See batch-W-tokens.md for the full
     rename + V4 shade-merge tables to veto any visible shift.
+
+### Batch W booth follow-ups (W6, W7)
+
+53. **Phone breaking slot is honest (W6).** When nothing is breaking, the slot takes 0px (no reserved
+    gap); it reserves space only while General is still loading. The ~0.09 load spike is fixed at the
+    source — the held head no longer re-picks on the general feed's initial double-commit — not masked
+    with a permanent floor. Hero headline top and the first Top Story are unchanged vs main.
+54. **Energy "Across MyNewsHub" sizes to content (W7).** The module reserves a floor only while its
+    categories are loading, then sizes to its content; if it has nothing to show it renders nothing,
+    never a bordered box showing just its title. The empty-box detector now catches that header-only
+    pattern too (collapsed sections excluded).
