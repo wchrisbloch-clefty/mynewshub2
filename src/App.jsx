@@ -170,8 +170,17 @@ function onePerCluster(items) {
 // classifier/rule — reported as a proposal in the batch report, NOT built here.
 function labelConfirmed(a, kwFor) {
   if (!a || !a.cat) return false;
-  if (a.cat === 'general') return true; // "News" is the catch-all, never a contradiction
-  try { return (kwFor(a, a.cat) || []).length > 0; } catch { return true; }
+  const confirmed = a.cat === 'general' ? true // "News" is the catch-all, never a contradiction
+    : (() => { try { return (kwFor(a, a.cat) || []).length > 0; } catch { return true; } })();
+  // Y4: under ?debug=1 record each mixed-surface label decision (keyed by title so repeats collapse)
+  // so the label-confirmation audit can tally how many labels the kwMatch rule suppresses vs the
+  // naive "always show the feed category" baseline — per surface, per category, with examples. No
+  // network, no behaviour change.
+  if (DEBUG && typeof window !== 'undefined' && a.title) {
+    const d = (window.__dbg = window.__dbg || {});
+    (d.labels = d.labels || {})[a.title] = { cat: a.cat, confirmed, source: a.source || '' };
+  }
+  return confirmed;
 }
 
 // Cover image with a REAL labeled fallback. Fills its (position:relative) parent: a
