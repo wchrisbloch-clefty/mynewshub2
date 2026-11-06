@@ -21,3 +21,4 @@ pnpm-lock.yaml
 
 # stray test outputs
 *.out
+test/visual/_t.mjs

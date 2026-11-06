@@ -38,7 +38,7 @@
 
 import { useState, useEffect, useLayoutEffect, useCallback, useMemo, useRef, Fragment, lazy, Suspense } from 'react';
 // Extracted, dependency-isolated capability modules (see src/modules/*/README.md)
-import { clusterStories, hotClusterTopics, rankClusters, TREND_STOP, decodeEntities, capByPublisher } from './modules/clustering';
+import { clusterStories, hotClusterTopics, rankClusters, TREND_STOP, decodeEntities, capByPublisher, sameStory, clusterKey } from './modules/clustering';
 import { opinionLabel } from './modules/opinion';
 import { SourceImage, hasUsableImage } from './modules/source-image';
 import { ShareControl, buildBriefingExcerpt } from './modules/share';
@@ -139,6 +139,39 @@ function catBadge(a) {
   const cc = CATS[a && a.cat] || CATS.general;
   if (a && a.cat === 'bloom') { const s = energySubsector(a); if (s) return { label: s.label, color: cc.color, subsector: s.key }; }
   return { label: cc.label, color: cc.color, subsector: null };
+}
+
+// X2a: one story once per page. Reuses the SAME cluster identity the rest of the app uses —
+// clusterKey (first-10-word normalized title) catches exact + whitespace/punctuation variants, and
+// sameStory (shared cluster members OR bigram-Jaccard >= 0.28) catches near-duplicates that the
+// first-60-char dedupe() misses (e.g. the three NY Post "Martha Stewart apology" headlines). The
+// FIRST occurrence is kept; if the feed carries cluster members we surface the existing "N sources"
+// treatment downstream. No new clustering — just applied to every category feed, not only Home.
+function onePerCluster(items) {
+  const kept = [];
+  const keys = new Set();
+  for (const a of (items || [])) {
+    if (!a || !a.title) continue;
+    const ck = clusterKey(a.title);
+    if (ck && keys.has(ck)) continue;
+    if (kept.some(k => sameStory(k, a))) continue;
+    kept.push(a);
+    if (ck) keys.add(ck);
+  }
+  return kept;
+}
+
+// X2b: is a story's category label TRUSTWORTHY on a mixed surface? We have no content classifier —
+// a story's `.cat` is just the feed it was fetched from (see conformance-X0.md). So on mixed
+// surfaces (Home Top Stories, State of Play) we only show the category label when the story's OWN
+// text confirms that category via the EXISTING keyword matcher (kwMatch). When it cannot confirm
+// (e.g. a tornado-risk story fetched from the sports source The Spun contains no sports keyword),
+// we show NO label rather than guess a wrong one. A full re-classification would need a new
+// classifier/rule — reported as a proposal in the batch report, NOT built here.
+function labelConfirmed(a, kwFor) {
+  if (!a || !a.cat) return false;
+  if (a.cat === 'general') return true; // "News" is the catch-all, never a contradiction
+  try { return (kwFor(a, a.cat) || []).length > 0; } catch { return true; }
 }
 
 // Cover image with a REAL labeled fallback. Fills its (position:relative) parent: a
@@ -7280,6 +7313,7 @@ function Sidebar({cat, arts, kw, health, activeKw, setActiveKw, activeSource, se
         <div className={hideSopMobile ? 'sidebar-sop sop-hide-mobile' : 'sidebar-sop'}>
           <StateOfPlay variant="sidebar" items={sopItems} gapItems={sopGapItems||[]} breakingItems={sopBreakingItems||[]}
             meta={sopMeta||cc} onRead={onRead} onAsk={onAsk} formatDate={formatDate||fmtDate}
+            labelOk={a=>labelConfirmed(a,(x,c)=>(kw&&kw[c]||[]).filter(k=>((x.title||'')+(x.desc||'')).toLowerCase().includes(k.toLowerCase())))}
             collapsed={sopCollapsed} onToggleCollapse={onToggleSop}/>
         </div>
       )}
@@ -8683,7 +8717,19 @@ function AcrossHub({ sections, onRead, onSeeAll, formatDate }) {
 // ChatBot now lives in ./modules/concierge
 
 // ─── TOP OF HOUR STRIP ────────────────────────────────────────────────────────
-function TopOfHourStrip({ catLead, arts, onRead, stories: storiesProp }) {
+function TopOfHourStrip({ catLead, arts, onRead, stories: storiesProp, pageCat = null, kwFor = null }) {
+  // X2c: hide the category label when it equals the page's own category (redundant — "ENERGY" on
+  // every Energy row). X2b: on the mixed Home strip show the label only when the story's text
+  // confirms the category (never a contradicting guess). Keeps it when the topic differs.
+  // business + finance render the SAME nav label ("Business & Markets"), so on either page a story
+  // from the other key is still redundant.
+  const sameGroup = (x, y) => x === y || ((x === 'business' || x === 'finance') && (y === 'business' || y === 'finance'));
+  const showLabel = (a) => {
+    if (!a || !a.cat) return false;
+    if (pageCat && sameGroup(a.cat, pageCat)) return false;
+    if (!pageCat && kwFor) return labelConfirmed(a, kwFor); // Home / mixed: verify
+    return true;
+  };
   const stories = useMemo(() => {
     // Caller (FeedPage) computes the picks for cross-module dedup and passes them
     // here so the strip shows exactly the deduped set; fall back to self-compute.
@@ -8731,7 +8777,7 @@ function TopOfHourStrip({ catLead, arts, onRead, stories: storiesProp }) {
                   separate eyebrow, so every Top Stories row shows its topic in one consistent place
                   and the element count per row does not grow. */}
               <h3 className="toh-title">{hero.title}</h3>
-              <div className="toh-meta"><TopicTag cat={hero.cat} onMedia={!!hero.img}/> · {hero.source} · {fmtDate(hero.pubDate)}</div>
+              <div className="toh-meta">{showLabel(hero) && <><TopicTag cat={hero.cat} onMedia={!!hero.img}/> · </>}{hero.source} · {fmtDate(hero.pubDate)}</div>
             </div>
           </article>
           {textHeads.length > 0 && (
@@ -8739,7 +8785,7 @@ function TopOfHourStrip({ catLead, arts, onRead, stories: storiesProp }) {
               {textHeads.map((a, i) => (
                 <button key={i} className="toh-text-row" onClick={() => onRead(a)}>
                   <span className="toh-text-title">{a.title}</span>
-                  <span className="toh-text-meta"><TopicTag cat={a.cat}/> · {a.source} · {fmtDate(a.pubDate)}</span>
+                  <span className="toh-text-meta">{showLabel(a) && <><TopicTag cat={a.cat}/> · </>}{a.source} · {fmtDate(a.pubDate)}</span>
                 </button>
               ))}
             </div>
@@ -8752,7 +8798,7 @@ function TopOfHourStrip({ catLead, arts, onRead, stories: storiesProp }) {
                 <SourceImage src={a.img} variant="row" className="toh-compact-thumb" alt=""/>
                 <span className="toh-compact-body">
                   <span className="toh-compact-title">{a.title}</span>
-                  <span className="toh-compact-meta"><TopicTag cat={a.cat}/> · {a.source} · {fmtDate(a.pubDate)}</span>
+                  <span className="toh-compact-meta">{showLabel(a) && <><TopicTag cat={a.cat}/> · </>}{a.source} · {fmtDate(a.pubDate)}</span>
                 </span>
               </button>
             ))}
@@ -9146,7 +9192,9 @@ function FeedPage({ cat, ctx }) {
     // The main feed excludes everything already placed above it (by title key, so
     // the same story from a different source can't slip back in).
     const dedupedFeed = useMemo(
-      () => feedItems.filter(a => !topStoryKeys.has(storyKey(a)) && !catBreakingKeys.has(storyKey(a)) && !sopShownKeys.has(storyKey(a)) && !houstonKeys.has(storyKey(a))),
+      // X2a: one story once — cluster-dedupe this category feed (not only Home/Sports) so near-
+      // duplicates (identical + bigram-near titles) collapse to one row.
+      () => onePerCluster(feedItems.filter(a => !topStoryKeys.has(storyKey(a)) && !catBreakingKeys.has(storyKey(a)) && !sopShownKeys.has(storyKey(a)) && !houstonKeys.has(storyKey(a)))),
       [feedItems, topStoryKeys, catBreakingKeys, sopShownKeys, houstonKeys]);
 
     // ── COVERAGE GAP (folded into State of Play) — widely-covered stories none of the
@@ -9298,7 +9346,7 @@ function FeedPage({ cat, ctx }) {
           // (or the load has settled), then drop in the full set at once — so the strip never
           // renders a growing partial list that shoves its own rows as late feeds arrive.
           (topStoriesCommitted || !isLoading) && topStoryItems.length
-            ? <TopOfHourStrip catLead={catLead} arts={arts} onRead={onRead} stories={topStoryItems}/>
+            ? <TopOfHourStrip catLead={catLead} arts={arts} onRead={onRead} stories={topStoryItems} pageCat={null} kwFor={kwMatch}/>
             : (isLoading && <div className="toh-reserve" aria-hidden="true"/>)
         )}
 
@@ -9313,7 +9361,7 @@ function FeedPage({ cat, ctx }) {
             through here, so they unify together. */}
         {!activeKw && !activeSrc && !isHome && (
           catLead && (topStoriesCommitted || !isLoading)
-            ? <TopOfHourStrip stories={topStoryItems} catLead={catLead} arts={arts} onRead={onRead}/>
+            ? <TopOfHourStrip stories={topStoryItems} catLead={catLead} arts={arts} onRead={onRead} pageCat={cat} kwFor={kwMatch}/>
             : (isLoading && <div className="toh-reserve" aria-hidden="true"/>)
         )}
 
@@ -9328,6 +9376,7 @@ function FeedPage({ cat, ctx }) {
           <div className="sop-hoist">
             <StateOfPlay variant="sidebar" items={sopTopItems} gapItems={gapItems} breakingItems={catBreaking}
               meta={CATS[cat]||CATS.general} onRead={onRead} onAsk={setChatContext} formatDate={fmtDate}
+              labelOk={a=>labelConfirmed(a,kwMatch)}
               collapsed={sopCollapsed} onToggleCollapse={toggleSop}/>
           </div>
         )}
@@ -9444,7 +9493,7 @@ function FeedPage({ cat, ctx }) {
                   {!activeKw && !activeSrc && !search && (
                     <div className="sop-mobile">
                       <StateOfPlay variant="sidebar" items={sopTopItems} gapItems={gapItems} breakingItems={catBreaking} maxRows={3}
-                        onOpenFull={() => handleTabChange('stateofplay')}
+                        onOpenFull={() => handleTabChange('stateofplay')} labelOk={a=>labelConfirmed(a,kwMatch)}
                         meta={CATS[cat]||CATS.general} onRead={onRead} onAsk={setChatContext} formatDate={fmtDate}
                         collapsed={sopCollapsed} onToggleCollapse={toggleSop}/>
                     </div>

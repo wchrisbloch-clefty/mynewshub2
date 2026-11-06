@@ -42,7 +42,10 @@ function AskBtn({ onAsk, item }) {
   );
 }
 
-export function StateOfPlay({ items, meta = {}, onRead, onAsk, formatDate = defaultFormatDate, collapsed = false, onToggleCollapse, gapItems = [], breakingItems = [], variant = 'strip', showTopic = false, maxRows = 0, onOpenFull }) {
+export function StateOfPlay({ items, meta = {}, onRead, onAsk, formatDate = defaultFormatDate, collapsed = false, onToggleCollapse, gapItems = [], breakingItems = [], variant = 'strip', showTopic = false, maxRows = 0, onOpenFull, labelOk = null }) {
+  // X2b: the mixed SoP keeps its topic labels, but never shows one that contradicts the story's
+  // content — labelOk(a) (host-injected, uses the existing keyword matcher) gates each label.
+  const okLabel = (a) => !labelOk || labelOk(a);
   const color = meta.color;
   const label = meta.label || '';
   const sidebar = variant === 'sidebar';
@@ -93,7 +96,7 @@ export function StateOfPlay({ items, meta = {}, onRead, onAsk, formatDate = defa
             title={b._breakingWhy ? `Breaking — ${b._breakingWhy}` : 'Breaking'}>
             <span className="sop-item-title">{b.title}</span>
             <span className="sop-item-meta">
-              {topicOn && <TopicTag cat={b.cat}/>}
+              {topicOn && okLabel(b) && <TopicTag cat={b.cat}/>}
               {/* S10: the red "BREAKING" word is the ONLY breaking marker — the red dot is gone, so
                   breaking rows align exactly with every other row. The word carries meaning without
                   colour (accessible) and stays >=4.5:1 on white. */}
@@ -109,7 +112,7 @@ export function StateOfPlay({ items, meta = {}, onRead, onAsk, formatDate = defa
             {/* S11: no number — each story is its own boxed row, so every title shares one left edge. */}
             <span className="sop-item-title">{a.title}</span>
             <span className="sop-item-meta">
-              {topicOn && <TopicTag cat={a.cat}/>}
+              {topicOn && okLabel(a) && <TopicTag cat={a.cat}/>}
               {a._clusterSize > 1 && <span className="sources-tag sop-item-sources">{a._clusterSize} sources</span>}
               <span className="sop-item-time">{formatDate(a.pubDate)}</span>
               {onAsk && <AskBtn onAsk={onAsk} item={a}/>}
@@ -126,7 +129,7 @@ export function StateOfPlay({ items, meta = {}, onRead, onAsk, formatDate = defa
           const srcText = outlets.slice(0, 2).map(cleanSourceName).join(', ') + (outlets.length > 2 ? ` +${outlets.length - 2}` : '');
           const meta = (
             <span className="sop-item-meta">
-              {topicOn && <TopicTag cat={g.cat}/>}
+              {topicOn && okLabel(g) && <TopicTag cat={g.cat}/>}
               {n > 1 && <span className="sources-tag sop-item-sources">{n} sources</span>}
               {srcText && <span className="sop-item-time">{srcText}</span>}
               {outlets[0] && (
