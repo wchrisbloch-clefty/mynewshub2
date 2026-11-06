@@ -5,6 +5,7 @@
 // App). Lazy-loaded + idle/hover-prefetched; a skeleton is the Suspense fallback.
 import { useState, useEffect, useMemo, useRef, useCallback, Fragment } from 'react';
 import { ChevronDown, ExternalLink, Star, Trophy, X as XIcon } from 'lucide-react';
+import { SourceImage } from '../source-image';
 import { StateOfPlay, selectStateOfPlay } from '../state-of-play';
 import { SnapshotCard } from '../snapshot-card';
 import { XPulse } from '../x-pulse';
@@ -437,7 +438,7 @@ export function SportsPage({ ctx }) {
             {lead && (
               <article className="sports-hero" onClick={()=>onRead(lead)}>
                 <div className="sports-hero-img">
-                  <CoverImg src={lead.img} label={lead.source}/>
+                  <SourceImage src={lead.img} variant="lead" className="cover-img" alt=""/>
                   {lead._favScore > 0 && <span className="sports-hero-fav">★ MY TEAMS</span>}
                 </div>
                 <div className="sports-hero-text">
@@ -469,7 +470,7 @@ export function SportsPage({ ctx }) {
               <div className="gn-row" style={{marginBottom:'24px'}}>
                 {gridCards.map((a, i) => (
                   <article key={i} className="gn-card" onClick={()=>onRead(a)}>
-                    <div className="gn-card-img"><CoverImg src={a.img} label={a.source}/></div>
+                    <div className="gn-card-img"><SourceImage src={a.img} variant="thumb" className="cover-img" alt=""/></div>
                     <h3 className="gn-card-title">{a.title}</h3>
                     <div className="gn-card-meta">
                       <span className="gn-card-source">{a.source}</span>

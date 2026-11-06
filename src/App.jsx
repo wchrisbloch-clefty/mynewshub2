@@ -40,6 +40,7 @@ import { useState, useEffect, useLayoutEffect, useCallback, useMemo, useRef, Fra
 // Extracted, dependency-isolated capability modules (see src/modules/*/README.md)
 import { clusterStories, hotClusterTopics, rankClusters, TREND_STOP, decodeEntities, capByPublisher } from './modules/clustering';
 import { opinionLabel } from './modules/opinion';
+import { SourceImage, hasUsableImage } from './modules/source-image';
 import { ShareControl, buildBriefingExcerpt } from './modules/share';
 import { ConnectionsStrip, findConnections } from './modules/connections';
 import { qualifyBreaking, isPromoItem } from './modules/breaking';
@@ -157,6 +158,8 @@ function CoverImg({ src, label, alt = '' }) {
     </>
   );
 }
+
+// X1: the ONE image path lives in ./modules/source-image (imported at the top as SourceImage).
 
 // One consistent line-icon (Feather stroke) for settings/customize affordances —
 // inherits text colour, single stroke weight. Replaces the old gear emoji in chrome.
@@ -4066,6 +4069,11 @@ body:not(.dark) .pill-bar{
 .cover-img-ph{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;text-align:center;padding:0 10px;border-radius:inherit;background:var(--ph-field);}
 .cover-img-ph-label{font-family:var(--font-serif);font-weight:800;font-size:13px;letter-spacing:0.02em;color:var(--ph-ink);display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;overflow-wrap:anywhere;}
 .cover-img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;object-position:center top;border-radius:inherit;display:block;}
+/* X1: the one image path. The <img> and the --navy fallback block both carry the caller's
+   positioning class (.cover-img / .toh-img / .fc-thumb / .houston-img …), so size, position and
+   radius come from the site; .src-img only pins object-fit and .src-img-ph only the --navy field. */
+.src-img{object-fit:cover;display:block;}
+.src-img-ph{background:var(--navy);border-radius:inherit;}
 /* Ensure the card-image containers clip the absolute CoverImg to their rounded box. */
 .gn-card-img{position:relative;overflow:hidden;}
 .gf-thumb{position:relative;overflow:hidden;}
@@ -6302,7 +6310,7 @@ function ExplainContent({ text }) {
 
 // ─── FEED CARD ────────────────────────────────────────────────────────────────
 function FeedCard({a, cat, isSaved, onSave, onRead, relatedSources, isRead, userKw, userTeams}) {
-  const [imgErr, setImgErr] = useState(false);
+  // X1: image error state now lives inside <SourceImage>.
   const [aiState, setAiState] = useState('closed');
   const [summary, setSummary] = useState('');
   const [takeaways, setTakeaways] = useState('');
@@ -6416,9 +6424,8 @@ function FeedCard({a, cat, isSaved, onSave, onRead, relatedSources, isRead, user
         <span className={`fc-date ${(()=>{const d=a.pubDate?Math.floor((Date.now()-new Date(a.pubDate))/1000):999999; return d<300?'fc-date-fresh':d<3600?'fc-date-recent':'';})()}`}>{fmtDate(a.pubDate)}</span>
       </div>
       <div className="fc-body">
-        {a.img && !imgErr
-          ? <img className="fc-thumb" src={a.img} loading="lazy" onError={()=>setImgErr(true)} alt=""/>
-          : <div className="fc-thumb-ph"><span className="ph-label">{a.source}</span></div>}
+        {/* X1: text-only when there is no usable image — no thumbnail column, no blank indent. */}
+        <SourceImage src={a.img} variant="row" className="fc-thumb" alt=""/>
         <div className="fc-text">
           <div className="fc-title">{a.title}</div>
           {a.desc && <div className="fc-desc">{a.desc}</div>}
@@ -6543,7 +6550,7 @@ function TodayItem({a, cc, onRead}) {
   const [sumPreview, setSumPreview] = useState(false);
   const [err, setErr] = useState('');
   const [loading, setLoading] = useState(false);
-  const [imgErr, setImgErr] = useState(false);
+  // X1: image error state now lives inside <SourceImage>.
 
   const handleAI = async (e) => {
     e.stopPropagation();
@@ -6558,9 +6565,8 @@ function TodayItem({a, cc, onRead}) {
   return (
     <div className="today-item-wrap">
       <div className="today-item" onClick={()=>onRead(a)}>
-        {a.img && !imgErr
-          ? <img className="today-thumb" src={a.img} loading="lazy" onError={()=>setImgErr(true)} alt=""/>
-          : <div className="today-thumb-ph"><span className="ph-label">{cc.label}</span></div>}
+        {/* X1: text-only when there is no usable image (no blank indent). */}
+        <SourceImage src={a.img} variant="row" className="today-thumb" alt=""/>
         <div className="today-item-body">
           <div className="today-item-title">{a.title}</div>
           <div className="today-item-src">{a.source} · {fmtDate(a.pubDate)}</div>
@@ -7850,7 +7856,7 @@ function HeroBand({ heroStories, heroIdx, setHeroIdx, paused, setPaused, onRead 
       {/* LEFT: large lead */}
       <article className="hero-band-lead" onClick={()=>onRead(lead)}>
         <div className="hero-band-img">
-          <CoverImg src={lead.img} label={lead.source}/>
+          <SourceImage src={lead.img} variant="lead" className="cover-img" alt=""/>
           <div className="hero-band-grad"/>
           <div className="hero-band-text-overlay">
             <div className="hero-band-badge" style={{background:(CATS[lead._cat]?.color||'var(--accent)')}}>
@@ -7883,15 +7889,7 @@ function HeroBand({ heroStories, heroIdx, setHeroIdx, paused, setPaused, onRead 
         <div className="hero-band-side-label">More top stories</div>
         {secondary.map((s, i) => (
           <div key={i} className="hero-band-side-item" onClick={()=>onRead(s)}>
-            {s.img && (
-              <img
-                className="hero-band-side-thumb"
-                src={s.img}
-                loading="lazy"
-                alt=""
-                onError={e=>{e.target.style.display='none';}}
-              />
-            )}
+            <SourceImage src={s.img} variant="row" className="hero-band-side-thumb" alt=""/>
             <div className="hero-band-side-body">
               <div className="hero-band-side-title">{s.title}</div>
               <div className="hero-band-side-meta">
@@ -8631,7 +8629,7 @@ function HoustonRow({ items, onRead, formatDate }) {
       <div className="houston-scroll" data-no-swipe>
         {items.map((a, i) => (
           <button key={a.link || i} className="houston-card" onClick={() => onRead(a)}>
-            {a.img ? <img className="houston-img" src={a.img} loading="lazy" alt=""/> : <div className="houston-img houston-img-ph"><span className="ph-label">{a.source}</span></div>}
+            <SourceImage src={a.img} variant="thumb" className="houston-img" alt=""/>
             <div className="houston-card-title">{a.title}</div>
             <div className="houston-card-meta"><span>{a.source}</span><span>·</span><span>{formatDate(a.pubDate)}</span></div>
           </button>
@@ -8665,8 +8663,7 @@ function AcrossHub({ sections, onRead, onSeeAll, formatDate }) {
             <div key={a.link || i} className="gf-item" onClick={() => onRead(a)}>
               <div className="gf-thumb-wrap">
                 <div className="gf-thumb-ph"/>
-                {a.img && <img className="gf-thumb-img" src={a.img} alt="" loading="lazy"
-                  onError={e => { e.currentTarget.style.display = 'none'; }}/>}
+                <SourceImage src={a.img} variant="thumb" className="gf-thumb-img" alt=""/>
               </div>
               <div className="gf-body">
                 <div className="gf-title">{a.title}</div>
@@ -8727,7 +8724,7 @@ function TopOfHourStrip({ catLead, arts, onRead, stories: storiesProp }) {
         <div className="toh-lead-col">
           <article className={`toh-card toh-card-lead${!hero.img ? ' toh-card-noimg' : ''}`} onClick={() => onRead(hero)}>
             <div className="toh-img-ph"><span className="ph-label">{hero.source}</span></div>
-            {hero.img && <img className="toh-img" src={hero.img} alt="" loading="lazy" onError={e => { e.currentTarget.style.display = 'none'; }}/>}
+            <SourceImage src={hero.img} variant="lead" className="toh-img" alt=""/>
             <div className="toh-grad"/>
             <div className="toh-body">
               {/* S13: the topic moves INTO the meta line (first token, category colour) instead of a
@@ -8752,7 +8749,7 @@ function TopOfHourStrip({ catLead, arts, onRead, stories: storiesProp }) {
           <div className="toh-side">
             {compact.map((a, i) => (
               <button key={i} className="toh-compact-row" onClick={() => onRead(a)}>
-                {a.img && <img className="toh-compact-thumb" src={a.img} loading="lazy" decoding="async" alt="" onError={e => { e.currentTarget.style.visibility = 'hidden'; }}/>}
+                <SourceImage src={a.img} variant="row" className="toh-compact-thumb" alt=""/>
                 <span className="toh-compact-body">
                   <span className="toh-compact-title">{a.title}</span>
                   <span className="toh-compact-meta"><TopicTag cat={a.cat}/> · {a.source} · {fmtDate(a.pubDate)}</span>
