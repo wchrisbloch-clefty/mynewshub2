@@ -88,10 +88,14 @@
 @media(hover:hover){ .sop-showall:hover{border-color:var(--text3);color:var(--text);} }
 .sop-showall:focus-visible{outline:2px solid var(--accent);outline-offset:2px;}
 
-/* T3: footer actions row — "Show all N" and/or "Open full view" under the card. */
-.sop-foot-actions{display:flex;flex-direction:column;gap:6px;margin-top:8px;}
-.sop-foot-actions .sop-showall{margin-top:0;}
-.sop-fullview{align-self:flex-start;background:none;border:none;color:var(--accent);
+/* T3/Y1.4: footer actions on ONE row — "Show all N" (bordered, takes the remaining width) and
+   "Open full view →" (ghost link, pinned right) sit side by side instead of stacking, so the card
+   foot is a single ~44px row instead of two. Each keeps its own look (conformance: .sop-showall is
+   the bordered SecondaryButton, .sop-fullview is a link). When only one is present it simply fills
+   the row. */
+.sop-foot-actions{display:flex;flex-direction:row;align-items:center;gap:10px;margin-top:8px;}
+.sop-foot-actions .sop-showall{margin-top:0;display:inline-block;width:auto;flex:1 1 auto;}
+.sop-fullview{flex:0 0 auto;margin-left:auto;background:none;border:none;color:var(--accent);
   font-family:var(--font-sans);font-size:var(--fs-meta);font-weight:700;letter-spacing:0.02em;
-  cursor:pointer;padding:9px 2px;min-height:40px;}
+  cursor:pointer;padding:9px 2px;min-height:40px;white-space:nowrap;}
 .sop-fullview:focus-visible{outline:2px solid var(--accent);outline-offset:2px;}

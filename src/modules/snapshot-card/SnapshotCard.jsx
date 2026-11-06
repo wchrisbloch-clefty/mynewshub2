@@ -16,7 +16,7 @@
 // Styling: co-located SnapshotCard.css + design tokens (src/styles/tokens.css).
 
 import { useState } from 'react';
-import { hasUsableImage, imgReferrerPolicy } from '../source-image';
+import { hasUsableImage, imgReferrerPolicy, imageVerdict } from '../source-image';
 import { FollowSourceChip } from '../follow-source';
 import { TierBadge } from '../provenance';
 import './SnapshotCard.css';
@@ -33,8 +33,14 @@ export function SnapshotCard({ a, meta = {}, isSaved, onSave, onRead, onPerspect
   // The no-image lead keeps the D5 typographic treatment. Regular cards are unchanged.
   const hasImg = hasUsableImage(a.img) && !imgErr && !hideImage; // X1: generic fallback-card URLs are "no image"
   const heroImg = lead && hasImg;
+  // Y3.1: stamp this card's image decision so the ?debug=1 image report can show src/host/verdict
+  // for EVERY slot — including ones that render no <img> (dropped as generic-card / 404 / blank /
+  // empty). `imgErr` is the runtime 404/blank signal; `iv` is the static (URL-shape) verdict.
+  const iv = imageVerdict(a.img);
+  const imgState = imgErr ? 'blank-or-404' : (hideImage ? 'hidden' : iv.verdict);
   return (
-    <article className={`snap-card ${a.isAlert ? 'snap-breaking' : ''}${lead ? ' snap-lead' : ''}${lead && !hasImg ? ' snap-lead-noimg' : ''}${heroImg ? ' snap-lead-hero' : ''}${!heroImg ? ' snap-row' : ''}`} onClick={() => onRead(a)}>
+    <article className={`snap-card ${a.isAlert ? 'snap-breaking' : ''}${lead ? ' snap-lead' : ''}${lead && !hasImg ? ' snap-lead-noimg' : ''}${heroImg ? ' snap-lead-hero' : ''}${!heroImg ? ' snap-row' : ''}`} onClick={() => onRead(a)}
+      data-img-src={a.img || ''} data-img-state={imgState} data-img-pattern={iv.pattern || ''} data-img-unverified={iv.unverified ? '1' : ''}>
       {/* K6: STANDARD row — the image is on the LEFT at a fixed 4:3 (112x84 / 88x66),
           its space reserved via aspect-ratio so nothing shifts; a text-only row keeps
           the same min-height so the list rhythm holds (no placeholder tile). The accent
@@ -83,20 +89,41 @@ export function SnapshotCard({ a, meta = {}, isSaved, onSave, onRead, onPerspect
                 <svg className="snap-cov-caret" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
               </button>}
           </span>
-          <span className="snap-foot-actions">
-            {/* D7: Ask the assistant about this specific story. */}
-            {onAsk && (
-              <button className="snap-ask" onClick={e => { e.stopPropagation(); onAsk(a); }}
-                aria-label="Ask about this story" title="Ask the assistant about this story">
-                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
-                Ask
+          {/* Y1.2: on the LEAD the actions are GHOST ICONS (no boxed button, 16px glyph, >=44px hit via
+              ::after) sitting on the meta foot — the hero already carries strong chrome, so a pair of
+              bordered buttons there was heavy. Distinct classes (.snap-lead-act), NOT the .snap-ask /
+              .snap-save secondary-button equivalence class, so the one-look conformance gate is
+              unaffected (a hero's inline icon actions are their own affordance). Every OTHER card keeps
+              the bordered Ask / Save. */}
+          {lead ? (
+            <span className="snap-foot-actions snap-lead-actions">
+              {onAsk && (
+                <button className="snap-lead-act" onClick={e => { e.stopPropagation(); onAsk(a); }}
+                  aria-label="Ask about this story" title="Ask the assistant about this story">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+                </button>
+              )}
+              <button className={`snap-lead-act ${isSaved ? 'saved' : ''}`}
+                onClick={e => { e.stopPropagation(); onSave(a); }} aria-label={isSaved ? 'Saved' : 'Save'} title={isSaved ? 'Saved' : 'Save'}>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill={isSaved ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth="2" aria-hidden="true"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg>
               </button>
-            )}
-            <button className={`snap-save ${isSaved ? 'saved' : ''}`}
-              onClick={e => { e.stopPropagation(); onSave(a); }} aria-label={isSaved ? 'Saved' : 'Save'}>
-              <svg width="14" height="14" viewBox="0 0 24 24" fill={isSaved ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth="2"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg>
-            </button>
-          </span>
+            </span>
+          ) : (
+            <span className="snap-foot-actions">
+              {/* D7: Ask the assistant about this specific story. */}
+              {onAsk && (
+                <button className="snap-ask" onClick={e => { e.stopPropagation(); onAsk(a); }}
+                  aria-label="Ask about this story" title="Ask the assistant about this story">
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+                  Ask
+                </button>
+              )}
+              <button className={`snap-save ${isSaved ? 'saved' : ''}`}
+                onClick={e => { e.stopPropagation(); onSave(a); }} aria-label={isSaved ? 'Saved' : 'Save'}>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill={isSaved ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth="2"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg>
+              </button>
+            </span>
+          )}
         </div>
       </div>
     </article>
