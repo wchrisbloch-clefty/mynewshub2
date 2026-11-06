@@ -8187,7 +8187,7 @@ function Wordmark({ height = 24 }) {
 // Renders BOTH desktop (whisper + nav) AND mobile (compact header + chip bar)
 // in DOM. CSS media queries decide which is visible. `hidden` prop drives
 // the auto-hide-on-scroll-down behavior (mobile only — drives translate).
-function TopBar({tab, setTab, search, setSearch, dark, setDark,
+function TopBar({tab, setTab, search, setSearch, dark, setDark, onAskChat, chatOpen,
                  onCustomize, onRefresh, breakingItems, onTickerClick,
                  isMobile, mobileSearchOpen, onMobileSearchToggle, weatherCities, hiddenIndices,
                  onAnalyze, searchHistory, trendingTopics, onAccount, signedIn,
@@ -8462,6 +8462,11 @@ function TopBar({tab, setTab, search, setSearch, dark, setDark,
               <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{flexShrink:0}}><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><rect x="8" y="2" width="8" height="4" rx="1"/><line x1="9" y1="12" x2="15" y2="12"/><line x1="9" y1="16" x2="13" y2="16"/></svg>
               Analyze
             </button>
+            {/* X6: Ask NewsHub — the chat launcher is a quiet header icon now (never a floating
+                button that can cover text). aria-expanded reflects the drawer state. */}
+            <button className="nav-icon-btn" onClick={onAskChat} title="Ask NewsHub" aria-label="Ask NewsHub" aria-expanded={!!chatOpen}>
+              <svg width={ICON.header} height={ICON.header} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+            </button>
             <button className="nav-icon-btn" onClick={onRefresh} title="Refresh">
               <RefreshCw size={ICON.header} strokeWidth={2}/>
             </button>
@@ -8494,6 +8499,10 @@ function TopBar({tab, setTab, search, setSearch, dark, setDark,
             </button>
             <button className="mobile-icon-btn" onClick={onAnalyze} title="Analyze" aria-label="Paste & Analyze">
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><rect x="8" y="2" width="8" height="4" rx="1"/><line x1="9" y1="12" x2="15" y2="12"/><line x1="9" y1="16" x2="13" y2="16"/></svg>
+            </button>
+            {/* X6: Ask NewsHub launcher as a quiet header icon (replaces the floating button). */}
+            <button className="mobile-icon-btn" onClick={onAskChat} title="Ask NewsHub" aria-label="Ask NewsHub" aria-expanded={!!chatOpen}>
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
             </button>
             {/* M2: the header search icon is removed on mobile — Search now lives in the
                 bottom tab bar (which opens this same .mobile-search input), so the two
@@ -8555,6 +8564,10 @@ function TopBar({tab, setTab, search, setSearch, dark, setDark,
                   {TAB_LABELS[t]||(t.charAt(0).toUpperCase()+t.slice(1))}
                 </button>
               ))}
+              {/* X6: Ask NewsHub also reachable from the More sheet. */}
+              <button role="menuitem" className="more-sheet-item" onClick={()=>{ setMoreSheetOpen(false); if(onAskChat) onAskChat(); }}>
+                Ask NewsHub
+              </button>
             </div>
           </div>
         )}
@@ -9691,6 +9704,7 @@ export default function App() {
   const [readLinks, setReadLinks] = useState(()=>new Set(ld('readLinks',[])));
   const [readerArticle, setReaderArticle] = useState(null);
   const [chatContext, setChatContext] = useState(null);
+  const [chatOpen, setChatOpen] = useState(false); // X6: launcher state lifted out of the FAB into the header icon / More sheet
   const [perspArticle, setPerspArticle] = useState(null);
   const [showAnalyze, setShowAnalyze] = useState(false);
   const [webResults, setWebResults] = useState([]);
@@ -10844,6 +10858,7 @@ export default function App() {
           searchHistory={searchHistory}
           trendingTopics={homeTrendingTopics}
           onAccount={()=>setShowAuth(true)} signedIn={!!userId}
+          onAskChat={()=>setChatOpen(o=>!o)} chatOpen={chatOpen}
           favTeams={[...teams, ...myTeams.map(t=>({match:t.name, league:t.league}))]}
           onGoToSports={() => handleTabChange('sports')}/>
 
@@ -10995,7 +11010,7 @@ export default function App() {
       </div>
       {/* Floating AI chatbot — available on all pages (lazy; prefetched on idle). */}
       <Suspense fallback={null}>
-      <ChatBot arts={arts}
+      <ChatBot arts={arts} open={chatOpen} setOpen={setChatOpen}
         onNavigate={(path)=>{ const p=(path||'').split('/').filter(Boolean); navigate(p[0]||'general', p[1]||null, p[2]||null); }}
         fetchSummary={fetchAISummary}
         fetchListen={fetchListen}
