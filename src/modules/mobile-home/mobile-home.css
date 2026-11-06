@@ -5,7 +5,7 @@
 
 /* LEAD 16:9 — SnapshotCard renders its own .snap-lead-hero (16:9 + a deck/actions block).
    Reserve its full height so the skeleton and the loaded lead occupy the same space (CLS). */
-.mh-lead{margin:0;min-height:360px;}
+.mh-lead{margin:0;min-height:360px;} /* X5a: kept at 360 — tightening to the ~331 content regressed mobile CLS 0.015->0.05 (the floor absorbs held-lead height variance, the W3-W7 CLS architecture); the ~29px is the smallest floor that holds CLS */
 
 /* Section shell: one shared header (eyebrow + See all) then its rows. Reserve a min-height
    that matches a loaded 3-row section (one STANDARD ~188px + two COMPACT ~75px + header),
@@ -40,7 +40,7 @@
 
 /* Top stories — always present once General loads; reserve 4 compact rows + header so the
    block does not pop in and shove the lead/sections (M4). */
-.mh-topstories{min-height:356px;} /* W3: raise the floor 330->356px to the real loaded height (held->committed shrink was the dominant mobile-Home shifter, ~58%); band reserve (.topbar-wx-reserve 26px) already matches the weather band */
+.mh-topstories{min-height:356px;} /* W3/X5a: 356 is the CLS-safe floor (tightening to the ~340 content regressed mobile CLS); the ~16px over-reserve is the smallest floor that holds CLS */
 /* Breaking is conditional; reserve its slot only while General is still loading so it does not
    shove content when it arrives, then it collapses if there is nothing breaking. T1: sized to the
    one-line strip (~2 rows) — the old 300px reserve was for the retired breaking CARD and collapsing

@@ -797,6 +797,18 @@ function fmtDate(d) {
     return `${Math.floor(diff/31536000)}y ago`;
   } catch { return ''; }
 }
+// X5c / O2: a SCHEDULED game shows its kickoff TIME (today -> "7:30 PM"; another day -> "Sun 1:00 PM"),
+// never 0/0 or an "—" placeholder. Falls back to the raw status when there is no parseable date.
+function fmtKickoff(d) {
+  if (!d) return '';
+  try {
+    const dt = new Date(d); if (isNaN(dt.getTime())) return '';
+    const now = new Date();
+    const time = dt.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }).replace(/ /g, ' ');
+    if (dt.toDateString() === now.toDateString()) return time;
+    return `${dt.toLocaleDateString([], { weekday: 'short' })} ${time}`;
+  } catch { return ''; }
+}
 function fmtDuration(s) {
   if (!s) return '';
   const parts = s.split(':').map(Number);
@@ -6266,19 +6278,19 @@ function ScoreTile({ g }) {
           <ScoreLogo url={g.awayLogo} abbr={away}/>
           <span className={`score-tile-team ${awayLead ? 'win' : ''}`}>{away}</span>
         </span>
-        <span className={`score-tile-score ${awayLead ? 'win' : ''}`}>{(live || final) ? g.awayScore : '—'}</span>
+        <span className={`score-tile-score ${awayLead ? 'win' : ''}`}>{(live || final) ? g.awayScore : ''}</span>{/* X5c: no 0/0 dashes for a scheduled game — the kickoff time is shown below */}
       </div>
       <div className="score-tile-row">
         <span className="score-tile-side">
           <ScoreLogo url={g.homeLogo} abbr={home}/>
           <span className={`score-tile-team ${homeLead ? 'win' : ''}`}>{home}</span>
         </span>
-        <span className={`score-tile-score ${homeLead ? 'win' : ''}`}>{(live || final) ? g.homeScore : '—'}</span>
+        <span className={`score-tile-score ${homeLead ? 'win' : ''}`}>{(live || final) ? g.homeScore : ''}</span>
       </div>
       <div className={`score-tile-status ${live ? 'live' : final ? 'final' : 'pre'}`}>
         {live && <span className="score-tile-dot"/>}
         {g._leagueLabel && <span className="score-tile-lg">{g._leagueLabel}</span>}
-        <span className="score-tile-when">{g.status || (final ? 'FINAL' : fmtDate(g.date))}</span>
+        <span className="score-tile-when">{live ? (g.status || 'LIVE') : final ? 'FINAL' : (fmtKickoff(g.date) || g.status || 'TBD')}</span>
       </div>
     </div>
   );
