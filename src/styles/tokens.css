@@ -98,6 +98,7 @@
   --tracking-label:0.06em;
   --border-strong:#c4c4bf;  /* one step darker than --border (#d8d8d4) — hover edge */
   --on-media:#ffffff;       /* text over photos (full-opacity, not a category colour) */
+  --overlay:rgba(10,15,25,0.62); /* X4b: dark scrim pill behind on-photo badges — white --on-media text clears 4.5:1 */
   --dur-fast:150ms;--dur-base:200ms;
   /* ── V4: centralised literals (brand, AI/syntax purple, gold tier, pale washes, fixed neutrals).
      Moved out of components so the ratchet catches NEW ad-hoc hex; close shades merged (small

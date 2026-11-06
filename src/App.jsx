@@ -787,13 +787,14 @@ function fmtDate(d) {
   try {
     const dt = new Date(d); if (isNaN(dt.getTime())) return '';
     const diff = Math.floor((Date.now() - dt.getTime()) / 1000);
-    if (diff < 45)        return 'Just now';
-    if (diff < 3600)      return `${Math.max(1, Math.floor(diff/60))}m ago`;
-    if (diff < 86400)     return `${Math.floor(diff/3600)}h ago`;
-    if (diff < 604800)    return `${Math.floor(diff/86400)}d ago`;
-    if (diff < 2592000)   return `${Math.floor(diff/604800)}w ago`;
-    if (diff < 31536000)  return `${Math.floor(diff/2592000)}mo ago`;
-    return `${Math.floor(diff/31536000)}y ago`;
+    // X4a: a non-breaking space in the relative age so "2h ago" never wraps leaving "ago" orphaned.
+    if (diff < 45)        return 'Just now';
+    if (diff < 3600)      return `${Math.max(1, Math.floor(diff/60))}m ago`;
+    if (diff < 86400)     return `${Math.floor(diff/3600)}h ago`;
+    if (diff < 604800)    return `${Math.floor(diff/86400)}d ago`;
+    if (diff < 2592000)   return `${Math.floor(diff/604800)}w ago`;
+    if (diff < 31536000)  return `${Math.floor(diff/2592000)}mo ago`;
+    return `${Math.floor(diff/31536000)}y ago`;
   } catch { return ''; }
 }
 function fmtDuration(s) {
@@ -1734,7 +1735,9 @@ body:not(.dark) .topbar-scores{background:var(--surface);}
 .houston-sub{font-family:var(--font-sans);font-size:var(--fs-meta);font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:var(--text3);}
 /* Horizontal scroll strip (Pass H item 3) — a compact rail instead of a full-width
    3-up grid row, so consecutive image blocks don't stack into a tall wall. */
-.houston-scroll{display:flex;gap:var(--s3);overflow-x:auto;scroll-snap-type:x proximity;scrollbar-width:none;-webkit-overflow-scrolling:touch;}
+/* X4d: leading + trailing 16px gutter so the first card sits at the page gutter and the last clears
+   the edge; a soft fade mask on the right so a clipped card never cuts text mid-glyph. */
+.houston-scroll{display:flex;gap:var(--s3);overflow-x:auto;scroll-snap-type:x proximity;scrollbar-width:none;-webkit-overflow-scrolling:touch;padding-inline:16px;scroll-padding-inline:16px;-webkit-mask-image:linear-gradient(to right,#000 0,#000 calc(100% - 24px),transparent 100%);mask-image:linear-gradient(to right,#000 0,#000 calc(100% - 24px),transparent 100%);}
 .houston-scroll::-webkit-scrollbar{display:none;}
 .houston-card{flex:0 0 232px;scroll-snap-align:start;background:var(--surface);border:1px solid var(--border2);border-radius:var(--radius);overflow:hidden;cursor:pointer;text-align:left;padding:0 0 10px;display:flex;flex-direction:column;font-family:inherit;}
 .houston-card:hover{border-color:var(--accent);}
@@ -3585,12 +3588,11 @@ body:not(.dark) .pill-bar{
   border-radius:8px;background-color:var(--surface2);
   position:relative;
 }
-.sports-hero-fav{
+.sports-hero-fav{ /* X4b: on-photo badge — white --on-media on a dark --overlay scrim (>=4.5:1), not brown-on-amber */
   position:absolute;top:12px;left:12px;
-  background:var(--amber);color:var(--accent-brown);
+  background:var(--overlay);color:var(--on-media);
   font-size:var(--fs-label);font-weight:900;letter-spacing:0.1em;
   padding:4px 10px;border-radius:var(--radius-sm);
-  box-shadow:0 2px 8px rgba(0,0,0,0.2);
 }
 .sports-hero-text{display:flex;flex-direction:column;justify-content:center;}
 .sports-hero-title{
@@ -4203,7 +4205,8 @@ body{overscroll-behavior-y:contain;}
 /* Horizontal chip bar — Yahoo News scrollable pills */
 .chip-bar{
   display:flex;gap:0;align-items:center;
-  padding:0 4px;height:44px;
+  padding:0 14px;height:44px; /* X4d: first chip sits at the 16px page gutter (14px pad + 2px chip margin), not flush at x=0 */
+  scroll-padding-inline:16px;
   overflow-x:auto;scrollbar-width:none;
   -webkit-overflow-scrolling:touch;
   scroll-snap-type:x proximity;
@@ -5770,7 +5773,7 @@ kbd{display:inline-block;padding:1px 5px;border:1px solid var(--border);border-r
   font-family:var(--font-sans);font-size:var(--fs-eyebrow);font-weight:700;text-transform:uppercase;letter-spacing:0.08em;
   color:var(--text3);margin-bottom:5px;align-self:flex-start;background:none;padding:0;
 }
-.toh-meta{font-size:var(--fs-meta);color:var(--text3);font-weight:500;font-family:var(--font-sans);}
+.toh-meta{font-size:var(--fs-meta);color:var(--text3);font-weight:500;font-family:var(--font-sans);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;} /* X4a */
 
 /* ── LEFT: text-only headlines under the hero. A divided list (no boxes), matching the
    K6 row rhythm: one bottom divider, one serif headline + one meta line. ── */
@@ -5785,7 +5788,7 @@ kbd{display:inline-block;padding:1px 5px;border:1px solid var(--border);border-r
   font-family:var(--font-serif);font-size:var(--fs-subhead);font-weight:700;color:var(--text);
   line-height:1.24;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;
 }
-.toh-text-meta{font-family:var(--font-sans);font-size:var(--fs-meta);color:var(--text3);font-weight:500;}
+.toh-text-meta{font-family:var(--font-sans);font-size:var(--fs-meta);color:var(--text3);font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%;} /* X4a: one line, no "ago" orphan */
 
 /* ── RIGHT: 3 compact K6-style rows — a fixed 112x84 (4:3) thumbnail on the LEFT when an
    image exists (else the body fills the row), a single bottom divider, one vertical
@@ -5812,7 +5815,7 @@ kbd{display:inline-block;padding:1px 5px;border:1px solid var(--border);border-r
   font-family:var(--font-serif);font-size:var(--fs-subhead);font-weight:700;color:var(--text);
   line-height:1.24;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden;
 }
-.toh-compact-meta{font-family:var(--font-sans);font-size:var(--fs-meta);color:var(--text3);font-weight:500;}
+.toh-compact-meta{font-family:var(--font-sans);font-size:var(--fs-meta);color:var(--text3);font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%;} /* X4a: one line, no "ago" orphan */
 
 /* Below 900 (iPad portrait / phones): hero + text headlines on top (full width), compact
    rows beneath. The two columns (1024/1180/1280/1440) stay side-by-side above this. */
