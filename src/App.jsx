@@ -1605,10 +1605,7 @@ body{
 .topbar-wx .rnw-card{max-width:1400px;margin:0 auto;padding:0 var(--s4);border:none;border-radius:0;background:none;}
 /* Scoreboard band in the top bar (below weather, above nav — Pass G item 3).
    Dark ESPN theme so the homepage strip matches the Sports-page strip (item 6). */
-.topbar-scores{background:var(--surface2);border-bottom:1px solid var(--border2);}
-/* S12: in the crisp-white light theme the Scores band is white, separated by its hairline
-   bottom border instead of a grey tint. Scoped to light so the dark theme is byte-identical. */
-body:not(.dark) .topbar-scores{background:var(--surface);}
+.topbar-scores{background:var(--bg);border-bottom:1px solid var(--border2);} /* Y2: flat band — page canvas, no grey tint, hairline bottom */
 .topbar-scores .home-scores{max-width:1400px;margin:0 auto;padding:4px var(--s4) 5px;border:none;border-radius:0;background:none;overflow:visible;}
 /* P2/A4: the scores strip is always in the DOM on Home (it wraps ActiveScoresBar, which is
    null until games load). Reserve its height from first paint so the async scores bar never
@@ -3303,11 +3300,10 @@ body:not(.dark) .pill-bar{
 .sports-page{padding-top:0;}
 
 /* SCOREBOARD STRIP — light band that blends with the page (Pass H item 2). */
-.sports-score-strip{
-  background:var(--surface2);
+.sports-score-strip{ /* Y2: flat band — the page canvas (opaque, to occlude under a sticky strip), no grey fill, hairline bottom only */
+  background:var(--bg);
   margin:0 -24px 18px; /* I0.3: was -28px top — it pulled the strip UP under the sticky nav */
   padding:9px 24px;
-  border-top:1px solid var(--border2);
   border-bottom:1px solid var(--border2);
 }
 .sports-score-strip.empty{padding:14px 24px;text-align:center;}
@@ -5399,7 +5395,9 @@ kbd{display:inline-block;padding:1px 5px;border:1px solid var(--border);border-r
 /* Mobile: reduce card image heights, fix hero */
 @media (max-width:640px){
   .gn-lead-img{aspect-ratio:16/7;max-height:180px;}
-  .sports-hero-img{aspect-ratio:16/7;max-height:170px;}
+  /* Y2.1: ONE lead look — the Sports hero image is full-bleed edge-to-edge with radius 0 on phone,
+     the same as the Home lead (was inset 12px with an 8px radius); >=641 keeps the --radius-md inset. */
+  .sports-hero-img{aspect-ratio:16/7;max-height:170px;border-radius:0;margin-left:-12px;margin-right:-12px;width:calc(100% + 24px);}
   .hero-lead-img{aspect-ratio:16/7;max-height:180px;}
   .trending-bar{padding:8px 0 12px;}
   .trending-chip{font-size:var(--fs-label);padding:4px 9px;}
@@ -6103,7 +6101,7 @@ kbd{display:inline-block;padding:1px 5px;border:1px solid var(--border);border-r
        z:300 header covered the strip's top ~12-16px and hid each card's first team row. --sticky-h
        is the header's live measured height (S2); it tracks the header shrinking on scroll. */
     position:sticky;top:calc(var(--sticky-h, 56px) + env(safe-area-inset-top, 0));z-index:110;
-    box-shadow:0 3px 10px rgba(0,0,0,0.25);
+    /* Y2: no drop shadow — the hairline bottom (from the base rule) is the only separator. */
   }
 }
 /* S4: on the Sports page the State of Play lives in the rail, which stacks LAST on a single
