@@ -18,7 +18,7 @@
 //  • General: neutral (homepage baseline, no extra accent)
 //  • Sports: dark navy score strip + purple sport tabs preserved (signature)
 //  • Markets: orange Bloomberg accent preserved + extended to Business
-//  • Pop Culture: pink var(--pink) top-border on cards, slightly bigger images
+//  • Pop Culture: pink var(--accent-pink) top-border on cards, slightly bigger images
 //  • Briefing: left-bar Morning Brew style (kept from v22b)
 //  • Bloom Energy: blue var(--accent) light accent
 //
@@ -918,7 +918,7 @@ function socialUrl(platform, handle) {
   }
 }
 const SOCIAL_META = {
-  twitter:   {label:'X / Twitter', color:'var(--ink)', bg:'var(--wash-cool)', icon:'𝕏'},
+  twitter:   {label:'X / Twitter', color:'var(--black)', bg:'var(--wash-cool)', icon:'𝕏'},
   linkedin:  {label:'LinkedIn',    color:'var(--brand-linkedin)', bg:'var(--wash-cool)', icon:'in'},
   instagram: {label:'Instagram',   color:'var(--brand-instagram)', bg:'var(--wash-pink)', icon:'IG'},
   youtube:   {label:'YouTube',     color:'var(--text2)', bg:'var(--surface2)',    icon:'▶'},
@@ -1551,8 +1551,8 @@ body{
 /* N7c: reserve the EXACT loaded weather-band height per breakpoint — it wraps to ~45px on phones
    but is a single 26px row at 641–899px, so the old flat 49px reserve over-reserved at tablet
    widths and the band shrank ~23px when weather arrived (the 820 header shove). */
-.topbar-wx-reserve{min-height:26px;}
-@media(min-width:641px){ .topbar-wx-reserve{min-height:26px;} }
+.topbar-wx-reserve{min-height:27px;} /* W3: match the band's real rendered height (27px incl. 1px border; <=32px O8) so the band resolving never moves main by the 1px reserve gap */
+@media(min-width:641px){ .topbar-wx-reserve{min-height:27px;} }
 .topbar-wx .rnw-card{max-width:1400px;margin:0 auto;padding:0 var(--s4);border:none;border-radius:0;background:none;}
 /* Scoreboard band in the top bar (below weather, above nav — Pass G item 3).
    Dark ESPN theme so the homepage strip matches the Sports-page strip (item 6). */
@@ -1636,8 +1636,8 @@ body:not(.dark) .topbar-scores{background:var(--surface);}
      +2…") fades out instead of being hard-cut by the weather divider at ~1180 — the
      last FULLY visible item reads whole, and the fade is the "more →" cue. The ticker
      clips only inside its own box (overflow:hidden), never under the weather. */
-  -webkit-mask-image:linear-gradient(90deg,var(--ink) 0,var(--ink) calc(100% - 72px),transparent);
-          mask-image:linear-gradient(90deg,var(--ink) 0,var(--ink) calc(100% - 72px),transparent);}
+  -webkit-mask-image:linear-gradient(90deg,var(--black) 0,var(--black) calc(100% - 72px),transparent);
+          mask-image:linear-gradient(90deg,var(--black) 0,var(--black) calc(100% - 72px),transparent);}
 .ss-ticker-inner{display:flex;align-items:center;gap:var(--s4);overflow-x:auto;scrollbar-width:none;padding-right:12px;}
 .ss-ticker-inner::-webkit-scrollbar{display:none;}
 .ss-tk-clipped{display:none;}  /* O6: items the right edge would cut are hidden (whole items only) */
@@ -1776,7 +1776,7 @@ body:not(.dark) .topbar-scores{background:var(--surface);}
 }
 /* Light mode: softer data strip — still readable but not jarring */
 body:not(.dark) .pill-bar{
-  background:var(--navy-2);
+  background:var(--accent-deep);
 }
 .pill-bar-inner{
   max-width:1400px;margin:0 auto;width:100%;
@@ -1900,7 +1900,7 @@ body:not(.dark) .pill-bar{
 /* U4/U6: tagline raised off the sub-11px floor to --fs-label; tighter tracking so the raised
    size does not widen .logo-wrap (verified: header height and logo column unchanged). */
 .logo-tag{
-  font-family:var(--font-sans);font-size:var(--fs-label);color:var(--text4);
+  font-family:var(--font-sans);font-size:var(--fs-label);color:var(--text3); /* W1: --text4 -> --text3 (1.95:1 -> >=4.5:1 on dark surface) */
   letter-spacing:var(--tracking-label);text-transform:uppercase;font-weight:var(--fw-medium);margin-top:2px;
 }
 /* BBC-clean section tabs: no box, strong underline on active */
@@ -2410,6 +2410,12 @@ body:not(.dark) .pill-bar{
 .ttp-chip.active .ttp-chip-star{color:rgba(255,255,255,0.85);}
 
 /* Across MyNewsHub — compact text list in the sidebar (Pass J item 4). */
+/* W7: no permanent floor (that left idle whitespace when content was shorter than 520px). The
+   floor applies ONLY while loading, sized to the real loaded content per width band (measured:
+   ~416px at <=1100, ~525–549px at >=1180) so dropping it once known does not shrink the box. The
+   borderless reserve holds the slot during the brief loading-empty window with the same floor. */
+.sb-across-loading, .sb-across-reserve{min-height:416px;}
+@media(min-width:1160px){ .sb-across-loading, .sb-across-reserve{min-height:530px;} }
 .sb-across-cat{margin-bottom:12px;}
 .sb-across-cat:last-child{margin-bottom:0;}
 .sb-across-clabel{background:none;border:none;cursor:pointer;font-family:inherit;padding:0 0 5px;font-size:var(--fs-label);font-weight:800;text-transform:uppercase;letter-spacing:0.08em;display:block;color:var(--text2);}  /* V2: neutral section label (was category colour) */
@@ -2464,7 +2470,7 @@ body:not(.dark) .pill-bar{
 .src-row:hover{opacity:0.7;}
 .src-row.active-src{opacity:1;}
 .health-dot{width:6px;height:6px;border-radius:50%;flex-shrink:0;}
-.h-green{background:var(--green);}.h-yellow{background:var(--amber);}.h-red{background:var(--red);}.h-gray{background:var(--c-gray);}
+.h-green{background:var(--green);}.h-yellow{background:var(--amber);}.h-red{background:var(--red);}.h-gray{background:var(--gray-mid);}
 .src-name{font-size:var(--fs-meta);font-weight:500;color:var(--text);flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
 .src-count{font-size:var(--fs-label);color:var(--text3);}
 
@@ -2962,12 +2968,12 @@ body:not(.dark) .pill-bar{
 .cp-src-row{display:flex;align-items:center;gap:8px;padding:7px 0;border-bottom:1px solid var(--border2);}
 .cp-src-row:last-child{border-bottom:none;}
 .cp-health{width:6px;height:6px;border-radius:50%;flex-shrink:0;}
-.cp-h-green{background:var(--green);}.cp-h-yellow{background:var(--amber);}.cp-h-red{background:var(--red);}.cp-h-gray{background:var(--c-gray);}
+.cp-h-green{background:var(--green);}.cp-h-yellow{background:var(--amber);}.cp-h-red{background:var(--red);}.cp-h-gray{background:var(--gray-mid);}
 .cp-src-name{flex:1;font-size:12px;color:var(--text);}
 .cp-src-count{font-size:var(--fs-label);color:var(--text3);}
 .cp-test-btn{background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius-md);padding:3px 8px;font-size:var(--fs-label);cursor:pointer;font-family:inherit;color:var(--text2);white-space:nowrap;}
 .cp-tog{width:30px;height:17px;border-radius:var(--radius-md);border:none;cursor:pointer;position:relative;transition:background 0.2s;flex-shrink:0;}
-.cp-tog.on{background:var(--accent);}.cp-tog.off{background:var(--c-gray-line);}
+.cp-tog.on{background:var(--accent);}.cp-tog.off{background:var(--line-muted);}
 .cp-tog::after{content:'';width:13px;height:13px;background:var(--on-media);border-radius:50%;position:absolute;top:2px;transition:left 0.15s;}
 .cp-tog.on::after{left:15px;}.cp-tog.off::after{left:2px;}
 .cp-del{background:none;border:none;color:var(--text3);cursor:pointer;font-size:var(--fs-body);padding:0 1px;line-height:1;}
@@ -3077,7 +3083,7 @@ body:not(.dark) .pill-bar{
 }
 
 /* Per-vertical card top-border accents */
-.gn-card.popculture{border-top:3px solid var(--pink);padding-top:8px;}
+.gn-card.popculture{border-top:3px solid var(--accent-pink);padding-top:8px;}
 .gn-card.business{border-top:3px solid var(--amber);padding-top:8px;}
 .gn-card.finance{border-top:3px solid var(--amber);padding-top:8px;}
 
@@ -3541,7 +3547,7 @@ body:not(.dark) .pill-bar{
 }
 .sports-hero-fav{
   position:absolute;top:12px;left:12px;
-  background:var(--amber);color:var(--brown);
+  background:var(--amber);color:var(--accent-brown);
   font-size:var(--fs-label);font-weight:900;letter-spacing:0.1em;
   padding:4px 10px;border-radius:var(--radius-sm);
   box-shadow:0 2px 8px rgba(0,0,0,0.2);
@@ -4175,11 +4181,11 @@ body{overscroll-behavior-y:contain;}
   -webkit-tap-highlight-color:transparent;
 }
 .chip:active{background:var(--surface2);}
-/* F5: active chip uses the single accent token (was var(--ink) / per-category color). */
+/* F5: active chip uses the single accent token (was var(--black) / per-category color). */
 .chip.active{color:var(--on-accent);font-weight:700;background:var(--accent);}
 /* D1: "More ▾" chip opens the mobile overflow sheet (Briefing/Podcasts/Sources/Saved). */
 .chip-more{font-weight:700;color:var(--text2);}
-.chip-more.active{color:var(--on-media);}
+.chip-more.active{color:var(--on-accent);} /* W1: --on-media -> --on-accent (white on accent pill, >=4.5:1) */
 .more-sheet-overlay{position:fixed;inset:0;background:rgba(0,0,0,0.45);z-index:650;display:flex;align-items:flex-end;}
 .more-sheet{background:var(--surface);width:100%;border-radius:16px 16px 0 0;
   padding:8px 10px calc(14px + env(safe-area-inset-bottom,0));box-shadow:0 -8px 30px rgba(0,0,0,0.22);
@@ -5193,7 +5199,7 @@ kbd{display:inline-block;padding:1px 5px;border:1px solid var(--border);border-r
 }
 .pc-subtab svg{flex-shrink:0;}
 @media(hover:hover){ .pc-subtab:hover{color:var(--text);border-color:var(--border-strong);} }
-/* U3: ONE active chip look — the single brand accent (was a hardcoded Pop-culture pink var(--pink)).
+/* U3: ONE active chip look — the single brand accent (was a hardcoded Pop-culture pink var(--accent-pink)).
    Energy and Pop-culture now share it; no per-section chip colour. */
 .pc-subtab.active{background:var(--accent);color:var(--on-accent);border-color:var(--accent);}
 @media(max-width:640px){
@@ -5497,7 +5503,7 @@ kbd{display:inline-block;padding:1px 5px;border:1px solid var(--border);border-r
 .analyze-url-input:focus{outline:none;border-color:var(--accent);}
 .analyze-yt-embed{
   width:100%;aspect-ratio:16/9;border:none;border-radius:8px;
-  background:var(--ink);margin-bottom:10px;
+  background:var(--black);margin-bottom:10px;
 }
 .analyze-yt-note{font-size:var(--fs-meta);color:var(--text3);margin-bottom:12px;font-style:italic;}
 .analyze-modes{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px;}
@@ -7150,7 +7156,7 @@ function GithubSignal() {
 
 // ─── GHOST SIDEBAR ────────────────────────────────────────────────────────────
 function Sidebar({cat, arts, kw, health, activeKw, setActiveKw, activeSource, setActiveSource, onRead, showScoreboard, recommended, showBriefing, onOpenBriefing, briefingExcludeCats, onTopicOpen, trendingItems, isTopicFollowed, toggleTopic, onTrendingOpen,
-  sopItems, sopGapItems, sopMeta, sopCollapsed, onToggleSop, formatDate, acrossSections, onAcrossSeeAll, followingModule, sopBreakingItems, feeds, onToggleFeed, favTeams, onAsk, hideSopMobile, voicesNode, connItems: connItemsProp}) {
+  sopItems, sopGapItems, sopMeta, sopCollapsed, onToggleSop, formatDate, acrossSections, acrossLoading, onAcrossSeeAll, followingModule, sopBreakingItems, feeds, onToggleFeed, favTeams, onAsk, hideSopMobile, voicesNode, connItems: connItemsProp}) {
   const cc = CATS[cat]||CATS.general;
   const catKws = kw[cat]||[];
   const catArts = arts[cat]||[];
@@ -7293,23 +7299,33 @@ function Sidebar({cat, arts, kw, health, activeKw, setActiveKw, activeSource, se
 
       {/* 4) ACROSS MYNEWSHUB — cross-category recirculation, moved into the sidebar
             (Pass J item 4), General only. Text-only compact rows for the narrow column. */}
-      {acrossSections && acrossSections.length > 0 && !activeKw && !activeSource && (
-        <div className="sidebar-section sb-across">
-          <div className="sidebar-sec-head"><span className="sidebar-sec-label">Across MyNewsHub</span></div>
-          {acrossSections.slice(0, 4).map(section => (
-            <div key={section.cat} className="sb-across-cat">
-              <button className="sb-across-clabel" onClick={()=>onAcrossSeeAll(section.cat)}>
-                {section.cc.label} →
-              </button>
-              {section.items.slice(0, 2).map((a, i) => (
-                <div key={i} className="sb-across-item" onClick={()=>onRead(a)}>
-                  <div className="sb-across-title">{a.title}</div>
-                  <div className="sb-across-src">{a.source} · {(formatDate||fmtDate)(a.pubDate)}</div>
+      {/* W7: Across MyNewsHub reserves a min-height FLOOR only WHILE its source categories are
+          still loading (`.sb-across-loading`), so the sections streaming in (0->N) do not shove the
+          rail; once the data is KNOWN the floor is dropped and it sizes to content. If it resolves
+          empty it renders NOTHING (never a bordered box whose only text is its header — that is what
+          the extended empty-box detector now flags). During the brief loading-empty window the slot
+          is held by a BORDERLESS reserve so the first section arriving does not shove the rail. */}
+      {Array.isArray(acrossSections) && !activeKw && !activeSource && (
+        acrossSections.length > 0
+          ? <div className={`sidebar-section sb-across${acrossLoading ? ' sb-across-loading' : ''}`}>
+              <div className="sidebar-sec-head"><span className="sidebar-sec-label">Across MyNewsHub</span></div>
+              {acrossSections.slice(0, 4).map(section => (
+                <div key={section.cat} className="sb-across-cat">
+                  <button className="sb-across-clabel" onClick={()=>onAcrossSeeAll(section.cat)}>
+                    {section.cc.label} →
+                  </button>
+                  {section.items.slice(0, 2).map((a, i) => (
+                    <div key={i} className="sb-across-item" onClick={()=>onRead(a)}>
+                      <div className="sb-across-title">{a.title}</div>
+                      <div className="sb-across-src">{a.source} · {(formatDate||fmtDate)(a.pubDate)}</div>
+                    </div>
+                  ))}
                 </div>
               ))}
             </div>
-          ))}
-        </div>
+          : (acrossLoading
+              ? <div className="sb-across-reserve" aria-hidden="true"/>
+              : null)
       )}
 
       {/* 4b) FOLLOWING — relocated out of the General-page full-width banner into the
@@ -7434,8 +7450,11 @@ function SocialFollows({cat, social}) {
                 <span className="social-plat-count">{handles.length}</span>
               </div>
               <div className="social-handles">
+                {/* W1: no inline brand colour on the handle text — the brand colour is
+                    kept on the ICON badge only (.social-plat-icon). The handle pill uses
+                    --text2 on --surface with the chip border, readable in dark + light. */}
                 {handles.map((h,i)=>(
-                  <a key={i} className="social-handle" href={socialUrl(p,h)} target="_blank" rel="noreferrer" style={{color:meta.color}}>{h}</a>
+                  <a key={i} className="social-handle" href={socialUrl(p,h)} target="_blank" rel="noreferrer">{h}</a>
                 ))}
               </div>
             </div>
@@ -8813,8 +8832,8 @@ function PerspectivesPanel({ article, onClose }) {
 // clicking it establishes a session, which onAuthStateChange picks up in App.
 function AuthModal({ onClose, onSend, status, email, setEmail, userId, onSignOut }) {
   const overlay = {position:'fixed',inset:0,background:'rgba(0,0,0,.45)',display:'flex',alignItems:'center',justifyContent:'center',zIndex:9999,padding:16};
-  const card = {position:'relative',background:'var(--surface,var(--on-media))',color:'var(--text,var(--ink))',width:'min(94vw,380px)',borderRadius:14,padding:'26px 24px',boxShadow:'0 12px 40px rgba(0,0,0,.28)',border:'1px solid var(--border,var(--c-gray-line))'};
-  const input = {width:'100%',padding:'11px 12px',border:'1px solid var(--border,var(--c-gray-line))',borderRadius:9,fontSize:15,margin:'0 0 12px',boxSizing:'border-box',background:'var(--surface2,var(--on-media))',color:'inherit'};
+  const card = {position:'relative',background:'var(--surface,var(--on-media))',color:'var(--text,var(--black))',width:'min(94vw,380px)',borderRadius:14,padding:'26px 24px',boxShadow:'0 12px 40px rgba(0,0,0,.28)',border:'1px solid var(--border,var(--line-muted))'};
+  const input = {width:'100%',padding:'11px 12px',border:'1px solid var(--border,var(--line-muted))',borderRadius:9,fontSize:15,margin:'0 0 12px',boxSizing:'border-box',background:'var(--surface2,var(--on-media))',color:'inherit'};
   const btn = {width:'100%',padding:'11px 12px',border:'none',borderRadius:9,background:'var(--accent)',color:'var(--on-media)',fontSize:15,fontWeight:600,cursor:'pointer',opacity:(status==='sending')?0.6:1};
   return (
     <div style={overlay} onClick={onClose}>
@@ -9186,6 +9205,12 @@ function FeedPage({ cat, ctx }) {
         .map(s => ({ ...s, items: s.items.slice(0, 3) })).filter(s => s.items.length > 0).slice(0, 4);
       return { railConnections, otherCatSections };
     }, [topStoryKeys, catBreakingKeys, sopShownKeys, houstonKeys, dedupedFeed, railConnCandidates, isHome, arts, cat]);
+    // W7: "Across MyNewsHub" is still LOADING while any of its source categories is fetching. While
+    // loading we reserve a floor so the streaming sections (0->N) do not shove the rail; once this is
+    // false the module is KNOWN and sizes to content (and renders nothing if it resolved empty).
+    const acrossLoading = !isHome &&
+      ['general','business','finance','bloom','sports','popculture','tech']
+        .filter(c => c !== cat).some(c => loading[c]);
 
     // K5: Following — sidebar module on General. It now shows FOLLOWED TOPICS only;
     // followed TEAMS live as pinned chips on the Sports page (the my-teams ribbon) and
@@ -9562,6 +9587,7 @@ function FeedPage({ cat, ctx }) {
             sopGapItems={gapItems} sopBreakingItems={!activeKw && !activeSrc && !search ? catBreaking : []} sopMeta={CATS[cat]||CATS.general}
             sopCollapsed={sopCollapsed} onToggleSop={toggleSop} formatDate={fmtDate}
             acrossSections={!isHome && !activeKw && !activeSrc && !search ? otherCatSections : null}
+            acrossLoading={acrossLoading}
             connItems={!activeKw && !activeSrc && !search ? railConnections : null}
             onAcrossSeeAll={handleTabChange}
             followingModule={followingModule}

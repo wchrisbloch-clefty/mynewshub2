@@ -173,3 +173,40 @@ Chromium + Chromium-touch; real iPad/iPhone Safari = NEEDS-DEVICE.
 48. **Scroll and load are stable (V6).** Scrolling re-renders only the header (App +0 on scroll).
     Home desktop CLS stays under the gate; the deeper Energy-rail CLS (async prediction-markets /
     sources / social modules) is pre-existing (fails on main too) and is documented, not hidden.
+
+---
+
+## Batch W — last visual close-out (dark legibility, two CLS shifts, token names)
+
+Chromium + Chromium-touch; real iPad/iPhone Safari = NEEDS-DEVICE (no WebKit in the sandbox).
+
+49. **Social handles read in dark (W1).** On iPhone/iPad dark mode, every "Social Follows" handle
+    (@BloomEnergy, @UtilityDive, Bloom Energy, …) is readable light-grey text (--text2) on the dark
+    tile with the chip border; the brand colour stays on the platform ICON badge only (𝕏 / in / IG /
+    ▶). No text anywhere uses #000 as a foreground in dark mode. A reusable dark+light contrast
+    scanner (test/visual/contrast.test.mjs) proves it: 0 failures over 7,209 text leaves (main had
+    249). Before/after dark shots at 390/1194 for Home/Energy under docs/verification/batch-W/.
+50. **Energy page settles while it loads (W2).** The right-rail "Across MyNewsHub" module is
+    reserved at its loaded height, so it no longer shoves the rail as cross-category items stream in.
+    Narrow desktop/iPad widths (1024/1100) are CLS-stable (<=0.017). The wider-width residual
+    (1180–1440, ~0.06) is the pre-existing main-column cascade (the "updated" line at the top of the
+    column + the Social Follows block at the bottom) — documented in batch-W-report.md, not hidden.
+51. **Phone top stays still (W3).** The weather "Right Now" band reserve matches the band's real
+    height (27px), and the breaking slot is always in the flow at its 108px floor, so neither the
+    band resolving nor the breaking row count streaming in moves the page. The old ~0.09 phone-Home
+    CLS spikes are gone (worst run 0.015, avg 0.006 at 390/375).
+52. **Token names read as roles (W4).** The relocated literals that V4 parked under junk-drawer
+    names are renamed to role names (--ink→--black, --c-gray→--gray-mid, --pink→--accent-pink, …);
+    the built CSS values are byte-identical, so nothing shifts. See batch-W-tokens.md for the full
+    rename + V4 shade-merge tables to veto any visible shift.
+
+### Batch W booth follow-ups (W6, W7)
+
+53. **Phone breaking slot is honest (W6).** When nothing is breaking, the slot takes 0px (no reserved
+    gap); it reserves space only while General is still loading. The ~0.09 load spike is fixed at the
+    source — the held head no longer re-picks on the general feed's initial double-commit — not masked
+    with a permanent floor. Hero headline top and the first Top Story are unchanged vs main.
+54. **Energy "Across MyNewsHub" sizes to content (W7).** The module reserves a floor only while its
+    categories are loading, then sizes to its content; if it has nothing to show it renders nothing,
+    never a bordered box showing just its title. The empty-box detector now catches that header-only
+    pattern too (collapsed sections excluded).
