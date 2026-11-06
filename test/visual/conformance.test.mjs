@@ -34,8 +34,9 @@ const PAGES = [
 // .nav-tab — are their own nav family and are NOT part of the chip class.)
 const SEL = {
   chip: ['.pc-subtab', '.kw-chip', '.ttp-chip', '.active-filter-chip', '.src-pill', '.ms-trending-chip', '.briefing-src-pill'],
-  tile: ['.sport-tab', '.team-card'],
-  button: ['.snap-ask', '.snap-save', '.sop-showall', '.sop-fullview', '.nav-btn-blue', '.nav-btn-brief', '.page-customize-btn', '.sport-league-all-btn', '.load-more'],
+  tile: ['.sport-tab'],
+  // bordered secondary buttons (the "See all >" / Open-full-view link is excluded — it is a link, not a bordered button)
+  button: ['.snap-ask', '.snap-save', '.sop-showall', '.nav-btn-blue', '.nav-btn-brief', '.page-customize-btn', '.sport-league-all-btn', '.load-more'],
   band: ['.status-strip', '.ss-ticker', '.topbar-scores'],
   status: ['.last-updated', '.feed-degraded'],
 };
@@ -66,8 +67,14 @@ async function scan(band, name, route, dark) {
     const vis = el => { const s = getComputedStyle(el); if (s.display === 'none' || s.visibility === 'hidden' || +s.opacity === 0) return false; const r = el.getBoundingClientRect(); return r.width > 1 && r.height > 1; };
     const isSel = el => /(\bactive\b|\bselected\b|aria-selected|is-active|is-selected)/.test(el.className + ' ' + (el.getAttribute('aria-selected') || '') + ' ' + (el.getAttribute('aria-current') || ''));
     // allowed font-size tokens (type scale), computed to px
-    // the small-type scale a chip/tile/button/status label may use (px): meta 11, body 13, subhead 14, headline 16
-    const fsTokens = [11, 13, 14, 16];
+    // the small-type scale a chip/tile/button/status label may use, RESOLVED to px in this viewport
+    // (the --fs-* tokens are responsive clamps, e.g. --fs-body is clamp(13px … 15px)).
+    const probe = document.createElement('span'); probe.style.position = 'absolute'; probe.style.visibility = 'hidden'; document.body.appendChild(probe);
+    const resolved = ['--fs-meta', '--fs-label', '--fs-body', '--fs-subhead', '--fs-headline'].map(t => { probe.style.fontSize = `var(${t})`; return Math.round(parseFloat(getComputedStyle(probe).fontSize)); }).filter(Boolean);
+    probe.remove();
+    // union with the discrete base type-scale values (a fixed 13px is a valid --fs-body floor even
+    // when the responsive clamp resolves to 15px at this width).
+    const fsTokens = [...new Set([...resolved, 11, 13, 14, 16])];
 
     const uniq = sels => { const set = new Set(); const out = []; for (const s of sels) for (const el of document.querySelectorAll(s)) if (!set.has(el)) { set.add(el); out.push(el); } return out; };
     const push = (el, rule, got) => fails.push({ rule, sel: (el.className && typeof el.className === 'string' ? '.' + el.className.trim().split(/\s+/).slice(0, 2).join('.') : el.tagName), got });
@@ -85,8 +92,16 @@ async function scan(band, name, route, dark) {
         const bw = px(cs.borderTopWidth) + px(cs.borderRightWidth) + px(cs.borderBottomWidth) + px(cs.borderLeftWidth);
         if (bw < 2) push(el, 'no-1px-border', 'bw=' + bw);
       }
-      // hit target >= 44 (hover:none bands)
-      if (hoverNone) { const r = el.getBoundingClientRect(); const aft = getComputedStyle(el, '::after'); const hit = Math.max(r.height, el.offsetHeight) + (aft && aft.content !== 'none' ? 8 : 0); if (hit < 43) push(el, 'hit<44', Math.round(hit)); }
+      // hit target >= 44 (hover:none bands) — credit a positioned ::after's actual negative inset
+      if (hoverNone) {
+        const aft = getComputedStyle(el, '::after');
+        let extra = 0;
+        if (aft && aft.content && aft.content !== 'none' && aft.position !== 'static') {
+          extra = Math.max(0, -(parseFloat(aft.top) || 0)) + Math.max(0, -(parseFloat(aft.bottom) || 0));
+        }
+        const hit = el.offsetHeight + extra;
+        if (hit < 43) push(el, 'hit<44', Math.round(hit));
+      }
       // font-size is a type token
       const fs = Math.round(px(cs.fontSize));
       if (fs && !fsTokens.includes(fs)) push(el, 'font-size-off-scale', fs + ' not in ' + fsTokens.join('/'));

@@ -2078,12 +2078,13 @@ body:not(.dark) .pill-bar{
   font-size:var(--fs-meta);font-weight:700;color:var(--text3);
   text-transform:uppercase;letter-spacing:0.1em;
 }
-.page-customize-btn{
-  background:none;border:none;color:var(--text3);
-  font-size:var(--fs-meta);font-weight:600;cursor:pointer;font-family:inherit;
-  display:flex;align-items:center;gap:3px;padding:0;transition:color 0.12s;
+.page-customize-btn{ /* X3: SecondaryButton look — 1px --border, transparent, radius-md */
+  background:transparent;border:1px solid var(--border);color:var(--text3);
+  font-size:var(--fs-body);font-weight:500;cursor:pointer;font-family:inherit;
+  display:inline-flex;align-items:center;gap:5px;padding:6px 12px;border-radius:var(--radius-md);
+  min-height:32px;transition:color 0.12s,border-color 0.12s;
 }
-.page-customize-btn:hover{color:var(--accent);}
+@media(hover:hover){ .page-customize-btn:hover{color:var(--text);border-color:var(--border-strong);} }
 
 .empty-state{text-align:center;padding:60px 20px;color:var(--text3);}
 .empty-icon{font-size:28px;margin-bottom:10px;}
@@ -2359,8 +2360,9 @@ body:not(.dark) .pill-bar{
    selected = the single accent fill. */
 .kw-chip{
   font-size:var(--fs-label);font-weight:var(--fw-medium);border-radius:var(--radius-full);padding:4px 11px;cursor:pointer;
-  border:1px solid var(--border);background:transparent;color:var(--text2);display:inline-block;transition:border-color var(--dur-fast),color var(--dur-fast),background var(--dur-fast);
+  border:1px solid var(--border);background:transparent;color:var(--text2);display:inline-flex;align-items:center;min-height:32px;position:relative;transition:border-color var(--dur-fast),color var(--dur-fast),background var(--dur-fast);
 }
+.kw-chip::after{content:'';position:absolute;inset:-6px 0;} /* X3: 44px touch target */
 @media(hover:hover){ .kw-chip:hover{border-color:var(--border-strong);color:var(--text);} }
 .kw-chip.active{background:var(--accent);color:var(--on-accent);border-color:var(--accent);}
 
@@ -3377,16 +3379,19 @@ body:not(.dark) .pill-bar{
 }
 .sport-tabs::-webkit-scrollbar{display:none;}
 .sport-tab{
-  background:var(--surface2);
-  border:1.5px solid var(--border);
-  border-radius:16px;
-  padding:5px 12px;font-size:12px;font-weight:700;
+  /* X3: one chip/tile look. Transparent rest, 1px --border, type-scale font, no bevel; selected is
+     the single accent fill (below). .sport-index overrides radius to --radius-md for the league
+     tiles; everything else is a --radius-full pill. */
+  background:transparent;
+  border:1px solid var(--border);
+  border-radius:var(--radius-full);
+  padding:6px 12px;font-size:var(--fs-body);font-weight:500;
   color:var(--text2);cursor:pointer;font-family:inherit;
   white-space:nowrap;flex-shrink:0;
   transition:all 0.15s;
   display:inline-flex;align-items:center;gap:5px;
   -webkit-tap-highlight-color:transparent;
-  min-height:30px;
+  min-height:32px;
 }
 /* I0.10: hover only where a real pointer can hover. On touch (iPad) an unguarded
    :hover sticks to the last-tapped chip — e.g. Horse Racing kept the lighter hover
@@ -3400,8 +3405,7 @@ body:not(.dark) .pill-bar{
 .sport-tab:focus-visible{outline:2px solid var(--accent);outline-offset:2px;}
 .sport-tab.active:focus-visible{outline-color:var(--on-media);}
 .sport-tab.active{
-  background:var(--accent);color:var(--on-accent);border-color:var(--accent);
-  box-shadow:var(--shadow-sm);
+  background:var(--accent);color:var(--on-accent);border-color:var(--accent); /* X3: no bevel/box-shadow */
 }
 .sport-tab-emoji{font-size:13px;}
 /* Team icon inside a pill: keep it legible on the blue active pill. */
@@ -3638,7 +3642,7 @@ body:not(.dark) .pill-bar{
 @media (max-width:640px){
   .sports-score-strip{margin:0 -12px 14px;padding:12px;} /* I0.3: no negative top under sticky nav */
   .score-tile{min-width:120px;padding:9px 11px;}
-  .sport-tab{padding:10px 12px;font-size:12px;min-height:44px;}
+  .sport-tab{padding:10px 12px;font-size:var(--fs-body);min-height:44px;}
   .team-pill-group{border-radius:var(--radius-lg);}
   .team-pill{padding:7px 12px;font-size:var(--fs-meta);min-height:36px;}
   .team-pill-link{padding:7px 9px;min-height:36px;}
@@ -4458,7 +4462,10 @@ body{overscroll-behavior-y:contain;}
 .last-updated:disabled{cursor:default;opacity:0.7;}
 .last-updated-icon{flex-shrink:0;}
 /* U5.4: .last-updated-dot removed — no status dot on the "Updated" pill. */
-@media(max-width:640px){ .last-updated{min-height:36px;padding:6px 12px;} }
+/* X3: StatusPill = chip height (32px visual) even on phone; the 44px touch target is the ::after. */
+.last-updated{position:relative;min-height:32px;}
+.last-updated::after{content:'';position:absolute;inset:-6px 0;}
+@media(max-width:640px){ .last-updated{padding:5px 11px;} }
 
 /* Swipe hint — brief toast when user changes category on mobile */
 .swipe-hint{
@@ -4670,7 +4677,7 @@ body{overscroll-behavior-y:contain;}
   .fin-name{display:none;}
   .fin-table thead th:nth-child(2){display:none;}
 
-  .page-customize-btn{font-size:12px;min-height:40px;}
+  .page-customize-btn{font-size:var(--fs-body);min-height:44px;}
 }
 
 @media (max-width:380px){
@@ -5244,7 +5251,7 @@ kbd{display:inline-block;padding:1px 5px;border:1px solid var(--border);border-r
    Energy and Pop-culture now share it; no per-section chip colour. */
 .pc-subtab.active{background:var(--accent);color:var(--on-accent);border-color:var(--accent);}
 @media(max-width:640px){
-  .pc-subtab{padding:8px 12px;font-size:12px;min-height:44px;}
+  .pc-subtab{padding:8px 12px;font-size:var(--fs-body);min-height:44px;} /* X3: type-scale font */
 }
 
 /* ═══ v36: RECOMMENDATIONS / FOR YOU ═══ */
@@ -6004,7 +6011,7 @@ kbd{display:inline-block;padding:1px 5px;border:1px solid var(--border);border-r
   .social-handle{min-height:44px;min-width:44px;display:inline-flex;align-items:center;justify-content:center;}
   .sb-across-clabel{min-height:44px;display:flex;align-items:center;}
   .sidebar-sec-collapse{min-height:44px;}
-  .last-updated{min-height:44px;display:inline-flex;align-items:center;}
+  .last-updated{min-height:32px;display:inline-flex;align-items:center;} /* X3: 32px visual, 44px hit via ::after */
   .page-customize-btn{min-height:44px;}
   .sport-tab,.pc-subtab,.en-subtabs .pc-subtab{min-width:44px;min-height:44px;}
   .feed-degraded{min-height:44px;}
