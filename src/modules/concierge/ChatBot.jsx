@@ -18,8 +18,13 @@ import { useState, useEffect, useRef } from 'react';
 import { retrieveFeedContext, buildFeedContextBlock } from '../retrieval';
 import './Concierge.css';
 
-export function ChatBot({ arts, onNavigate, fetchSummary, fetchListen, fetchWebSearch, resolveDeepLink, chatContext, onClearContext, pageContext }) {
-  const [open, setOpen] = useState(false);
+export function ChatBot({ arts, onNavigate, fetchSummary, fetchListen, fetchWebSearch, resolveDeepLink, chatContext, onClearContext, pageContext, open: openProp, setOpen: setOpenProp }) {
+  // X6: the launcher is now a header icon (never a floating button that can cover text). The host
+  // lifts the open state so the header icon / More-sheet row and the drawer share it; fall back to
+  // internal state if the host doesn't control it.
+  const [openState, setOpenState] = useState(false);
+  const open = openProp !== undefined ? openProp : openState;
+  const setOpen = setOpenProp || setOpenState;
   // D7: when the user clicks × on the page chip, widen to all topics for the session.
   const [pageScopeOff, setPageScopeOff] = useState(false);
   const pageScoped = !!pageContext && !pageScopeOff && !chatContext
@@ -30,40 +35,10 @@ export function ChatBot({ arts, onNavigate, fetchSummary, fetchListen, fetchWebS
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
   const messagesEndRef = useRef(null);
-  const fabRef = useRef(null);
 
   useEffect(() => {
     if (open) messagesEndRef.current?.scrollIntoView({ behavior:'smooth' });
   }, [msgs, open]);
-
-  // O3: on touch / narrow viewports, hide the launcher while scrolling DOWN so it never covers a
-  // headline or section header mid-scroll; bring it back on scroll up / near the top / when
-  // scrolling stops. Ref-based class toggle (no React state → no re-render), one rAF-throttled
-  // passive scroll listener + a one-shot idle timeout (not an interval). Desktop mouse keeps it.
-  useEffect(() => {
-    if (typeof window === 'undefined') return;
-    const fab = fabRef.current; if (fab && open) fab.classList.remove('chat-fab-hidden');
-    const mq = window.matchMedia('(hover: none), (max-width: 1100px)');
-    if (!mq.matches) return;
-    // S6: the launcher is VISIBLE at rest (CB saw it hidden in every shot — the old "reveal only
-    // where it is clear of text" rule meant it was always hidden on Home, since there is always
-    // some text near the corner). It now hides ONLY while the reader actively scrolls DOWN — so it
-    // never sweeps across a headline as it passes — and comes back on scroll-up or after 400ms idle
-    // (a single timeout, no interval). It stays keyboard-focusable while visually hidden.
-    let ticking = false, idle, lastY = window.scrollY;
-    const show = () => { const f = fabRef.current; if (f && !open) f.classList.remove('chat-fab-hidden'); };
-    const hide = () => { const f = fabRef.current; if (f && !open) f.classList.add('chat-fab-hidden'); };
-    const apply = () => {
-      ticking = false; if (open) return;
-      const y = window.scrollY; const goingDown = y > lastY + 4; lastY = y;
-      if (goingDown && y > 80) hide(); else show();
-      clearTimeout(idle); idle = setTimeout(show, 400); // always returns when the page stops moving
-    };
-    const onScroll = () => { if (!ticking) { ticking = true; requestAnimationFrame(apply); } };
-    window.addEventListener('scroll', onScroll, { passive: true });
-    show(); // visible at load / at rest
-    return () => { window.removeEventListener('scroll', onScroll); clearTimeout(idle); };
-  }, [open]);
 
   // When the reader hands us an article to ground on, pop the chat open.
   useEffect(() => {
@@ -164,12 +139,7 @@ export function ChatBot({ arts, onNavigate, fetchSummary, fetchListen, fetchWebS
 
   return (
     <>
-      <button ref={fabRef} className={`chat-fab ${open?'open':''}`} onClick={() => setOpen(o => !o)} aria-label="Chat assistant">
-        {open
-          ? <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-          : <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
-        }
-      </button>
+      {/* X6: no floating launcher — the "Ask NewsHub" header icon / More-sheet row opens this. */}
       {open && (
         <div className="chat-drawer">
           <div className="chat-header">

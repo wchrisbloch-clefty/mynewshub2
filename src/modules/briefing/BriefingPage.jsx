@@ -6,6 +6,7 @@
 import { useState, useMemo } from 'react';
 import { Sparkles } from 'lucide-react';
 import { ShareControl, buildBriefingExcerpt } from '../share';
+import { SourceImage } from '../source-image';
 
 export function BriefingPage({ arts, briefingExclude, lastUpdated, briefingSourceList, loadCat, handleTabChange,
   openCustomize, onRead, fetchAISummary, fmtDate, CoverImg, MorningBriefingInline,
@@ -52,7 +53,7 @@ export function BriefingPage({ arts, briefingExclude, lastUpdated, briefingSourc
     return (
       <div className="ba-item">
         <div className="ba-main" onClick={()=>onRead(a)}>
-          <div className="gf-thumb"><CoverImg src={a.img} label={a.source}/></div>
+          <div className="gf-thumb"><SourceImage src={a.img} variant="thumb" className="cover-img" alt=""/></div>
           <div className="gf-body">
             <div className="gf-title">{a.title}</div>
             <div className="gf-meta">

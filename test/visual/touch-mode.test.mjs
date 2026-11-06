@@ -74,11 +74,20 @@ for (const v of VIEWPORTS) {
     else log(null, `${tag} d: no phone hero found`);
   }
 
-  // ---- f) launcher visible at rest ----
+  // ---- f) launcher is a header icon (X6: no floating .chat-fab; the "Ask NewsHub" header icon
+  //         replaces it — visible at rest, in view, >=44px hit) ----
   await p.waitForTimeout(600);
-  const fab = await p.evaluate(() => { const e = document.querySelector('.chat-fab'); if (!e) return { found: false }; const s = getComputedStyle(e); const b = e.getBoundingClientRect(); return { found: true, inView: b.top >= 0 && b.bottom <= innerHeight + 0.5 && b.left >= 0 && b.right <= innerWidth + 0.5, hidden: s.visibility === 'hidden' || +s.opacity < 0.1 || e.classList.contains('chat-fab-hidden') }; });
-  if (!fab.found) log(false, `${tag} f: chat launcher element exists`);
-  else log(fab.inView && !fab.hidden, `${tag} f: launcher visible at rest (inView=${fab.inView} hidden=${fab.hidden})`);
+  const fab = await p.evaluate(() => {
+    const els = [...document.querySelectorAll('button[aria-label="Ask NewsHub"]')];
+    const e = els.find(x => { const b = x.getBoundingClientRect(); return b.width > 1 && b.height > 1; });
+    if (!e) return { found: false };
+    const b = e.getBoundingClientRect();
+    const aft = getComputedStyle(e, '::after');
+    const hit = e.offsetHeight + (aft && aft.content !== 'none' ? Math.max(0, -(parseFloat(aft.top) || 0)) + Math.max(0, -(parseFloat(aft.bottom) || 0)) : 0);
+    return { found: true, inView: b.top >= 0 && b.bottom <= innerHeight + 0.5 && b.left >= 0 && b.right <= innerWidth + 0.5, hit };
+  });
+  if (!fab.found) log(false, `${tag} f: "Ask NewsHub" header launcher exists`);
+  else log(fab.inView && fab.hit >= 43, `${tag} f: header launcher visible at rest (inView=${fab.inView} hit=${Math.round(fab.hit)})`);
 
   // ---- b) State of Play rows: gap + left-edge drift (rail on iPad, card on phone) ----
   const sop = await p.evaluate(() => {

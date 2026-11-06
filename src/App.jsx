@@ -38,8 +38,9 @@
 
 import { useState, useEffect, useLayoutEffect, useCallback, useMemo, useRef, Fragment, lazy, Suspense } from 'react';
 // Extracted, dependency-isolated capability modules (see src/modules/*/README.md)
-import { clusterStories, hotClusterTopics, rankClusters, TREND_STOP, decodeEntities, capByPublisher } from './modules/clustering';
+import { clusterStories, hotClusterTopics, rankClusters, TREND_STOP, decodeEntities, capByPublisher, sameStory, clusterKey } from './modules/clustering';
 import { opinionLabel } from './modules/opinion';
+import { SourceImage, hasUsableImage } from './modules/source-image';
 import { ShareControl, buildBriefingExcerpt } from './modules/share';
 import { ConnectionsStrip, findConnections } from './modules/connections';
 import { qualifyBreaking, isPromoItem } from './modules/breaking';
@@ -140,6 +141,39 @@ function catBadge(a) {
   return { label: cc.label, color: cc.color, subsector: null };
 }
 
+// X2a: one story once per page. Reuses the SAME cluster identity the rest of the app uses —
+// clusterKey (first-10-word normalized title) catches exact + whitespace/punctuation variants, and
+// sameStory (shared cluster members OR bigram-Jaccard >= 0.28) catches near-duplicates that the
+// first-60-char dedupe() misses (e.g. the three NY Post "Martha Stewart apology" headlines). The
+// FIRST occurrence is kept; if the feed carries cluster members we surface the existing "N sources"
+// treatment downstream. No new clustering — just applied to every category feed, not only Home.
+function onePerCluster(items) {
+  const kept = [];
+  const keys = new Set();
+  for (const a of (items || [])) {
+    if (!a || !a.title) continue;
+    const ck = clusterKey(a.title);
+    if (ck && keys.has(ck)) continue;
+    if (kept.some(k => sameStory(k, a))) continue;
+    kept.push(a);
+    if (ck) keys.add(ck);
+  }
+  return kept;
+}
+
+// X2b: is a story's category label TRUSTWORTHY on a mixed surface? We have no content classifier —
+// a story's `.cat` is just the feed it was fetched from (see conformance-X0.md). So on mixed
+// surfaces (Home Top Stories, State of Play) we only show the category label when the story's OWN
+// text confirms that category via the EXISTING keyword matcher (kwMatch). When it cannot confirm
+// (e.g. a tornado-risk story fetched from the sports source The Spun contains no sports keyword),
+// we show NO label rather than guess a wrong one. A full re-classification would need a new
+// classifier/rule — reported as a proposal in the batch report, NOT built here.
+function labelConfirmed(a, kwFor) {
+  if (!a || !a.cat) return false;
+  if (a.cat === 'general') return true; // "News" is the catch-all, never a contradiction
+  try { return (kwFor(a, a.cat) || []).length > 0; } catch { return true; }
+}
+
 // Cover image with a REAL labeled fallback. Fills its (position:relative) parent: a
 // branded placeholder sits underneath and the <img> loads on top; if the src is missing
 // OR fails to load (e.g. a hotlink-protected source like Thoroughbred Daily News that
@@ -157,6 +191,8 @@ function CoverImg({ src, label, alt = '' }) {
     </>
   );
 }
+
+// X1: the ONE image path lives in ./modules/source-image (imported at the top as SourceImage).
 
 // One consistent line-icon (Feather stroke) for settings/customize affordances —
 // inherits text colour, single stroke weight. Replaces the old gear emoji in chrome.
@@ -751,13 +787,26 @@ function fmtDate(d) {
   try {
     const dt = new Date(d); if (isNaN(dt.getTime())) return '';
     const diff = Math.floor((Date.now() - dt.getTime()) / 1000);
-    if (diff < 45)        return 'Just now';
-    if (diff < 3600)      return `${Math.max(1, Math.floor(diff/60))}m ago`;
-    if (diff < 86400)     return `${Math.floor(diff/3600)}h ago`;
-    if (diff < 604800)    return `${Math.floor(diff/86400)}d ago`;
-    if (diff < 2592000)   return `${Math.floor(diff/604800)}w ago`;
-    if (diff < 31536000)  return `${Math.floor(diff/2592000)}mo ago`;
-    return `${Math.floor(diff/31536000)}y ago`;
+    // X4a: a non-breaking space in the relative age so "2h ago" never wraps leaving "ago" orphaned.
+    if (diff < 45)        return 'Just now';
+    if (diff < 3600)      return `${Math.max(1, Math.floor(diff/60))}m ago`;
+    if (diff < 86400)     return `${Math.floor(diff/3600)}h ago`;
+    if (diff < 604800)    return `${Math.floor(diff/86400)}d ago`;
+    if (diff < 2592000)   return `${Math.floor(diff/604800)}w ago`;
+    if (diff < 31536000)  return `${Math.floor(diff/2592000)}mo ago`;
+    return `${Math.floor(diff/31536000)}y ago`;
+  } catch { return ''; }
+}
+// X5c / O2: a SCHEDULED game shows its kickoff TIME (today -> "7:30 PM"; another day -> "Sun 1:00 PM"),
+// never 0/0 or an "—" placeholder. Falls back to the raw status when there is no parseable date.
+function fmtKickoff(d) {
+  if (!d) return '';
+  try {
+    const dt = new Date(d); if (isNaN(dt.getTime())) return '';
+    const now = new Date();
+    const time = dt.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }).replace(/ /g, ' ');
+    if (dt.toDateString() === now.toDateString()) return time;
+    return `${dt.toLocaleDateString([], { weekday: 'short' })} ${time}`;
   } catch { return ''; }
 }
 function fmtDuration(s) {
@@ -1698,7 +1747,9 @@ body:not(.dark) .topbar-scores{background:var(--surface);}
 .houston-sub{font-family:var(--font-sans);font-size:var(--fs-meta);font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:var(--text3);}
 /* Horizontal scroll strip (Pass H item 3) — a compact rail instead of a full-width
    3-up grid row, so consecutive image blocks don't stack into a tall wall. */
-.houston-scroll{display:flex;gap:var(--s3);overflow-x:auto;scroll-snap-type:x proximity;scrollbar-width:none;-webkit-overflow-scrolling:touch;}
+/* X4d: leading + trailing 16px gutter so the first card sits at the page gutter and the last clears
+   the edge; a soft fade mask on the right so a clipped card never cuts text mid-glyph. */
+.houston-scroll{display:flex;gap:var(--s3);overflow-x:auto;scroll-snap-type:x proximity;scrollbar-width:none;-webkit-overflow-scrolling:touch;padding-inline:16px;scroll-padding-inline:16px;-webkit-mask-image:linear-gradient(to right,black 0,black calc(100% - 24px),transparent 100%);mask-image:linear-gradient(to right,black 0,black calc(100% - 24px),transparent 100%);}
 .houston-scroll::-webkit-scrollbar{display:none;}
 .houston-card{flex:0 0 232px;scroll-snap-align:start;background:var(--surface);border:1px solid var(--border2);border-radius:var(--radius);overflow:hidden;cursor:pointer;text-align:left;padding:0 0 10px;display:flex;flex-direction:column;font-family:inherit;}
 .houston-card:hover{border-color:var(--accent);}
@@ -2042,12 +2093,13 @@ body:not(.dark) .pill-bar{
   font-size:var(--fs-meta);font-weight:700;color:var(--text3);
   text-transform:uppercase;letter-spacing:0.1em;
 }
-.page-customize-btn{
-  background:none;border:none;color:var(--text3);
-  font-size:var(--fs-meta);font-weight:600;cursor:pointer;font-family:inherit;
-  display:flex;align-items:center;gap:3px;padding:0;transition:color 0.12s;
+.page-customize-btn{ /* X3: SecondaryButton look — 1px --border, transparent, radius-md */
+  background:transparent;border:1px solid var(--border);color:var(--text3);
+  font-size:var(--fs-body);font-weight:500;cursor:pointer;font-family:inherit;
+  display:inline-flex;align-items:center;gap:5px;padding:6px 12px;border-radius:var(--radius-md);
+  min-height:32px;transition:color 0.12s,border-color 0.12s;
 }
-.page-customize-btn:hover{color:var(--accent);}
+@media(hover:hover){ .page-customize-btn:hover{color:var(--text);border-color:var(--border-strong);} }
 
 .empty-state{text-align:center;padding:60px 20px;color:var(--text3);}
 .empty-icon{font-size:28px;margin-bottom:10px;}
@@ -2323,8 +2375,9 @@ body:not(.dark) .pill-bar{
    selected = the single accent fill. */
 .kw-chip{
   font-size:var(--fs-label);font-weight:var(--fw-medium);border-radius:var(--radius-full);padding:4px 11px;cursor:pointer;
-  border:1px solid var(--border);background:transparent;color:var(--text2);display:inline-block;transition:border-color var(--dur-fast),color var(--dur-fast),background var(--dur-fast);
+  border:1px solid var(--border);background:transparent;color:var(--text2);display:inline-flex;align-items:center;min-height:32px;position:relative;transition:border-color var(--dur-fast),color var(--dur-fast),background var(--dur-fast);
 }
+.kw-chip::after{content:'';position:absolute;inset:-6px 0;} /* X3: 44px touch target */
 @media(hover:hover){ .kw-chip:hover{border-color:var(--border-strong);color:var(--text);} }
 .kw-chip.active{background:var(--accent);color:var(--on-accent);border-color:var(--accent);}
 
@@ -3341,16 +3394,19 @@ body:not(.dark) .pill-bar{
 }
 .sport-tabs::-webkit-scrollbar{display:none;}
 .sport-tab{
-  background:var(--surface2);
-  border:1.5px solid var(--border);
-  border-radius:16px;
-  padding:5px 12px;font-size:12px;font-weight:700;
+  /* X3: one chip/tile look. Transparent rest, 1px --border, type-scale font, no bevel; selected is
+     the single accent fill (below). .sport-index overrides radius to --radius-md for the league
+     tiles; everything else is a --radius-full pill. */
+  background:transparent;
+  border:1px solid var(--border);
+  border-radius:var(--radius-full);
+  padding:6px 12px;font-size:var(--fs-body);font-weight:500;
   color:var(--text2);cursor:pointer;font-family:inherit;
   white-space:nowrap;flex-shrink:0;
   transition:all 0.15s;
   display:inline-flex;align-items:center;gap:5px;
   -webkit-tap-highlight-color:transparent;
-  min-height:30px;
+  min-height:32px;
 }
 /* I0.10: hover only where a real pointer can hover. On touch (iPad) an unguarded
    :hover sticks to the last-tapped chip — e.g. Horse Racing kept the lighter hover
@@ -3364,8 +3420,7 @@ body:not(.dark) .pill-bar{
 .sport-tab:focus-visible{outline:2px solid var(--accent);outline-offset:2px;}
 .sport-tab.active:focus-visible{outline-color:var(--on-media);}
 .sport-tab.active{
-  background:var(--accent);color:var(--on-accent);border-color:var(--accent);
-  box-shadow:var(--shadow-sm);
+  background:var(--accent);color:var(--on-accent);border-color:var(--accent); /* X3: no bevel/box-shadow */
 }
 .sport-tab-emoji{font-size:13px;}
 /* Team icon inside a pill: keep it legible on the blue active pill. */
@@ -3545,12 +3600,11 @@ body:not(.dark) .pill-bar{
   border-radius:8px;background-color:var(--surface2);
   position:relative;
 }
-.sports-hero-fav{
+.sports-hero-fav{ /* X4b: on-photo badge — white --on-media on a dark --overlay scrim (>=4.5:1), not brown-on-amber */
   position:absolute;top:12px;left:12px;
-  background:var(--amber);color:var(--accent-brown);
+  background:var(--overlay);color:var(--on-media);
   font-size:var(--fs-label);font-weight:900;letter-spacing:0.1em;
   padding:4px 10px;border-radius:var(--radius-sm);
-  box-shadow:0 2px 8px rgba(0,0,0,0.2);
 }
 .sports-hero-text{display:flex;flex-direction:column;justify-content:center;}
 .sports-hero-title{
@@ -3602,7 +3656,7 @@ body:not(.dark) .pill-bar{
 @media (max-width:640px){
   .sports-score-strip{margin:0 -12px 14px;padding:12px;} /* I0.3: no negative top under sticky nav */
   .score-tile{min-width:120px;padding:9px 11px;}
-  .sport-tab{padding:10px 12px;font-size:12px;min-height:44px;}
+  .sport-tab{padding:10px 12px;font-size:var(--fs-body);min-height:44px;}
   .team-pill-group{border-radius:var(--radius-lg);}
   .team-pill{padding:7px 12px;font-size:var(--fs-meta);min-height:36px;}
   .team-pill-link{padding:7px 9px;min-height:36px;}
@@ -4066,6 +4120,11 @@ body:not(.dark) .pill-bar{
 .cover-img-ph{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;text-align:center;padding:0 10px;border-radius:inherit;background:var(--ph-field);}
 .cover-img-ph-label{font-family:var(--font-serif);font-weight:800;font-size:13px;letter-spacing:0.02em;color:var(--ph-ink);display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;overflow-wrap:anywhere;}
 .cover-img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;object-position:center top;border-radius:inherit;display:block;}
+/* X1: the one image path. The <img> and the --navy fallback block both carry the caller's
+   positioning class (.cover-img / .toh-img / .fc-thumb / .houston-img …), so size, position and
+   radius come from the site; .src-img only pins object-fit and .src-img-ph only the --navy field. */
+.src-img{object-fit:cover;display:block;}
+.src-img-ph{background:var(--navy);border-radius:inherit;}
 /* Ensure the card-image containers clip the absolute CoverImg to their rounded box. */
 .gn-card-img{position:relative;overflow:hidden;}
 .gf-thumb{position:relative;overflow:hidden;}
@@ -4158,7 +4217,8 @@ body{overscroll-behavior-y:contain;}
 /* Horizontal chip bar — Yahoo News scrollable pills */
 .chip-bar{
   display:flex;gap:0;align-items:center;
-  padding:0 4px;height:44px;
+  padding:0 14px;height:44px; /* X4d: first chip sits at the 16px page gutter (14px pad + 2px chip margin), not flush at x=0 */
+  scroll-padding-inline:16px;
   overflow-x:auto;scrollbar-width:none;
   -webkit-overflow-scrolling:touch;
   scroll-snap-type:x proximity;
@@ -4417,7 +4477,10 @@ body{overscroll-behavior-y:contain;}
 .last-updated:disabled{cursor:default;opacity:0.7;}
 .last-updated-icon{flex-shrink:0;}
 /* U5.4: .last-updated-dot removed — no status dot on the "Updated" pill. */
-@media(max-width:640px){ .last-updated{min-height:36px;padding:6px 12px;} }
+/* X3: StatusPill = chip height (32px visual) even on phone; the 44px touch target is the ::after. */
+.last-updated{position:relative;min-height:32px;}
+.last-updated::after{content:'';position:absolute;inset:-6px 0;}
+@media(max-width:640px){ .last-updated{padding:5px 11px;} }
 
 /* Swipe hint — brief toast when user changes category on mobile */
 .swipe-hint{
@@ -4629,7 +4692,7 @@ body{overscroll-behavior-y:contain;}
   .fin-name{display:none;}
   .fin-table thead th:nth-child(2){display:none;}
 
-  .page-customize-btn{font-size:12px;min-height:40px;}
+  .page-customize-btn{font-size:var(--fs-body);min-height:44px;}
 }
 
 @media (max-width:380px){
@@ -5203,7 +5266,7 @@ kbd{display:inline-block;padding:1px 5px;border:1px solid var(--border);border-r
    Energy and Pop-culture now share it; no per-section chip colour. */
 .pc-subtab.active{background:var(--accent);color:var(--on-accent);border-color:var(--accent);}
 @media(max-width:640px){
-  .pc-subtab{padding:8px 12px;font-size:12px;min-height:44px;}
+  .pc-subtab{padding:8px 12px;font-size:var(--fs-body);min-height:44px;} /* X3: type-scale font */
 }
 
 /* ═══ v36: RECOMMENDATIONS / FOR YOU ═══ */
@@ -5722,7 +5785,7 @@ kbd{display:inline-block;padding:1px 5px;border:1px solid var(--border);border-r
   font-family:var(--font-sans);font-size:var(--fs-eyebrow);font-weight:700;text-transform:uppercase;letter-spacing:0.08em;
   color:var(--text3);margin-bottom:5px;align-self:flex-start;background:none;padding:0;
 }
-.toh-meta{font-size:var(--fs-meta);color:var(--text3);font-weight:500;font-family:var(--font-sans);}
+.toh-meta{font-size:var(--fs-meta);color:var(--text3);font-weight:500;font-family:var(--font-sans);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;} /* X4a */
 
 /* ── LEFT: text-only headlines under the hero. A divided list (no boxes), matching the
    K6 row rhythm: one bottom divider, one serif headline + one meta line. ── */
@@ -5737,7 +5800,7 @@ kbd{display:inline-block;padding:1px 5px;border:1px solid var(--border);border-r
   font-family:var(--font-serif);font-size:var(--fs-subhead);font-weight:700;color:var(--text);
   line-height:1.24;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;
 }
-.toh-text-meta{font-family:var(--font-sans);font-size:var(--fs-meta);color:var(--text3);font-weight:500;}
+.toh-text-meta{font-family:var(--font-sans);font-size:var(--fs-meta);color:var(--text3);font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%;} /* X4a: one line, no "ago" orphan */
 
 /* ── RIGHT: 3 compact K6-style rows — a fixed 112x84 (4:3) thumbnail on the LEFT when an
    image exists (else the body fills the row), a single bottom divider, one vertical
@@ -5764,7 +5827,7 @@ kbd{display:inline-block;padding:1px 5px;border:1px solid var(--border);border-r
   font-family:var(--font-serif);font-size:var(--fs-subhead);font-weight:700;color:var(--text);
   line-height:1.24;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden;
 }
-.toh-compact-meta{font-family:var(--font-sans);font-size:var(--fs-meta);color:var(--text3);font-weight:500;}
+.toh-compact-meta{font-family:var(--font-sans);font-size:var(--fs-meta);color:var(--text3);font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%;} /* X4a: one line, no "ago" orphan */
 
 /* Below 900 (iPad portrait / phones): hero + text headlines on top (full width), compact
    rows beneath. The two columns (1024/1180/1280/1440) stay side-by-side above this. */
@@ -5963,7 +6026,7 @@ kbd{display:inline-block;padding:1px 5px;border:1px solid var(--border);border-r
   .social-handle{min-height:44px;min-width:44px;display:inline-flex;align-items:center;justify-content:center;}
   .sb-across-clabel{min-height:44px;display:flex;align-items:center;}
   .sidebar-sec-collapse{min-height:44px;}
-  .last-updated{min-height:44px;display:inline-flex;align-items:center;}
+  .last-updated{min-height:32px;display:inline-flex;align-items:center;} /* X3: 32px visual, 44px hit via ::after */
   .page-customize-btn{min-height:44px;}
   .sport-tab,.pc-subtab,.en-subtabs .pc-subtab{min-width:44px;min-height:44px;}
   .feed-degraded{min-height:44px;}
@@ -6215,19 +6278,19 @@ function ScoreTile({ g }) {
           <ScoreLogo url={g.awayLogo} abbr={away}/>
           <span className={`score-tile-team ${awayLead ? 'win' : ''}`}>{away}</span>
         </span>
-        <span className={`score-tile-score ${awayLead ? 'win' : ''}`}>{(live || final) ? g.awayScore : '—'}</span>
+        <span className={`score-tile-score ${awayLead ? 'win' : ''}`}>{(live || final) ? g.awayScore : ''}</span>{/* X5c: no 0/0 dashes for a scheduled game — the kickoff time is shown below */}
       </div>
       <div className="score-tile-row">
         <span className="score-tile-side">
           <ScoreLogo url={g.homeLogo} abbr={home}/>
           <span className={`score-tile-team ${homeLead ? 'win' : ''}`}>{home}</span>
         </span>
-        <span className={`score-tile-score ${homeLead ? 'win' : ''}`}>{(live || final) ? g.homeScore : '—'}</span>
+        <span className={`score-tile-score ${homeLead ? 'win' : ''}`}>{(live || final) ? g.homeScore : ''}</span>
       </div>
       <div className={`score-tile-status ${live ? 'live' : final ? 'final' : 'pre'}`}>
         {live && <span className="score-tile-dot"/>}
         {g._leagueLabel && <span className="score-tile-lg">{g._leagueLabel}</span>}
-        <span className="score-tile-when">{g.status || (final ? 'FINAL' : fmtDate(g.date))}</span>
+        <span className="score-tile-when">{live ? (g.status || 'LIVE') : final ? 'FINAL' : (fmtKickoff(g.date) || g.status || 'TBD')}</span>
       </div>
     </div>
   );
@@ -6302,7 +6365,7 @@ function ExplainContent({ text }) {
 
 // ─── FEED CARD ────────────────────────────────────────────────────────────────
 function FeedCard({a, cat, isSaved, onSave, onRead, relatedSources, isRead, userKw, userTeams}) {
-  const [imgErr, setImgErr] = useState(false);
+  // X1: image error state now lives inside <SourceImage>.
   const [aiState, setAiState] = useState('closed');
   const [summary, setSummary] = useState('');
   const [takeaways, setTakeaways] = useState('');
@@ -6416,9 +6479,8 @@ function FeedCard({a, cat, isSaved, onSave, onRead, relatedSources, isRead, user
         <span className={`fc-date ${(()=>{const d=a.pubDate?Math.floor((Date.now()-new Date(a.pubDate))/1000):999999; return d<300?'fc-date-fresh':d<3600?'fc-date-recent':'';})()}`}>{fmtDate(a.pubDate)}</span>
       </div>
       <div className="fc-body">
-        {a.img && !imgErr
-          ? <img className="fc-thumb" src={a.img} loading="lazy" onError={()=>setImgErr(true)} alt=""/>
-          : <div className="fc-thumb-ph"><span className="ph-label">{a.source}</span></div>}
+        {/* X1: text-only when there is no usable image — no thumbnail column, no blank indent. */}
+        <SourceImage src={a.img} variant="row" className="fc-thumb" alt=""/>
         <div className="fc-text">
           <div className="fc-title">{a.title}</div>
           {a.desc && <div className="fc-desc">{a.desc}</div>}
@@ -6543,7 +6605,7 @@ function TodayItem({a, cc, onRead}) {
   const [sumPreview, setSumPreview] = useState(false);
   const [err, setErr] = useState('');
   const [loading, setLoading] = useState(false);
-  const [imgErr, setImgErr] = useState(false);
+  // X1: image error state now lives inside <SourceImage>.
 
   const handleAI = async (e) => {
     e.stopPropagation();
@@ -6558,9 +6620,8 @@ function TodayItem({a, cc, onRead}) {
   return (
     <div className="today-item-wrap">
       <div className="today-item" onClick={()=>onRead(a)}>
-        {a.img && !imgErr
-          ? <img className="today-thumb" src={a.img} loading="lazy" onError={()=>setImgErr(true)} alt=""/>
-          : <div className="today-thumb-ph"><span className="ph-label">{cc.label}</span></div>}
+        {/* X1: text-only when there is no usable image (no blank indent). */}
+        <SourceImage src={a.img} variant="row" className="today-thumb" alt=""/>
         <div className="today-item-body">
           <div className="today-item-title">{a.title}</div>
           <div className="today-item-src">{a.source} · {fmtDate(a.pubDate)}</div>
@@ -7274,6 +7335,7 @@ function Sidebar({cat, arts, kw, health, activeKw, setActiveKw, activeSource, se
         <div className={hideSopMobile ? 'sidebar-sop sop-hide-mobile' : 'sidebar-sop'}>
           <StateOfPlay variant="sidebar" items={sopItems} gapItems={sopGapItems||[]} breakingItems={sopBreakingItems||[]}
             meta={sopMeta||cc} onRead={onRead} onAsk={onAsk} formatDate={formatDate||fmtDate}
+            labelOk={a=>labelConfirmed(a,(x,c)=>(kw&&kw[c]||[]).filter(k=>((x.title||'')+(x.desc||'')).toLowerCase().includes(k.toLowerCase())))}
             collapsed={sopCollapsed} onToggleCollapse={onToggleSop}/>
         </div>
       )}
@@ -7850,7 +7912,7 @@ function HeroBand({ heroStories, heroIdx, setHeroIdx, paused, setPaused, onRead 
       {/* LEFT: large lead */}
       <article className="hero-band-lead" onClick={()=>onRead(lead)}>
         <div className="hero-band-img">
-          <CoverImg src={lead.img} label={lead.source}/>
+          <SourceImage src={lead.img} variant="lead" className="cover-img" alt=""/>
           <div className="hero-band-grad"/>
           <div className="hero-band-text-overlay">
             <div className="hero-band-badge" style={{background:(CATS[lead._cat]?.color||'var(--accent)')}}>
@@ -7883,15 +7945,7 @@ function HeroBand({ heroStories, heroIdx, setHeroIdx, paused, setPaused, onRead 
         <div className="hero-band-side-label">More top stories</div>
         {secondary.map((s, i) => (
           <div key={i} className="hero-band-side-item" onClick={()=>onRead(s)}>
-            {s.img && (
-              <img
-                className="hero-band-side-thumb"
-                src={s.img}
-                loading="lazy"
-                alt=""
-                onError={e=>{e.target.style.display='none';}}
-              />
-            )}
+            <SourceImage src={s.img} variant="row" className="hero-band-side-thumb" alt=""/>
             <div className="hero-band-side-body">
               <div className="hero-band-side-title">{s.title}</div>
               <div className="hero-band-side-meta">
@@ -8148,7 +8202,7 @@ function Wordmark({ height = 24 }) {
 // Renders BOTH desktop (whisper + nav) AND mobile (compact header + chip bar)
 // in DOM. CSS media queries decide which is visible. `hidden` prop drives
 // the auto-hide-on-scroll-down behavior (mobile only — drives translate).
-function TopBar({tab, setTab, search, setSearch, dark, setDark,
+function TopBar({tab, setTab, search, setSearch, dark, setDark, onAskChat, chatOpen,
                  onCustomize, onRefresh, breakingItems, onTickerClick,
                  isMobile, mobileSearchOpen, onMobileSearchToggle, weatherCities, hiddenIndices,
                  onAnalyze, searchHistory, trendingTopics, onAccount, signedIn,
@@ -8423,6 +8477,11 @@ function TopBar({tab, setTab, search, setSearch, dark, setDark,
               <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{flexShrink:0}}><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><rect x="8" y="2" width="8" height="4" rx="1"/><line x1="9" y1="12" x2="15" y2="12"/><line x1="9" y1="16" x2="13" y2="16"/></svg>
               Analyze
             </button>
+            {/* X6: Ask NewsHub — the chat launcher is a quiet header icon now (never a floating
+                button that can cover text). aria-expanded reflects the drawer state. */}
+            <button className="nav-icon-btn" onClick={onAskChat} title="Ask NewsHub" aria-label="Ask NewsHub" aria-expanded={!!chatOpen}>
+              <svg width={ICON.header} height={ICON.header} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+            </button>
             <button className="nav-icon-btn" onClick={onRefresh} title="Refresh">
               <RefreshCw size={ICON.header} strokeWidth={2}/>
             </button>
@@ -8455,6 +8514,10 @@ function TopBar({tab, setTab, search, setSearch, dark, setDark,
             </button>
             <button className="mobile-icon-btn" onClick={onAnalyze} title="Analyze" aria-label="Paste & Analyze">
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><rect x="8" y="2" width="8" height="4" rx="1"/><line x1="9" y1="12" x2="15" y2="12"/><line x1="9" y1="16" x2="13" y2="16"/></svg>
+            </button>
+            {/* X6: Ask NewsHub launcher as a quiet header icon (replaces the floating button). */}
+            <button className="mobile-icon-btn" onClick={onAskChat} title="Ask NewsHub" aria-label="Ask NewsHub" aria-expanded={!!chatOpen}>
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
             </button>
             {/* M2: the header search icon is removed on mobile — Search now lives in the
                 bottom tab bar (which opens this same .mobile-search input), so the two
@@ -8516,6 +8579,10 @@ function TopBar({tab, setTab, search, setSearch, dark, setDark,
                   {TAB_LABELS[t]||(t.charAt(0).toUpperCase()+t.slice(1))}
                 </button>
               ))}
+              {/* X6: Ask NewsHub also reachable from the More sheet. */}
+              <button role="menuitem" className="more-sheet-item" onClick={()=>{ setMoreSheetOpen(false); if(onAskChat) onAskChat(); }}>
+                Ask NewsHub
+              </button>
             </div>
           </div>
         )}
@@ -8631,7 +8698,7 @@ function HoustonRow({ items, onRead, formatDate }) {
       <div className="houston-scroll" data-no-swipe>
         {items.map((a, i) => (
           <button key={a.link || i} className="houston-card" onClick={() => onRead(a)}>
-            {a.img ? <img className="houston-img" src={a.img} loading="lazy" alt=""/> : <div className="houston-img houston-img-ph"><span className="ph-label">{a.source}</span></div>}
+            <SourceImage src={a.img} variant="thumb" className="houston-img" alt=""/>
             <div className="houston-card-title">{a.title}</div>
             <div className="houston-card-meta"><span>{a.source}</span><span>·</span><span>{formatDate(a.pubDate)}</span></div>
           </button>
@@ -8665,8 +8732,7 @@ function AcrossHub({ sections, onRead, onSeeAll, formatDate }) {
             <div key={a.link || i} className="gf-item" onClick={() => onRead(a)}>
               <div className="gf-thumb-wrap">
                 <div className="gf-thumb-ph"/>
-                {a.img && <img className="gf-thumb-img" src={a.img} alt="" loading="lazy"
-                  onError={e => { e.currentTarget.style.display = 'none'; }}/>}
+                <SourceImage src={a.img} variant="thumb" className="gf-thumb-img" alt=""/>
               </div>
               <div className="gf-body">
                 <div className="gf-title">{a.title}</div>
@@ -8686,7 +8752,19 @@ function AcrossHub({ sections, onRead, onSeeAll, formatDate }) {
 // ChatBot now lives in ./modules/concierge
 
 // ─── TOP OF HOUR STRIP ────────────────────────────────────────────────────────
-function TopOfHourStrip({ catLead, arts, onRead, stories: storiesProp }) {
+function TopOfHourStrip({ catLead, arts, onRead, stories: storiesProp, pageCat = null, kwFor = null }) {
+  // X2c: hide the category label when it equals the page's own category (redundant — "ENERGY" on
+  // every Energy row). X2b: on the mixed Home strip show the label only when the story's text
+  // confirms the category (never a contradicting guess). Keeps it when the topic differs.
+  // business + finance render the SAME nav label ("Business & Markets"), so on either page a story
+  // from the other key is still redundant.
+  const sameGroup = (x, y) => x === y || ((x === 'business' || x === 'finance') && (y === 'business' || y === 'finance'));
+  const showLabel = (a) => {
+    if (!a || !a.cat) return false;
+    if (pageCat && sameGroup(a.cat, pageCat)) return false;
+    if (!pageCat && kwFor) return labelConfirmed(a, kwFor); // Home / mixed: verify
+    return true;
+  };
   const stories = useMemo(() => {
     // Caller (FeedPage) computes the picks for cross-module dedup and passes them
     // here so the strip shows exactly the deduped set; fall back to self-compute.
@@ -8727,14 +8805,14 @@ function TopOfHourStrip({ catLead, arts, onRead, stories: storiesProp }) {
         <div className="toh-lead-col">
           <article className={`toh-card toh-card-lead${!hero.img ? ' toh-card-noimg' : ''}`} onClick={() => onRead(hero)}>
             <div className="toh-img-ph"><span className="ph-label">{hero.source}</span></div>
-            {hero.img && <img className="toh-img" src={hero.img} alt="" loading="lazy" onError={e => { e.currentTarget.style.display = 'none'; }}/>}
+            <SourceImage src={hero.img} variant="lead" className="toh-img" alt=""/>
             <div className="toh-grad"/>
             <div className="toh-body">
               {/* S13: the topic moves INTO the meta line (first token, category colour) instead of a
                   separate eyebrow, so every Top Stories row shows its topic in one consistent place
                   and the element count per row does not grow. */}
               <h3 className="toh-title">{hero.title}</h3>
-              <div className="toh-meta"><TopicTag cat={hero.cat} onMedia={!!hero.img}/> · {hero.source} · {fmtDate(hero.pubDate)}</div>
+              <div className="toh-meta">{showLabel(hero) && <><TopicTag cat={hero.cat} onMedia={!!hero.img}/> · </>}{hero.source} · {fmtDate(hero.pubDate)}</div>
             </div>
           </article>
           {textHeads.length > 0 && (
@@ -8742,7 +8820,7 @@ function TopOfHourStrip({ catLead, arts, onRead, stories: storiesProp }) {
               {textHeads.map((a, i) => (
                 <button key={i} className="toh-text-row" onClick={() => onRead(a)}>
                   <span className="toh-text-title">{a.title}</span>
-                  <span className="toh-text-meta"><TopicTag cat={a.cat}/> · {a.source} · {fmtDate(a.pubDate)}</span>
+                  <span className="toh-text-meta">{showLabel(a) && <><TopicTag cat={a.cat}/> · </>}{a.source} · {fmtDate(a.pubDate)}</span>
                 </button>
               ))}
             </div>
@@ -8752,10 +8830,10 @@ function TopOfHourStrip({ catLead, arts, onRead, stories: storiesProp }) {
           <div className="toh-side">
             {compact.map((a, i) => (
               <button key={i} className="toh-compact-row" onClick={() => onRead(a)}>
-                {a.img && <img className="toh-compact-thumb" src={a.img} loading="lazy" decoding="async" alt="" onError={e => { e.currentTarget.style.visibility = 'hidden'; }}/>}
+                <SourceImage src={a.img} variant="row" className="toh-compact-thumb" alt=""/>
                 <span className="toh-compact-body">
                   <span className="toh-compact-title">{a.title}</span>
-                  <span className="toh-compact-meta"><TopicTag cat={a.cat}/> · {a.source} · {fmtDate(a.pubDate)}</span>
+                  <span className="toh-compact-meta">{showLabel(a) && <><TopicTag cat={a.cat}/> · </>}{a.source} · {fmtDate(a.pubDate)}</span>
                 </span>
               </button>
             ))}
@@ -9149,7 +9227,9 @@ function FeedPage({ cat, ctx }) {
     // The main feed excludes everything already placed above it (by title key, so
     // the same story from a different source can't slip back in).
     const dedupedFeed = useMemo(
-      () => feedItems.filter(a => !topStoryKeys.has(storyKey(a)) && !catBreakingKeys.has(storyKey(a)) && !sopShownKeys.has(storyKey(a)) && !houstonKeys.has(storyKey(a))),
+      // X2a: one story once — cluster-dedupe this category feed (not only Home/Sports) so near-
+      // duplicates (identical + bigram-near titles) collapse to one row.
+      () => onePerCluster(feedItems.filter(a => !topStoryKeys.has(storyKey(a)) && !catBreakingKeys.has(storyKey(a)) && !sopShownKeys.has(storyKey(a)) && !houstonKeys.has(storyKey(a)))),
       [feedItems, topStoryKeys, catBreakingKeys, sopShownKeys, houstonKeys]);
 
     // ── COVERAGE GAP (folded into State of Play) — widely-covered stories none of the
@@ -9301,7 +9381,7 @@ function FeedPage({ cat, ctx }) {
           // (or the load has settled), then drop in the full set at once — so the strip never
           // renders a growing partial list that shoves its own rows as late feeds arrive.
           (topStoriesCommitted || !isLoading) && topStoryItems.length
-            ? <TopOfHourStrip catLead={catLead} arts={arts} onRead={onRead} stories={topStoryItems}/>
+            ? <TopOfHourStrip catLead={catLead} arts={arts} onRead={onRead} stories={topStoryItems} pageCat={null} kwFor={kwMatch}/>
             : (isLoading && <div className="toh-reserve" aria-hidden="true"/>)
         )}
 
@@ -9316,7 +9396,7 @@ function FeedPage({ cat, ctx }) {
             through here, so they unify together. */}
         {!activeKw && !activeSrc && !isHome && (
           catLead && (topStoriesCommitted || !isLoading)
-            ? <TopOfHourStrip stories={topStoryItems} catLead={catLead} arts={arts} onRead={onRead}/>
+            ? <TopOfHourStrip stories={topStoryItems} catLead={catLead} arts={arts} onRead={onRead} pageCat={cat} kwFor={kwMatch}/>
             : (isLoading && <div className="toh-reserve" aria-hidden="true"/>)
         )}
 
@@ -9331,6 +9411,7 @@ function FeedPage({ cat, ctx }) {
           <div className="sop-hoist">
             <StateOfPlay variant="sidebar" items={sopTopItems} gapItems={gapItems} breakingItems={catBreaking}
               meta={CATS[cat]||CATS.general} onRead={onRead} onAsk={setChatContext} formatDate={fmtDate}
+              labelOk={a=>labelConfirmed(a,kwMatch)}
               collapsed={sopCollapsed} onToggleCollapse={toggleSop}/>
           </div>
         )}
@@ -9447,7 +9528,7 @@ function FeedPage({ cat, ctx }) {
                   {!activeKw && !activeSrc && !search && (
                     <div className="sop-mobile">
                       <StateOfPlay variant="sidebar" items={sopTopItems} gapItems={gapItems} breakingItems={catBreaking} maxRows={3}
-                        onOpenFull={() => handleTabChange('stateofplay')}
+                        onOpenFull={() => handleTabChange('stateofplay')} labelOk={a=>labelConfirmed(a,kwMatch)}
                         meta={CATS[cat]||CATS.general} onRead={onRead} onAsk={setChatContext} formatDate={fmtDate}
                         collapsed={sopCollapsed} onToggleCollapse={toggleSop}/>
                     </div>
@@ -9638,6 +9719,7 @@ export default function App() {
   const [readLinks, setReadLinks] = useState(()=>new Set(ld('readLinks',[])));
   const [readerArticle, setReaderArticle] = useState(null);
   const [chatContext, setChatContext] = useState(null);
+  const [chatOpen, setChatOpen] = useState(false); // X6: launcher state lifted out of the FAB into the header icon / More sheet
   const [perspArticle, setPerspArticle] = useState(null);
   const [showAnalyze, setShowAnalyze] = useState(false);
   const [webResults, setWebResults] = useState([]);
@@ -10791,6 +10873,7 @@ export default function App() {
           searchHistory={searchHistory}
           trendingTopics={homeTrendingTopics}
           onAccount={()=>setShowAuth(true)} signedIn={!!userId}
+          onAskChat={()=>setChatOpen(o=>!o)} chatOpen={chatOpen}
           favTeams={[...teams, ...myTeams.map(t=>({match:t.name, league:t.league}))]}
           onGoToSports={() => handleTabChange('sports')}/>
 
@@ -10942,7 +11025,7 @@ export default function App() {
       </div>
       {/* Floating AI chatbot — available on all pages (lazy; prefetched on idle). */}
       <Suspense fallback={null}>
-      <ChatBot arts={arts}
+      <ChatBot arts={arts} open={chatOpen} setOpen={setChatOpen}
         onNavigate={(path)=>{ const p=(path||'').split('/').filter(Boolean); navigate(p[0]||'general', p[1]||null, p[2]||null); }}
         fetchSummary={fetchAISummary}
         fetchListen={fetchListen}

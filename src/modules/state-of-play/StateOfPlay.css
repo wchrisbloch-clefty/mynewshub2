@@ -82,8 +82,8 @@
    keeps the scroll position of everything above unchanged). Collapsed on every load. */
 .sop-limited > .sop-item:nth-child(n+4){display:none;}
 .sop-showall{display:block;width:100%;min-height:44px;margin-top:8px;padding:10px 12px;
-  background:var(--surface2);border:1px solid var(--border);border-radius:8px;
-  font-family:var(--font-sans);font-size:var(--fs-meta);font-weight:700;letter-spacing:0.02em;
+  background:transparent;border:1px solid var(--border);border-radius:var(--radius-md); /* X3: no grey fill */
+  font-family:var(--font-sans);font-size:var(--fs-body);font-weight:500;letter-spacing:0.02em;
   color:var(--text2);cursor:pointer;text-align:center;}
 @media(hover:hover){ .sop-showall:hover{border-color:var(--text3);color:var(--text);} }
 .sop-showall:focus-visible{outline:2px solid var(--accent);outline-offset:2px;}

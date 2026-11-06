@@ -16,6 +16,7 @@
 // Styling: co-located SnapshotCard.css + design tokens (src/styles/tokens.css).
 
 import { useState } from 'react';
+import { hasUsableImage, imgReferrerPolicy } from '../source-image';
 import { FollowSourceChip } from '../follow-source';
 import { TierBadge } from '../provenance';
 import './SnapshotCard.css';
@@ -30,7 +31,7 @@ export function SnapshotCard({ a, meta = {}, isSaved, onSave, onRead, onPerspect
   // F2: a lead WITH an image renders as a hero — 16:9 cover image, a bottom-up dark
   // gradient, and the source + headline overlaid in white (meta in one fixed position).
   // The no-image lead keeps the D5 typographic treatment. Regular cards are unchanged.
-  const hasImg = a.img && !imgErr && !hideImage;
+  const hasImg = hasUsableImage(a.img) && !imgErr && !hideImage; // X1: generic fallback-card URLs are "no image"
   const heroImg = lead && hasImg;
   return (
     <article className={`snap-card ${a.isAlert ? 'snap-breaking' : ''}${lead ? ' snap-lead' : ''}${lead && !hasImg ? ' snap-lead-noimg' : ''}${heroImg ? ' snap-lead-hero' : ''}${!heroImg ? ' snap-row' : ''}`} onClick={() => onRead(a)}>
@@ -38,10 +39,10 @@ export function SnapshotCard({ a, meta = {}, isSaved, onSave, onRead, onPerspect
           its space reserved via aspect-ratio so nothing shifts; a text-only row keeps
           the same min-height so the list rhythm holds (no placeholder tile). The accent
           left bar + card box chrome are removed in CSS. */}
-      {!heroImg && hasImg && <img className="snap-thumb" src={a.img} loading="lazy" decoding="async" alt="" onError={() => setImgErr(true)} />}
+      {!heroImg && hasImg && <img className="snap-thumb" src={a.img} loading="lazy" decoding="async" alt="" referrerPolicy={imgReferrerPolicy(a.img)} onError={() => setImgErr(true)} onLoad={e => { if (!e.currentTarget.naturalWidth) setImgErr(true); }} />}
       {heroImg && (
         <div className="snap-hero-media">
-          <img className="snap-hero-img" src={a.img} loading="lazy" alt="" onError={() => setImgErr(true)} />
+          <img className="snap-hero-img" src={a.img} loading="lazy" alt="" referrerPolicy={imgReferrerPolicy(a.img)} onError={() => setImgErr(true)} onLoad={e => { if (!e.currentTarget.naturalWidth) setImgErr(true); }} />
           <div className="snap-hero-overlay">
             <div className="snap-meta snap-hero-meta">
               <span className="snap-hero-source">{a.source}</span>

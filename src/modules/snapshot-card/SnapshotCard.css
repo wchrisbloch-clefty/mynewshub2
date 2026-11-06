@@ -117,7 +117,7 @@
 /* O5: the Ask/Save buttons are 32px VISUAL but keep a 44px tap area via an invisible ::after
    that extends the hit box without taking any layout height — so the foot row stays slim. */
 .snap-ask,.snap-save{position:relative;min-height:32px;}
-.snap-ask::after,.snap-save::after{content:'';position:absolute;inset:-6px;}
+.snap-ask::after,.snap-save::after{content:'';position:absolute;inset:-11px -8px;} /* X3: >=44px touch target (covers the compact 23px variant) */
 /* Thumbnail is a FIXED size, capped regardless of the column/main-column width, so
    standard feed cards stay headline-forward and balanced against the sidebar. Height
    is capped too so a tall card can't stretch the image into a large square. (The

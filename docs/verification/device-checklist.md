@@ -210,3 +210,28 @@ Chromium + Chromium-touch; real iPad/iPhone Safari = NEEDS-DEVICE (no WebKit in 
     categories are loading, then sizes to its content; if it has nothing to show it renders nothing,
     never a bordered box showing just its title. The empty-box detector now catches that header-only
     pattern too (collapsed sections excluded).
+
+---
+
+## Batch X — trust, one look, phone first screen, reliable chat (X0–X9)
+
+Chromium + Chromium touch; real iPad/iPhone Safari = NEEDS-DEVICE (no WebKit in the sandbox).
+
+55. **Chat is a header icon (X6).** On every width the "Ask NewsHub" launcher is a quiet header icon
+    (phone icon row — fits at 360; iPad/desktop icon group after search; plus a More-sheet row), not a
+    floating button. At every scroll stop no fixed/sticky element (other than the header, bottom bar
+    and sheets) covers text; chat opens in one tap; aria-label + aria-expanded present.
+56. **One chip look everywhere (X3).** Business chips, Sports league tiles and team chips are the same
+    transparent 1px-border outline pill/tile as Energy — no grey fill, bevel or 12px off-scale text;
+    selected is the single accent fill. Status pills are 32px; "Show all" is a bordered SecondaryButton,
+    not a grey box. The conformance suite is 0 violations across every category and band.
+57. **No ghost watermark / no blank thumbnails (X1).** A Guardian generic fallback-card (the faint
+    "THE GUARDIAN US/BUSINESS" wordmark) and any 404 / blank-hotlink image are treated as no-image: a
+    text-only row (no blank indent) or a --navy lead block with a white headline — never a blank box.
+58. **No repeated stories, no wrong labels (X2).** The same story appears once per category feed
+    (near-duplicates collapse via the existing cluster identity). A story is never shown a category
+    label its own text does not confirm (the tornado-from-a-sports-source is not labelled "Sports"),
+    and a category page does not repeat its own name on every row.
+59. **Phone first screen (X4/X5).** The first chip sits at the 16px gutter; meta lines never orphan an
+    "ago"; the on-photo "MY TEAMS" badge is white on a dark scrim; a scheduled score card shows its
+    kickoff time, never "—".
