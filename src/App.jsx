@@ -1749,7 +1749,7 @@ body:not(.dark) .topbar-scores{background:var(--surface);}
    3-up grid row, so consecutive image blocks don't stack into a tall wall. */
 /* X4d: leading + trailing 16px gutter so the first card sits at the page gutter and the last clears
    the edge; a soft fade mask on the right so a clipped card never cuts text mid-glyph. */
-.houston-scroll{display:flex;gap:var(--s3);overflow-x:auto;scroll-snap-type:x proximity;scrollbar-width:none;-webkit-overflow-scrolling:touch;padding-inline:16px;scroll-padding-inline:16px;-webkit-mask-image:linear-gradient(to right,#000 0,#000 calc(100% - 24px),transparent 100%);mask-image:linear-gradient(to right,#000 0,#000 calc(100% - 24px),transparent 100%);}
+.houston-scroll{display:flex;gap:var(--s3);overflow-x:auto;scroll-snap-type:x proximity;scrollbar-width:none;-webkit-overflow-scrolling:touch;padding-inline:16px;scroll-padding-inline:16px;-webkit-mask-image:linear-gradient(to right,black 0,black calc(100% - 24px),transparent 100%);mask-image:linear-gradient(to right,black 0,black calc(100% - 24px),transparent 100%);}
 .houston-scroll::-webkit-scrollbar{display:none;}
 .houston-card{flex:0 0 232px;scroll-snap-align:start;background:var(--surface);border:1px solid var(--border2);border-radius:var(--radius);overflow:hidden;cursor:pointer;text-align:left;padding:0 0 10px;display:flex;flex-direction:column;font-family:inherit;}
 .houston-card:hover{border-color:var(--accent);}

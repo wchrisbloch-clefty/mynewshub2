@@ -8,7 +8,10 @@ import { installRealFixtures } from './realfix.mjs';
 const BASE = (process.env.BASE || 'http://localhost:8137') + '/?debug=1';
 const WIDTHS = [[360, 780], [390, 844], [390, 664], [430, 932], [820, 1180], [1024, 1366], [1194, 834], [1280, 900], [1440, 900]];
 const PAGES = [['home', 'general'], ['sports', 'sports'], ['energy', 'bloom'], ['business', 'business'], ['tech', 'tech'], ['health', 'health'], ['briefing', 'briefing']];
-const ALLOW = '.topbar-wrap,.header-scroll,.nav-bar,.bottom-tabs,.bottom-topics,.chip-bar,.more-sheet,.more-sheet-overlay,.mobile-search,.chat-drawer,.chat-overlay,.swipe-hint,.toast,.score-strip-scroll,.sticky-scores,.topbar-scores,.status-strip,.new-stories-pill,.sop-mobile';
+// allowed chrome: the header, bottom tab bar, sheets/toasts, and the sticky scores bands (which are
+// deliberate chrome that stays in view — the touch-mode harness separately asserts they sit below the
+// chip bar). These may be sticky/fixed; everything else must not sit over a text leaf.
+const ALLOW = '.topbar-wrap,.header-scroll,.nav-bar,.bottom-tabs,.bottom-topics,.chip-bar,.more-sheet,.more-sheet-overlay,.mobile-search,.chat-drawer,.chat-overlay,.swipe-hint,.toast,.score-strip-scroll,.sticky-scores,.sports-score-strip,.topbar-scores,.status-strip,.new-stories-pill,.sop-mobile';
 
 const browser = await chromium.launch();
 let fails = 0, consoleErrs = 0;
