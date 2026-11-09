@@ -64,6 +64,41 @@ function catItems(cat) {
   items.push({ title: `DraftKings promo code: Bet $20, Get $350 in Bonus Bets (${L})`, link:`https://ex.com/${cat}/promo`, pubDate: iso(-15), img: IMG, desc:'promo', source:'DraftKings' });
   return items;
 }
+
+// Z1: GENERAL is a MERGE of many publishers (real-shape). The app stamps each item's source = the
+// feed's configured name, so a single general feed makes the whole Home pool one publisher and
+// capByPublisher would correctly cap Top Stories at 2. Route each general headline across several of
+// the real general feed URLs (distinct links per feed so clustering sees multiple outlets) to model
+// the real multi-publisher Home pool. The top headlines are carried by 3 feeds (multi-outlet).
+const GENERAL_FEED_IDX = {
+  'https://feeds.bbci.co.uk/news/rss.xml': 0,
+  'https://feeds.npr.org/1001/rss.xml': 1,
+  'https://moxie.foxnews.com/google-publisher/latest.xml': 2,
+  'https://nypost.com/feed/': 3,
+  'https://thehill.com/homenews/feed/': 4,
+  'https://www.washingtontimes.com/rss/headlines/news/': 5,
+  'https://www.theguardian.com/us/rss': 6,
+  'https://api.axios.com/feed/': 7,
+};
+const N_GENERAL_FEEDS = 8;
+// headline 0 (the lead) and 1 are widely covered (3 outlets each); the rest are single-outlet, so
+// the breaking strip stays small (the 3-outlet non-lead + the strong-term story) and Top stories
+// fills with the remaining diverse-publisher general headlines.
+const generalFeedsForHead = i => { const n = i < 2 ? 3 : 1; return Array.from({ length: n }, (_, k) => (i + k) % N_GENERAL_FEEDS); };
+function generalItemsForFeed(fi) {
+  const items = [];
+  HEADS.general.forEach((t, i) => {
+    if (!generalFeedsForHead(i).includes(fi)) return;
+    const noImg = i === 2 || i === 5;
+    items.push({ title: t, link: `https://ex.com/general/${i}/f${fi}`, pubDate: iso(-10 - i * 18), img: noImg ? '' : IMG, desc: 'News standfirst for a real-shape headline that also wraps to a second line in the excerpt area.' });
+  });
+  // the one genuinely-breaking story (strong term) + the promo come from the primary feed only.
+  if (fi === 0) {
+    items.push({ title: HEADS.general[3], link: 'https://ex.com/general/brk', pubDate: iso(-6), img: IMG, desc: 'breaking', _breaking: true });
+    items.push({ title: 'DraftKings promo code: Bet $20, Get $350 in Bonus Bets (News)', link: 'https://ex.com/general/promo', pubDate: iso(-15), img: IMG, desc: 'promo' });
+  }
+  return items;
+}
 function scoresJSON(league){
   if (league!=='nfl') return { events: [] };
   const g=(id,st,away,home,as_,hs,status,date)=>({id:String(id),name:`${away} at ${home}`,shortName:`${away.slice(0,3).toUpperCase()} @ ${home.slice(0,3).toUpperCase()}`,date,status:{type:{description:status,state:st}},links:[{href:'#'}],competitions:[{competitors:[{homeAway:'home',team:{shortDisplayName:home,abbreviation:home.slice(0,3).toUpperCase(),logo:''},score:String(hs)},{homeAway:'away',team:{shortDisplayName:away,abbreviation:away.slice(0,3).toUpperCase(),logo:''},score:String(as_)}]}]});
@@ -98,6 +133,9 @@ export async function installRealFixtures(page, { emptyCats = [], failCats = [],
   await page.route('**/api/quote**', async r => { await D(); const s=new URL(r.request().url()).searchParams.get('sym')||'X'; return r.fulfill({ status:200, contentType:'application/json', body: JSON.stringify({ price:200+s.length, chg:-1.2, pct:-0.6 }) }); });
   await page.route('**/api/prediction-markets**', async r => { await D(); return r.fulfill({ status:200, contentType:'application/json', body: JSON.stringify(PM) }); });
   await page.route('**/api/signals**', async r => { await D(); return r.fulfill({ status:200, contentType:'application/json', body: JSON.stringify({ items: [], results: [] }) }); });
-  await page.route('**/api/feed**', async r => { await D(); const u=new URL(r.request().url()); const feedUrl=u.searchParams.get('url')||''; const cat=urlToCat[feedUrl]; if(cat&&failCats.includes(cat)) return r.fulfill({ status:500, contentType:'application/json', body: JSON.stringify({ items:[], status:503 }) }); if(cat&&!emptyCats.includes(cat)) return r.fulfill({ status:200, contentType:'application/json', body: JSON.stringify({ items: catItems(cat), status:200 }) }); return r.fulfill({ status:200, contentType:'application/json', body: JSON.stringify({ items: [], status:200 }) }); });
+  await page.route('**/api/feed**', async r => { await D(); const u=new URL(r.request().url()); const feedUrl=u.searchParams.get('url')||'';
+    // Z1: general is multi-publisher — route each general feed URL to its slice of the headlines.
+    if (feedUrl in GENERAL_FEED_IDX) { if (!emptyCats.includes('general') && !failCats.includes('general')) return r.fulfill({ status:200, contentType:'application/json', body: JSON.stringify({ items: generalItemsForFeed(GENERAL_FEED_IDX[feedUrl]), status:200 }) }); return r.fulfill({ status:200, contentType:'application/json', body: JSON.stringify({ items:[], status:200 }) }); }
+    const cat=urlToCat[feedUrl]; if(cat&&failCats.includes(cat)) return r.fulfill({ status:500, contentType:'application/json', body: JSON.stringify({ items:[], status:503 }) }); if(cat&&!emptyCats.includes(cat)) return r.fulfill({ status:200, contentType:'application/json', body: JSON.stringify({ items: catItems(cat), status:200 }) }); return r.fulfill({ status:200, contentType:'application/json', body: JSON.stringify({ items: [], status:200 }) }); });
 }
 export { PRIMARY, LABEL };
