@@ -1768,7 +1768,7 @@ body{
 .houston-img{width:100%;aspect-ratio:16/9;object-fit:cover;background:var(--surface2);margin-bottom:8px;}
 .houston-img-ph{display:flex;align-items:center;justify-content:center;background:linear-gradient(135deg,var(--surface2),var(--surface));}
 .houston-card-title{font-family:var(--font-sans);font-size:var(--fs-body);font-weight:600;line-height:1.35;color:var(--text);padding:0 10px;margin-bottom:6px;overflow-wrap:anywhere;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden;}
-.houston-card-meta{font-family:var(--font-sans);font-size:var(--fs-label);color:var(--text3);padding:0 10px;display:flex;gap:5px;flex-wrap:wrap;font-variant-numeric:tabular-nums;}
+.houston-card-meta{font-family:var(--font-sans);font-size:var(--fs-meta);color:var(--text3);padding:0 10px;display:flex;gap:5px;flex-wrap:wrap;font-variant-numeric:tabular-nums;} /* Z3: one meta token */
 @media(max-width:640px){
   /* F1 bug fix: the flex row defaulted to align-items:stretch, so a short-title card
      stretched to the tallest card and showed a large empty tail of white card background
@@ -2489,7 +2489,7 @@ body:not(.dark) .pill-bar{
 .sb-across-cat .sb-across-item:first-of-type{border-top:none;}
 .sb-across-title{font-family:var(--font-serif);font-weight:600;font-size:var(--fs-body);line-height:1.3;color:var(--text);display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;}/* D4: tokenized (was 12px) */
 .sb-across-item:hover .sb-across-title{color:var(--accent);}
-.sb-across-src{font-size:var(--fs-label);color:var(--text3);margin-top:2px;}
+.sb-across-src{font-size:var(--fs-meta);color:var(--text3);margin-top:2px;} /* Z3: one meta token */
 
 /* Sources pill grid */
 .src-pills{display:flex;flex-wrap:wrap;gap:5px;}
@@ -2521,7 +2521,7 @@ body:not(.dark) .pill-bar{
   font-size:12px;font-weight:700;color:var(--text);line-height:1.35;
   display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;margin-bottom:3px;
 }
-.trend-src{font-size:var(--fs-label);color:var(--text3);display:flex;align-items:center;gap:4px;flex-wrap:wrap;}
+.trend-src{font-size:var(--fs-meta);color:var(--text3);display:flex;align-items:center;gap:4px;flex-wrap:wrap;} /* Z3: one meta token */
 .trend-cat-badge{
   font-size:var(--fs-label);font-weight:700;border-radius:4px;padding:1px 5px;
   letter-spacing:0.03em;text-transform:uppercase;
@@ -2939,7 +2939,7 @@ body:not(.dark) .pill-bar{
 .pod-show{font-size:var(--fs-label);font-weight:600;color:var(--accent);margin-bottom:2px;}
 .pod-title{font-size:var(--fs-body);font-weight:700;color:var(--text);line-height:1.35;margin-bottom:4px;cursor:pointer;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;overflow-wrap:anywhere;word-break:break-word;}
 .pod-title:hover{color:var(--accent);}
-.pod-meta{font-size:var(--fs-label);color:var(--text3);display:flex;gap:8px;flex-wrap:wrap;}
+.pod-meta{font-size:var(--fs-meta);color:var(--text3);display:flex;gap:8px;flex-wrap:wrap;} /* Z3: one meta token */
 .pod-desc{font-size:var(--fs-meta);color:var(--text2);line-height:1.5;margin-top:6px;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden;}
 .pod-actions{display:flex;gap:6px;flex-wrap:wrap;}
 .pod-skel-line{border-radius:var(--radius-md);background:linear-gradient(90deg,var(--surface2) 25%,var(--border) 50%,var(--surface2) 75%);background-size:200% 100%;animation:shimmer 1.4s infinite;}
@@ -3151,7 +3151,7 @@ body:not(.dark) .pill-bar{
 }
 .gn-card-source{
   font-weight:800;color:var(--text2);
-  text-transform:uppercase;letter-spacing:0.05em;font-size:var(--fs-label);
+  text-transform:uppercase;letter-spacing:0.05em;font-size:var(--fs-meta); /* Z3: one meta token */
 }
 
 /* Per-vertical card top-border accents */
@@ -3641,7 +3641,7 @@ body:not(.dark) .pill-bar{
   font-size:var(--fs-meta);color:var(--text3);
   display:flex;align-items:center;gap:6px;
 }
-.sports-hero-source{font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:0.04em;font-size:var(--fs-label);}
+.sports-hero-source{font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:0.04em;font-size:var(--fs-meta);} /* Z3: one meta token */
 
 /* CUSTOMIZE — Teams section */
 .cp-team-row{
@@ -4854,7 +4854,7 @@ body{overscroll-behavior-y:contain;}
 
 /* v26: Business + Finance card terminal-feel source label */
 .gn-card.business .gn-card-source,.gn-card.finance .gn-card-source{
-  font-family:'SF Mono','Cascadia Code','Consolas',monospace;letter-spacing:0;font-size:var(--fs-label);
+  font-family:'SF Mono','Cascadia Code','Consolas',monospace;letter-spacing:0;font-size:var(--fs-meta); /* Z3: one meta token */
 }
 
 /* Dark palette is owned solely by src/styles/tokens.css (single source of truth). */
@@ -5106,7 +5106,7 @@ kbd{display:inline-block;padding:1px 5px;border:1px solid var(--border);border-r
 }
 .gn-lead-source,.gn-card-source{
   font-family:var(--font-sans);
-  font-size:var(--fs-label);font-weight:800;text-transform:uppercase;letter-spacing:0.08em;
+  font-size:var(--fs-meta);font-weight:800;text-transform:uppercase;letter-spacing:0.08em; /* Z3: one meta token */
 }
 
 /* Briefing teaser: editorial serif + crimson accent line */
@@ -5365,7 +5365,7 @@ kbd{display:inline-block;padding:1px 5px;border:1px solid var(--border);border-r
   .gn-card:last-child{border-bottom:none;}
   .gn-card-img,.gn-card-img-ph{width:100px;height:72px;aspect-ratio:auto;flex-shrink:0;border-radius:var(--radius-md);}
   .gn-card-title{font-size:var(--fs-title);-webkit-line-clamp:3;font-weight:600;}
-  .gn-card-meta{font-size:var(--fs-label);}
+  .gn-card-meta{font-size:var(--fs-meta);} /* Z3: one meta token */
   /* gn-grid on mobile: single column lead only, no grid */
   .gn-grid{grid-template-columns:1fr;}
   .gn-lead-img{aspect-ratio:16/9;height:auto;max-height:200px;}
@@ -5791,7 +5791,7 @@ kbd{display:inline-block;padding:1px 5px;border:1px solid var(--border);border-r
 .toh-card-lead .toh-body{position:absolute;inset:0;padding:16px 18px;display:flex;flex-direction:column;justify-content:flex-end;}
 .toh-card-lead .toh-cat{color:var(--on-media);}
 .toh-card-lead .toh-title{font-family:var(--font-serif);font-size:var(--fs-lead);font-weight:800;color:var(--on-media);line-height:1.16;margin:0 0 5px;text-shadow:0 1px 4px rgba(0,0,0,0.7);display:-webkit-box;-webkit-line-clamp:4;-webkit-box-orient:vertical;overflow:hidden;}
-.toh-card-lead .toh-meta{font-size:var(--fs-label);color:rgba(255,255,255,0.72);font-weight:600;font-family:var(--font-sans);}
+.toh-card-lead .toh-meta{font-size:var(--fs-meta);color:rgba(255,255,255,0.72);font-weight:600;font-family:var(--font-sans);} /* Z3: one meta token */
 /* G7f item 2: no-image lead — typographic (D5 style), NOT a giant watermark. Surface
    card, small-caps source kicker + oversized serif headline in ink. */
 .toh-card-noimg{background:var(--surface);border:1px solid var(--border);}
