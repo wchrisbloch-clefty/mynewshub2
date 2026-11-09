@@ -1636,7 +1636,9 @@ body{
    the min-height reserves its slot so scores loading causes no CLS. It scrolls away with the
    header; only the nav/chip bar stays pinned. */
 @media(max-width:640px){
-  .topbar-scores{min-height:60px;}
+  /* Z4: reserve the band's LOADED height (score tiles ~68px + padding), so scores streaming in
+     no longer grows the band 60->76 and shoves main down 17px (the dominant phone CLS source). */
+  .topbar-scores{min-height:76px;}
   /* O2: one horizontal band — the "Live Scores / Scores" label sits at the LEFT, the tile row
      scrolls to its right, so the whole strip is a single compact line (<=64px). */
   .topbar-scores .home-scores{padding:4px var(--s3);display:flex;align-items:center;gap:10px;}
@@ -1651,6 +1653,16 @@ body{
   .topbar-scores .score-tile-team,.topbar-scores .score-tile-score{font-size:var(--fs-label);}
   .topbar-scores .score-tile-logo{width:13px;height:13px;}
   .topbar-scores .score-tile-status{font-size:var(--fs-label);margin-top:0;}
+  /* Z4: weather merged INTO the scores band on phone — compact "Right Now" chip pinned left,
+     scores scroll to its right. One band; the band min-height absorbs it (no extra height). */
+  .topbar-scores{display:flex;align-items:stretch;}
+  .tbs-wx{flex:0 0 auto;display:flex;align-items:center;max-width:120px;border-right:1px solid var(--border2);}
+  .tbs-wx .rnw-card{background:none;border:none;border-radius:0;margin:0;padding:0;overflow:hidden;}
+  .tbs-wx .rnw-row{flex-wrap:nowrap;gap:6px;padding:0 var(--s3);min-height:0;overflow:hidden;align-items:center;}
+  .tbs-wx .rnw-label,.tbs-wx .rnw-caret,.tbs-wx .rnw-desc,.tbs-wx .rnw-forecast{display:none;} /* chip: city + temp only, not expandable */
+  .tbs-wx .rnw-cities{flex-wrap:nowrap;gap:6px;overflow:hidden;}
+  .tbs-wx .rnw-city-item:not(:first-child){display:none;}
+  .topbar-scores .home-scores{flex:1;min-width:0;}
 }
 /* N5: when the iPad-portrait-sections flag is on, MobileHome shows scores in its own body, so
    hide the header copy there too (avoids showing scores twice). Inert while the flag is off. */
@@ -8389,7 +8401,16 @@ function TopBar({tab, setTab, search, setSearch, dark, setDark, onAskChat, chatO
         The mobile ticker-collapse class rides here now (the strip moved out of the nav). */}
     <div className={`header-scroll ${tickerOpen?'':'ticker-collapsed'}`}>
       {tab==='general' && (
-        <div className="topbar-scores"><ActiveScoresBar favTeams={favTeams} onGoToSports={onGoToSports}/></div>
+        <div className="topbar-scores">
+          {/* Z4: on phone, weather is merged INTO the scores band (one band) — a compact
+              "Right Now" chip pinned left, scores scroll to its right. The band's own
+              min-height absorbs it, so weather resolving no longer adds a 2nd band (−27px
+              chrome) or a reserve shift. 641-899px keeps the standalone band below. */}
+          {isMobile && weatherData.length > 0 && (
+            <div className="tbs-wx"><RightNowWeather data={weatherData}/></div>
+          )}
+          <ActiveScoresBar favTeams={favTeams} onGoToSports={onGoToSports}/>
+        </div>
       )}
       {/* Unified status strip — collapses the old weather + ticker + breaking bars
           into one slim row: live/breaking signal LEFT, market ticker CENTER,
@@ -8433,7 +8454,9 @@ function TopBar({tab, setTab, search, setSearch, dark, setDark, onAskChat, chatO
       {/* Home weather band (<900px, where it is NOT merged onto the ticker line). R2: reserve the
           band's height until the weather resolves so it doesn't pop in and shove the page down
           (the band is display:none >=900, so this reserve is phone/narrow-tablet only). */}
-      {tab==='general' && (
+      {/* Z4: phone (<=640) merges weather into the scores band above, so the standalone band
+          is only for 641-899px (where scores are also shown but not merged). */}
+      {tab==='general' && !isMobile && (
         weatherData.length > 0
           ? <div className="topbar-wx"><RightNowWeather data={weatherData}/></div>
           : <div className="topbar-wx topbar-wx-reserve" aria-hidden="true"/>
@@ -10188,6 +10211,9 @@ export default function App() {
       return {...a,[cat]:merged};
     });
     setPendingNew(p=>({...p,[cat]:[]}));
+    // Z4: applying is user-initiated, so a visible update is correct — bump lastUpdated so the phone
+    // Home's frozen head re-picks to surface the newly-applied stories (no-op cost on FeedPage).
+    setLastUpdated(prev => ({...prev, [cat]: Date.now()}));
     window.scrollTo({top:0,behavior:'smooth'});
   },[pendingNew]);
 
@@ -10228,6 +10254,34 @@ export default function App() {
       loadMarketData(),
     ]);
   }, [loadCat, loadPod, loadScores, loadMarketData]);
+
+  // Z4: STAGED refresh for the phone Home — re-fetch general read-only and stow only the stories we
+  // are not already showing into pendingNew.general, so the view does not jump. The "N new stories"
+  // pill (rendered in <MobileHome/>) applies them on tap. 0 shifts during refresh. (Defined after
+  // refreshAll so loadPod/loadScores/loadMarketData are already in scope — avoids a TDZ in the deps.)
+  const stageGeneralRefresh = useCallback(async () => {
+    const fresh = await fetchCatArticles('general');
+    if (!fresh || !fresh.length) return 0;
+    const have = new Set((arts.general || []).map(storyKey));
+    const staged = fresh.filter(a => a && a.title && a.link && !isPromoItem(a) && !have.has(storyKey(a)));
+    if (staged.length) setPendingNew(p => ({ ...p, general: staged }));
+    return staged.length;
+  }, [arts.general, fetchCatArticles]);
+  const refreshHomeStaged = useCallback(async () => {
+    await Promise.allSettled([
+      ...Object.keys(DEFAULT_FEEDS).filter(c => c !== 'general').map(c => loadCat(c)),
+      ...PODCAST_FEEDS.map(p => loadPod(p)),
+      loadScores(), loadMarketData(), stageGeneralRefresh(),
+    ]);
+  }, [loadCat, loadPod, loadScores, loadMarketData, stageGeneralRefresh]);
+  // DEBUG-only: seed synthetic "new" general stories so the pill can be exercised headlessly (a real
+  // second fetch of the fixtures returns the same items → nothing to stage).
+  useEffect(() => { if (DEBUG && typeof window !== 'undefined') window.__stageDemo = (n = 2) => {
+    const now = Date.now();
+    setPendingNew(p => ({ ...p, general: Array.from({ length: n }, (_, i) => ({
+      title: `Freshly staged story ${i + 1}`, link: `https://ex.com/new/${now}/${i}`, source: 'Reuters',
+      cat: 'general', pubDate: new Date(now - i * 60000).toISOString() })) }));
+  }; });
 
   useEffect(()=>{
     // D6: fetch everything once on load. No 120s scores poll, no 3-min category
@@ -10451,7 +10505,8 @@ export default function App() {
     setTab(category); setSubcat(subcategory || null); setTertiary(tertiary || null);
     setSearch('');setActiveKw(null);setActiveSrc(null);
     setMobileSearchOpen(false);
-    window.scrollTo({top:0, behavior:'instant'});
+    // Z4: scroll is handled by the caller — navigate() jumps to top on a forward move, popstate
+    // RESTORES the saved position (place-keeping), so applyRoute no longer forces top itself.
     const CAT_TABS = ['general','sports','business','finance','popculture','comedy','tech'];
     if (CAT_TABS.includes(category)) setLastFeedTab(category);
     // Refetch feed whenever the category changes (or first visit).
@@ -10462,12 +10517,59 @@ export default function App() {
 
   // Phase 2/5: the URL is the single source of truth. navigate() writes the path
   // (/:category/:subcategory?/:team?), then applies it. Chips call this, never local state.
+  // Z4: per-route scroll memory for place-keeping — remember where the user was on each path and
+  // restore it on Back (within a few px), waiting until the lazy content is tall enough first.
+  // Z4: scroll place-keeping via history.state (per-entry, so a later navigation can never clobber an
+  // earlier entry's saved position — the path-keyed approach raced during navigation). Each entry
+  // remembers its own scrollY; Back restores it, climbing as lazy sections grow the page.
+  const restoringRef = useRef(false);
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    try { history.scrollRestoration = 'manual'; } catch {} // we own restoration, not the browser
+    let raf = 0;
+    const save = () => {
+      raf = 0; if (restoringRef.current) return;
+      try { history.replaceState({ ...(history.state || {}), _sy: window.scrollY }, ''); } catch {}
+    };
+    const onScroll = () => { if (!raf) raf = requestAnimationFrame(save); };
+    window.addEventListener('scroll', onScroll, { passive: true });
+    return () => { window.removeEventListener('scroll', onScroll); if (raf) cancelAnimationFrame(raf); };
+  }, []);
+  const restoreScroll = (target) => {
+    if (!target || target <= 0) { restoringRef.current = false; window.scrollTo(0, 0); return; }
+    restoringRef.current = true;   // freeze saves until we land, so back-nav scroll events can't clobber
+    // The Home/feed surfaces load sections lazily, so on first paint the page is often shorter than
+    // the saved position. CLIMB toward the target: each frame scroll to the current max (which brings
+    // the next lazy section into its 600px preload margin and grows the page), until we reach target.
+    let tries = 0;
+    const tick = () => {
+      const max = document.documentElement.scrollHeight - window.innerHeight;
+      const y = Math.min(target, Math.max(0, max));
+      window.scrollTo(0, y);
+      if (Math.abs(y - target) <= 4 || tries++ > 120) {
+        // Settle pass: the auto-hiding header toggles as we climb, nudging content a few px; after it
+        // stabilizes, snap once more to the exact target so Back lands within a couple of px.
+        setTimeout(() => {
+          const m = document.documentElement.scrollHeight - window.innerHeight;
+          window.scrollTo(0, Math.min(target, Math.max(0, m)));
+          restoringRef.current = false;
+        }, 220);
+        return;
+      }
+      requestAnimationFrame(tick);
+    };
+    requestAnimationFrame(tick);
+  };
+
   const navigate = (category, subcategory=null, tertiary=null) => {
     const path = buildPath(category, subcategory, tertiary);
     if (typeof window!=='undefined' && window.location.pathname !== path) {
+      // Stamp the CURRENT entry with where we're leaving from, THEN push the new (top) entry.
+      try { window.history.replaceState({ ...(window.history.state||{}), _sy: window.scrollY }, ''); } catch {}
       window.history.pushState({category,subcategory,tertiary}, '', path);
     }
     applyRoute(category, subcategory, tertiary);
+    if (typeof window!=='undefined') window.scrollTo({top:0, behavior:'instant'}); // forward move starts at top
   };
 
   const handleTabChange = t => navigate(t, null, null);
@@ -10476,11 +10578,15 @@ export default function App() {
   // can reach any page deterministically at any width (the More-overflow menu is width-
   // dependent and brittle to drive by click). Zero cost when the flag is off.
   const [, __forceTick] = useState(0);
-  useEffect(() => { if (DEBUG && typeof window !== 'undefined') { window.__nav = navigate; window.__openCustomize = openCustomize; window.__forceRender = () => __forceTick(n => n + 1); } });
+  useEffect(() => { if (DEBUG && typeof window !== 'undefined') { window.__nav = navigate; window.__openCustomize = openCustomize; window.__forceRender = () => __forceTick(n => n + 1); window.__scrollMem = () => (window.history.state || {}); } });
 
   // Phase 2: back/forward buttons re-apply the URL as source of truth.
   useEffect(()=>{
-    const onPop = () => { const r = parseRoute(); applyRoute(r.category, r.subcategory, r.tertiary); };
+    const onPop = (e) => {
+      const target = (e && e.state && e.state._sy) || 0; // the returned-to entry's own saved scroll
+      const r = parseRoute(); applyRoute(r.category, r.subcategory, r.tertiary);
+      restoreScroll(target);
+    };
     window.addEventListener('popstate', onPop);
     return () => window.removeEventListener('popstate', onPop);
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -10490,7 +10596,10 @@ export default function App() {
   const { distance: ptrDistance } = usePullToRefresh(
     async () => {
       setRefreshing(true);
-      try { await refreshAll(); } finally { setRefreshing(false); }
+      // Z4: on the phone Home, stage general (0-shift pill) instead of replacing it; everywhere
+      // else keep the destructive full refresh.
+      const stageHome = isMobile && tab === 'general' && !search && !activeKw && !activeSrc;
+      try { await (stageHome ? refreshHomeStaged() : refreshAll()); } finally { setRefreshing(false); }
     },
     { enabled: isMobile, threshold: 110 }
   );
@@ -10955,6 +11064,8 @@ export default function App() {
                     setPerspArticle,
                     // Z5: phone Home Podcasts section — latest 3 episodes, lazy, collapses empty.
                     podEps, podLoading, loadPod, PODCAST_FEEDS, fmtDuration,
+                    // Z4: "N new stories" pill reuses the staged-refresh machinery (pendingNew/applyPending).
+                    pendingNew, applyPending,
                     // Z0: phone (<=640) = isMobile here; the lead renders text-first (no hero image).
                     // At 641-900 (ipad-portrait sections) isMobile is false, so the hero image stays.
                     isPhone: isMobile,

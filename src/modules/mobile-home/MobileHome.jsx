@@ -190,7 +190,8 @@ export function MobileHome({ ctx }) {
   const { arts, breakingItems, loadCat, loading, lastUpdated, onRead, onSave, isSavedFn,
     setChatContext, navigate, openCustomize, favTeams, CATS, storyKey, fmtDate, opinionLabel,
     HOUSTON_SOURCES, ActiveScoresBar, DEBUG, isPhone, setPerspArticle,
-    podEps, loadPod, PODCAST_FEEDS } = ctx;
+    podEps, loadPod, PODCAST_FEEDS, pendingNew, applyPending } = ctx;
+  const nNew = (pendingNew && pendingNew.general || []).length;
 
   // Lazy-load bookkeeping: which section cats have had loadCat fired.
   const requestedRef = useRef(new Set());
@@ -319,6 +320,14 @@ export function MobileHome({ ctx }) {
 
   return (
     <div className="page mobile-home" data-mobile-home="1">
+      {/* Z4: "N new stories" pill — staged refresh (pull-to-refresh) stows fresh general stories in
+          pendingNew.general without replacing the view (0 shift), and this fixed-position pill (out
+          of flow, so its appearance shifts nothing) applies them on tap. */}
+      {nNew > 0 && applyPending && (
+        <button className="new-stories-pill mh-nsp" type="button" onClick={() => applyPending('general')}>
+          <span className="nsp-dot"/> ↑ {nNew} new {nNew === 1 ? 'story' : 'stories'}
+        </button>
+      )}
       {/* LEAD. Z0: on phone (<=640) the lead is TEXT-FIRST — no hero image is rendered or requested
           (hideImage={isPhone} on the one Lead component; the band decision, not a fork). At 641-900
           (ipad-portrait sections) isPhone is false, so the 16:9 hero image stays exactly as before.

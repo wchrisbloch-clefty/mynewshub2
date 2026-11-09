@@ -150,3 +150,7 @@
 .mh-brk-title{flex:1;min-width:0;font-family:var(--font-sans);font-weight:500;font-size:var(--fs-body);
   color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
 .mh-brk-age{flex-shrink:0;font-size:var(--fs-meta);color:var(--text3);white-space:nowrap;}
+
+/* Z4: "N new stories" pill on the phone Home — FIXED (out of flow) so its appearance during a
+   staged refresh shifts nothing. Overrides the in-flow sticky base (.new-stories-pill). */
+.new-stories-pill.mh-nsp{position:fixed;top:auto;bottom:calc(64px + env(safe-area-inset-bottom,0));left:50%;margin:0;z-index:200;}
