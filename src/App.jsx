@@ -66,7 +66,9 @@ import { TopicTag } from './modules/topic-tag';
 import { CatIcon, SHOW_CHIP_ICONS } from './modules/cat-icon';
 import { cleanSourceName } from './modules/source-name';
 import { SnapshotCard, CoverageList } from './modules/snapshot-card';
-import { MobileHome } from './modules/mobile-home';
+// Z7: lazy-split the phone/iPad-portrait Home surface off the initial chunk (it never renders on
+// desktop). The Suspense fallback reserves full height so the chunk swap causes no layout shift.
+const MobileHome = lazy(() => import('./modules/mobile-home').then(m => ({ default: m.MobileHome })));
 import { FollowSourceContext, FollowSourceChip } from './modules/follow-source';
 import { MarketsSurface, useMarkets } from './modules/markets-surface';
 import { parseRoute, buildPath } from './modules/routing';
@@ -6631,48 +6633,6 @@ function FeedCard({a, cat, isSaved, onSave, onRead, relatedSources, isRead, user
 }
 
 // ─── TODAY ITEM ───────────────────────────────────────────────────────────────
-function TodayItem({a, cc, onRead}) {
-  const [showSum, setShowSum] = useState(false);
-  const [sum, setSum] = useState('');
-  const [sumPreview, setSumPreview] = useState(false);
-  const [err, setErr] = useState('');
-  const [loading, setLoading] = useState(false);
-  // X1: image error state now lives inside <SourceImage>.
-
-  const handleAI = async (e) => {
-    e.stopPropagation();
-    if (showSum) { setShowSum(false); return; }
-    if (sum||err) { setShowSum(true); return; }
-    setShowSum(true); setLoading(true);
-    const {summary, error, fromPreview} = await fetchAISummary({type:'article',title:a.title,content:a.desc||'',url:a.link});
-    if (summary) { setSum(summary); setSumPreview(!!fromPreview); } else setErr(error||'Summary unavailable');
-    setLoading(false);
-  };
-
-  return (
-    <div className="today-item-wrap">
-      <div className="today-item" onClick={()=>onRead(a)}>
-        {/* X1: text-only when there is no usable image (no blank indent). */}
-        <SourceImage src={a.img} variant="row" className="today-thumb" alt=""/>
-        <div className="today-item-body">
-          <div className="today-item-title">{a.title}</div>
-          <div className="today-item-src">{a.source} · {fmtDate(a.pubDate)}</div>
-        </div>
-        <button className={`today-ai-btn ${showSum?'on':''}`} title="AI Summary" onClick={handleAI} disabled={loading}>
-          {loading?'…':<Sparkles size={13} aria-hidden="true"/>}
-        </button>
-        <ShareControl className="today-share" title={a.title} url={a.link} source={a.source}/>
-      </div>
-      {showSum && (
-        <div className="today-summary" onClick={e=>e.stopPropagation()}>
-          {loading ? <em style={{color:'var(--text3)'}}>Generating summary...</em>
-          : err ? <span style={{color:'var(--red)'}}>{err}</span>
-          : <>{sumPreview && <div className="fc-preview-note" style={{marginBottom:'8px'}}>{PREVIEW_LABEL}</div>}{sum}</>}
-        </div>
-      )}
-    </div>
-  );
-}
 
 
 // ─── MORNING BRIEFING INLINE (v19 enhanced) ──────────────────────────────────
@@ -7717,74 +7677,6 @@ function PtrIndicator({ distance, threshold, refreshing }) {
 //   2. Favorite-team live games (ESPN scores, state === 'in')
 //   3. Big watchlist moves (>=2% up or down)
 // One glanceable row. Caps total items at 6 so it doesn't become a ticker.
-function RightNowStrip({ breakingItems, scores, marketData, watchlist, onOpen, onNavigate }) {
-  const items = useMemo(() => {
-    const out = [];
-
-    // Live games involving favorite teams
-    Object.values(scores || {}).flat().forEach(g => {
-      if (g.state !== 'in') return;
-      const fav = favoriteIn(g);
-      if (!fav) return;
-      out.push({
-        kind:'score', key:`g${g.id}`, emoji:fav.emoji,
-        text:`${g.awayAbbr||g.awayName} ${g.awayScore} — ${g.homeScore} ${g.homeAbbr||g.homeName}`,
-        sub:g.status, link:g.link,
-      });
-    });
-
-    // Watchlist big movers (≥2% abs)
-    (watchlist || []).forEach(w => {
-      const q = marketData?.[w.sym];
-      if (!q || Math.abs(q.pct) < 2) return;
-      out.push({
-        kind:'market', key:`m${w.sym}`,
-        emoji: q.chg >= 0 ? '' : '',
-        text: w.sym,
-        val: `${q.chg >= 0 ? '▲':'▼'} ${Math.abs(q.pct).toFixed(2)}%`,
-        valClass: q.chg >= 0 ? 'up' : 'down',
-        link: `https://finance.yahoo.com/quote/${encodeURIComponent(w.sym)}`,
-      });
-    });
-
-    // Urgent breaking items (already deduped + urgent-filtered upstream)
-    (breakingItems || []).slice(0, 3).forEach((b, i) => {
-      out.push({
-        kind:'urgent', key:`b${i}`, emoji:'',
-        text: b.title.length > 54 ? b.title.slice(0, 52) + '…' : b.title,
-        sub: b.source,
-        article: b,
-      });
-    });
-
-    return out.slice(0, 6);
-  }, [breakingItems, scores, marketData, watchlist]);
-
-  if (items.length === 0) return null;
-
-  return (
-    <div className="rn-strip">
-      <span className="rn-label">
-        <span className="rn-pulse"/>
-        Breaking & Right Now
-      </span>
-      <div className="rn-items">
-        {items.map((it, i) => (
-          <span key={it.key} className={`rn-item ${it.kind==='urgent'?'urgent':''}`} onClick={() => {
-            if (it.article) onOpen(it.article);
-            else if (it.link) window.open(it.link, '_blank');
-          }}>
-            <span className="rn-item-kind">{it.emoji}</span>
-            <span className="rn-item-text">{it.text}</span>
-            {it.val && <span className={`rn-item-val ${it.valClass||''}`}>{it.val}</span>}
-            {it.sub && <span style={{color:'var(--text3)',fontSize:'var(--fs-label)'}}>· {it.sub}</span>}
-            {i < items.length - 1 && <span className="rn-divider" style={{marginLeft:10}}/>}
-          </span>
-        ))}
-      </div>
-    </div>
-  );
-}
 
 // FollowingStrip removed in v21 per user — low signal, consumed above-fold space.
 
@@ -7792,33 +7684,6 @@ function RightNowStrip({ breakingItems, scores, marketData, watchlist, onOpen, o
 // Uses the existing diverseTrending() function so no category dominates.
 // Scrollable on both desktop and mobile. Each card shows rank + category
 // badge + title + source. Tap → read article.
-function TrendingCarousel({ arts, kw, onRead }) {
-  const stories = useMemo(() => diverseTrending(arts, kw, 10, 2), [arts, kw]);
-  if (!stories.length) return null;
-  return (
-    <div className="trending-inline">
-      <div className="trending-inline-head">
-        <span className="trending-inline-title">Trending across the hub</span>
-      </div>
-      <div className="trending-row">
-        {stories.map((a, i) => {
-          const cc = CATS[a.cat] || CATS.general;
-          const badge = catBadge(a);
-          return (
-            <div key={i} className="trending-card" onClick={() => onRead(a)}>
-              <div className="trending-card-meta">
-                <span className="trending-card-num">{i+1}</span>
-                <span className="trending-card-badge">{badge.label}</span>
-              </div>
-              <div className="trending-card-title">{a.title}</div>
-              <div className="trending-card-src">{a.source} · {fmtDate(a.pubDate)}</div>
-            </div>
-          );
-        })}
-      </div>
-    </div>
-  );
-}
 
 // MINI SCOREBOARD STRIP — v20 — slim horizontal row of live/recent games
 // involving favorite teams. Sits ABOVE the Sports section on Today. Ghost
@@ -7929,69 +7794,6 @@ function SportsScoreStrip({ sportTab = 'all', teams }) {
 // Mobile: single-column, headlines below hero.
 // Purpose: put 5 headlines on screen WITH the hero so user gets density
 // + snapshot the moment the page opens.
-function HeroBand({ heroStories, heroIdx, setHeroIdx, paused, setPaused, onRead }) {
-  const lead = heroStories[heroIdx];
-  if (!lead) return null;
-  // Secondary headlines = the rest of the ranked set (up to 5)
-  const secondary = heroStories.slice(0, 6).filter((_, i) => i !== heroIdx).slice(0, 5);
-
-  return (
-    <div
-      className="hero-band"
-      onMouseEnter={()=>setPaused(true)}
-      onMouseLeave={()=>setPaused(false)}
-    >
-      {/* LEFT: large lead */}
-      <article className="hero-band-lead" onClick={()=>onRead(lead)}>
-        <div className="hero-band-img">
-          <SourceImage src={lead.img} variant="lead" className="cover-img" alt=""/>
-          <div className="hero-band-grad"/>
-          <div className="hero-band-text-overlay">
-            <div className="hero-band-badge" style={{background:(CATS[lead._cat]?.color||'var(--accent)')}}>
-              {CATS[lead._cat]?.emoji} {CATS[lead._cat]?.label||'News'}
-            </div>
-            <h1 className="hero-band-title">{lead.title}</h1>
-            {lead.desc && <p className="hero-band-desc">{lead.desc}</p>}
-            <div className="hero-band-meta">
-              <span className="hero-band-source">{lead.source}</span>
-              <span>·</span>
-              <span>{fmtDate(lead.pubDate)}</span>
-            </div>
-          </div>
-          {heroStories.length > 1 && (
-            <div className="hero-band-dots">
-              {heroStories.slice(0,5).map((_,i)=>(
-                <button key={i}
-                  className={`hero-band-dot ${i===heroIdx?'active':''}`}
-                  onClick={e=>{e.stopPropagation();setHeroIdx(i);}}
-                  aria-label={`Story ${i+1}`}
-                />
-              ))}
-            </div>
-          )}
-        </div>
-      </article>
-
-      {/* RIGHT: secondary headline stack */}
-      <aside className="hero-band-side">
-        <div className="hero-band-side-label">More top stories</div>
-        {secondary.map((s, i) => (
-          <div key={i} className="hero-band-side-item" onClick={()=>onRead(s)}>
-            <SourceImage src={s.img} variant="row" className="hero-band-side-thumb" alt=""/>
-            <div className="hero-band-side-body">
-              <div className="hero-band-side-title">{s.title}</div>
-              <div className="hero-band-side-meta">
-                <span style={{color:CATS[s._cat]?.color,fontWeight:700}}>{CATS[s._cat]?.label}</span>
-                <span>·</span>
-                <span>{s.source}</span>
-              </div>
-            </div>
-          </div>
-        ))}
-      </aside>
-    </div>
-  );
-}
 
 
 // I2: G5 skeleton shown as the Suspense fallback while the lazy Podcasts chunk loads —
@@ -11056,7 +10858,7 @@ export default function App() {
               {/* M1: the phone Home is a dedicated sectioned surface. Desktop/iPad (and any
                   active filter/search) keep the existing FeedPage render unchanged. */}
               {tab==='general' && (isMobile || ipadSections) && !search && !activeKw && !activeSrc
-                ? <MobileHome ctx={{
+                ? <Suspense fallback={<div className="page mobile-home" style={{minHeight:'100vh'}} aria-busy="true"/>}><MobileHome ctx={{
                     arts, breakingItems, loadCat, loading, lastUpdated, onRead, onSave, isSavedFn,
                     setChatContext, navigate, openCustomize, feeds, feedHealth,
                     favTeams: [...teams, ...myTeams.map(t=>({match:t.name, league:t.league}))],
@@ -11069,7 +10871,7 @@ export default function App() {
                     // Z0: phone (<=640) = isMobile here; the lead renders text-first (no hero image).
                     // At 641-900 (ipad-portrait sections) isMobile is false, so the hero image stays.
                     isPhone: isMobile,
-                  }}/>
+                  }}/></Suspense>
                 : NEWS_CATS.filter(c=>c!=='sports').includes(tab)&&<FeedPage cat={tab} ctx={{
                 activeKw, activeSrc, applyPending, arts, breakingItems, briefingExclude, feedHealth,
                 feeds, followTeam, followedTeams, handleTabChange, health, isSavedFn, isTeamFollowed,
