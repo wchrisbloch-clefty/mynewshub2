@@ -2946,6 +2946,13 @@ body:not(.dark) .pill-bar{
 .pod-btn{border:1px solid var(--border);border-radius:var(--radius-md);padding:4px 10px;font-size:var(--fs-label);cursor:pointer;font-family:inherit;font-weight:500;background:none;color:var(--text2);transition:all 0.12s;}
 .pod-btn:hover{border-color:var(--accent);color:var(--accent);}
 .pod-btn.saved{border-color:var(--amber);color:var(--amber);background:var(--wash-warm);}
+/* Z5: PODCAST · Show · time · duration — dot separators between meta tokens. */
+.pod-meta span:not(:first-child)::before{content:"·";margin-right:7px;color:var(--text4);}
+/* Z5: episode AI panel states (shared look with the article panel). */
+.pod-ai-panel{margin:10px 0 0;}
+.pod-ai-note{font-size:var(--fs-meta);color:var(--text3);font-style:italic;}
+.pod-ai-err{font-size:var(--fs-meta);color:var(--red);}
+.pod-inline-link{background:none;border:none;padding:0;margin:0;color:var(--accent);font-weight:700;cursor:pointer;font-family:inherit;font-size:var(--fs-meta);text-decoration:underline;}
 .pod-shows{background:var(--surface);border-radius:var(--radius-md);border:1px solid var(--border);padding:14px;}
 .pod-show-item{display:flex;align-items:center;gap:8px;padding:8px 0;border-bottom:1px solid var(--border2);cursor:pointer;}
 .pod-show-item:last-child{border-bottom:none;}
@@ -10946,6 +10953,8 @@ export default function App() {
                     favTeams: [...teams, ...myTeams.map(t=>({match:t.name, league:t.league}))],
                     CATS, storyKey, fmtDate, opinionLabel, HOUSTON_SOURCES, ActiveScoresBar, DEBUG,
                     setPerspArticle,
+                    // Z5: phone Home Podcasts section — latest 3 episodes, lazy, collapses empty.
+                    podEps, podLoading, loadPod, PODCAST_FEEDS, fmtDuration,
                     // Z0: phone (<=640) = isMobile here; the lead renders text-first (no hero image).
                     // At 641-900 (ipad-portrait sections) isMobile is false, so the hero image stays.
                     isPhone: isMobile,
@@ -10969,7 +10978,9 @@ export default function App() {
                     onSave={onSave} isSaved={isSavedFn} loadPod={loadPod}
                     fetchAISummary={fetchAISummary} fmtDate={fmtDate} fmtDuration={fmtDuration}
                     TakeawaysContent={TakeawaysContent} LastUpdated={LastUpdated}
-                    PODCAST_FEEDS={PODCAST_FEEDS}/>
+                    PODCAST_FEEDS={PODCAST_FEEDS}
+                    fetchListen={fetchListen} setChatContext={setChatContext}
+                    ExplainContent={ExplainContent} ShareControl={ShareControl} PREVIEW_MIN={PREVIEW_MIN}/>
                 </Suspense>
               )}
               {tab==='sources'&&(

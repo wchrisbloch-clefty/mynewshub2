@@ -139,13 +139,62 @@ function CategorySection({ s, ctx, eager, onNear }) {
   );
 }
 
+// Z5: phone Home PODCASTS section — the latest 3 episodes across all shows, lazy-loaded when near
+// the viewport and collapsing to nothing when there are none. Same COMPACT row anatomy as the rest
+// of the page (PODCAST · Show · time · duration meta); the row opens the episode, the header's
+// "See all" opens the full Podcasts page where the Z5 action set (Summary/Takeaways/Explain/Ask/…) lives.
+function PodcastSection({ ctx, onNear }) {
+  const { podEps, podLoading, PODCAST_FEEDS, fmtDate, fmtDuration, navigate } = ctx;
+  const ref = useRef(null);
+  const firedRef = useRef(false);
+  const fire = () => { if (firedRef.current) return; firedRef.current = true; onNear(); };
+  useEffect(() => {
+    const el = ref.current;
+    if (!el || typeof IntersectionObserver === 'undefined') { fire(); return; }
+    const io = new IntersectionObserver(ents => { if (ents.some(e => e.isIntersecting)) { fire(); io.disconnect(); } }, { rootMargin: '600px 0px' });
+    io.observe(el);
+    return () => io.disconnect();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const feeds = PODCAST_FEEDS || [];
+  const eps = feeds.flatMap(p => (podEps[p.name] || []).slice(0, 3).map(e => ({ ...e, show: e.show || p.name })))
+    .sort((a, b) => new Date(b.pubDate) - new Date(a.pubDate)).slice(0, 3);
+  const anyLoading = feeds.some(p => podLoading && podLoading[p.name]);
+  const everLoaded = feeds.some(p => podEps && podEps[p.name] !== undefined);
+
+  // Collapse to nothing once loaded & genuinely empty — but keep the observed node so a late
+  // fetch can still fill it in.
+  if (everLoaded && !anyLoading && eps.length === 0) return <div ref={ref} className="mh-section mh-section-hidden" aria-hidden="true"/>;
+
+  return (
+    <section ref={ref} className="mh-section mh-podcasts" data-cat="podcasts">
+      <div className="mh-sec-head">
+        <span className="eyebrow mh-sec-label">Podcasts</span>
+        <SeeAll label="Podcasts" onClick={() => navigate('podcasts')}/>
+      </div>
+      {eps.length
+        ? <div className="mh-rows">{eps.map((ep, i) => (
+            <button key={ep.link || i} className="mh-compact" type="button"
+              onClick={() => ep.link ? window.open(ep.link, '_blank', 'noopener') : navigate('podcasts')}>
+              <span className="mh-compact-title">{ep.title}</span>
+              <span className="mh-compact-meta">Podcast · {ep.show} · {fmtDate(ep.pubDate)}{ep.duration ? ` · ${fmtDuration(ep.duration)}` : ''}</span>
+            </button>))}
+          </div>
+        : <SectionSkeleton rows={3} label="Podcasts"/>}
+    </section>
+  );
+}
+
 export function MobileHome({ ctx }) {
   const { arts, breakingItems, loadCat, loading, lastUpdated, onRead, onSave, isSavedFn,
     setChatContext, navigate, openCustomize, favTeams, CATS, storyKey, fmtDate, opinionLabel,
-    HOUSTON_SOURCES, ActiveScoresBar, DEBUG, isPhone, setPerspArticle } = ctx;
+    HOUSTON_SOURCES, ActiveScoresBar, DEBUG, isPhone, setPerspArticle,
+    podEps, loadPod, PODCAST_FEEDS } = ctx;
 
   // Lazy-load bookkeeping: which section cats have had loadCat fired.
   const requestedRef = useRef(new Set());
+  const podsRequestedRef = useRef(false);   // Z5: fire loadPod for all shows once, when near.
   const [, forceReq] = useState(0);
   const requestCat = (cats) => {
     let changed = false;
@@ -339,6 +388,12 @@ export function MobileHome({ ctx }) {
         <CategorySection key={s.cat} s={s} ctx={ctx} eager={i < EAGER}
           onNear={() => requestCat([s.cat, ...(s.extra || [])])}/>
       ))}
+
+      {/* Z5: PODCASTS — latest 3 episodes, lazy-loaded, collapses when empty. */}
+      <PodcastSection ctx={ctx} onNear={() => {
+        if (podsRequestedRef.current) return; podsRequestedRef.current = true;
+        (PODCAST_FEEDS || []).forEach(p => { if (!(podEps && podEps[p.name]) && loadPod) loadPod(p); });
+      }}/>
 
       {/* HOUSTON LOCAL */}
       {model.houston.length > 0 && (

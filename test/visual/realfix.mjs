@@ -134,6 +134,17 @@ export async function installRealFixtures(page, { emptyCats = [], failCats = [],
   await page.route('**/api/prediction-markets**', async r => { await D(); return r.fulfill({ status:200, contentType:'application/json', body: JSON.stringify(PM) }); });
   await page.route('**/api/signals**', async r => { await D(); return r.fulfill({ status:200, contentType:'application/json', body: JSON.stringify({ items: [], results: [] }) }); });
   await page.route('**/api/feed**', async r => { await D(); const u=new URL(r.request().url()); const feedUrl=u.searchParams.get('url')||'';
+    // Z5: podcast feeds (megaphone / libsyn) return real-shape episodes — one with LONG show notes,
+    // one with SHORT (<120 char) notes, one with NONE — each with a media URL, so the Podcasts page
+    // can exercise the summary source ladder and the full action set.
+    if (/feeds\.megaphone\.fm|\.libsyn\.com/.test(feedUrl)) {
+      const eps = [
+        { title: 'Episode 412 — The State of AI, Markets, and the Election Fallout', link: 'https://ex.com/pod/412', audio: 'https://ex.com/pod/412.mp3', pubDate: iso(-120), duration: '1:42:00', desc: 'A wide-ranging conversation covering the macro picture, the latest AI model releases, what the election means for regulation, and a long listener-questions segment at the end that runs well past the usual length for this show.' },
+        { title: 'Episode 411 — Quick Hits on the Week in Tech', link: 'https://ex.com/pod/411', audio: 'https://ex.com/pod/411.mp3', pubDate: iso(-1560), duration: '58:00', desc: 'Short recap of the week.' },
+        { title: 'Episode 410 — No Show Notes This Week', link: 'https://ex.com/pod/410', audio: 'https://ex.com/pod/410.mp3', pubDate: iso(-3000), duration: '2:05:00', desc: '' },
+      ];
+      return r.fulfill({ status:200, contentType:'application/json', body: JSON.stringify({ items: eps, status:200 }) });
+    }
     // Z1: general is multi-publisher — route each general feed URL to its slice of the headlines.
     if (feedUrl in GENERAL_FEED_IDX) { if (!emptyCats.includes('general') && !failCats.includes('general')) return r.fulfill({ status:200, contentType:'application/json', body: JSON.stringify({ items: generalItemsForFeed(GENERAL_FEED_IDX[feedUrl]), status:200 }) }); return r.fulfill({ status:200, contentType:'application/json', body: JSON.stringify({ items:[], status:200 }) }); }
     const cat=urlToCat[feedUrl]; if(cat&&failCats.includes(cat)) return r.fulfill({ status:500, contentType:'application/json', body: JSON.stringify({ items:[], status:503 }) }); if(cat&&!emptyCats.includes(cat)) return r.fulfill({ status:200, contentType:'application/json', body: JSON.stringify({ items: catItems(cat), status:200 }) }); return r.fulfill({ status:200, contentType:'application/json', body: JSON.stringify({ items: [], status:200 }) }); });
