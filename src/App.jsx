@@ -275,22 +275,25 @@ const DEFAULT_KW = {
 
 const DEFAULT_FEEDS = {
   general: [
+    // Z2: NEWS is headlines-first. The clearly non-news publishers that were in the general bucket
+    // are reclassified to the category they belong to (per-feed cat override) so they no longer
+    // qualify as General lead / Top stories / breaking — they still appear on their category page and
+    // in its sections. Moved (old -> new): TechCrunch -> tech (already present there; removed here),
+    // CNBC Top News -> business, Morning Brew -> business, Bloomberg (markets) -> finance. Left as
+    // general: BBC, NPR, Fox, NY Post, The Hill, Washington Times, Guardian US, Axios, Breitbart,
+    // KHOU, Chron, Morning Wire.
     { name:'BBC News',          url:'https://feeds.bbci.co.uk/news/rss.xml',                                    on:true },
     { name:'NPR News',          url:'https://feeds.npr.org/1001/rss.xml',                                       on:true },
-    { name:'CNBC Top News',     url:'https://www.cnbc.com/id/100003114/device/rss/rss.html',                    on:true },
     { name:'Fox News',          url:'https://moxie.foxnews.com/google-publisher/latest.xml',                    on:true },
     { name:'NY Post',           url:'https://nypost.com/feed/',                                                 on:true },
     { name:'The Hill',          url:'https://thehill.com/homenews/feed/',                                       on:true },
-    { name:'TechCrunch',        url:'https://techcrunch.com/feed/',                                             on:true },
     { name:'Washington Times',  url:'https://www.washingtontimes.com/rss/headlines/news/',                      on:true },
     { name:'The Guardian US',   url:'https://www.theguardian.com/us/rss',                                       on:true },
     { name:'Axios',             url:'https://api.axios.com/feed/',                                              on:true },
     { name:'Breitbart',         url:'https://feeds.feedburner.com/breitbart',                                   on:true },
     { name:'KHOU Houston',      url:'https://www.khou.com/feeds/syndication/rss/news',                          on:true },
     { name:'Chron.com',         url:'https://www.chron.com/rss/feed/News-270.php',                              on:true },
-    { name:'Morning Brew',      url:'https://www.morningbrew.com/feed',                                         on:true },
     { name:'Morning Wire',      url:'https://feeds.megaphone.fm/BVDWV8747925072',                               on:true },
-    { name:'Bloomberg',         url:'https://feeds.bloomberg.com/markets/news.rss',                              on:true },
   ],
   sports: [
     // ESPN via its supported JSON news API (site.api.espn.com) — the old
@@ -326,6 +329,8 @@ const DEFAULT_FEEDS = {
   business: [
     { name:'NPR Business',           url:'https://feeds.npr.org/1006/rss.xml',                                  on:true },
     { name:'CNBC Business',          url:'https://www.cnbc.com/id/10001147/device/rss/rss.html',                on:true },
+    { name:'CNBC Top News',          url:'https://www.cnbc.com/id/100003114/device/rss/rss.html',               on:true }, // Z2: moved from general
+    { name:'Morning Brew',           url:'https://www.morningbrew.com/feed',                                    on:true }, // Z2: moved from general
     { name:'Oilprice.com',           url:'https://oilprice.com/rss/main',                                       on:true },
     { name:'Utility Dive',           url:'https://www.utilitydive.com/feeds/news/',                             on:true },
     { name:'Data Center Dynamics',   url:'https://www.datacenterdynamics.com/en/rss/',                          on:true },
@@ -338,6 +343,7 @@ const DEFAULT_FEEDS = {
   ],
   finance: [
     { name:'MarketWatch',   url:'https://feeds.marketwatch.com/marketwatch/topstories/',                        on:true },
+    { name:'Bloomberg',     url:'https://feeds.bloomberg.com/markets/news.rss',                                 on:true }, // Z2: moved from general (markets)
     { name:'Yahoo Finance', url:'https://finance.yahoo.com/news/rssindex',                                      on:true },
     { name:'Motley Fool',   url:'https://www.fool.com/feeds/index.aspx',                                        on:true },
     { name:'BiggerPockets', url:'https://www.biggerpockets.com/blog/feed',                                      on:true },
@@ -10939,6 +10945,10 @@ export default function App() {
                     setChatContext, navigate, openCustomize, feeds, feedHealth,
                     favTeams: [...teams, ...myTeams.map(t=>({match:t.name, league:t.league}))],
                     CATS, storyKey, fmtDate, opinionLabel, HOUSTON_SOURCES, ActiveScoresBar, DEBUG,
+                    setPerspArticle,
+                    // Z0: phone (<=640) = isMobile here; the lead renders text-first (no hero image).
+                    // At 641-900 (ipad-portrait sections) isMobile is false, so the hero image stays.
+                    isPhone: isMobile,
                   }}/>
                 : NEWS_CATS.filter(c=>c!=='sports').includes(tab)&&<FeedPage cat={tab} ctx={{
                 activeKw, activeSrc, applyPending, arts, breakingItems, briefingExclude, feedHealth,

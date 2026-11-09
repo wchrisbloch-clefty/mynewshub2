@@ -33,6 +33,30 @@
 .mh-lead-skel-deck{width:40%;margin-top:4px;}
 @media(prefers-reduced-motion:reduce){.mh-lead-skel-img,.mh-lead-skel-main span{animation:none;}}
 
+/* Z0: phone (<=640) TEXT-FIRST lead — no hero image. SnapshotCard renders its existing
+   .snap-lead-noimg phone treatment (large serif headline + meta + hairline under, no box, no image).
+   Drop the .mh-lead 16:9 reserve so the lead is sized to its text (blank beneath <=12px); the
+   hairline and vertical rhythm come from .snap-lead-noimg. The loading skeleton is text-only and
+   sized to the committed text lead so the swap-in causes no shift. */
+/* Z0: the phone text lead box is reserved at the committed text-lead height (~256px for the fixture
+   lead headline) so the skeleton and the loaded lead occupy the same box — no growth shift when the
+   lead commits. SnapshotCard's shared .snap-lead-noimg keeps a 220px centred reserve for category
+   fallbacks; the Home lead is top-aligned and content-sized so the first Top-stories row rides up.
+   The hairline under the lead comes from .snap-lead-noimg's border. (For a shorter real headline the
+   box over-reserves; sized to content is reported as CLS-limited in batch-Z-report.) */
+.mh-lead-noimg{min-height:256px;}
+.mh-lead-noimg .snap-lead-noimg{min-height:0;justify-content:flex-start;padding:0 0 14px;}
+.mh-lead-skel-text{display:flex;flex-direction:column;gap:12px;padding:8px 0 16px;justify-content:flex-start;}
+.mh-lead-skel-text span{border-radius:var(--radius-md);
+  background:linear-gradient(90deg,var(--surface2) 25%,var(--border) 50%,var(--surface2) 75%);
+  background-size:200% 100%;animation:shimmer 1.4s infinite;}
+.mh-lead-skel-text .mh-lead-skel-kicker{width:28%;height:12px;}
+.mh-lead-skel-text .mh-lead-skel-h1{width:96%;height:28px;}
+.mh-lead-skel-text .mh-lead-skel-h2{width:76%;height:28px;}
+.mh-lead-skel-text .mh-lead-skel-deck{width:60%;height:14px;margin-top:2px;}
+.mh-lead-skel-text .mh-lead-skel-meta{width:44%;height:12px;}
+@media(prefers-reduced-motion:reduce){.mh-lead-skel-text span{animation:none;}}
+
 /* Section shell: one shared header (eyebrow + See all) then its rows. Reserve a min-height
    that matches a loaded 3-row section (one STANDARD ~188px + two COMPACT ~75px + header),
    so the skeleton and the final content occupy ~the same space and nothing below shifts
@@ -47,6 +71,20 @@
   background:none;border:none;cursor:pointer;font-family:var(--font-sans);
   font-size:var(--fs-body);font-weight:700;color:var(--accent);}
 .mh-seeall svg{margin-top:1px;}
+
+/* Z1: "Show all top stories" — a full-width secondary button under the 5 Top-stories rows that opens
+   the full State-of-Play page ("All top stories"). Matches the one SecondaryButton look (1px border,
+   transparent, radius-md) so conformance is unaffected. */
+.mh-topstories-all{display:flex;align-items:center;justify-content:center;gap:4px;width:100%;
+  min-height:44px;margin-top:10px;background:transparent;border:1px solid var(--border);
+  border-radius:var(--radius-md);cursor:pointer;font-family:var(--font-sans);
+  font-size:var(--fs-body);font-weight:700;letter-spacing:0.02em;color:var(--text2);}
+.mh-topstories-all:focus-visible{outline:2px solid var(--accent);outline-offset:2px;}
+/* Z1.2: the quiet "N sources" chip on a widely-covered Top-stories row; opens perspectives. */
+.mh-compact-sources{display:inline-block;margin-left:2px;padding:0 6px;border:1px solid var(--border);
+  border-radius:var(--radius-full);font-size:var(--fs-meta);font-weight:700;color:var(--text3);
+  cursor:pointer;white-space:nowrap;}
+.mh-compact-sources:focus-visible{outline:2px solid var(--accent);outline-offset:2px;}
 
 .mh-rows{display:flex;flex-direction:column;}
 
@@ -66,13 +104,20 @@
 
 /* Top stories — always present once General loads; reserve 4 compact rows + header so the
    block does not pop in and shove the lead/sections (M4). */
-.mh-topstories{min-height:356px;} /* W3/X5a: 356 is the CLS-safe floor (tightening to the ~340 content regressed mobile CLS); the ~16px over-reserve is the smallest floor that holds CLS */
+/* Z1: the Top-stories block is a FIXED 5-row reserve (header + 5 COMPACT rows + the Show-all button)
+   so it never changes height between the skeleton and the committed list — nothing below it shifts.
+   Measured committed height ~430px; the floor matches so the swap-in is zero-shift. */
+.mh-topstories{min-height:430px;}
 /* Breaking is conditional; reserve its slot only while General is still loading so it does not
    shove content when it arrives, then it collapses if there is nothing breaking. T1: sized to the
    one-line strip (~2 rows) — the old 300px reserve was for the retired breaking CARD and collapsing
    it to the lean strip was the Home CLS. */
-.mh-breaking{min-height:0;} /* W6: collapses to 0px when nothing is breaking (Batch T). The real fix for the load-shove is the held-head coalescing in MobileHome.jsx, not a permanent floor. */
-.mh-breaking-reserve{min-height:108px;} /* reserve the slot only while General is still loading (see the JSX gate) so breaking arriving does not shove content */
+.mh-breaking{min-height:0;} /* collapses to 0px when nothing is breaking (Batch T). */
+/* Z1: the breaking slot is reserved at its PREDICTED row count so the committed strip fills the
+   reserve instead of shoving Top stories. A .mh-brk-row is 36px (7+7 padding + ~22 line). */
+.mh-breaking-n1{min-height:36px;}
+.mh-breaking-n2{min-height:72px;}
+.mh-breaking-n3{min-height:108px;}
 
 /* Live scores strip — ActiveScoresBar styles itself (.home-scores); just spacing. */
 .mh-scores{min-height:0;}
