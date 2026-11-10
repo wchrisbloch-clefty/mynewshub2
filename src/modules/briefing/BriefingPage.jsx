@@ -150,7 +150,7 @@ export function BriefingPage({ arts, briefingExclude, lastUpdated, briefingSourc
               </span>
             </div>
             {tier1.items.length === 0
-              ? <div style={{padding:'14px 0',fontSize:'12px',color:'var(--text3)'}}>
+              ? <div style={{padding:'14px 0',fontSize:'var(--fs-meta)',color:'var(--text3)'}}>
                   Priority briefing sources haven't loaded yet. Make sure {briefingSourceList().join(', ')} are enabled in your General feeds.
                 </div>
               : tier1.items.map((a, i) => (
@@ -178,7 +178,7 @@ export function BriefingPage({ arts, briefingExclude, lastUpdated, briefingSourc
             );
           })}
 
-          <div style={{textAlign:'center',padding:'32px 0 16px',fontSize:'11px',color:'var(--text3)'}}>
+          <div style={{textAlign:'center',padding:'32px 0 16px',fontSize:'var(--fs-label)',color:'var(--text3)'}}>
             Customize the briefing input by adding sources to General feeds.
             <br/>
             <button className="today-section-link" style={{marginTop:'8px'}} onClick={()=>openCustomize('sources','general')}>

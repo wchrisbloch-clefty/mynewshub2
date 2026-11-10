@@ -1,9 +1,9 @@
 /* T3: the full State of Play page — one column, the rail modules stacked. */
 .sop-page{max-width:720px;margin:0 auto;padding:16px 16px 40px;display:flex;flex-direction:column;gap:22px;}
 .sop-page-head{display:flex;flex-direction:column;gap:3px;}
-.sop-page-title{font-family:var(--font-serif);font-weight:800;font-size:26px;line-height:1.1;color:var(--text);margin:0;}
+.sop-page-title{font-family:var(--font-serif);font-weight:700;font-size:var(--fs-lead);line-height:1.1;color:var(--text);margin:0;}
 .sop-page-sub{font-family:var(--font-sans);font-size:var(--fs-meta);color:var(--text3);}
 .sop-page-module{display:flex;flex-direction:column;}
 .sop-page-sources{display:flex;flex-wrap:wrap;gap:6px;}
 .sop-page-source{display:inline-flex;align-items:center;gap:6px;font-family:var(--font-sans);font-size:var(--fs-meta);font-weight:600;color:var(--text2);background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius-lg);padding:4px 10px;}
-.sop-page-source-n{font-weight:800;color:var(--text3);font-variant-numeric:tabular-nums;}
+.sop-page-source-n{font-weight:700;color:var(--text3);font-variant-numeric:tabular-nums;}

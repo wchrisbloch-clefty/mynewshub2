@@ -5,8 +5,8 @@
 .sop-head{display:flex;align-items:baseline;gap:10px;margin-bottom:10px;flex-wrap:wrap;}
 .sop-collapse{margin-left:auto;background:none;border:none;cursor:pointer;color:var(--text3);padding:2px 2px 0;display:flex;align-items:center;align-self:center;}
 .sop-collapse:hover{color:var(--text);}
-.sop-label{font-family:var(--font-serif);font-weight:800;font-size:12px;text-transform:uppercase;letter-spacing:0.08em;border-left:3px solid;padding-left:8px;}
-.sop-sub{font-family:var(--font-sans);font-size:12px;color:var(--text3);}
+.sop-label{font-family:var(--font-serif);font-weight:700;font-size:var(--fs-meta);text-transform:uppercase;letter-spacing:0.08em;border-left:3px solid;padding-left:8px;}
+.sop-sub{font-family:var(--font-sans);font-size:var(--fs-meta);color:var(--text3);}
 /* S11/S3: ONE row anatomy — every story (ranked, cluster, breaking, gap) is its own lightly
    boxed row: 1px border, 8px radius, 12px padding, 8px gap between rows. No number column, so
    every row's title shares the exact same left edge. Headline on line 1, ONE meta line directly
@@ -15,7 +15,8 @@
 .sop-item{display:flex;flex-direction:column;align-items:stretch;gap:4px;padding:12px;border:1px solid var(--border);border-radius:8px;background:var(--surface);cursor:pointer;text-align:left;font-family:inherit;width:100%;transition:border-color 0.12s,background 0.12s;}
 @media(hover:hover){ .sop-item:hover{border-color:var(--text3);} }
 /* U5.2: ONE headline weight for every row (ranked, cluster, breaking, gap). */
-.sop-item-title{font-family:var(--font-sans);font-weight:var(--fw-medium);font-size:var(--fs-body);line-height:1.35;color:var(--text);min-width:0;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden;overflow-wrap:anywhere;word-break:break-word;}
+/* AA2: a story headline is ALWAYS serif — the SoP/rail rows were the one sans exception (booth). */
+.sop-item-title{font-family:var(--font-serif);font-weight:var(--fw-semibold);font-size:var(--fs-title);line-height:1.3;color:var(--text);min-width:0;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden;overflow-wrap:anywhere;word-break:break-word;}
 .sop-item-meta{display:flex;align-items:center;flex-wrap:wrap;gap:6px;}
 .sop-item-sources{font-family:var(--font-sans);font-size:var(--fs-label);font-weight:700;color:var(--accent);background:var(--surface2);border-radius:var(--radius-md);padding:2px 8px;white-space:nowrap;}
 .sop-item-time{font-family:var(--font-sans);font-size:var(--fs-meta);color:var(--text3);white-space:nowrap;}

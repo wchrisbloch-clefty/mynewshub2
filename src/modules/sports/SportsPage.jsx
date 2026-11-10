@@ -499,7 +499,7 @@ export function SportsPage({ ctx }) {
             {sportTab !== 'all' && (sportWebResults.length > 0 || sportWebLoading) && (
               <div className="web-fallback">
                 <div className="rail-label" style={{margin:'24px 0 12px'}}>From the Web</div>
-                {sportWebLoading && <div style={{fontSize:'12px',color:'var(--text3)',fontStyle:'italic',padding:'10px 0'}}>Searching the web…</div>}
+                {sportWebLoading && <div style={{fontSize:'var(--fs-meta)',color:'var(--text3)',fontStyle:'italic',padding:'10px 0'}}>Searching the web…</div>}
                 {sportWebResults.map((r,i) => (
                   <a key={i} className="web-result" href={r.link} target="_blank" rel="noreferrer">
                     <div className="web-result-title">{r.title}</div>

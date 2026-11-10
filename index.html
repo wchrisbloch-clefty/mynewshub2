@@ -23,11 +23,13 @@
     <meta name="twitter:title" content="MyNewsHub — Your Daily Briefing" />
     <meta name="twitter:description" content="Top stories across General, Business, Sports, Finance, Energy, Pop Culture and more." />
     <link rel="manifest" href="/manifest.json" />
-    <!-- G7b: two families only — Source Serif 4 (headlines) + Inter (UI/data).
-         Non-blocking: preconnect + display=swap (no FOIT, no render-blocking @import). -->
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Serif+4:opsz,wght@8..60,400;8..60,600;8..60,700;8..60,800&family=Inter:wght@400;500;600;700;800&display=swap" />
+    <!-- AA3: self-hosted fonts (no Google Fonts, no third-party on the critical path).
+         @font-face lives in src/styles/fonts.css; preload only the two LATIN variable files
+         (Inter + Source Serif roman, ~97KB total) so first paint has its type without a blocking
+         request. latin-ext loads on demand via unicode-range; metric-matched fallbacks make the
+         swap shift-free. -->
+    <link rel="preload" href="/fonts/inter-latin-wght.f052ee44.woff2" as="font" type="font/woff2" crossorigin />
+    <link rel="preload" href="/fonts/source-serif-4-latin-wght.0804a88d.woff2" as="font" type="font/woff2" crossorigin />
     <title>MyNewsHub — Your Daily Briefing</title>
     <!-- N2: declare both schemes so the browser paints the correct canvas background BEFORE CSS/JS
          load (no white flash for dark-system users) and native controls/scrollbars match the theme. -->

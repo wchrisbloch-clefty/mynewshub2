@@ -108,7 +108,7 @@ export function CustomizePanel({feeds, kw, alerts, urgent, social, watchlist, te
               <div className="cp-cat-tabs">{Object.keys(CAT_LABELS).map(c=><button key={c} className={`cp-cat-tab ${kwTab===c?'active':''}`} onClick={()=>setKwTab(c)}>{CAT_LABELS[c]}</button>)}</div>
               <div className="cp-chips">
                 {(lk[kwTab]||[]).map((k,i)=><span key={i} className="cp-chip cp-chip-kw">{k}<button className="cp-chip-x" onClick={()=>setLk(p=>{const n={...p};n[kwTab]=n[kwTab].filter((_,j)=>j!==i);return n;})}><XIcon size={13} aria-hidden="true"/></button></span>)}
-                {(lk[kwTab]||[]).length===0&&<span style={{fontSize:'11px',color:'var(--text3)'}}>No keywords yet</span>}
+                {(lk[kwTab]||[]).length===0&&<span style={{fontSize:'var(--fs-label)',color:'var(--text3)'}}>No keywords yet</span>}
               </div>
               <div className="cp-add">
                 <input className="cp-input" placeholder={`Add ${kwTab} keyword…`} value={newKw} onChange={e=>setNewKw(e.target.value)}
@@ -124,7 +124,7 @@ export function CustomizePanel({feeds, kw, alerts, urgent, social, watchlist, te
               <div className="cp-desc">Red scrolling ticker fires only on these words. Keep short and urgent-only — disasters, major incidents, crashes. Routine words create noise.</div>
               <div className="cp-chips">
                 {lu.map((u,i)=><span key={i} className="cp-chip cp-chip-alert">{u}<button className="cp-chip-x" onClick={()=>setLu(x=>x.filter((_,j)=>j!==i))}><XIcon size={13} aria-hidden="true"/></button></span>)}
-                {lu.length===0&&<span style={{fontSize:'11px',color:'var(--text3)'}}>No urgent words — ticker off</span>}
+                {lu.length===0&&<span style={{fontSize:'var(--fs-label)',color:'var(--text3)'}}>No urgent words — ticker off</span>}
               </div>
               <div className="cp-add">
                 <input className="cp-input" placeholder="Add urgent word (e.g. hurricane)…" value={newAlert} onChange={e=>setNewAlert(e.target.value)}
@@ -198,7 +198,7 @@ export function CustomizePanel({feeds, kw, alerts, urgent, social, watchlist, te
                 {(ls[socCat]?.[socPlat]||[]).map((h,i)=>(
                   <span key={i} className="cp-chip cp-chip-social">{h}<button className="cp-chip-x" onClick={()=>removeHandle(i)}><XIcon size={13} aria-hidden="true"/></button></span>
                 ))}
-                {(ls[socCat]?.[socPlat]||[]).length===0&&<span style={{fontSize:'11px',color:'var(--text3)'}}>No accounts yet</span>}
+                {(ls[socCat]?.[socPlat]||[]).length===0&&<span style={{fontSize:'var(--fs-label)',color:'var(--text3)'}}>No accounts yet</span>}
               </div>
               <div className="cp-add">
                 <input className="cp-input" placeholder={socPlat==='linkedin'?'Company or person name…':'Handle (e.g. HoustonTexans)'} value={newHandle}
@@ -320,12 +320,12 @@ export function CustomizePanel({feeds, kw, alerts, urgent, social, watchlist, te
               <div className="cp-desc">Stocks shown on the Finance page. Click any row to open Yahoo Finance.</div>
               {lw.map((w,i)=>(
                 <div key={i} className="cp-src-row">
-                  <span style={{fontWeight:700,fontFamily:'monospace',color:'var(--accent)',fontSize:'12px',minWidth:'50px'}}>{w.sym}</span>
+                  <span style={{fontWeight:700,fontFamily:'monospace',color:'var(--accent)',fontSize:'var(--fs-meta)',minWidth:'50px'}}>{w.sym}</span>
                   <span className="cp-src-name">{w.name}</span>
                   <button className="cp-del" onClick={()=>setLw(prev=>prev.filter((_,j)=>j!==i))}><XIcon size={13} aria-hidden="true"/></button>
                 </div>
               ))}
-              {lw.length===0&&<div style={{fontSize:'11px',color:'var(--text3)',padding:'10px 0'}}>No symbols yet</div>}
+              {lw.length===0&&<div style={{fontSize:'var(--fs-label)',color:'var(--text3)',padding:'10px 0'}}>No symbols yet</div>}
               <div className="cp-add-src" style={{marginTop:'10px'}}>
                 <div className="cp-add-src-title">+ Add symbol</div>
                 <input className="cp-input-sm" placeholder="Symbol (e.g. AAPL)" value={newSym} onChange={e=>setNewSym(e.target.value.toUpperCase())}/>
@@ -350,8 +350,8 @@ export function CustomizePanel({feeds, kw, alerts, urgent, social, watchlist, te
                       <button className="cp-reorder" disabled={i===lt.length-1} aria-label={`Move ${t.team} down`}
                         onClick={()=>setLt(prev=>{ if(i===prev.length-1) return prev; const n=[...prev]; [n[i+1],n[i]]=[n[i],n[i+1]]; return n; })}>↓</button>
                     </span>
-                    <span style={{fontSize:'18px'}}>{t.emoji}</span>
-                    <strong style={{fontSize:'12px',color:'var(--text)',flex:1}}>{t.team}</strong>
+                    <span style={{fontSize:'var(--fs-headline)'}}>{t.emoji}</span>
+                    <strong style={{fontSize:'var(--fs-meta)',color:'var(--text)',flex:1}}>{t.team}</strong>
                     <span style={{fontSize:'var(--fs-label)',color:'var(--text3)'}}>{(t.sport||'').toUpperCase()} · {(t.league||'').toUpperCase()}</span>
                     <button className="cp-del" onClick={()=>setLt(prev=>prev.filter((_,j)=>j!==i))}><XIcon size={13} aria-hidden="true"/></button>
                   </div>
@@ -362,7 +362,7 @@ export function CustomizePanel({feeds, kw, alerts, urgent, social, watchlist, te
                   </div>
                 </div>
               ))}
-              {lt.length===0 && <div style={{fontSize:'11px',color:'var(--text3)',padding:'10px 0'}}>No teams yet</div>}
+              {lt.length===0 && <div style={{fontSize:'var(--fs-label)',color:'var(--text3)',padding:'10px 0'}}>No teams yet</div>}
               <div className="cp-add-src" style={{marginTop:'14px'}}>
                 <div className="cp-add-src-title">+ Add team</div>
                 <input className="cp-input-sm" placeholder="Display name (e.g. Houston Texans)" value={newTeam.team} onChange={e=>setNewTeam(t=>({...t,team:e.target.value}))}/>
@@ -431,7 +431,7 @@ export function CustomizePanel({feeds, kw, alerts, urgent, social, watchlist, te
               <div className="cp-desc">Toggle which indices appear in the data strip. Uncheck any to hide.</div>
               <div style={{display:'flex',flexWrap:'wrap',gap:'8px',margin:'8px 0'}}>
                 {INDICES.map(idx => (
-                  <label key={idx.sym} style={{display:'flex',alignItems:'center',gap:'5px',fontSize:'12px',cursor:'pointer'}}>
+                  <label key={idx.sym} style={{display:'flex',alignItems:'center',gap:'5px',fontSize:'var(--fs-meta)',cursor:'pointer'}}>
                     <input type="checkbox"
                       checked={!lhi.includes(idx.sym)}
                       onChange={e => setLhi(prev => e.target.checked ? prev.filter(s=>s!==idx.sym) : [...prev,idx.sym])}
@@ -442,7 +442,7 @@ export function CustomizePanel({feeds, kw, alerts, urgent, social, watchlist, te
               </div>
               <div className="cp-lbl" style={{marginTop:'12px'}}>Watchlist Tickers in Strip</div>
               <div className="cp-desc">Your watchlist tickers also appear — manage them in the Watchlist tab.</div>
-              <div style={{fontSize:'11px',color:'var(--text2)',background:'var(--surface2)',borderRadius:'var(--radius-md)',padding:'8px 10px'}}>
+              <div style={{fontSize:'var(--fs-label)',color:'var(--text2)',background:'var(--surface2)',borderRadius:'var(--radius-md)',padding:'8px 10px'}}>
                 Current watchlist: {lw.map(w=>w.sym).join(' · ') || 'none'}
               </div>
             </div>
@@ -464,7 +464,7 @@ export function CustomizePanel({feeds, kw, alerts, urgent, social, watchlist, te
                   );
                 })}
               </div>
-              <div style={{marginTop:'8px',fontSize:'11px',color:'var(--text3)'}}>
+              <div style={{marginTop:'8px',fontSize:'var(--fs-label)',color:'var(--text3)'}}>
                 {lbs.length ? `${lbs.length} source${lbs.length===1?'':'s'} selected` : `Using defaults: ${BRIEFING_PRIORITY_SOURCES.join(', ')}`}
               </div>
               <div className="cp-lbl" style={{marginTop:'14px'}}>Categories included in briefing</div>
@@ -475,7 +475,7 @@ export function CustomizePanel({feeds, kw, alerts, urgent, social, watchlist, te
                     <label key={cat} style={{display:'flex',alignItems:'center',gap:'6px',cursor:'pointer',
                       background:excluded?'var(--surface2)':'var(--surface)',
                       border:`1px solid ${excluded?'var(--border)':'var(--accent)'}`,
-                      borderRadius:'20px',padding:'5px 12px',fontSize:'12px',fontWeight:600,
+                      borderRadius:'20px',padding:'5px 12px',fontSize:'var(--fs-meta)',fontWeight:600,
                       color:excluded?'var(--text3)':'var(--text)',transition:'all 0.15s'}}>
                       <input type="checkbox" style={{accentColor:'var(--accent)'}}
                         checked={!excluded}
@@ -486,7 +486,7 @@ export function CustomizePanel({feeds, kw, alerts, urgent, social, watchlist, te
                   );
                 })}
               </div>
-              <div style={{marginTop:'12px',fontSize:'11px',color:'var(--text3)'}}>
+              <div style={{marginTop:'12px',fontSize:'var(--fs-label)',color:'var(--text3)'}}>
                 Currently excluded: {lbe.length===0?'none':lbe.map(c=>CAT_LABELS[c]||c).join(', ')}
               </div>
             </div>

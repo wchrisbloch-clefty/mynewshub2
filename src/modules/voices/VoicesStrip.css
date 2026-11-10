@@ -1,7 +1,7 @@
 /* VoicesStrip (E3) — consumes design tokens; reads as a calm sidebar module. */
 .voices-strip{margin-bottom:22px;}
 .voices-head{display:flex;align-items:baseline;gap:6px;padding-bottom:9px;border-bottom:2px solid var(--border);margin-bottom:10px;}
-.voices-label{font-family:var(--font-sans);font-size:var(--fs-label);font-weight:800;color:var(--text3);letter-spacing:0.14em;text-transform:uppercase;}
+.voices-label{font-family:var(--font-sans);font-size:var(--fs-label);font-weight:700;color:var(--text3);letter-spacing:0.14em;text-transform:uppercase;}
 .voices-inferred{font-family:var(--font-sans);font-size:var(--fs-label);font-weight:700;color:var(--text4);letter-spacing:0.04em;}
 .voices-empty{font-family:var(--font-sans);font-size:var(--fs-meta);color:var(--text3);padding:6px 0;}
 /* G5: loading skeleton — reserves the tile height so there's no layout shift. */
@@ -12,7 +12,7 @@
 .voices-tile{display:flex;align-items:flex-start;gap:9px;padding:9px 0;border-top:1px solid var(--border2);text-decoration:none;transition:opacity 0.12s;}
 .voices-tile:first-child{border-top:none;}
 .voices-tile:hover{opacity:0.7;}
-.voices-badge{flex-shrink:0;font-family:var(--font-sans);font-size:var(--fs-label);font-weight:800;letter-spacing:0.04em;color:var(--text3);border:1px solid var(--border);border-radius:var(--radius-md);padding:2px 5px;min-width:26px;text-align:center;}
+.voices-badge{flex-shrink:0;font-family:var(--font-sans);font-size:var(--fs-label);font-weight:700;letter-spacing:0.04em;color:var(--text3);border:1px solid var(--border);border-radius:var(--radius-md);padding:2px 5px;min-width:26px;text-align:center;}
 .voices-tile-main{min-width:0;display:flex;flex-direction:column;gap:2px;}
 .voices-who{font-family:var(--font-sans);font-size:var(--fs-label);font-weight:700;color:var(--accent);}
 .voices-age{color:var(--text3);font-weight:600;}

@@ -79,5 +79,23 @@ const bbcPool = Array.from({ length: 4 }, (_, i) => art(`BBC Story Number ${i}`,
 const capped = selectTopStories({ general: bbcPool, allCats: bbcPool, breaking: [], max: 6 });
 eq(capped.filter(r => r.source === 'BBC News').length <= 2, true, 'Z1: at most TWO rows per publisher');
 
+// AA4.5: rankHomeTop ≤2 per publisher, counting the LEAD (the booth's "three NY Post in five").
+// Lead = NY Post; pool has 4 more NY Post + plenty of others. Lead + rows must be ≤2 NY Post total,
+// i.e. at most ONE NY Post row survives below the hero.
+const nypPool = [
+  { key: 'nyp1', cat: 'general', source: 'New York Post', clusterSize: 2, pubDate: iso(-1) },
+  { key: 'nyp2', cat: 'general', source: 'New York Post', clusterSize: 2, pubDate: iso(-2) },
+  { key: 'nyp3', cat: 'general', source: 'New York Post', clusterSize: 2, pubDate: iso(-3) },
+  { key: 'nyp4', cat: 'general', source: 'New York Post', clusterSize: 2, pubDate: iso(-4) },
+  { key: 'r1', cat: 'general', source: 'Reuters', clusterSize: 2, pubDate: iso(-5) },
+  { key: 'ap1', cat: 'general', source: 'AP', clusterSize: 2, pubDate: iso(-6) },
+  { key: 'bbc1', cat: 'general', source: 'BBC News', clusterSize: 2, pubDate: iso(-7) },
+];
+const pickedLead = rankHomeTop(nypPool, { max: 5, seedSources: ['New York Post'] }); // lead is NY Post
+eq(pickedLead.filter(k => k.startsWith('nyp')).length <= 1, true, 'AA4.5: with an NY Post lead, ≤1 NY Post ROW (so ≤2 NY Post incl. the lead)');
+// without a seed, the cap still holds at ≤2 rows per publisher
+const pickedNoSeed = rankHomeTop(nypPool, { max: 5 });
+eq(pickedNoSeed.filter(k => k.startsWith('nyp')).length <= 2, true, 'AA4.5: ≤2 rows per publisher even with no lead seed');
+
 console.log(fail === 0 ? '\nALL PASS' : `\n${fail} FAILURE(S)`);
 process.exit(fail === 0 ? 0 : 1);

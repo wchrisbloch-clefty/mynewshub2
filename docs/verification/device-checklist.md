@@ -235,3 +235,23 @@ Chromium + Chromium touch; real iPad/iPhone Safari = NEEDS-DEVICE (no WebKit in 
 59. **Phone first screen (X4/X5).** The first chip sits at the 16px gutter; meta lines never orphan an
     "ago"; the on-photo "MY TEAMS" badge is white on a dark scrim; a scheduled score card shows its
     kickoff time, never "—".
+
+---
+
+## Batch AB — font caching, optical sizes, real-header proof (AB1–AB3)
+
+Chromium + Chromium touch; real iPad/iPhone Safari + the real Vercel cache header = NEEDS-DEVICE
+(no WebKit, no Vercel static layer in the sandbox).
+
+60. **Fonts cached for a year (AB1).** On a second visit the four self-hosted woff2 are served from
+    cache, not re-checked — no fallback-face flash on a flaky mobile connection. Confirm on the preview:
+    `curl -sI https://<preview>/fonts/<file>.<hash>.woff2 | grep -i cache-control` → `public,
+    max-age=31536000, immutable`, for all four files. The filenames are content-hashed, so a font
+    change busts the cache on its own.
+61. **Crisper large headlines (AB2).** With the optical-size axis shipped, 30–36px hero/lead headlines
+    render the refined DISPLAY cut (higher serif contrast), not the heavier text cut; 15px row titles
+    keep the text cut. No text jump on a cold load (metric-matched fallback, swap CLS ≤0.01). iPad and
+    iPhone at the hero/lead sizes should look visibly sharper than main.
+62. **No third-party font on any page (AB3).** Home, Business, Sports, Podcasts and the Reader make
+    0 requests to fonts.googleapis.com / fonts.gstatic.com; each self-hosted font is requested once and
+    returns 200/304; 0 console errors.

@@ -15,8 +15,9 @@
 :root{
   color-scheme: light;  /* N2: light by default; the manual dark toggle sets dark below */
   /* Type — TWO families. Serif for headlines, Inter for everything UI/label/data. */
-  --font-serif:'Source Serif 4',Georgia,'Times New Roman',serif;
-  --font-sans:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,sans-serif;
+  /* AA3: self-hosted; the metric-matched *-fallback faces sit first so the swap never reflows. */
+  --font-serif:'Source Serif 4','SourceSerif4-fallback',Georgia,'Times New Roman',serif;
+  --font-sans:'Inter','Inter-fallback',-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;
 
   /* ── LIGHT (primary) — S12: CRISP WHITE canvas (was pearl #f4f4f2), white cards separated by
      the 1px --border, near-black ink. Dark mode is unchanged (its tokens live under .dark). ── */
@@ -170,6 +171,25 @@
   --shadow-lg:0 8px 36px rgba(0,0,0,0.65);
 }
 
+/* ── AA2: WORLD-CLASS TYPESETTING ───────────────────────────────────────────────
+   Source Serif 4 carries an opsz axis (loaded), so optical sizing is on globally.
+   Headlines balance and never hyphenate or widow a short word; decks/excerpts use
+   `pretty` and a readable measure; numbers are tabular (see .tnum/time below). */
+html{font-optical-sizing:auto;}
+/* Headline / title / display roles — balance the rag, kill hyphenation, tighten tracking at size. */
+[class*="-title"],[class*="-headline"],[class*="hero-title"],[class*="-head"] h1,
+.snap-title,.snap-hero-title,.fc-title,.gn-card-title,.toh-title,.mh-compact-title,
+.houston-card-title,.pod-title,.sop-item-title,.sb-across-title,.web-result-title,
+.sports-hero-title,.mh-brk-title,.trend-title{
+  text-wrap:balance;hyphens:none;-webkit-hyphens:none;
+}
+/* ≥22px headlines get the -0.01em editorial tracking (lead/display tiers). */
+.snap-hero-title,.snap-lead .snap-title,.toh-card-lead .toh-title,.sports-hero-title,
+.mh-lead-h1,[class*="hero-title"]{letter-spacing:-0.01em;}
+/* Decks, excerpts and body copy — `pretty` (no orphans/short last lines), capped measure. */
+[class*="-desc"],[class*="-deck"],[class*="-excerpt"],[class*="-snippet"],[class*="-summary-text"],
+.fc-desc,.snap-deck,.pod-desc{text-wrap:pretty;max-width:68ch;}
+
 /* ── G7c: ONE eyebrow label style. Every section kicker / category label uses this —
    Inter, small, uppercase, wide tracking, meta colour. Accent only for active state. */
 .eyebrow{
@@ -183,7 +203,7 @@
 .media-img{width:100%;aspect-ratio:16/9;object-fit:cover;background:var(--surface2);border-radius:var(--img-radius);display:block;}
 .media-img.square{aspect-ratio:1/1;}
 .media-img.wide{aspect-ratio:21/9;}
-.media-img-ph{width:100%;aspect-ratio:16/9;border-radius:var(--img-radius);display:flex;align-items:center;justify-content:center;background:var(--ph-field);color:var(--ph-ink);font-weight:800;}
+.media-img-ph{width:100%;aspect-ratio:16/9;border-radius:var(--img-radius);display:flex;align-items:center;justify-content:center;background:var(--ph-field);color:var(--ph-ink);font-weight:700;}
 
 /* V4: one utility for the tiny inline-icon baseline nudge (was a repeated inline style). */
 .ic-nudge{vertical-align:-1px;}
