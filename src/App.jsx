@@ -2569,8 +2569,7 @@ body:not(.dark) .pill-bar{
 .sb-box-head-btn{width:100%;background:none;border:none;border-bottom:1px solid var(--border2);cursor:pointer;font-family:inherit;}
 .sb-box-head-btn:hover{background:var(--surface2);} /* S12: visible on white */
 .sb-collapse-chev{font-size:var(--fs-label);color:var(--text3);}
-.sb-live-pill{background:var(--red);color:var(--on-media);border-radius:var(--radius-md);padding:1px 7px;font-size:var(--fs-label);font-weight:800;letter-spacing:0.04em;animation:score-pulse 2s ease-in-out infinite;}
-.sb-league-live{color:var(--red);font-weight:800;font-size:var(--fs-label);}
+/* AA1: sb-live-pill / sb-league-live removed — scores carry no red "live" badge. */
 .sb-empty{padding:14px;font-size:var(--fs-meta);color:var(--text3);text-align:center;font-style:italic;}
 .sb-league{border-bottom:1px solid var(--border2);}
 .sb-league:last-child{border-bottom:none;}
@@ -2600,13 +2599,11 @@ body:not(.dark) .pill-bar{
 .sb-side{display:flex;align-items:center;gap:6px;flex:1;min-width:0;}
 .sb-logo{width:15px;height:15px;object-fit:contain;flex-shrink:0;}
 .sb-abbr{font-size:var(--fs-meta);font-weight:600;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
-.sb-num{font-size:var(--fs-body);font-weight:800;color:var(--text);flex-shrink:0;min-width:22px;text-align:right;font-variant-numeric:tabular-nums;}
-.sb-num.winner{color:var(--green);}
-.sb-num.loser{color:var(--text3);font-weight:500;}
-.sb-status{font-size:var(--fs-label);margin-top:4px;text-transform:uppercase;letter-spacing:0.04em;display:flex;align-items:center;gap:4px;}
-.sb-status.live{color:var(--red);font-weight:700;}
-.sb-status.final{color:var(--text3);}
-.sb-status.pre{color:var(--accent);}
+.sb-num{font-size:var(--fs-body);font-weight:400;color:var(--text2);flex-shrink:0;min-width:22px;text-align:right;font-variant-numeric:tabular-nums;}
+.sb-num.winner{color:var(--text);font-weight:600;} /* AA1: leader by WEIGHT, never colour (was green) */
+.sb-num.loser{color:var(--text3);font-weight:400;}
+.sb-status{font-size:var(--fs-meta);margin-top:4px;letter-spacing:0;display:flex;align-items:center;gap:4px;color:var(--text2);font-weight:500;}
+.sb-status.live,.sb-status.final,.sb-status.pre{color:var(--text2);} /* AA1: neutral, one colour for every state */
 .sb-fav-star{color:var(--amber);font-size:var(--fs-label);}
 .sb-more{padding:5px;text-align:center;font-size:var(--fs-label);color:var(--text3);font-style:italic;}
 
@@ -3385,7 +3382,7 @@ body:not(.dark) .pill-bar{
   color:var(--accent);font-size:var(--fs-label);
 }
 /* H2: league moved INTO the status row (saves a line, hides no info). */
-.score-tile-lg{font-weight:800;color:var(--text3);}
+.score-tile-lg{font-weight:600;color:var(--text3);}
 .score-tile-when{opacity:0.95;}
 .score-tile-status .score-tile-lg + .score-tile-when::before{content:'·';margin:0 3px;opacity:0.6;}
 .score-tile-row{
@@ -3398,22 +3395,18 @@ body:not(.dark) .pill-bar{
 .score-tile-logo-ph{display:inline-flex;align-items:center;justify-content:center;
   border-radius:50%;background:var(--surface2);color:var(--text2);
   font-family:var(--font-sans);font-size:var(--fs-label);font-weight:800;letter-spacing:0;}
-.score-tile-team{font-weight:500;letter-spacing:-0.2px;color:var(--text2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
-.score-tile-team.win{color:var(--text);font-weight:700;}
-.score-tile-score{font-weight:600;font-size:var(--fs-body);color:var(--text2);min-width:22px;text-align:right;font-variant-numeric:tabular-nums;}
-.score-tile-score.win{color:var(--text);font-weight:900;} /* leader: WEIGHT, not colour */
+.score-tile-team{font-weight:400;letter-spacing:-0.2px;color:var(--text2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.score-tile-team.win{color:var(--text);font-weight:600;}
+.score-tile-score{font-weight:400;font-size:var(--fs-body);color:var(--text2);min-width:22px;text-align:right;font-variant-numeric:tabular-nums;}
+.score-tile-score.win{color:var(--text);font-weight:600;} /* AA1: leader by WEIGHT (600 vs 400), never colour */
 .score-tile-status{
-  font-family:var(--font-sans);font-size:var(--fs-label);color:var(--text3);
-  text-transform:uppercase;letter-spacing:0.05em;
+  /* AA1/AA2: neutral status at the meta role — no uppercase, no red, one colour for every state. */
+  font-family:var(--font-sans);font-size:var(--fs-meta);color:var(--text2);font-weight:500;
+  letter-spacing:0;
   margin-top:2px;display:flex;align-items:center;gap:4px;
   border-top:1px solid var(--border2);padding-top:2px;
 }
-.score-tile-status.live{color:var(--red);font-weight:700;}
-.score-tile-status.final,.score-tile-status.pre{color:var(--text3);}
-.score-tile-dot{
-  width:5px;height:5px;border-radius:50%;background:var(--red);flex-shrink:0;
-  animation:pulse-badge 1.4s ease-in-out infinite;
-}
+.score-tile-status.live,.score-tile-status.final,.score-tile-status.pre{color:var(--text2);}
 
 /* SPORT TABS — ESPN/Yahoo-style compact pill row (Pass I item 2): tighter gaps,
    shorter pills, horizontal scroll (never wraps to a second line). */
@@ -3805,19 +3798,14 @@ body:not(.dark) .pill-bar{
 }
 .mini-sb-item:hover{color: var(--text);}
 .mini-sb-item.live .mini-sb-teams{font-weight: 700;color: var(--text);}
-.mini-sb-dot{
-  width: 6px;height: 6px;border-radius: 50%;
-  background: var(--red);flex-shrink: 0;
-  animation: pulse-badge 1.4s ease-in-out infinite;
-}
+/* AA1: mini-sb-dot removed — no red/pulse on scores. */
 .mini-sb-teams{
-  font-weight: 600;font-variant-numeric: tabular-nums;
+  font-weight: 500;font-variant-numeric: tabular-nums;
 }
-.mini-sb-score{font-weight: 800;color: var(--text);}
+.mini-sb-score{font-weight: 600;color: var(--text);}
 .mini-sb-sep{color: var(--text4);margin: 0 5px;}
 .mini-sb-status{
-  font-size: var(--fs-label);color: var(--text3);text-transform: uppercase;
-  letter-spacing: 0.05em;
+  font-size: var(--fs-meta);color: var(--text2);letter-spacing: 0;
 }
 
 /* BLOOMBERG ACCENT BAR — subtle 2px color under section headers on Today */
@@ -5247,7 +5235,7 @@ kbd{display:inline-block;padding:1px 5px;border:1px solid var(--border);border-r
   text-transform:uppercase;letter-spacing:0.12em;
   display:flex;align-items:center;gap:6px;
 }
-.home-scores-label.is-live::before{content:'●';color:var(--red);font-size:var(--fs-label);animation:score-pulse 2s ease-in-out infinite;}
+/* AA1: the live dot is gone — scores never carry a red/pulsing "live" signal. */
 @keyframes score-pulse{0%,100%{opacity:1;}50%{opacity:0.4;}}
 .home-scores-see-all{
   font-size:var(--fs-label);font-weight:600;color:var(--text2);  /* N2: text3 was 4.35:1 on the dark scores band (<4.5); text2 clears it */
@@ -6295,6 +6283,15 @@ function ScoreLogo({ url, abbr }) {
   if (!url || err) return <span className="score-tile-logo score-tile-logo-ph" aria-hidden="true">{(abbr || '').replace(/[^A-Za-z]/g, '').slice(0, 2).toUpperCase()}</span>;
   return <img className="score-tile-logo" src={url} alt="" loading="lazy" onError={() => setErr(true)}/>;
 }
+// AA1: calm scores. A live game shows its period/clock when the data has it ("Q3 4:12", "Top 7",
+// "Halftime", "Delay") and NOTHING otherwise — never the words "Live" / "In progress". No red, no
+// dot, no pulse: the scores are shown, so there is no need to shout that they are live. Red in the
+// product means exactly one thing — Breaking.
+function liveClock(g) {
+  const s = (g.status || '').trim();
+  if (/\b(live|in[\s-]?progress|in\s*prog)\b/i.test(s)) return ''; // no usable clock → show nothing
+  return s;
+}
 function ScoreTile({ g }) {
   const live = g.state === 'in';
   const final = g.state === 'post';
@@ -6322,9 +6319,8 @@ function ScoreTile({ g }) {
         <span className={`score-tile-score ${homeLead ? 'win' : ''}`}>{(live || final) ? g.homeScore : ''}</span>
       </div>
       <div className={`score-tile-status ${live ? 'live' : final ? 'final' : 'pre'}`}>
-        {live && <span className="score-tile-dot"/>}
         {g._leagueLabel && <span className="score-tile-lg">{g._leagueLabel}</span>}
-        <span className="score-tile-when">{live ? (g.status || 'LIVE') : final ? 'FINAL' : (fmtKickoff(g.date) || g.status || 'TBD')}</span>
+        {(() => { const when = live ? liveClock(g) : final ? 'Final' : (fmtKickoff(g.date) || g.status || ''); return when ? <span className="score-tile-when">{when}</span> : null; })()}
       </div>
     </div>
   );
@@ -6350,14 +6346,13 @@ function ActiveScoresBar({ onGoToSports, favTeams }) {
       .slice(0, 12);
   }, [scores, favTeams]);
 
-  const anyLive = games.some(g => g.state === 'in');
   if (!games.length) return null;
 
   return (
     <div className="home-scores">
       <div className="home-scores-head">
-        {/* I0.2: "LIVE SCORES" + pulsing dot only when a game is live; else plain "SCORES". */}
-        <span className={`home-scores-label${anyLive ? ' is-live' : ''}`}>{anyLive ? 'Live Scores' : 'Scores'}</span>
+        {/* AA1: always plain "Scores" — the scores are shown, so there is no "live" shout and no dot. */}
+        <span className="home-scores-label">Scores</span>
         <button className="home-scores-see-all" onClick={onGoToSports}>Sports →</button>
       </div>
       <div className="score-strip-scroll home-scores-scroll" data-no-swipe>
@@ -6943,7 +6938,7 @@ function Scoreboard({compact=false, favTeams}) {
         </div>
         <div className={`sb-status ${live?'live':final?'final':'pre'}`}>
           {isFav&&<Star className="sb-fav-star" size={10} fill="currentColor" aria-hidden="true"/>}
-          {live?'● LIVE · ':''}{g.status||fmtDate(g.date)}
+          {live ? (liveClock(g) || fmtDate(g.date)) : (final ? 'Final' : (fmtDate(g.date) || g.status || ''))}
         </div>
       </div>
     );
@@ -6971,7 +6966,6 @@ function Scoreboard({compact=false, favTeams}) {
       <button className="sb-box-head sb-box-head-btn" onClick={()=>setCollapsed(c=>!c)}>
         <span className="sb-box-title">Scoreboard</span>
         <span className="sb-box-sub">
-          {totalLive>0 && <span className="sb-live-pill">● {totalLive} LIVE</span>}
           <span className="sb-collapse-chev"><ChevronDown size={11} aria-hidden="true" style={{transform:collapsed?'rotate(-90deg)':'none',transition:"transform .15s"}}/></span>
         </span>
       </button>
@@ -6993,7 +6987,6 @@ function Scoreboard({compact=false, favTeams}) {
             <button className="sb-league-head" onClick={()=>setExpanded(s=>({...s,[L.key]:!s[L.key]}))}>
               <span style={{color:L.accent,fontWeight:700}}>{L.emoji} {L.label}</span>
               <span className="sb-league-meta">
-                {liveCount>0 && <span className="sb-league-live">● {liveCount}</span>}
                 <span>{sorted.length} {sorted.length===1?'game':'games'}</span>
                 {favCount>0&&<span className="sb-league-fav">★ {favCount}</span>}
               </span>
@@ -7714,13 +7707,12 @@ function MiniScoreboardStrip({ scores, onOpen }) {
             <span key={g.id}
               className={`mini-sb-item ${live?'live':''}`}
               onClick={()=>g.link && window.open(g.link, '_blank')}>
-              {live && <span className="mini-sb-dot"/>}
               <span className="mini-sb-teams">
                 {away} <span className="mini-sb-score">{g.awayScore}</span>
                 <span className="mini-sb-sep">·</span>
                 <span className="mini-sb-score">{g.homeScore}</span> {home}
               </span>
-              <span className="mini-sb-status">{g.status}</span>
+              <span className="mini-sb-status">{live ? liveClock(g) : (g.state==='post' ? 'Final' : g.status)}</span>
             </span>
           );
         })}
