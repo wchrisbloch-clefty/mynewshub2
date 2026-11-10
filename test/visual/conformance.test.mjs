@@ -35,8 +35,10 @@ const PAGES = [
 const SEL = {
   chip: ['.pc-subtab', '.kw-chip', '.ttp-chip', '.active-filter-chip', '.src-pill', '.ms-trending-chip', '.briefing-src-pill'],
   tile: ['.sport-tab'],
-  // bordered secondary buttons (the "See all >" / Open-full-view link is excluded — it is a link, not a bordered button)
-  button: ['.snap-ask', '.snap-save', '.sop-showall', '.nav-btn-blue', '.nav-btn-brief', '.page-customize-btn', '.sport-league-all-btn', '.load-more'],
+  // bordered secondary buttons (the "See all >" / Open-full-view link is excluded — it is a link, not a bordered button).
+  // AA4.3: .nav-btn-brief/.nav-btn-blue (Analyze/Customize) are ghost ICON buttons <=1280 (boxed label only >=1281),
+  // so they joined the icon-button family and are no longer in the bordered-secondary class.
+  button: ['.snap-ask', '.snap-save', '.sop-showall', '.page-customize-btn', '.sport-league-all-btn', '.load-more'],
   band: ['.status-strip', '.ss-ticker', '.topbar-scores', '.sports-score-strip', '.home-scores', '.score-strip-scroll'],
   status: ['.last-updated', '.feed-degraded'],
   // Z3: every list row that renders a story / episode / item headline+meta. The ANATOMY block

@@ -246,6 +246,15 @@ const TICKERS = [
 // D3: price decimals by instrument. True indices (^GSPC/^DJI/^IXIC) show whole
 // numbers; everything else — gas (NG=F), oil (CL=F), crypto, equities — shows 2
 // decimals. Fixes natural gas rendering as "3" under the indices' 0-decimal format.
+// AA4.4: a ticker never renders a mysterious faded/blank tile. When a quote has a price but no
+// finite change (market closed / stale), show a neutral "Closed" at the same colour as the rest —
+// not a faded disabled look — with an explanatory title/aria-label on the tile.
+function TkChg({ q }) {
+  if (!q) return null;
+  if (!Number.isFinite(q.pct)) return <span className="ss-tk-chg ss-tk-closed">Closed</span>;
+  const up = q.chg >= 0;
+  return <span className={`ss-tk-chg tnum ${up ? 'up' : 'down'}`}>{up ? '+' : '−'}{Math.abs(q.pct).toFixed(2)}%</span>;
+}
 const fmtQuotePrice = (sym, price) =>
   Number(price).toLocaleString('en-US', /^\^/.test(sym)
     ? { maximumFractionDigits: 0 }
@@ -1726,6 +1735,7 @@ body{
 .ss-tk-chg{font-size:var(--fs-meta);font-weight:700;}
 .ss-tk-chg.up{color:var(--pos);}
 .ss-tk-chg.down{color:var(--neg);}
+.ss-tk-closed{color:var(--text3);font-weight:500;} /* AA4.4: neutral "Closed", not a faded/disabled tile */
 /* (Weather chip removed from the strip in Part B — now the Home RightNowWeather card.) */
 
 /* ═══ HOME: Right Now weather card + Houston local row (Part B) ═══ */
@@ -2052,14 +2062,24 @@ body:not(.dark) .pill-bar{
 /* U4: ONE secondary button language — Analyze (.nav-btn-brief) and Customize (.nav-btn-blue)
    share it: 1px --border, transparent, --radius-md, body/medium. Customize loses its navy fill;
    the ONLY accent-filled element in the header is now the active nav pill. See .nav-btn-brief. */
-.nav-btn-blue{
-  background:transparent;border:1px solid var(--border);color:var(--text2);
-  border-radius:var(--radius-md);padding:7px 13px;cursor:pointer;
+/* AA4.3: Analyze + Customize are the SAME ghost icon buttons as the rest of the header up to 1280;
+   only at >=1281 do they grow a border + text label. 0 boxed buttons in the header at <=1280. */
+.nav-btn-blue,.nav-btn-brief{
+  background:transparent;border:none;color:var(--text3);position:relative;
+  border-radius:var(--radius-sm);width:36px;height:36px;padding:0;cursor:pointer;
   font-size:var(--fs-body);font-weight:var(--fw-medium);font-family:var(--font-sans);
-  transition:border-color var(--dur-fast),color var(--dur-fast);
-  display:flex;align-items:center;gap:6px;white-space:nowrap;
+  transition:color var(--dur-fast),background var(--dur-fast);flex-shrink:0;
+  display:flex;align-items:center;justify-content:center;gap:6px;white-space:nowrap;
 }
-@media(hover:hover){ .nav-btn-blue:hover{border-color:var(--border-strong);color:var(--text);} }
+.nav-btn-blue::after,.nav-btn-brief::after{content:'';position:absolute;inset:-4px;} /* 36+8 = 44px hit */
+.nav-btn-label{display:none;}
+@media(min-width:1281px){
+  .nav-btn-blue,.nav-btn-brief{width:auto;height:auto;padding:7px 13px;border:1px solid var(--border);border-radius:var(--radius-md);color:var(--text2);}
+  .nav-btn-blue::after,.nav-btn-brief::after{content:none;}
+  .nav-btn-label{display:inline;}
+}
+@media(hover:hover){ .nav-btn-blue:hover,.nav-btn-brief:hover{color:var(--text);background:var(--surface2);} }
+@media(hover:hover) and (min-width:1281px){ .nav-btn-blue:hover,.nav-btn-brief:hover{border-color:var(--border-strong);background:transparent;} }
 
 /* ═══════════════════════════════════════════
    PAGE SHELL
@@ -5620,15 +5640,8 @@ kbd{display:inline-block;padding:1px 5px;border:1px solid var(--border);border-r
 }
 .analyze-result-clear:hover{color:var(--accent);border-color:var(--accent);}
 /* Brief button in nav */
-/* U4: the ONE secondary button style (shared with Customize = .nav-btn-blue). */
-.nav-btn-brief{
-  background:transparent;border:1px solid var(--border);color:var(--text2);
-  border-radius:var(--radius-md);padding:7px 13px;cursor:pointer;
-  font-size:var(--fs-body);font-weight:var(--fw-medium);font-family:var(--font-sans);
-  transition:border-color var(--dur-fast),color var(--dur-fast);white-space:nowrap;
-  display:flex;align-items:center;gap:6px;
-}
-@media(hover:hover){ .nav-btn-brief:hover{border-color:var(--border-strong);color:var(--text);} }
+/* AA4.3: nav-btn-brief/-blue are now defined together up top as ghost icon buttons (boxed label
+   only >=1281); the old boxed-everywhere rule here is retired. */
 @media(max-width:640px){
   .analyze-overlay{padding:0;}
   .analyze-panel{border-radius:0;min-height:100dvh;}
@@ -8216,22 +8229,22 @@ function TopBar({tab, setTab, search, setSearch, dark, setDark, onAskChat, chatO
           <div className="ss-ticker">
             <div className="ss-ticker-inner" data-no-swipe ref={tickerRef}>
               {INDICES.filter(idx=>!(hiddenIndices||[]).includes(idx.sym)).map(idx=>{
-                const q=quotes[idx.sym]; const up=q?q.chg>=0:null;
+                const q=quotes[idx.sym];
                 return (
-                  <button key={idx.sym} className="ss-tk" onClick={()=>q&&window.open(`https://finance.yahoo.com/quote/${encodeURIComponent(idx.sym)}`,'_blank')}>
+                  <button key={idx.sym} className="ss-tk" title={q&&!Number.isFinite(q.pct)?'Market closed — last close':undefined} onClick={()=>q&&window.open(`https://finance.yahoo.com/quote/${encodeURIComponent(idx.sym)}`,'_blank')}>
                     <span className="ss-tk-sym">{idx.short}</span>
                     <span className="ss-tk-val tnum">{q?fmtQuotePrice(idx.sym,q.price):'—'}</span>
-                    {q&&<span className={`ss-tk-chg tnum ${up?'up':'down'}`}>{up?'+':'−'}{Math.abs(q.pct).toFixed(2)}%</span>}
+                    <TkChg q={q}/>
                   </button>
                 );
               })}
               {TICKERS.map(t=>{
-                const q=quotes[t.sym]; const up=q?q.chg>=0:null;
+                const q=quotes[t.sym];
                 return (
-                  <button key={t.sym} className="ss-tk" onClick={()=>onTickerClick&&onTickerClick(t)}>
+                  <button key={t.sym} className="ss-tk" title={q&&!Number.isFinite(q.pct)?'Market closed — last close':undefined} onClick={()=>onTickerClick&&onTickerClick(t)}>
                     <span className="ss-tk-sym">{t.short||t.sym}</span>
                     <span className="ss-tk-val tnum">{q?`$${fmtQuotePrice(t.sym,q.price)}`:'—'}</span>
-                    {q&&<span className={`ss-tk-chg tnum ${up?'up':'down'}`}>{up?'+':'−'}{Math.abs(q.pct).toFixed(2)}%</span>}
+                    <TkChg q={q}/>
                   </button>
                 );
               })}
@@ -8309,9 +8322,9 @@ function TopBar({tab, setTab, search, setSearch, dark, setDark, onAskChat, chatO
                 </div>
               )}
             </div>
-            <button className="nav-btn-brief" onClick={onAnalyze} title="Paste &amp; Analyze">
-              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{flexShrink:0}}><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><rect x="8" y="2" width="8" height="4" rx="1"/><line x1="9" y1="12" x2="15" y2="12"/><line x1="9" y1="16" x2="13" y2="16"/></svg>
-              Analyze
+            <button className="nav-btn-brief" onClick={onAnalyze} title="Paste & Analyze" aria-label="Paste & Analyze">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{flexShrink:0}}><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><rect x="8" y="2" width="8" height="4" rx="1"/><line x1="9" y1="12" x2="15" y2="12"/><line x1="9" y1="16" x2="13" y2="16"/></svg>
+              <span className="nav-btn-label">Analyze</span>
             </button>
             {/* X6: Ask NewsHub — the chat launcher is a quiet header icon now (never a floating
                 button that can cover text). aria-expanded reflects the drawer state. */}
@@ -8327,9 +8340,9 @@ function TopBar({tab, setTab, search, setSearch, dark, setDark, onAskChat, chatO
             <button className="nav-icon-btn" onClick={onAccount} title={signedIn?'Account — synced':'Sign in to sync'} style={signedIn?{color:'var(--green)'}:undefined}>
               <User size={ICON.header}/>
             </button>
-            <button className="nav-btn-blue" onClick={onCustomize}>
-              <Settings size={ICON.meta} strokeWidth={2} style={{flexShrink:0}}/>
-              Customize
+            <button className="nav-btn-blue" onClick={onCustomize} title="Customize" aria-label="Customize">
+              <Settings size={18} strokeWidth={2} style={{flexShrink:0}}/>
+              <span className="nav-btn-label">Customize</span>
             </button>
           </div>
         </div>
@@ -8972,10 +8985,12 @@ function FeedPage({ cat, ctx }) {
           const k = storyKey(a);
           if (used.has(k) || isPromoItem(a)) continue;
           if (!byKey.has(k)) byKey.set(k, a);
-          pool.push({ key: k, cat: a.cat, clusterSize: outletCount[k] || 1, pubDate: a.pubDate, breaking: !!(a.isAlert || a._breaking) });
+          pool.push({ key: k, cat: a.cat, source: a.source, clusterSize: outletCount[k] || 1, pubDate: a.pubDate, breaking: !!(a.isAlert || a._breaking) });
         }
         const leadNonGen = catLead && (catLead.cat || 'general') !== 'general' ? 1 : 0;
-        for (const k of rankHomeTop(pool, { max: 6 - picks.length, nonGeneralUsed: leadNonGen })) {
+        // AA4.5: seed the ≤2/publisher cap with the hero's publisher so lead + rows ≤ 2 per source.
+        const seedSources = catLead && catLead.source ? [catLead.source] : [];
+        for (const k of rankHomeTop(pool, { max: 6 - picks.length, nonGeneralUsed: leadNonGen, seedSources })) {
           const it = byKey.get(k);
           if (it && !used.has(k)) { picks.push({ ...it, cat: it.cat || 'general' }); used.add(k); }
         }

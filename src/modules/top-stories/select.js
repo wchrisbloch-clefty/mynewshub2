@@ -12,7 +12,7 @@ import { isPromoItem } from '../breaking/index.js';
 //
 // items: [{ key, cat, clusterSize, pubDate, breaking }]  (already image-eligible where required)
 // nonGeneralUsed: how many non-general slots the lead/hero already consumed (0 or 1).
-export function rankHomeTop(items, { max = 5, nonGeneralUsed = 0 } = {}) {
+export function rankHomeTop(items, { max = 5, nonGeneralUsed = 0, seedSources = [] } = {}) {
   const seen = new Set();
   const dedup = [];
   for (const a of items || []) { if (!a || seen.has(a.key)) continue; seen.add(a.key); dedup.push(a); }
@@ -24,17 +24,32 @@ export function rankHomeTop(items, { max = 5, nonGeneralUsed = 0 } = {}) {
   const out = [];
   let ng = nonGeneralUsed;
   const overflow = []; // kept to fill the tail so Top Stories is never short
+  // AA4.5: ≤2 rows per publisher, and the LEAD is counted (seedSources) — fixes "three NY Post in
+  // the first five" where the hero's publisher slipped the cap. Keyed like capByPublisher.
+  const PUB_MAX = 2;
+  const pub = a => ((a && a.source) || '').toLowerCase();
+  const pubCount = new Map();
+  for (const s of seedSources) { const k = (s || '').toLowerCase(); if (k) pubCount.set(k, (pubCount.get(k) || 0) + 1); }
   for (const a of dedup) {
     if (out.length >= max) break;
+    const p = pub(a);
+    if (p && (pubCount.get(p) || 0) >= PUB_MAX) { overflow.push(a.key); continue; }
     const isGeneral = (a.cat || 'general') === 'general';
     if (!isGeneral) {
       if (ng >= 1 || !((a.clusterSize || 1) >= 2 || a.breaking)) { overflow.push(a.key); continue; }
       ng++;
     }
     out.push(a.key);
+    if (p) pubCount.set(p, (pubCount.get(p) || 0) + 1);
   }
-  // never leave Top Stories short: top up from the rejected pool (keeps 6 filled on thin data).
-  for (const k of overflow) { if (out.length >= max) break; out.push(k); }
+  // never leave Top Stories short: top up from the rejected pool (keeps 6 filled on thin data) —
+  // but still honour the ≤2/publisher cap so the top-up can't re-introduce a third from one source.
+  for (const k of overflow) {
+    if (out.length >= max) break;
+    const a = dedup.find(x => x.key === k); const p = pub(a);
+    if (p && (pubCount.get(p) || 0) >= PUB_MAX) continue;
+    out.push(k); if (p) pubCount.set(p, (pubCount.get(p) || 0) + 1);
+  }
   return out;
 }
 
