@@ -59,7 +59,7 @@
 .sop-sidebar .sop-collapse{margin-left:auto;}
 /* S11: the rail uses the SAME boxed row anatomy as everywhere else (the base .sop-item box).
    No grid, no number column — just tighter type for the narrow column. */
-.sop-sidebar .sop-item-time{font-size:var(--fs-label);}
+.sop-sidebar .sop-item-time{font-size:var(--fs-meta);} /* Z3: one meta token */
 .sop-sidebar .sop-item-sources{font-size:var(--fs-label);padding:1px 6px;}
 /* Coverage-gap rows: the headline, then outlets + a quiet Follow menu — inside the same box. */
 .sop-gap-headline{display:flex;gap:8px;align-items:flex-start;}

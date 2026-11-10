@@ -39,6 +39,13 @@ const SEL = {
   button: ['.snap-ask', '.snap-save', '.sop-showall', '.nav-btn-blue', '.nav-btn-brief', '.page-customize-btn', '.sport-league-all-btn', '.load-more'],
   band: ['.status-strip', '.ss-ticker', '.topbar-scores', '.sports-score-strip', '.home-scores', '.score-strip-scroll'],
   status: ['.last-updated', '.feed-degraded'],
+  // Z3: every list row that renders a story / episode / item headline+meta. The ANATOMY block
+  // classifies each into exactly one of LEAD / STANDARD / COMPACT and asserts ≤3 per page, one
+  // meta token (--fs-meta), and no un-classifiable "tweener" title. (Nav tabs, chips, score tiles,
+  // team/show selectors and the Right-Now ticker are NOT story rows and are excluded.)
+  row: ['.fc', '.snap-card', '.snap-lead-hero', '.snap-lead-noimg', '.toh-card-lead', '.toh-compact-row',
+    '.toh-text-row', '.houston-card', '.gf-item', '.sb-across-item', '.trend-row', '.mh-lead', '.mh-compact',
+    '.mh-brk-row', '.sop-item', '.sports-hero', '.gn-card', '.web-result', '.pod-card'],
 };
 
 const browser = await chromium.launch();
@@ -137,7 +144,46 @@ async function scan(band, name, route, dark) {
       const h = el.offsetHeight;
       if (h > 34) push(el, 'status-pill-too-tall', h + 'px');
     }
-    return { fails, counts: { chips: uniq([...SEL.chip, ...SEL.tile, ...SEL.button]).length } };
+    // (g) Z3 ROW ANATOMY — every list row is ONE of LEAD / STANDARD / COMPACT, with ≤3 per page,
+    // one meta token, and no un-classifiable "tweener" title.
+    //   LEAD      = title ≥ 20px (thumbnail optional)
+    //   STANDARD  = title 13–18px + a thumbnail
+    //   COMPACT   = title 13–18px + no thumbnail
+    // The source·time meta line must resolve to the --fs-meta token (±1px; --fs-label is reserved
+    // for UPPERCASE eyebrows/kickers, never for meta).
+    const probe2 = document.createElement('span'); probe2.style.cssText = 'position:absolute;visibility:hidden;font-size:var(--fs-meta)'; document.body.appendChild(probe2);
+    const metaToken = Math.round(parseFloat(getComputedStyle(probe2).fontSize)); probe2.remove();
+    const anatomies = new Set();
+    for (const el of uniq(SEL.row)) {
+      if (!vis(el)) continue;
+      // title = the largest-font visible text leaf inside the row
+      let titleFs = 0;
+      for (const d of el.querySelectorAll('*')) {
+        if (!vis(d)) continue;
+        if (![...d.childNodes].some(n => n.nodeType === 3 && n.textContent.trim().length > 2)) continue;
+        const f = px(getComputedStyle(d).fontSize); if (f > titleFs) titleFs = f;
+      }
+      if (!titleFs) continue; // skeleton / no text yet
+      const hasThumb = !!el.querySelector('img, [class*="thumb"], [class*="-img"], [class*="hero-media"], [style*="background-image"]');
+      let anat = null;
+      if (titleFs >= 20) anat = 'LEAD';
+      else if (titleFs >= 13 && titleFs <= 18) anat = hasThumb ? 'STANDARD' : 'COMPACT';
+      if (!anat) { push(el, 'row-anatomy-tweener-title', titleFs + 'px (not LEAD≥20 / STD/COMPACT 13-18)'); continue; }
+      anatomies.add(anat);
+      // meta token check: the source·time meta TEXT LEAF (source / time / date / byline) must resolve
+      // to --fs-meta. We look at text-bearing leaves only (a bare .*-meta* flex CONTAINER inherits the
+      // row's title size, so checking it would be a false positive). Kickers/eyebrows (--fs-label) are
+      // NOT matched here — their class names carry label/eyebrow/topic/cat, not source/time/date/meta.
+      const metaLeaf = [...el.querySelectorAll('[class*="source"],[class*="-src"],[class*="-time"],[class*="-date"],[class*="byline"],[class*="-meta"]')]
+        .find(m => vis(m) && [...m.childNodes].some(n => n.nodeType === 3 && n.textContent.trim().length > 1)
+          && !/label|eyebrow|topic|\bcat\b|kicker/.test(String(m.className)));
+      if (metaLeaf) {
+        const mf = px(getComputedStyle(metaLeaf).fontSize);
+        if (Math.abs(mf - metaToken) > 1) push(el, 'row-meta-off-token', `${mf}px, --fs-meta=${metaToken}px (${anat}, .${String(metaLeaf.className).split(' ')[0]})`);
+      }
+    }
+    if (anatomies.size > 3) push(document.body, 'too-many-anatomies', [...anatomies].join('+') + ' = ' + anatomies.size);
+    return { fails, counts: { chips: uniq([...SEL.chip, ...SEL.tile, ...SEL.button]).length, anatomies: anatomies.size } };
   }, SEL);
   await ctx.close();
   return res;

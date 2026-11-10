@@ -66,7 +66,9 @@ import { TopicTag } from './modules/topic-tag';
 import { CatIcon, SHOW_CHIP_ICONS } from './modules/cat-icon';
 import { cleanSourceName } from './modules/source-name';
 import { SnapshotCard, CoverageList } from './modules/snapshot-card';
-import { MobileHome } from './modules/mobile-home';
+// Z7: lazy-split the phone/iPad-portrait Home surface off the initial chunk (it never renders on
+// desktop). The Suspense fallback reserves full height so the chunk swap causes no layout shift.
+const MobileHome = lazy(() => import('./modules/mobile-home').then(m => ({ default: m.MobileHome })));
 import { FollowSourceContext, FollowSourceChip } from './modules/follow-source';
 import { MarketsSurface, useMarkets } from './modules/markets-surface';
 import { parseRoute, buildPath } from './modules/routing';
@@ -275,22 +277,25 @@ const DEFAULT_KW = {
 
 const DEFAULT_FEEDS = {
   general: [
+    // Z2: NEWS is headlines-first. The clearly non-news publishers that were in the general bucket
+    // are reclassified to the category they belong to (per-feed cat override) so they no longer
+    // qualify as General lead / Top stories / breaking — they still appear on their category page and
+    // in its sections. Moved (old -> new): TechCrunch -> tech (already present there; removed here),
+    // CNBC Top News -> business, Morning Brew -> business, Bloomberg (markets) -> finance. Left as
+    // general: BBC, NPR, Fox, NY Post, The Hill, Washington Times, Guardian US, Axios, Breitbart,
+    // KHOU, Chron, Morning Wire.
     { name:'BBC News',          url:'https://feeds.bbci.co.uk/news/rss.xml',                                    on:true },
     { name:'NPR News',          url:'https://feeds.npr.org/1001/rss.xml',                                       on:true },
-    { name:'CNBC Top News',     url:'https://www.cnbc.com/id/100003114/device/rss/rss.html',                    on:true },
     { name:'Fox News',          url:'https://moxie.foxnews.com/google-publisher/latest.xml',                    on:true },
     { name:'NY Post',           url:'https://nypost.com/feed/',                                                 on:true },
     { name:'The Hill',          url:'https://thehill.com/homenews/feed/',                                       on:true },
-    { name:'TechCrunch',        url:'https://techcrunch.com/feed/',                                             on:true },
     { name:'Washington Times',  url:'https://www.washingtontimes.com/rss/headlines/news/',                      on:true },
     { name:'The Guardian US',   url:'https://www.theguardian.com/us/rss',                                       on:true },
     { name:'Axios',             url:'https://api.axios.com/feed/',                                              on:true },
     { name:'Breitbart',         url:'https://feeds.feedburner.com/breitbart',                                   on:true },
     { name:'KHOU Houston',      url:'https://www.khou.com/feeds/syndication/rss/news',                          on:true },
     { name:'Chron.com',         url:'https://www.chron.com/rss/feed/News-270.php',                              on:true },
-    { name:'Morning Brew',      url:'https://www.morningbrew.com/feed',                                         on:true },
     { name:'Morning Wire',      url:'https://feeds.megaphone.fm/BVDWV8747925072',                               on:true },
-    { name:'Bloomberg',         url:'https://feeds.bloomberg.com/markets/news.rss',                              on:true },
   ],
   sports: [
     // ESPN via its supported JSON news API (site.api.espn.com) — the old
@@ -326,6 +331,8 @@ const DEFAULT_FEEDS = {
   business: [
     { name:'NPR Business',           url:'https://feeds.npr.org/1006/rss.xml',                                  on:true },
     { name:'CNBC Business',          url:'https://www.cnbc.com/id/10001147/device/rss/rss.html',                on:true },
+    { name:'CNBC Top News',          url:'https://www.cnbc.com/id/100003114/device/rss/rss.html',               on:true }, // Z2: moved from general
+    { name:'Morning Brew',           url:'https://www.morningbrew.com/feed',                                    on:true }, // Z2: moved from general
     { name:'Oilprice.com',           url:'https://oilprice.com/rss/main',                                       on:true },
     { name:'Utility Dive',           url:'https://www.utilitydive.com/feeds/news/',                             on:true },
     { name:'Data Center Dynamics',   url:'https://www.datacenterdynamics.com/en/rss/',                          on:true },
@@ -338,6 +345,7 @@ const DEFAULT_FEEDS = {
   ],
   finance: [
     { name:'MarketWatch',   url:'https://feeds.marketwatch.com/marketwatch/topstories/',                        on:true },
+    { name:'Bloomberg',     url:'https://feeds.bloomberg.com/markets/news.rss',                                 on:true }, // Z2: moved from general (markets)
     { name:'Yahoo Finance', url:'https://finance.yahoo.com/news/rssindex',                                      on:true },
     { name:'Motley Fool',   url:'https://www.fool.com/feeds/index.aspx',                                        on:true },
     { name:'BiggerPockets', url:'https://www.biggerpockets.com/blog/feed',                                      on:true },
@@ -1630,7 +1638,9 @@ body{
    the min-height reserves its slot so scores loading causes no CLS. It scrolls away with the
    header; only the nav/chip bar stays pinned. */
 @media(max-width:640px){
-  .topbar-scores{min-height:60px;}
+  /* Z4: reserve the band's LOADED height (score tiles ~68px + padding), so scores streaming in
+     no longer grows the band 60->76 and shoves main down 17px (the dominant phone CLS source). */
+  .topbar-scores{min-height:76px;}
   /* O2: one horizontal band — the "Live Scores / Scores" label sits at the LEFT, the tile row
      scrolls to its right, so the whole strip is a single compact line (<=64px). */
   .topbar-scores .home-scores{padding:4px var(--s3);display:flex;align-items:center;gap:10px;}
@@ -1645,6 +1655,16 @@ body{
   .topbar-scores .score-tile-team,.topbar-scores .score-tile-score{font-size:var(--fs-label);}
   .topbar-scores .score-tile-logo{width:13px;height:13px;}
   .topbar-scores .score-tile-status{font-size:var(--fs-label);margin-top:0;}
+  /* Z4: weather merged INTO the scores band on phone — compact "Right Now" chip pinned left,
+     scores scroll to its right. One band; the band min-height absorbs it (no extra height). */
+  .topbar-scores{display:flex;align-items:stretch;}
+  .tbs-wx{flex:0 0 auto;display:flex;align-items:center;max-width:120px;border-right:1px solid var(--border2);}
+  .tbs-wx .rnw-card{background:none;border:none;border-radius:0;margin:0;padding:0;overflow:hidden;}
+  .tbs-wx .rnw-row{flex-wrap:nowrap;gap:6px;padding:0 var(--s3);min-height:0;overflow:hidden;align-items:center;}
+  .tbs-wx .rnw-label,.tbs-wx .rnw-caret,.tbs-wx .rnw-desc,.tbs-wx .rnw-forecast{display:none;} /* chip: city + temp only, not expandable */
+  .tbs-wx .rnw-cities{flex-wrap:nowrap;gap:6px;overflow:hidden;}
+  .tbs-wx .rnw-city-item:not(:first-child){display:none;}
+  .topbar-scores .home-scores{flex:1;min-width:0;}
 }
 /* N5: when the iPad-portrait-sections flag is on, MobileHome shows scores in its own body, so
    hide the header copy there too (avoids showing scores twice). Inert while the flag is off. */
@@ -1762,7 +1782,7 @@ body{
 .houston-img{width:100%;aspect-ratio:16/9;object-fit:cover;background:var(--surface2);margin-bottom:8px;}
 .houston-img-ph{display:flex;align-items:center;justify-content:center;background:linear-gradient(135deg,var(--surface2),var(--surface));}
 .houston-card-title{font-family:var(--font-sans);font-size:var(--fs-body);font-weight:600;line-height:1.35;color:var(--text);padding:0 10px;margin-bottom:6px;overflow-wrap:anywhere;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden;}
-.houston-card-meta{font-family:var(--font-sans);font-size:var(--fs-label);color:var(--text3);padding:0 10px;display:flex;gap:5px;flex-wrap:wrap;font-variant-numeric:tabular-nums;}
+.houston-card-meta{font-family:var(--font-sans);font-size:var(--fs-meta);color:var(--text3);padding:0 10px;display:flex;gap:5px;flex-wrap:wrap;font-variant-numeric:tabular-nums;} /* Z3: one meta token */
 @media(max-width:640px){
   /* F1 bug fix: the flex row defaulted to align-items:stretch, so a short-title card
      stretched to the tallest card and showed a large empty tail of white card background
@@ -2483,7 +2503,7 @@ body:not(.dark) .pill-bar{
 .sb-across-cat .sb-across-item:first-of-type{border-top:none;}
 .sb-across-title{font-family:var(--font-serif);font-weight:600;font-size:var(--fs-body);line-height:1.3;color:var(--text);display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;}/* D4: tokenized (was 12px) */
 .sb-across-item:hover .sb-across-title{color:var(--accent);}
-.sb-across-src{font-size:var(--fs-label);color:var(--text3);margin-top:2px;}
+.sb-across-src{font-size:var(--fs-meta);color:var(--text3);margin-top:2px;} /* Z3: one meta token */
 
 /* Sources pill grid */
 .src-pills{display:flex;flex-wrap:wrap;gap:5px;}
@@ -2515,7 +2535,7 @@ body:not(.dark) .pill-bar{
   font-size:12px;font-weight:700;color:var(--text);line-height:1.35;
   display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;margin-bottom:3px;
 }
-.trend-src{font-size:var(--fs-label);color:var(--text3);display:flex;align-items:center;gap:4px;flex-wrap:wrap;}
+.trend-src{font-size:var(--fs-meta);color:var(--text3);display:flex;align-items:center;gap:4px;flex-wrap:wrap;} /* Z3: one meta token */
 .trend-cat-badge{
   font-size:var(--fs-label);font-weight:700;border-radius:4px;padding:1px 5px;
   letter-spacing:0.03em;text-transform:uppercase;
@@ -2933,13 +2953,20 @@ body:not(.dark) .pill-bar{
 .pod-show{font-size:var(--fs-label);font-weight:600;color:var(--accent);margin-bottom:2px;}
 .pod-title{font-size:var(--fs-body);font-weight:700;color:var(--text);line-height:1.35;margin-bottom:4px;cursor:pointer;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;overflow-wrap:anywhere;word-break:break-word;}
 .pod-title:hover{color:var(--accent);}
-.pod-meta{font-size:var(--fs-label);color:var(--text3);display:flex;gap:8px;flex-wrap:wrap;}
+.pod-meta{font-size:var(--fs-meta);color:var(--text3);display:flex;gap:8px;flex-wrap:wrap;} /* Z3: one meta token */
 .pod-desc{font-size:var(--fs-meta);color:var(--text2);line-height:1.5;margin-top:6px;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden;}
 .pod-actions{display:flex;gap:6px;flex-wrap:wrap;}
 .pod-skel-line{border-radius:var(--radius-md);background:linear-gradient(90deg,var(--surface2) 25%,var(--border) 50%,var(--surface2) 75%);background-size:200% 100%;animation:shimmer 1.4s infinite;}
 .pod-btn{border:1px solid var(--border);border-radius:var(--radius-md);padding:4px 10px;font-size:var(--fs-label);cursor:pointer;font-family:inherit;font-weight:500;background:none;color:var(--text2);transition:all 0.12s;}
 .pod-btn:hover{border-color:var(--accent);color:var(--accent);}
 .pod-btn.saved{border-color:var(--amber);color:var(--amber);background:var(--wash-warm);}
+/* Z5: PODCAST · Show · time · duration — dot separators between meta tokens. */
+.pod-meta span:not(:first-child)::before{content:"·";margin-right:7px;color:var(--text4);}
+/* Z5: episode AI panel states (shared look with the article panel). */
+.pod-ai-panel{margin:10px 0 0;}
+.pod-ai-note{font-size:var(--fs-meta);color:var(--text3);font-style:italic;}
+.pod-ai-err{font-size:var(--fs-meta);color:var(--red);}
+.pod-inline-link{background:none;border:none;padding:0;margin:0;color:var(--accent);font-weight:700;cursor:pointer;font-family:inherit;font-size:var(--fs-meta);text-decoration:underline;}
 .pod-shows{background:var(--surface);border-radius:var(--radius-md);border:1px solid var(--border);padding:14px;}
 .pod-show-item{display:flex;align-items:center;gap:8px;padding:8px 0;border-bottom:1px solid var(--border2);cursor:pointer;}
 .pod-show-item:last-child{border-bottom:none;}
@@ -3138,7 +3165,7 @@ body:not(.dark) .pill-bar{
 }
 .gn-card-source{
   font-weight:800;color:var(--text2);
-  text-transform:uppercase;letter-spacing:0.05em;font-size:var(--fs-label);
+  text-transform:uppercase;letter-spacing:0.05em;font-size:var(--fs-meta); /* Z3: one meta token */
 }
 
 /* Per-vertical card top-border accents */
@@ -3628,7 +3655,7 @@ body:not(.dark) .pill-bar{
   font-size:var(--fs-meta);color:var(--text3);
   display:flex;align-items:center;gap:6px;
 }
-.sports-hero-source{font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:0.04em;font-size:var(--fs-label);}
+.sports-hero-source{font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:0.04em;font-size:var(--fs-meta);} /* Z3: one meta token */
 
 /* CUSTOMIZE — Teams section */
 .cp-team-row{
@@ -4841,7 +4868,7 @@ body{overscroll-behavior-y:contain;}
 
 /* v26: Business + Finance card terminal-feel source label */
 .gn-card.business .gn-card-source,.gn-card.finance .gn-card-source{
-  font-family:'SF Mono','Cascadia Code','Consolas',monospace;letter-spacing:0;font-size:var(--fs-label);
+  font-family:'SF Mono','Cascadia Code','Consolas',monospace;letter-spacing:0;font-size:var(--fs-meta); /* Z3: one meta token */
 }
 
 /* Dark palette is owned solely by src/styles/tokens.css (single source of truth). */
@@ -5093,7 +5120,7 @@ kbd{display:inline-block;padding:1px 5px;border:1px solid var(--border);border-r
 }
 .gn-lead-source,.gn-card-source{
   font-family:var(--font-sans);
-  font-size:var(--fs-label);font-weight:800;text-transform:uppercase;letter-spacing:0.08em;
+  font-size:var(--fs-meta);font-weight:800;text-transform:uppercase;letter-spacing:0.08em; /* Z3: one meta token */
 }
 
 /* Briefing teaser: editorial serif + crimson accent line */
@@ -5352,7 +5379,7 @@ kbd{display:inline-block;padding:1px 5px;border:1px solid var(--border);border-r
   .gn-card:last-child{border-bottom:none;}
   .gn-card-img,.gn-card-img-ph{width:100px;height:72px;aspect-ratio:auto;flex-shrink:0;border-radius:var(--radius-md);}
   .gn-card-title{font-size:var(--fs-title);-webkit-line-clamp:3;font-weight:600;}
-  .gn-card-meta{font-size:var(--fs-label);}
+  .gn-card-meta{font-size:var(--fs-meta);} /* Z3: one meta token */
   /* gn-grid on mobile: single column lead only, no grid */
   .gn-grid{grid-template-columns:1fr;}
   .gn-lead-img{aspect-ratio:16/9;height:auto;max-height:200px;}
@@ -5778,7 +5805,7 @@ kbd{display:inline-block;padding:1px 5px;border:1px solid var(--border);border-r
 .toh-card-lead .toh-body{position:absolute;inset:0;padding:16px 18px;display:flex;flex-direction:column;justify-content:flex-end;}
 .toh-card-lead .toh-cat{color:var(--on-media);}
 .toh-card-lead .toh-title{font-family:var(--font-serif);font-size:var(--fs-lead);font-weight:800;color:var(--on-media);line-height:1.16;margin:0 0 5px;text-shadow:0 1px 4px rgba(0,0,0,0.7);display:-webkit-box;-webkit-line-clamp:4;-webkit-box-orient:vertical;overflow:hidden;}
-.toh-card-lead .toh-meta{font-size:var(--fs-label);color:rgba(255,255,255,0.72);font-weight:600;font-family:var(--font-sans);}
+.toh-card-lead .toh-meta{font-size:var(--fs-meta);color:rgba(255,255,255,0.72);font-weight:600;font-family:var(--font-sans);} /* Z3: one meta token */
 /* G7f item 2: no-image lead — typographic (D5 style), NOT a giant watermark. Surface
    card, small-caps source kicker + oversized serif headline in ink. */
 .toh-card-noimg{background:var(--surface);border:1px solid var(--border);}
@@ -6606,48 +6633,6 @@ function FeedCard({a, cat, isSaved, onSave, onRead, relatedSources, isRead, user
 }
 
 // ─── TODAY ITEM ───────────────────────────────────────────────────────────────
-function TodayItem({a, cc, onRead}) {
-  const [showSum, setShowSum] = useState(false);
-  const [sum, setSum] = useState('');
-  const [sumPreview, setSumPreview] = useState(false);
-  const [err, setErr] = useState('');
-  const [loading, setLoading] = useState(false);
-  // X1: image error state now lives inside <SourceImage>.
-
-  const handleAI = async (e) => {
-    e.stopPropagation();
-    if (showSum) { setShowSum(false); return; }
-    if (sum||err) { setShowSum(true); return; }
-    setShowSum(true); setLoading(true);
-    const {summary, error, fromPreview} = await fetchAISummary({type:'article',title:a.title,content:a.desc||'',url:a.link});
-    if (summary) { setSum(summary); setSumPreview(!!fromPreview); } else setErr(error||'Summary unavailable');
-    setLoading(false);
-  };
-
-  return (
-    <div className="today-item-wrap">
-      <div className="today-item" onClick={()=>onRead(a)}>
-        {/* X1: text-only when there is no usable image (no blank indent). */}
-        <SourceImage src={a.img} variant="row" className="today-thumb" alt=""/>
-        <div className="today-item-body">
-          <div className="today-item-title">{a.title}</div>
-          <div className="today-item-src">{a.source} · {fmtDate(a.pubDate)}</div>
-        </div>
-        <button className={`today-ai-btn ${showSum?'on':''}`} title="AI Summary" onClick={handleAI} disabled={loading}>
-          {loading?'…':<Sparkles size={13} aria-hidden="true"/>}
-        </button>
-        <ShareControl className="today-share" title={a.title} url={a.link} source={a.source}/>
-      </div>
-      {showSum && (
-        <div className="today-summary" onClick={e=>e.stopPropagation()}>
-          {loading ? <em style={{color:'var(--text3)'}}>Generating summary...</em>
-          : err ? <span style={{color:'var(--red)'}}>{err}</span>
-          : <>{sumPreview && <div className="fc-preview-note" style={{marginBottom:'8px'}}>{PREVIEW_LABEL}</div>}{sum}</>}
-        </div>
-      )}
-    </div>
-  );
-}
 
 
 // ─── MORNING BRIEFING INLINE (v19 enhanced) ──────────────────────────────────
@@ -7692,74 +7677,6 @@ function PtrIndicator({ distance, threshold, refreshing }) {
 //   2. Favorite-team live games (ESPN scores, state === 'in')
 //   3. Big watchlist moves (>=2% up or down)
 // One glanceable row. Caps total items at 6 so it doesn't become a ticker.
-function RightNowStrip({ breakingItems, scores, marketData, watchlist, onOpen, onNavigate }) {
-  const items = useMemo(() => {
-    const out = [];
-
-    // Live games involving favorite teams
-    Object.values(scores || {}).flat().forEach(g => {
-      if (g.state !== 'in') return;
-      const fav = favoriteIn(g);
-      if (!fav) return;
-      out.push({
-        kind:'score', key:`g${g.id}`, emoji:fav.emoji,
-        text:`${g.awayAbbr||g.awayName} ${g.awayScore} — ${g.homeScore} ${g.homeAbbr||g.homeName}`,
-        sub:g.status, link:g.link,
-      });
-    });
-
-    // Watchlist big movers (≥2% abs)
-    (watchlist || []).forEach(w => {
-      const q = marketData?.[w.sym];
-      if (!q || Math.abs(q.pct) < 2) return;
-      out.push({
-        kind:'market', key:`m${w.sym}`,
-        emoji: q.chg >= 0 ? '' : '',
-        text: w.sym,
-        val: `${q.chg >= 0 ? '▲':'▼'} ${Math.abs(q.pct).toFixed(2)}%`,
-        valClass: q.chg >= 0 ? 'up' : 'down',
-        link: `https://finance.yahoo.com/quote/${encodeURIComponent(w.sym)}`,
-      });
-    });
-
-    // Urgent breaking items (already deduped + urgent-filtered upstream)
-    (breakingItems || []).slice(0, 3).forEach((b, i) => {
-      out.push({
-        kind:'urgent', key:`b${i}`, emoji:'',
-        text: b.title.length > 54 ? b.title.slice(0, 52) + '…' : b.title,
-        sub: b.source,
-        article: b,
-      });
-    });
-
-    return out.slice(0, 6);
-  }, [breakingItems, scores, marketData, watchlist]);
-
-  if (items.length === 0) return null;
-
-  return (
-    <div className="rn-strip">
-      <span className="rn-label">
-        <span className="rn-pulse"/>
-        Breaking & Right Now
-      </span>
-      <div className="rn-items">
-        {items.map((it, i) => (
-          <span key={it.key} className={`rn-item ${it.kind==='urgent'?'urgent':''}`} onClick={() => {
-            if (it.article) onOpen(it.article);
-            else if (it.link) window.open(it.link, '_blank');
-          }}>
-            <span className="rn-item-kind">{it.emoji}</span>
-            <span className="rn-item-text">{it.text}</span>
-            {it.val && <span className={`rn-item-val ${it.valClass||''}`}>{it.val}</span>}
-            {it.sub && <span style={{color:'var(--text3)',fontSize:'var(--fs-label)'}}>· {it.sub}</span>}
-            {i < items.length - 1 && <span className="rn-divider" style={{marginLeft:10}}/>}
-          </span>
-        ))}
-      </div>
-    </div>
-  );
-}
 
 // FollowingStrip removed in v21 per user — low signal, consumed above-fold space.
 
@@ -7767,33 +7684,6 @@ function RightNowStrip({ breakingItems, scores, marketData, watchlist, onOpen, o
 // Uses the existing diverseTrending() function so no category dominates.
 // Scrollable on both desktop and mobile. Each card shows rank + category
 // badge + title + source. Tap → read article.
-function TrendingCarousel({ arts, kw, onRead }) {
-  const stories = useMemo(() => diverseTrending(arts, kw, 10, 2), [arts, kw]);
-  if (!stories.length) return null;
-  return (
-    <div className="trending-inline">
-      <div className="trending-inline-head">
-        <span className="trending-inline-title">Trending across the hub</span>
-      </div>
-      <div className="trending-row">
-        {stories.map((a, i) => {
-          const cc = CATS[a.cat] || CATS.general;
-          const badge = catBadge(a);
-          return (
-            <div key={i} className="trending-card" onClick={() => onRead(a)}>
-              <div className="trending-card-meta">
-                <span className="trending-card-num">{i+1}</span>
-                <span className="trending-card-badge">{badge.label}</span>
-              </div>
-              <div className="trending-card-title">{a.title}</div>
-              <div className="trending-card-src">{a.source} · {fmtDate(a.pubDate)}</div>
-            </div>
-          );
-        })}
-      </div>
-    </div>
-  );
-}
 
 // MINI SCOREBOARD STRIP — v20 — slim horizontal row of live/recent games
 // involving favorite teams. Sits ABOVE the Sports section on Today. Ghost
@@ -7904,69 +7794,6 @@ function SportsScoreStrip({ sportTab = 'all', teams }) {
 // Mobile: single-column, headlines below hero.
 // Purpose: put 5 headlines on screen WITH the hero so user gets density
 // + snapshot the moment the page opens.
-function HeroBand({ heroStories, heroIdx, setHeroIdx, paused, setPaused, onRead }) {
-  const lead = heroStories[heroIdx];
-  if (!lead) return null;
-  // Secondary headlines = the rest of the ranked set (up to 5)
-  const secondary = heroStories.slice(0, 6).filter((_, i) => i !== heroIdx).slice(0, 5);
-
-  return (
-    <div
-      className="hero-band"
-      onMouseEnter={()=>setPaused(true)}
-      onMouseLeave={()=>setPaused(false)}
-    >
-      {/* LEFT: large lead */}
-      <article className="hero-band-lead" onClick={()=>onRead(lead)}>
-        <div className="hero-band-img">
-          <SourceImage src={lead.img} variant="lead" className="cover-img" alt=""/>
-          <div className="hero-band-grad"/>
-          <div className="hero-band-text-overlay">
-            <div className="hero-band-badge" style={{background:(CATS[lead._cat]?.color||'var(--accent)')}}>
-              {CATS[lead._cat]?.emoji} {CATS[lead._cat]?.label||'News'}
-            </div>
-            <h1 className="hero-band-title">{lead.title}</h1>
-            {lead.desc && <p className="hero-band-desc">{lead.desc}</p>}
-            <div className="hero-band-meta">
-              <span className="hero-band-source">{lead.source}</span>
-              <span>·</span>
-              <span>{fmtDate(lead.pubDate)}</span>
-            </div>
-          </div>
-          {heroStories.length > 1 && (
-            <div className="hero-band-dots">
-              {heroStories.slice(0,5).map((_,i)=>(
-                <button key={i}
-                  className={`hero-band-dot ${i===heroIdx?'active':''}`}
-                  onClick={e=>{e.stopPropagation();setHeroIdx(i);}}
-                  aria-label={`Story ${i+1}`}
-                />
-              ))}
-            </div>
-          )}
-        </div>
-      </article>
-
-      {/* RIGHT: secondary headline stack */}
-      <aside className="hero-band-side">
-        <div className="hero-band-side-label">More top stories</div>
-        {secondary.map((s, i) => (
-          <div key={i} className="hero-band-side-item" onClick={()=>onRead(s)}>
-            <SourceImage src={s.img} variant="row" className="hero-band-side-thumb" alt=""/>
-            <div className="hero-band-side-body">
-              <div className="hero-band-side-title">{s.title}</div>
-              <div className="hero-band-side-meta">
-                <span style={{color:CATS[s._cat]?.color,fontWeight:700}}>{CATS[s._cat]?.label}</span>
-                <span>·</span>
-                <span>{s.source}</span>
-              </div>
-            </div>
-          </div>
-        ))}
-      </aside>
-    </div>
-  );
-}
 
 
 // I2: G5 skeleton shown as the Suspense fallback while the lazy Podcasts chunk loads —
@@ -8376,7 +8203,16 @@ function TopBar({tab, setTab, search, setSearch, dark, setDark, onAskChat, chatO
         The mobile ticker-collapse class rides here now (the strip moved out of the nav). */}
     <div className={`header-scroll ${tickerOpen?'':'ticker-collapsed'}`}>
       {tab==='general' && (
-        <div className="topbar-scores"><ActiveScoresBar favTeams={favTeams} onGoToSports={onGoToSports}/></div>
+        <div className="topbar-scores">
+          {/* Z4: on phone, weather is merged INTO the scores band (one band) — a compact
+              "Right Now" chip pinned left, scores scroll to its right. The band's own
+              min-height absorbs it, so weather resolving no longer adds a 2nd band (−27px
+              chrome) or a reserve shift. 641-899px keeps the standalone band below. */}
+          {isMobile && weatherData.length > 0 && (
+            <div className="tbs-wx"><RightNowWeather data={weatherData}/></div>
+          )}
+          <ActiveScoresBar favTeams={favTeams} onGoToSports={onGoToSports}/>
+        </div>
       )}
       {/* Unified status strip — collapses the old weather + ticker + breaking bars
           into one slim row: live/breaking signal LEFT, market ticker CENTER,
@@ -8420,7 +8256,9 @@ function TopBar({tab, setTab, search, setSearch, dark, setDark, onAskChat, chatO
       {/* Home weather band (<900px, where it is NOT merged onto the ticker line). R2: reserve the
           band's height until the weather resolves so it doesn't pop in and shove the page down
           (the band is display:none >=900, so this reserve is phone/narrow-tablet only). */}
-      {tab==='general' && (
+      {/* Z4: phone (<=640) merges weather into the scores band above, so the standalone band
+          is only for 641-899px (where scores are also shown but not merged). */}
+      {tab==='general' && !isMobile && (
         weatherData.length > 0
           ? <div className="topbar-wx"><RightNowWeather data={weatherData}/></div>
           : <div className="topbar-wx topbar-wx-reserve" aria-hidden="true"/>
@@ -10175,6 +10013,9 @@ export default function App() {
       return {...a,[cat]:merged};
     });
     setPendingNew(p=>({...p,[cat]:[]}));
+    // Z4: applying is user-initiated, so a visible update is correct — bump lastUpdated so the phone
+    // Home's frozen head re-picks to surface the newly-applied stories (no-op cost on FeedPage).
+    setLastUpdated(prev => ({...prev, [cat]: Date.now()}));
     window.scrollTo({top:0,behavior:'smooth'});
   },[pendingNew]);
 
@@ -10215,6 +10056,34 @@ export default function App() {
       loadMarketData(),
     ]);
   }, [loadCat, loadPod, loadScores, loadMarketData]);
+
+  // Z4: STAGED refresh for the phone Home — re-fetch general read-only and stow only the stories we
+  // are not already showing into pendingNew.general, so the view does not jump. The "N new stories"
+  // pill (rendered in <MobileHome/>) applies them on tap. 0 shifts during refresh. (Defined after
+  // refreshAll so loadPod/loadScores/loadMarketData are already in scope — avoids a TDZ in the deps.)
+  const stageGeneralRefresh = useCallback(async () => {
+    const fresh = await fetchCatArticles('general');
+    if (!fresh || !fresh.length) return 0;
+    const have = new Set((arts.general || []).map(storyKey));
+    const staged = fresh.filter(a => a && a.title && a.link && !isPromoItem(a) && !have.has(storyKey(a)));
+    if (staged.length) setPendingNew(p => ({ ...p, general: staged }));
+    return staged.length;
+  }, [arts.general, fetchCatArticles]);
+  const refreshHomeStaged = useCallback(async () => {
+    await Promise.allSettled([
+      ...Object.keys(DEFAULT_FEEDS).filter(c => c !== 'general').map(c => loadCat(c)),
+      ...PODCAST_FEEDS.map(p => loadPod(p)),
+      loadScores(), loadMarketData(), stageGeneralRefresh(),
+    ]);
+  }, [loadCat, loadPod, loadScores, loadMarketData, stageGeneralRefresh]);
+  // DEBUG-only: seed synthetic "new" general stories so the pill can be exercised headlessly (a real
+  // second fetch of the fixtures returns the same items → nothing to stage).
+  useEffect(() => { if (DEBUG && typeof window !== 'undefined') window.__stageDemo = (n = 2) => {
+    const now = Date.now();
+    setPendingNew(p => ({ ...p, general: Array.from({ length: n }, (_, i) => ({
+      title: `Freshly staged story ${i + 1}`, link: `https://ex.com/new/${now}/${i}`, source: 'Reuters',
+      cat: 'general', pubDate: new Date(now - i * 60000).toISOString() })) }));
+  }; });
 
   useEffect(()=>{
     // D6: fetch everything once on load. No 120s scores poll, no 3-min category
@@ -10438,7 +10307,8 @@ export default function App() {
     setTab(category); setSubcat(subcategory || null); setTertiary(tertiary || null);
     setSearch('');setActiveKw(null);setActiveSrc(null);
     setMobileSearchOpen(false);
-    window.scrollTo({top:0, behavior:'instant'});
+    // Z4: scroll is handled by the caller — navigate() jumps to top on a forward move, popstate
+    // RESTORES the saved position (place-keeping), so applyRoute no longer forces top itself.
     const CAT_TABS = ['general','sports','business','finance','popculture','comedy','tech'];
     if (CAT_TABS.includes(category)) setLastFeedTab(category);
     // Refetch feed whenever the category changes (or first visit).
@@ -10449,12 +10319,59 @@ export default function App() {
 
   // Phase 2/5: the URL is the single source of truth. navigate() writes the path
   // (/:category/:subcategory?/:team?), then applies it. Chips call this, never local state.
+  // Z4: per-route scroll memory for place-keeping — remember where the user was on each path and
+  // restore it on Back (within a few px), waiting until the lazy content is tall enough first.
+  // Z4: scroll place-keeping via history.state (per-entry, so a later navigation can never clobber an
+  // earlier entry's saved position — the path-keyed approach raced during navigation). Each entry
+  // remembers its own scrollY; Back restores it, climbing as lazy sections grow the page.
+  const restoringRef = useRef(false);
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    try { history.scrollRestoration = 'manual'; } catch {} // we own restoration, not the browser
+    let raf = 0;
+    const save = () => {
+      raf = 0; if (restoringRef.current) return;
+      try { history.replaceState({ ...(history.state || {}), _sy: window.scrollY }, ''); } catch {}
+    };
+    const onScroll = () => { if (!raf) raf = requestAnimationFrame(save); };
+    window.addEventListener('scroll', onScroll, { passive: true });
+    return () => { window.removeEventListener('scroll', onScroll); if (raf) cancelAnimationFrame(raf); };
+  }, []);
+  const restoreScroll = (target) => {
+    if (!target || target <= 0) { restoringRef.current = false; window.scrollTo(0, 0); return; }
+    restoringRef.current = true;   // freeze saves until we land, so back-nav scroll events can't clobber
+    // The Home/feed surfaces load sections lazily, so on first paint the page is often shorter than
+    // the saved position. CLIMB toward the target: each frame scroll to the current max (which brings
+    // the next lazy section into its 600px preload margin and grows the page), until we reach target.
+    let tries = 0;
+    const tick = () => {
+      const max = document.documentElement.scrollHeight - window.innerHeight;
+      const y = Math.min(target, Math.max(0, max));
+      window.scrollTo(0, y);
+      if (Math.abs(y - target) <= 4 || tries++ > 120) {
+        // Settle pass: the auto-hiding header toggles as we climb, nudging content a few px; after it
+        // stabilizes, snap once more to the exact target so Back lands within a couple of px.
+        setTimeout(() => {
+          const m = document.documentElement.scrollHeight - window.innerHeight;
+          window.scrollTo(0, Math.min(target, Math.max(0, m)));
+          restoringRef.current = false;
+        }, 220);
+        return;
+      }
+      requestAnimationFrame(tick);
+    };
+    requestAnimationFrame(tick);
+  };
+
   const navigate = (category, subcategory=null, tertiary=null) => {
     const path = buildPath(category, subcategory, tertiary);
     if (typeof window!=='undefined' && window.location.pathname !== path) {
+      // Stamp the CURRENT entry with where we're leaving from, THEN push the new (top) entry.
+      try { window.history.replaceState({ ...(window.history.state||{}), _sy: window.scrollY }, ''); } catch {}
       window.history.pushState({category,subcategory,tertiary}, '', path);
     }
     applyRoute(category, subcategory, tertiary);
+    if (typeof window!=='undefined') window.scrollTo({top:0, behavior:'instant'}); // forward move starts at top
   };
 
   const handleTabChange = t => navigate(t, null, null);
@@ -10463,11 +10380,15 @@ export default function App() {
   // can reach any page deterministically at any width (the More-overflow menu is width-
   // dependent and brittle to drive by click). Zero cost when the flag is off.
   const [, __forceTick] = useState(0);
-  useEffect(() => { if (DEBUG && typeof window !== 'undefined') { window.__nav = navigate; window.__openCustomize = openCustomize; window.__forceRender = () => __forceTick(n => n + 1); } });
+  useEffect(() => { if (DEBUG && typeof window !== 'undefined') { window.__nav = navigate; window.__openCustomize = openCustomize; window.__forceRender = () => __forceTick(n => n + 1); window.__scrollMem = () => (window.history.state || {}); } });
 
   // Phase 2: back/forward buttons re-apply the URL as source of truth.
   useEffect(()=>{
-    const onPop = () => { const r = parseRoute(); applyRoute(r.category, r.subcategory, r.tertiary); };
+    const onPop = (e) => {
+      const target = (e && e.state && e.state._sy) || 0; // the returned-to entry's own saved scroll
+      const r = parseRoute(); applyRoute(r.category, r.subcategory, r.tertiary);
+      restoreScroll(target);
+    };
     window.addEventListener('popstate', onPop);
     return () => window.removeEventListener('popstate', onPop);
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -10477,7 +10398,10 @@ export default function App() {
   const { distance: ptrDistance } = usePullToRefresh(
     async () => {
       setRefreshing(true);
-      try { await refreshAll(); } finally { setRefreshing(false); }
+      // Z4: on the phone Home, stage general (0-shift pill) instead of replacing it; everywhere
+      // else keep the destructive full refresh.
+      const stageHome = isMobile && tab === 'general' && !search && !activeKw && !activeSrc;
+      try { await (stageHome ? refreshHomeStaged() : refreshAll()); } finally { setRefreshing(false); }
     },
     { enabled: isMobile, threshold: 110 }
   );
@@ -10934,12 +10858,20 @@ export default function App() {
               {/* M1: the phone Home is a dedicated sectioned surface. Desktop/iPad (and any
                   active filter/search) keep the existing FeedPage render unchanged. */}
               {tab==='general' && (isMobile || ipadSections) && !search && !activeKw && !activeSrc
-                ? <MobileHome ctx={{
+                ? <Suspense fallback={<div className="page mobile-home" style={{minHeight:'100vh'}} aria-busy="true"/>}><MobileHome ctx={{
                     arts, breakingItems, loadCat, loading, lastUpdated, onRead, onSave, isSavedFn,
                     setChatContext, navigate, openCustomize, feeds, feedHealth,
                     favTeams: [...teams, ...myTeams.map(t=>({match:t.name, league:t.league}))],
                     CATS, storyKey, fmtDate, opinionLabel, HOUSTON_SOURCES, ActiveScoresBar, DEBUG,
-                  }}/>
+                    setPerspArticle,
+                    // Z5: phone Home Podcasts section — latest 3 episodes, lazy, collapses empty.
+                    podEps, podLoading, loadPod, PODCAST_FEEDS, fmtDuration,
+                    // Z4: "N new stories" pill reuses the staged-refresh machinery (pendingNew/applyPending).
+                    pendingNew, applyPending,
+                    // Z0: phone (<=640) = isMobile here; the lead renders text-first (no hero image).
+                    // At 641-900 (ipad-portrait sections) isMobile is false, so the hero image stays.
+                    isPhone: isMobile,
+                  }}/></Suspense>
                 : NEWS_CATS.filter(c=>c!=='sports').includes(tab)&&<FeedPage cat={tab} ctx={{
                 activeKw, activeSrc, applyPending, arts, breakingItems, briefingExclude, feedHealth,
                 feeds, followTeam, followedTeams, handleTabChange, health, isSavedFn, isTeamFollowed,
@@ -10959,7 +10891,9 @@ export default function App() {
                     onSave={onSave} isSaved={isSavedFn} loadPod={loadPod}
                     fetchAISummary={fetchAISummary} fmtDate={fmtDate} fmtDuration={fmtDuration}
                     TakeawaysContent={TakeawaysContent} LastUpdated={LastUpdated}
-                    PODCAST_FEEDS={PODCAST_FEEDS}/>
+                    PODCAST_FEEDS={PODCAST_FEEDS}
+                    fetchListen={fetchListen} setChatContext={setChatContext}
+                    ExplainContent={ExplainContent} ShareControl={ShareControl} PREVIEW_MIN={PREVIEW_MIN}/>
                 </Suspense>
               )}
               {tab==='sources'&&(
