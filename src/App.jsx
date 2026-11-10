@@ -4071,7 +4071,7 @@ body{overscroll-behavior-y:contain;}
 .mobile-header{display:flex;align-items:center;justify-content:space-between;padding:0 12px;height:48px;}
 .mobile-logo{font-size:var(--fs-headline);font-weight:700;color:var(--text);letter-spacing:-0.8px;line-height:1;}
 .mobile-logo span{color:var(--accent);}
-.mobile-logo-sub{font-size:var(--fs-label);color:var(--text3);letter-spacing:0.14em;text-transform:uppercase;font-weight:700;margin-top:1px;}
+.mobile-logo-sub{font-size:var(--fs-label);color:var(--text3);letter-spacing:0;font-weight:500;margin-top:1px;} /* AA2: tagline sentence case, not uppercase */
 .mobile-actions{display:flex;gap:4px;align-items:center;}
 
 /* v22: weather + ticker strip — mobile/iPad. Slim 28px horizontal scrollable row. */
@@ -4873,7 +4873,7 @@ kbd{display:inline-block;padding:1px 5px;border:1px solid var(--border);border-r
 .mobile-logo span{color:var(--accent);}
 .mobile-logo-sub{
   font-family:var(--font-sans);
-  font-size:var(--fs-label);color:var(--text3);letter-spacing:0.16em;text-transform:uppercase;margin-top:2px;
+  font-size:var(--fs-label);color:var(--text3);letter-spacing:0;margin-top:2px; /* AA2: tagline sentence case */
 }
 /* V1: borderless to match the base .mobile-icon-btn (was a 1px bordered square — the old look
    U4 only removed at >=641). Hover tint only on real pointers. */

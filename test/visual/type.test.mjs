@@ -24,7 +24,7 @@ const HEAD_SEL = ['.snap-title','.snap-hero-title','.fc-title','.gn-card-title',
   '.toh-compact-title','.mh-compact-title','.houston-card-title','.pod-title','.sop-item-title','.sb-across-title',
   '.web-result-title','.sports-hero-title','.mh-brk-title','.trend-title'];
 // classes (self or ancestor) that MAY be uppercase: the label/eyebrow role, TopicLabel, tickers, kickers.
-const UPPER_OK = /(eyebrow|-label|-lbl|label\b|kicker|topic|-tag\b|tag-|-source\b|-src\b|-sub\b|-head\b|-lg\b|-sym\b|ticker|page-header|scores-label|sop-brk|ss-flag-live|disagree|dp-h2|cp-lbl|cp-seed-cat|cp-voice|stat-|stats-|src-footer|sources-cat|persp-|my-team|following-label|menu-sheet-head|rnw-city|rnw-label|rnw-city-fc-head|houston-sub|mobile-logo-sub|mobile-strip-city|social-block|sd-tier|snap-tag|snap-opinion|snap-cov-title|snap-source|snap-hero-source|gap-tag|pm-src|pm-tag|fc-disc|fc-summary-lbl|fc-takeaways|fc-why|chat-context-label|chat-analyze|following-chip|team-card-league|sb-box)/i;
+const UPPER_OK = /(eyebrow|-label|-lbl|label\b|kicker|topic|-tag\b|tag-|-source\b|-src\b|-sub\b|-head\b|-lg\b|-sym\b|ticker|page-header|scores-label|sop-brk|ss-flag-live|disagree|dp-h2|cp-lbl|cp-seed-cat|cp-voice|stat-|stats-|src-footer|sources-cat|persp-|my-team|following-label|menu-sheet-head|rnw-city|rnw-label|rnw-city-fc-head|houston-sub|mobile-strip-city|social-block|sd-tier|snap-tag|snap-opinion|snap-cov-title|snap-source|snap-hero-source|gap-tag|pm-src|pm-tag|fc-disc|fc-summary-lbl|fc-takeaways|fc-why|chat-context-label|chat-analyze|following-chip|team-card-league|sb-box)/i;
 
 async function scan(band, route, dark) {
   const ctx = await browser.newContext({ viewport: { width: band.w, height: band.h }, isMobile: band.mobile, hasTouch: band.mobile, colorScheme: dark ? 'dark' : 'light' });
@@ -61,7 +61,7 @@ async function scan(band, route, dark) {
     // wordmark = the SVG logo text; exclude from weight/size checks
     const inWordmark = el => !!(el.closest && el.closest('.logo,.wordmark,svg'));
     const weights = new Set();
-    for (const el of document.querySelectorAll('.hub *')) {
+    for (const el of document.querySelectorAll('.hub *, .topbar-wrap *, .mobile-top *, .header-scroll *')) {
       if (!vis(el)) continue;
       const hasText = [...el.childNodes].some(n => n.nodeType === 3 && n.textContent.trim().length > 1);
       if (!hasText) continue;
