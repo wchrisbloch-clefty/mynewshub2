@@ -72,6 +72,7 @@ const MobileHome = lazy(() => import('./modules/mobile-home').then(m => ({ defau
 import { FollowSourceContext, FollowSourceChip } from './modules/follow-source';
 import { MarketsSurface, useMarkets } from './modules/markets-surface';
 import { parseRoute, buildPath } from './modules/routing';
+import { migrateFeedsZ2, FEEDS_MIG_V } from './modules/feeds-migrate';
 import { PROMPT_VERSION } from '../lib/ai-models.js';
 import { TIER_LABEL, tagProvenance, TierBadge } from './modules/provenance';
 const ChatBot = lazy(() => import('./modules/concierge').then(m => ({ default: m.ChatBot })));
@@ -6089,8 +6090,10 @@ kbd{display:inline-block;padding:1px 5px;border:1px solid var(--border);border-r
 
 /* ═══════════ v46 — "N NEW STORIES" PILL ═══════════ */
 .new-stories-pill{
-  position:sticky;top:64px;z-index:120;left:50%;
-  display:flex;align-items:center;gap:7px;width:max-content;margin:0 auto 14px;
+  /* AA5.2: FIXED (out of flow) so it appears during a staged refresh with 0 layout shift — on the
+     phone Home AND every iPad/desktop feed page. (.mh-nsp pins the phone variant to the bottom.) */
+  position:fixed;top:calc(72px + env(safe-area-inset-top,0));z-index:200;left:50%;
+  display:flex;align-items:center;gap:7px;width:max-content;margin:0;
   transform:translateX(-50%);
   background:var(--accent);color:var(--on-accent);border:none;
   border-radius:var(--radius-lg);padding:8px 18px;font-size:var(--fs-meta);font-weight:700;
@@ -9580,7 +9583,15 @@ export default function App() {
   const [sourceRecs, setSourceRecs] = useState([]);
   const [kw, setKw]             = useState(()=>ld('kw',DEFAULT_KW));
   const [alerts, setAlerts]     = useState(()=>ld('alerts',['Texans','Astros','Kentucky','Clemson','ERCOT','Bloom Energy','fuel cell','hurricane','earthquake','breaking']));
-  const [feeds, setFeeds]       = useState(()=>ld('feeds',DEFAULT_FEEDS));
+  const [feeds, setFeeds]       = useState(()=>{
+    const saved = ld('feeds', null);
+    if (saved == null) return DEFAULT_FEEDS;              // fresh browser — already Z2-tagged
+    if (ld('feedsMigV', 0) >= FEEDS_MIG_V) return saved;  // migrated already; respect later user edits
+    const { feeds: migrated, changed } = migrateFeedsZ2(saved);
+    try { sv('feeds', migrated); sv('feedsMigV', FEEDS_MIG_V); } catch {}
+    if (DEBUG && typeof console !== 'undefined') console.log('[feedsMigrationZ2] applied; moved feeds:', changed);
+    return migrated;
+  });
   // ── FOLLOW-A-SOURCE-FROM-FEED (Pass G item 7) ───────────────────────────────
   // "Followed" = present and enabled in any category's feed list (the same list
   // Customize manages). followSource enables an existing entry or, if the source
@@ -10069,14 +10080,17 @@ export default function App() {
   // are not already showing into pendingNew.general, so the view does not jump. The "N new stories"
   // pill (rendered in <MobileHome/>) applies them on tap. 0 shifts during refresh. (Defined after
   // refreshAll so loadPod/loadScores/loadMarketData are already in scope — avoids a TDZ in the deps.)
-  const stageGeneralRefresh = useCallback(async () => {
-    const fresh = await fetchCatArticles('general');
+  // AA5.2: generalized to any category so the "N new" pill works on the phone Home AND on every
+  // iPad/desktop feed page. Stages only the stories not already shown into pendingNew[cat].
+  const stageCatRefresh = useCallback(async (cat) => {
+    const fresh = await fetchCatArticles(cat);
     if (!fresh || !fresh.length) return 0;
-    const have = new Set((arts.general || []).map(storyKey));
+    const have = new Set((arts[cat] || []).map(storyKey));
     const staged = fresh.filter(a => a && a.title && a.link && !isPromoItem(a) && !have.has(storyKey(a)));
-    if (staged.length) setPendingNew(p => ({ ...p, general: staged }));
+    if (staged.length) setPendingNew(p => ({ ...p, [cat]: staged }));
     return staged.length;
-  }, [arts.general, fetchCatArticles]);
+  }, [arts, fetchCatArticles]);
+  const stageGeneralRefresh = useCallback(() => stageCatRefresh('general'), [stageCatRefresh]);
   const refreshHomeStaged = useCallback(async () => {
     await Promise.allSettled([
       ...Object.keys(DEFAULT_FEEDS).filter(c => c !== 'general').map(c => loadCat(c)),
@@ -10084,6 +10098,16 @@ export default function App() {
       loadScores(), loadMarketData(), stageGeneralRefresh(),
     ]);
   }, [loadCat, loadPod, loadScores, loadMarketData, stageGeneralRefresh]);
+  // AA5.2: the header/page refresh. When the user is scrolled past 600px into a feed category, STAGE
+  // the new stories (the pill, 0 shift) instead of replacing the list under them; otherwise do the
+  // normal full refresh. Keeps the phone pull-to-refresh (refreshHomeStaged) and this on one model.
+  const smartRefresh = useCallback(async () => {
+    const scrolled = typeof window !== 'undefined' && window.scrollY > 600;
+    const cat = tab;
+    const isFeedCat = !search && !activeKw && !activeSrc && !['saved','podcasts','social','sources','briefing','stateofplay'].includes(cat);
+    if (scrolled && isFeedCat) { await stageCatRefresh(cat); return; }
+    await refreshAll();
+  }, [tab, search, activeKw, activeSrc, stageCatRefresh, refreshAll]);
   // DEBUG-only: seed synthetic "new" general stories so the pill can be exercised headlessly (a real
   // second fetch of the fixtures returns the same items → nothing to stage).
   useEffect(() => { if (DEBUG && typeof window !== 'undefined') window.__stageDemo = (n = 2) => {
@@ -10801,7 +10825,7 @@ export default function App() {
       <div className={`hub${dark?' dark':''}${ipadSections?' ipad-sections':''}`}>
         <TopBar tab={tab} setTab={handleTabChange} search={search} setSearch={setSearch}
           dark={dark} setDark={setDark}
-          onCustomize={()=>openCustomize('keywords','general')} onRefresh={refreshAll}
+          onCustomize={()=>openCustomize('keywords','general')} onRefresh={smartRefresh}
           breakingItems={breakingItems} onTickerClick={handleTickerClick}
           isMobile={isMobile}
           mobileSearchOpen={mobileSearchOpen}
@@ -10938,7 +10962,7 @@ export default function App() {
             onTabChange={handleTabChange}
             onClose={() => setMenuOpen(false)}
             onCustomize={() => openCustomize('keywords','general')}
-            onRefresh={refreshAll}
+            onRefresh={smartRefresh}
             dark={dark}
             setDark={setDark}
             search={search}
