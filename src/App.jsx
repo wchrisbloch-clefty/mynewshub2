@@ -2001,9 +2001,9 @@ body:not(.dark) .pill-bar{
   position:relative;z-index:0;display:inline-flex;align-items:center;
   background:transparent;border:none;color:var(--text3);
   padding:0 11px;height:54px;cursor:pointer; /* F7: tighter tab spacing (was 0 14px) */
-  font-family:var(--font-sans);font-size:var(--fs-body);font-weight:600;
+  font-family:var(--font-sans);font-size:var(--fs-meta);font-weight:600;
   white-space:nowrap;border-bottom:3px solid transparent;
-  transition:color 0.12s;letter-spacing:0; /* AA2: nav is sentence case, not uppercase/tracked */
+  transition:color 0.12s;letter-spacing:0; /* AA2: nav is sentence case, not uppercase/tracked (size kept compact) */
 }
 /* P4: the active section is a filled brand-navy rounded pill with its tuned on-accent ink
    (white in light, dark ink in dark — both >=4.5:1 by G1), not an underline. The pill is drawn
@@ -3120,35 +3120,6 @@ body:not(.dark) .pill-bar{
   display:grid;grid-template-columns:53% 1fr;gap:22px;align-items:start;
   margin-bottom:28px;
 }
-.gn-lead{
-  display:flex;flex-direction:column;gap:12px;
-  cursor:pointer;transition:opacity 0.15s;
-}
-.gn-lead:hover{opacity:0.92;}
-.gn-lead-img{
-  width:100%;aspect-ratio:16/10;
-  background-size:cover;background-position:center top;
-  border-radius:8px;background-color:var(--surface2);
-  position:relative;
-}
-.gn-lead-text{display:flex;flex-direction:column;}
-.gn-lead-title{
-  /* Top-Stories-module hero — smaller than the page hero token, per Pass G addendum */
-  /* P3: Top Stories is an editorial lead, so its headline is serif (the dense rows go sans). */
-  font-family:var(--font-serif);
-  font-size:var(--fs-lead);font-weight:700;line-height:1.2;
-  letter-spacing:-0.3px;color:var(--text);margin:0 0 8px;
-  display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden;
-}
-.gn-lead-desc{
-  font-size:var(--fs-subhead);font-weight:400;line-height:1.45;color:var(--text2);
-  margin:0 0 8px;
-  display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;
-}
-.gn-lead-meta{
-  font-size:var(--fs-meta);color:var(--text3);
-  display:flex;align-items:center;gap:6px;
-}
 .gn-lead-source{
   font-weight:700;color:var(--text2);
   text-transform:uppercase;letter-spacing:0.06em;font-size:var(--fs-label);
@@ -3876,119 +3847,6 @@ body:not(.dark) .pill-bar{
    v19 ADDITIONS — Editorial top band + enhanced briefing + tabbed sidebar
 ═══════════════════════════════════════════ */
 
-/* HERO BAND — Yahoo News / NBC News 2-column top band */
-.hero-band{
-  display:grid;grid-template-columns: 1.5fr 1fr;
-  gap:20px;margin-bottom:36px;
-}
-.hero-band-lead{
-  position:relative;cursor:pointer;
-  border-radius:var(--radius);overflow:hidden;
-  background:var(--surface2);
-  transition:transform 0.2s ease, box-shadow 0.2s ease;
-}
-.hero-band-lead:hover{
-  transform:translateY(-2px);
-  box-shadow:var(--shadow-md);
-}
-.hero-band-img{
-  position:relative;width:100%;
-  aspect-ratio: 16/10;
-  background-size:cover;background-position:center;
-  min-height:360px;
-}
-/* Gradient overlay — dark at bottom so white text has contrast */
-.hero-band-grad{
-  position:absolute;inset:0;pointer-events:none;
-  background: linear-gradient(to top,
-    rgba(0,0,0,0.82) 0%,
-    rgba(0,0,0,0.55) 30%,
-    rgba(0,0,0,0.15) 60%,
-    rgba(0,0,0,0) 100%);
-}
-.hero-band-text-overlay{
-  position:absolute;left:0;right:0;bottom:0;
-  padding: 22px 24px 24px;
-  color:var(--on-media);z-index:2;
-}
-.hero-band-badge{
-  display:inline-block;
-  /* v22b MSN polish: brighter, more punch */
-  font-size:var(--fs-meta);font-weight:700;letter-spacing:0.08em;text-transform:uppercase;
-  color:var(--on-media);padding:5px 11px;border-radius:var(--radius-sm);
-  margin-bottom:14px;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.25);
-}
-/* EDITORIAL SERIF TITLE — the core polish lever */
-.hero-band-title{
-  font-family: 'Inter', 'Helvetica Neue', system-ui, sans-serif;
-  /* v22b MSN polish: bigger hero, more weight, more presence */
-  font-size: var(--fs-hero);font-weight: 700;line-height: 1.12;
-  letter-spacing: -0.025em;
-  color: var(--on-media);margin: 0 0 12px 0;
-  display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden;
-  text-shadow: 0 2px 8px rgba(0,0,0,0.5);
-}
-.hero-band-desc{
-  font-size:var(--fs-title);line-height:1.5;
-  color:rgba(255,255,255,0.92);margin:0 0 12px 0;
-  display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;
-  text-shadow: 0 1px 3px rgba(0,0,0,0.5);
-}
-.hero-band-meta{
-  display:flex;align-items:center;gap:6px;
-  font-size:var(--fs-meta);color:rgba(255,255,255,0.85);
-  font-weight:500;
-}
-.hero-band-source{font-weight:700;}
-.hero-band-dots{
-  position:absolute;bottom:14px;right:16px;z-index:3;
-  display:flex;gap:5px;
-}
-.hero-band-dot{
-  width:8px;height:8px;border-radius:50%;border:none;cursor:pointer;
-  background:rgba(255,255,255,0.4);padding:0;
-  transition:background 0.2s;
-  -webkit-tap-highlight-color:transparent;
-}
-.hero-band-dot.active{background:var(--on-media);}
-.hero-band-dot:hover{background:rgba(255,255,255,0.7);}
-
-/* Side rail — 5 secondary headlines */
-.hero-band-side{
-  display:flex;flex-direction:column;
-  gap:2px;
-}
-.hero-band-side-label{
-  font-size:var(--fs-meta);font-weight:700;color:var(--text3);
-  text-transform:uppercase;letter-spacing:0.12em;
-  margin-bottom:12px;padding-bottom:10px;
-  border-bottom:1px solid var(--border);
-}
-.hero-band-side-item{
-  display:flex;gap:12px;align-items:flex-start;
-  /* v22b MSN polish: tighter rows, more density */
-  padding:10px 0;cursor:pointer;
-  transition:background 0.15s;
-  border-radius:var(--radius-md);
-  border-bottom:1px solid var(--border2);
-}
-.hero-band-side-item:last-child{border-bottom:none;}
-.hero-band-side-item:hover{background:var(--surface2);margin:0 -10px;padding:10px 10px;}
-.hero-band-side-thumb{
-  /* v22b MSN polish: slightly bigger thumbs for more visual punch */
-  width:80px;height:60px;object-fit:cover;border-radius:var(--radius-md);flex-shrink:0;
-}
-.hero-band-side-body{flex:1;min-width:0;display:flex;flex-direction:column;gap:4px;}
-.hero-band-side-title{
-  font-size:var(--fs-subhead);font-weight:700;color:var(--text);
-  line-height:1.32;letter-spacing:-0.2px;
-  display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden;
-}
-.hero-band-side-meta{
-  font-size:var(--fs-label);color:var(--text3);
-  display:flex;align-items:center;gap:5px;
-}
 
 /* ENHANCED BRIEFING — bullets, timestamp, prominent button */
 .briefing-inline-label-row{
@@ -4810,28 +4668,6 @@ body{overscroll-behavior-y:contain;}
 .dark .fc-why-line{color:var(--gold-light);}
 .fc-why-line:last-child{margin-bottom:0;}
 
-/* v26: General homepage 2-col hero (lead left, briefing right)
-   TIME-style: big serif headline left, editorial briefing right */
-.home-hero-row{display:grid;grid-template-columns:1.7fr 1fr;gap:28px;margin-bottom:36px;padding-bottom:28px;border-bottom:2px solid var(--border);}
-.home-hero-side .briefing-teaser{margin-bottom:0;height:100%;}
-.gn-lead-solo{cursor:pointer;transition:opacity 0.15s;}
-.gn-lead-solo:hover{opacity:0.92;}
-.gn-lead-solo .gn-lead-img{border-radius:var(--radius);margin-bottom:16px;}
-/* TIME-magazine lead headline: largest Source Serif 4 on the page */
-.gn-lead-solo .gn-lead-title{
-  font-family:var(--font-serif);
-  font-size:var(--fs-hero);font-weight:700;line-height:1.15;letter-spacing:-0.3px;
-  color:var(--text);margin:0 0 12px;max-width:720px;
-  display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden;
-}
-.gn-lead-solo .gn-lead-desc{
-  font-family:var(--font-sans);
-  font-size:var(--fs-title);line-height:1.6;color:var(--text2);margin:0 0 12px;
-  display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;
-}
-.gn-lead-solo .gn-lead-meta{font-size:var(--fs-meta);color:var(--text3);display:flex;align-items:center;gap:6px;font-family:var(--font-sans);}
-@media (max-width:900px){.home-hero-row{grid-template-columns:1fr;gap:16px;}.gn-lead-solo .gn-lead-title{font-size:var(--fs-lead);}}
-@media (max-width:640px){.home-hero-row{margin-bottom:20px;padding-bottom:18px;}.gn-lead-solo .gn-lead-title{font-size:var(--fs-lead);-webkit-line-clamp:3;}}
 
 /* v26: Sticky filter pill */
 .sticky-filter{position:sticky;top:96px;z-index:5;background:var(--bg);padding:8px 0;border-bottom:1px solid var(--border2);}
@@ -5503,7 +5339,7 @@ kbd{display:inline-block;padding:1px 5px;border:1px solid var(--border);border-r
 }
 .article-reader-date{color:var(--text3);font-weight:400;text-transform:none;letter-spacing:0;}
 .article-reader-title{
-  font-family:var(--font-serif);font-size:clamp(20px,3vw,28px);
+  font-family:var(--font-serif);font-size:var(--fs-lead);
   font-weight:700;line-height:1.25;color:var(--text1);margin:0 0 12px;
 }
 .article-reader-desc{
@@ -5798,7 +5634,7 @@ kbd{display:inline-block;padding:1px 5px;border:1px solid var(--border);border-r
    so its placeholder (shown only if the lead image URL fails) must stay a dark
    field. --ph-overlay-ink is 4.8:1 on this navy — above 4.5:1. */
 .toh-card-lead .toh-img-ph{background:linear-gradient(135deg,var(--navy-light) 0%,var(--navy) 100%);}
-.toh-card-lead .toh-img-ph .ph-label{font-size:clamp(20px,4vw,34px);color:var(--ph-overlay-ink);}
+.toh-card-lead .toh-img-ph .ph-label{font-size:var(--fs-lead);color:var(--ph-overlay-ink);}
 .toh-card-lead .toh-grad{
   position:absolute;inset:0;
   background:linear-gradient(to top,rgba(0,0,0,0.92) 0%,rgba(0,0,0,0.45) 45%,rgba(0,0,0,0.06) 100%);
@@ -5813,7 +5649,7 @@ kbd{display:inline-block;padding:1px 5px;border:1px solid var(--border);border-r
 .toh-card-noimg .toh-img,.toh-card-noimg .toh-img-ph,.toh-card-noimg .toh-grad{display:none;}
 .toh-card-noimg .toh-body{position:absolute;inset:0;justify-content:center;padding:22px 24px;}
 .toh-card-noimg .toh-cat{color:var(--accent);}
-.toh-card-noimg .toh-title{color:var(--text);text-shadow:none;font-size:clamp(24px,3.2vw,34px);line-height:1.1;-webkit-line-clamp:5;}
+.toh-card-noimg .toh-title{color:var(--text);text-shadow:none;font-size:var(--fs-hero);line-height:1.1;-webkit-line-clamp:5;}
 .toh-card-noimg .toh-meta{color:var(--text3);}
 
 .toh-cat{
@@ -7927,7 +7763,7 @@ function LastUpdated({ timestamp, onRefresh }) {
 // any width. Keyboard: More opens/closes on Enter/click and Esc; items are buttons.
 const NAV_PRIMARY = ['general','business','bloom','tech','sports','health','popculture','briefing','podcasts'];
 const NAV_ALWAYS_MORE = ['sources','saved'];
-const NAV_MORE_RESERVE = 104; // px kept free for the More ▾ button when measuring
+const NAV_MORE_RESERVE = 172; // px kept free for the More ▾ button when measuring
 
 function PriorityNav({ tab, onPick, labels, classes }) {
   const wrapRef = useRef(null);

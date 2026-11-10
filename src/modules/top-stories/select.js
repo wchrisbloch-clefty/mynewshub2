@@ -42,12 +42,16 @@ export function rankHomeTop(items, { max = 5, nonGeneralUsed = 0, seedSources = 
     out.push(a.key);
     if (p) pubCount.set(p, (pubCount.get(p) || 0) + 1);
   }
-  // never leave Top Stories short: top up from the rejected pool (keeps 6 filled on thin data) —
-  // but still honour the ≤2/publisher cap so the top-up can't re-introduce a third from one source.
+  // never leave Top Stories short: top up from the rejected pool (keeps 6 filled on thin data) — but
+  // still honour BOTH the ≤2/publisher cap AND the non-general gate, so capping general stories can't
+  // pull a niche single-outlet non-general item (e.g. a tornado story from a sports source) up into
+  // Top Stories. Better a short list than a wrong one.
   for (const k of overflow) {
     if (out.length >= max) break;
     const a = dedup.find(x => x.key === k); const p = pub(a);
     if (p && (pubCount.get(p) || 0) >= PUB_MAX) continue;
+    const isGeneral = (a && (a.cat || 'general') === 'general');
+    if (!isGeneral) { if (ng >= 1 || !((a.clusterSize || 1) >= 2 || a.breaking)) continue; ng++; }
     out.push(k); if (p) pubCount.set(p, (pubCount.get(p) || 0) + 1);
   }
   return out;
