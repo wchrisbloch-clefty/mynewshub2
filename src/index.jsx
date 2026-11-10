@@ -1,5 +1,6 @@
 import React from "react";
 import ReactDOM from "react-dom/client";
+import "./styles/fonts.css";    // AA3: self-hosted @font-face (before tokens, which reference them)
 import "./styles/tokens.css";   // design tokens (must load before component styles)
 import App from "./App";
 

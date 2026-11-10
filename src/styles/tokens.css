@@ -15,8 +15,9 @@
 :root{
   color-scheme: light;  /* N2: light by default; the manual dark toggle sets dark below */
   /* Type — TWO families. Serif for headlines, Inter for everything UI/label/data. */
-  --font-serif:'Source Serif 4',Georgia,'Times New Roman',serif;
-  --font-sans:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,sans-serif;
+  /* AA3: self-hosted; the metric-matched *-fallback faces sit first so the swap never reflows. */
+  --font-serif:'Source Serif 4','SourceSerif4-fallback',Georgia,'Times New Roman',serif;
+  --font-sans:'Inter','Inter-fallback',-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;
 
   /* ── LIGHT (primary) — S12: CRISP WHITE canvas (was pearl #f4f4f2), white cards separated by
      the 1px --border, near-black ink. Dark mode is unchanged (its tokens live under .dark). ── */
