@@ -18,11 +18,11 @@
      the photo still reads). Verified by pixel sampling over a white image in o7-hero-contrast. */
   background:linear-gradient(to top, rgba(0,0,0,0.92) 0%, rgba(0,0,0,0.78) 55%, rgba(0,0,0,0.58) 72%, rgba(0,0,0,0) 90%);}
 .snap-hero-meta{display:flex;align-items:center;gap:8px;margin-bottom:6px;}
-.snap-hero-overlay .snap-hero-source{font-family:var(--font-sans);font-size:var(--fs-meta);font-weight:800;text-transform:uppercase;letter-spacing:0.06em;color:var(--on-media);}
+.snap-hero-overlay .snap-hero-source{font-family:var(--font-sans);font-size:var(--fs-meta);font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:var(--on-media);}
 .snap-hero-overlay .snap-hero-time{font-family:var(--font-sans);font-size:var(--fs-meta);color:rgba(255,255,255,0.85);}
 /* Scoped under the overlay so white reliably beats the equal-specificity, later-in-source
    `.snap-title{color:var(--text)}` on this same element (the title carries both classes). */
-.snap-hero-overlay .snap-hero-title{color:var(--on-media);font-family:var(--font-serif);font-weight:800;font-size:24px;line-height:1.14;letter-spacing:-0.3px;margin:0;
+.snap-hero-overlay .snap-hero-title{color:var(--on-media);font-family:var(--font-serif);font-weight:700;font-size:var(--fs-lead);line-height:1.14;letter-spacing:-0.3px;margin:0;
   display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden;text-shadow:0 1px 4px rgba(0,0,0,0.35);}
 .snap-lead-hero .snap-main{padding:10px 0 12px;}
 .snap-lead-hero .snap-snippet{font-size:var(--fs-body);-webkit-line-clamp:2;}
@@ -34,7 +34,7 @@
      the viewport edges regardless of the (symmetric) gutter. */
   .snap-lead-hero .snap-hero-media{width:100vw;max-width:none;margin-left:calc(50% - 50vw);margin-right:0;border-radius:0;}
   .snap-lead-hero .snap-main{padding:10px 0 14px;}
-  .snap-hero-overlay .snap-hero-title{font-size:22px;}
+  .snap-hero-overlay .snap-hero-title{font-size:var(--fs-lead);}
 }
 /* K6: ONE standard row at every width — borderless (no card box, no shadow, no accent
    left bar), a single bottom divider, LEFT thumbnail at a fixed 4:3 with its space
@@ -52,11 +52,11 @@
 .snap-main{flex:1;min-width:0;padding:10px 0;order:1;}
 .snap-meta{display:flex;align-items:center;gap:8px;margin-bottom:4px;flex-wrap:wrap;}
 .snap-source{font-family:var(--font-sans);font-size:var(--fs-meta);font-weight:700;text-transform:uppercase;letter-spacing:0.05em;color:var(--text3);}
-.snap-live{font-family:var(--font-sans);font-size:var(--fs-label);font-weight:800;color:var(--on-media);background:var(--red);border-radius:4px;padding:2px 6px;letter-spacing:0.06em;}
+.snap-live{font-family:var(--font-sans);font-size:var(--fs-label);font-weight:700;color:var(--on-media);background:var(--red);border-radius:4px;padding:2px 6px;letter-spacing:0.06em;}
 .snap-tag{font-family:var(--font-sans);font-size:var(--fs-label);font-weight:700;padding:0;text-transform:uppercase;letter-spacing:0.03em;background:transparent;color:var(--text3);}
 /* F8: Opinion/Analysis label — rules-only metadata, styled as a neutral OUTLINE tag so it
    never reads as a trust tier/category (no fill, no accent). */
-.snap-opinion{font-family:var(--font-sans);font-size:var(--fs-label);font-weight:800;text-transform:uppercase;letter-spacing:0.06em;color:var(--text3);border:1px solid var(--border);border-radius:4px;padding:1px 6px;white-space:nowrap;}
+.snap-opinion{font-family:var(--font-sans);font-size:var(--fs-label);font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:var(--text3);border:1px solid var(--border);border-radius:4px;padding:1px 6px;white-space:nowrap;}
 .snap-hero-overlay .snap-opinion{color:var(--on-media);border-color:rgba(255,255,255,0.55);}
 .snap-time{font-family:var(--font-sans);font-size:var(--fs-meta);color:var(--text3);}
 /* F3: single meta row — time (+ sources) left, actions right. */
@@ -65,7 +65,7 @@
    (600). Serif is reserved for the editorial leads — .snap-lead .snap-title and the hero overlay
    title both override this via higher specificity, so they stay serif. Same size/line-height/clamp
    as before, so the row box geometry is unchanged. */
-.snap-title{font-family:var(--font-sans);font-weight:600;font-size:18px;line-height:1.22;letter-spacing:-0.2px;color:var(--text);margin:0 0 6px;overflow-wrap:anywhere;word-break:break-word;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden;}
+.snap-title{font-family:var(--font-serif);font-weight:600;font-size:var(--fs-headline);line-height:1.22;letter-spacing:-0.1px;color:var(--text);margin:0 0 6px;overflow-wrap:anywhere;word-break:break-word;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden;} /* AA2: story headline = serif */
 /* K6: the deck is clamped to 2 lines AND reserves 2 lines of height, so a short standfirst
    doesn't shorten the row — the list rhythm stays even across mixed content. */
 /* O5: no forced 3-line reserve (the excerpt ships with the item — no async, no CLS), one-line
@@ -73,7 +73,7 @@
 .snap-snippet{font-family:var(--font-sans);font-size:var(--fs-body);line-height:1.45;color:var(--text2);margin:0 0 7px;display:-webkit-box;-webkit-line-clamp:1;-webkit-box-orient:vertical;overflow:hidden;overflow-wrap:anywhere;word-break:break-word;}
 .snap-lead .snap-snippet,.snap-lead-hero .snap-snippet{-webkit-line-clamp:2;}
 /* F5: mobile deck/summary text = 14px / 1.5 (headlines unchanged, dense list rows unchanged). */
-@media(max-width:640px){ .snap-snippet{font-size:14px;line-height:1.5;} }
+@media(max-width:640px){ .snap-snippet{font-size:var(--fs-subhead);line-height:1.5;} }
 .snap-byline{font-family:var(--font-sans);font-size:var(--fs-meta);color:var(--text3);}
 .snap-byline::before{content:"·";margin-right:5px;color:var(--text4);}
 .snap-foot{display:flex;align-items:center;justify-content:space-between;gap:10px;}
@@ -86,8 +86,8 @@
 .snap-cov-caret.open{transform:rotate(180deg);}
 .snap-coverage{margin-top:10px;border-top:1px solid var(--border2);padding-top:10px;animation:fade-in 0.15s ease-out;}
 .snap-cov-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;}
-.snap-cov-title-lbl{font-family:var(--font-sans);font-size:var(--fs-label);font-weight:800;text-transform:uppercase;letter-spacing:0.07em;color:var(--text3);}
-.snap-cov-close{background:none;border:none;font-size:20px;line-height:1;color:var(--text3);cursor:pointer;display:none;}
+.snap-cov-title-lbl{font-family:var(--font-sans);font-size:var(--fs-label);font-weight:700;text-transform:uppercase;letter-spacing:0.07em;color:var(--text3);}
+.snap-cov-close{background:none;border:none;font-size:var(--fs-lead);line-height:1;color:var(--text3);cursor:pointer;display:none;}
 .snap-cov-list{display:flex;flex-direction:column;gap:2px;}
 .snap-cov-item{display:block;text-decoration:none;padding:8px;border-radius:8px;transition:background 0.12s;}
 .snap-cov-item:hover{background:var(--surface2);}
@@ -96,7 +96,7 @@
 .snap-cov-by{font-family:var(--font-sans);font-size:var(--fs-meta);color:var(--text3);}
 .snap-cov-time{font-family:var(--font-sans);font-size:var(--fs-meta);color:var(--text3);margin-left:auto;font-variant-numeric:tabular-nums;}
 .snap-cov-hl{font-family:var(--font-sans);font-size:var(--fs-body);line-height:1.35;color:var(--text);overflow-wrap:anywhere;}
-.snap-cov-all{margin-top:8px;background:none;border:1px solid var(--border);border-radius:8px;padding:6px 12px;font-family:var(--font-sans);font-size:12px;font-weight:600;color:var(--accent);cursor:pointer;width:100%;}
+.snap-cov-all{margin-top:8px;background:none;border:1px solid var(--border);border-radius:8px;padding:6px 12px;font-family:var(--font-sans);font-size:var(--fs-meta);font-weight:600;color:var(--accent);cursor:pointer;width:100%;}
 .snap-cov-all:hover{background:var(--accent-bg);border-color:var(--accent);}
 /* Mobile: Full Coverage becomes a full-screen sheet. */
 @media(max-width:640px){
@@ -155,7 +155,7 @@
   .snap-main,.snap-skel-main{order:1;padding:12px 0;}
   .snap-thumb,.snap-skel-thumb{order:0;width:88px;height:66px;aspect-ratio:4/3;margin:12px 0;border-radius:8px;}
   .snap-row{min-height:90px;}
-  .snap-title{font-family:var(--font-sans);font-weight:600;font-size:16px;line-height:1.25;-webkit-line-clamp:2;} /* K6: one consistent clamp for rhythm; P3: sans on the standard row (lead stays serif below) */
+  .snap-title{font-family:var(--font-serif);font-weight:600;font-size:var(--fs-headline);line-height:1.25;-webkit-line-clamp:2;} /* AA2: story headline = serif (was sans on the standard row) */
   .snap-snippet{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;} /* K6: 2-line deck */
   .snap-meta{margin-bottom:4px;}
   /* THE LEAD — full-bleed image, large serif headline, one meta line. */
@@ -163,13 +163,13 @@
   .snap-lead .snap-accent{display:none;}
   .snap-lead .snap-thumb{order:-1;width:100vw;max-width:none;height:auto;aspect-ratio:3/2;margin-left:calc(50% - 50vw);margin-right:0;border-radius:0;align-self:stretch;} /* S5b: gutter-independent full-bleed */
   .snap-lead .snap-main{padding:14px 0 16px;}
-  .snap-lead .snap-title{font-family:var(--font-serif);font-size:26px;line-height:1.12;letter-spacing:-0.3px;-webkit-line-clamp:4;}
-  .snap-lead .snap-snippet{display:-webkit-box;font-size:14px;line-height:1.5;-webkit-line-clamp:2;margin-bottom:8px;}
+  .snap-lead .snap-title{font-family:var(--font-serif);font-size:var(--fs-lead);line-height:1.12;letter-spacing:-0.3px;-webkit-line-clamp:4;}
+  .snap-lead .snap-snippet{display:-webkit-box;font-size:var(--fs-subhead);line-height:1.5;-webkit-line-clamp:2;margin-bottom:8px;}
   /* D5 fix 2: typographic lead fallback — no image box. Small-caps kicker (the source)
      + oversized serif headline + one meta line, filling a similar height budget. */
   .snap-lead-noimg{min-height:220px;justify-content:center;padding:8px 0 16px;border-bottom:2px solid var(--border);}
   .snap-lead-noimg .snap-source{font-size:var(--fs-label);letter-spacing:0.1em;}
-  .snap-lead-noimg .snap-title{font-size:30px;line-height:1.08;-webkit-line-clamp:5;margin-top:4px;}
+  .snap-lead-noimg .snap-title{font-size:var(--fs-hero);line-height:1.08;-webkit-line-clamp:5;margin-top:4px;}
 }
 /* D5 — carry the DIVIDED-LIST treatment to DESKTOP SECONDARY lists only (not the main
    grid): any .snap-feed inside .snap-feed-divided renders as calm rows. Desktop main

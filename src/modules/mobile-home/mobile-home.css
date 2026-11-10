@@ -145,10 +145,10 @@
   cursor:pointer;font-family:inherit;}
 .mh-brk-row:last-child{border-bottom:none;}
 .mh-brk-row::after{content:'';position:absolute;inset:-4px 0;} /* 44px effective tap target */
-.mh-brk-tag{flex-shrink:0;color:var(--red);font-family:var(--font-sans);font-weight:800;
+.mh-brk-tag{flex-shrink:0;color:var(--red);font-family:var(--font-sans);font-weight:700;
   font-size:var(--fs-eyebrow);text-transform:uppercase;letter-spacing:0.06em;}
-.mh-brk-title{flex:1;min-width:0;font-family:var(--font-sans);font-weight:500;font-size:var(--fs-body);
-  color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.mh-brk-title{flex:1;min-width:0;font-family:var(--font-serif);font-weight:600;font-size:var(--fs-body);
+  color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;} /* AA2: story headline = serif */
 .mh-brk-age{flex-shrink:0;font-size:var(--fs-meta);color:var(--text3);white-space:nowrap;}
 
 /* Z4: "N new stories" pill on the phone Home — FIXED (out of flow) so its appearance during a
