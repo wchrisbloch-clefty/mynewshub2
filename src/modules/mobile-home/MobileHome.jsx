@@ -20,6 +20,7 @@ import { useEffect, useMemo, useRef, useState, Fragment } from 'react';
 import { SnapshotCard } from '../snapshot-card';
 import { SectionSkeleton, SectionError } from '../section-state';
 import { TopicTag } from '../topic-tag';
+import { hasUsableImage, imgReferrerPolicy } from '../source-image';
 import { isPromoItem } from '../breaking';
 import { selectTopStories } from '../top-stories/select.js';
 import { sameStory } from '../clustering/index.js';
@@ -74,6 +75,38 @@ function CompactRow({ a, fmtDate, onRead, onPerspectives }) {
           </span>
         )}
       </span>
+    </button>
+  );
+}
+
+// AC3: STANDARD row — headline left, a 72px thumbnail right, TOPIC · Source · time. Used for
+// Top-stories rows 1–2 WHEN the story has a usable image (the chooser checks hasUsableImage
+// first). The 72px slot is fixed so the lazy image loads into reserved space (no shift); if the
+// image 404s/blanks at runtime it collapses to the plain COMPACT layout — no gap, no placeholder.
+function StandardRow({ a, fmtDate, onRead, onPerspectives }) {
+  const [imgErr, setImgErr] = useState(false);
+  const sources = a._clusterSize || 1;
+  return (
+    <button className="mh-standard" type="button" onClick={() => onRead(a)}>
+      <span className="mh-standard-main">
+        <span className="mh-compact-title">{a.title}</span>
+        <span className="mh-compact-meta">
+          <TopicTag cat={a.cat}/> · {a.source} · {fmtDate(a.pubDate)}
+          {sources >= 3 && onPerspectives && (
+            <span className="mh-compact-sources" role="button" tabIndex={0}
+              onClick={e => { e.stopPropagation(); onPerspectives(a); }}
+              onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.stopPropagation(); e.preventDefault(); onPerspectives(a); } }}>
+              {sources} sources
+            </span>
+          )}
+        </span>
+      </span>
+      {!imgErr && (
+        <span className="mh-standard-thumb">
+          <img src={a.img} loading="lazy" decoding="async" alt="" referrerPolicy={imgReferrerPolicy(a.img)}
+            onError={() => setImgErr(true)} onLoad={e => { if (!e.currentTarget.naturalWidth) setImgErr(true); }} />
+        </span>
+      )}
     </button>
   );
 }
@@ -380,7 +413,9 @@ export function MobileHome({ ctx }) {
         <div className="mh-sec-head"><span className="eyebrow mh-sec-label">Top stories</span></div>
         {committed && model.top.length > 0
           ? <>
-              <div className="mh-rows">{model.top.slice(0, TOP_SHOWN).map((a, i) => <CompactRow key={a.link || i} a={a} fmtDate={fmtDate} onRead={onRead} onPerspectives={setPerspArticle}/>)}</div>
+              <div className="mh-rows">{model.top.slice(0, TOP_SHOWN).map((a, i) => (i < 2 && hasUsableImage(a.img))
+                ? <StandardRow key={a.link || i} a={a} fmtDate={fmtDate} onRead={onRead} onPerspectives={setPerspArticle}/>
+                : <CompactRow key={a.link || i} a={a} fmtDate={fmtDate} onRead={onRead} onPerspectives={setPerspArticle}/>)}</div>
               <button className="mh-topstories-all" type="button" onClick={() => navigate('stateofplay')}>
                 Show all top stories
                 <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><polyline points="9 18 15 12 9 6"/></svg>

@@ -102,12 +102,29 @@
   color:var(--text);line-height:1.26;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;}
 .mh-compact-meta{font-family:var(--font-sans);font-size:var(--fs-meta);color:var(--text3);font-weight:500;}
 
+/* AC3: STANDARD row — same box as COMPACT plus a fixed 72px thumbnail on the right. The thumb
+   slot is a fixed 72x72 so the lazy image loads into reserved space (no shift); it collapses
+   entirely if the image fails. Title/meta reuse the COMPACT classes (same 13–18px type). */
+.mh-standard{display:flex;gap:12px;align-items:flex-start;text-align:left;cursor:pointer;
+  background:none;border:none;border-bottom:1px solid var(--border2);
+  padding:12px 0;min-height:44px;font-family:inherit;transition:background 0.12s;}
+.mh-standard:last-child{border-bottom:none;}
+.mh-standard:active{background:var(--surface2);}
+.mh-standard:focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:4px;}
+.mh-standard-main{flex:1 1 auto;min-width:0;display:flex;flex-direction:column;gap:3px;}
+.mh-standard-thumb{flex:0 0 72px;width:72px;height:72px;border-radius:var(--radius-md);overflow:hidden;background:var(--surface2);}
+.mh-standard-thumb img{width:100%;height:100%;object-fit:cover;display:block;}
+
 /* Top stories — always present once General loads; reserve 4 compact rows + header so the
    block does not pop in and shove the lead/sections (M4). */
 /* Z1: the Top-stories block is a FIXED 5-row reserve (header + 5 COMPACT rows + the Show-all button)
    so it never changes height between the skeleton and the committed list — nothing below it shifts.
    Measured committed height ~430px; the floor matches so the swap-in is zero-shift. */
-.mh-topstories{min-height:430px;}
+/* AC3: rows 1–2 become STANDARD (72px thumb) when they have a usable image, which makes the
+   committed block taller than 5 COMPACT rows. Reserve the common 1-image-row height (~500px) so
+   the skeleton→committed swap is shift-free; the list is always full (5 rows), so there is no
+   empty-floor whitespace — only a small bounded delta in the rare all-/no-image cases. */
+.mh-topstories{min-height:500px;}
 /* Breaking is conditional; reserve its slot only while General is still loading so it does not
    shove content when it arrives, then it collapses if there is nothing breaking. T1: sized to the
    one-line strip (~2 rows) — the old 300px reserve was for the retired breaking CARD and collapsing
