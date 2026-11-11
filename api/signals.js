@@ -20,6 +20,7 @@ import voiceResolve from '../lib/voices/handler-resolve.js';
 import voiceSignals from '../lib/voices/handler-signals.js';
 import voiceTest from '../lib/voices/handler-test.js';
 import voiceSearch from '../lib/voices/handler-search.js';
+import voiceFind from '../lib/voices/handler-find.js';
 
 const UA = 'MyNewsHub/1.0 (+https://mynewshub2.vercel.app; street signals)';
 
@@ -163,6 +164,7 @@ export default async function handler(req, res) {
   if (kind === 'voice-signals') return voiceSignals(req, res);
   if (kind === 'voice-test') return voiceTest(req, res);
   if (kind === 'voice-search') return voiceSearch(req, res);
+  if (kind === 'voicefind') return voiceFind(req, res);
   res.setHeader('Access-Control-Allow-Origin', '*');
   if (kind === 'discussions') return handleDiscussions(req, res);
   if (kind === 'github') return handleGithub(req, res);
