@@ -56,10 +56,16 @@ import { SEED_VOICES } from './modules/voices/seeds';
 // G4: code-split heavy, not-needed-at-first-paint surfaces. Home is never lazy.
 // ChatBot is always mounted but not first-paint; ResolveModal is rare.
 const ResolveModal = lazy(() => import('./modules/voices/ResolveModal').then(m => ({ default: m.ResolveModal })));
+const VoiceFinderModal = lazy(() => import('./modules/voices/VoiceFinderModal').then(m => ({ default: m.VoiceFinderModal })));
 import { VoicesStrip } from './modules/voices/VoicesStrip';
 import { extractContent, extractionFallbackMessage } from './modules/extractor';
 import { retrieveFeedContext, buildFeedContextBlock } from './modules/retrieval';
-import { XPulse } from './modules/x-pulse';
+// XPulse is click-to-load (nothing fetches until tapped) and renders only at feed position 2 /
+// in the reader — never on the phone-Home first screen — so it is split off the initial chunk.
+// A self-wrapping lazy component keeps every <XPulse/> call site unchanged; fallback={null}
+// (the collapsed trigger is below the first screen and non-blocking).
+const XPulseLazy = lazy(() => import('./modules/x-pulse').then(m => ({ default: m.XPulse })));
+function XPulse(props) { return <Suspense fallback={null}><XPulseLazy {...props} /></Suspense>; }
 import { StateOfPlay, selectStateOfPlay } from './modules/state-of-play';
 import { rankHomeTop } from './modules/top-stories/select';
 import { TopicTag } from './modules/topic-tag';
@@ -90,7 +96,7 @@ const DesignPage = lazy(() => import('./modules/design-page/DesignPage').then(m 
 const PAGE_IMPORTERS = { podcasts: () => import('./modules/podcasts/PodcastsPage'), sources: () => import('./modules/sources/SourcesPage'), briefing: () => import('./modules/briefing/BriefingPage'), sports: () => import('./modules/sports/SportsPage') };
 export const prefetchPage = (name) => { const f = PAGE_IMPORTERS[name]; if (f) f(); };
 const prefetchCustomize = () => import('./modules/customize/CustomizePanel');
-const prefetchLazy = () => { import('./modules/concierge'); import('./modules/voices/ResolveModal'); import('./modules/analyze/AnalyzePanel'); import('./modules/reader/ArticleReader'); prefetchCustomize(); Object.values(PAGE_IMPORTERS).forEach(f => f()); };
+const prefetchLazy = () => { import('./modules/concierge'); import('./modules/voices/ResolveModal'); import('./modules/x-pulse'); import('./modules/analyze/AnalyzePanel'); import('./modules/reader/ArticleReader'); prefetchCustomize(); Object.values(PAGE_IMPORTERS).forEach(f => f()); };
 // Icons: single set (lucide-react), fixed size per context — item 7.
 import { Settings, RefreshCw, Moon, Sun, User,
   Zap, Droplet, Leaf, TrendingUp, Scale, LayoutGrid, Film, Music, BookOpen, Laugh, Trophy,
@@ -3030,6 +3036,9 @@ body:not(.dark) .pill-bar{
 .cp-btn-red{background:var(--red);}
 .cp-btn-sec{background:none;border:1px solid var(--border);color:var(--text2);border-radius:var(--radius-md);padding:6px 12px;font-size:var(--fs-meta);font-weight:700;cursor:pointer;font-family:inherit;white-space:nowrap;}
 .cp-btn-sec:hover{border-color:var(--accent);color:var(--accent);}
+.cp-find-wrap{margin:2px 0 10px;}
+.cp-find-wrap .cp-btn-sec{min-height:44px;}
+.cp-find-wrap .cp-desc{margin:4px 0 0;}
 /* E1: Voices tab */
 .cp-voice-group{margin-bottom:12px;}
 .cp-voice-cat{font-family:var(--font-sans);font-size:var(--fs-label);font-weight:700;text-transform:uppercase;letter-spacing:0.08em;color:var(--text3);padding:8px 0 4px;border-bottom:1px solid var(--border2);}
@@ -9537,6 +9546,25 @@ export default function App() {
       setVoiceResolve(cur => cur && cur.voice.id === v.id ? { ...cur, loading: false, data: { enabled: false, note: 'Discovery unreachable — add handles manually.', platforms: {} } } : cur);
     }
   }, [addOrUpdateVoice]);
+  // AC2: Voices SOURCE FINDER (Firecrawl). On-demand only (a tap — never on load/scroll). A
+  // 7-day localStorage cache per (category, focus) and a 60s cooldown keep paid Firecrawl calls
+  // rare; the server also caps calls and edge-caches. Candidates are unverified and never
+  // auto-followed — "Add" hands one to the E2 confirm flow as a status:'seed' voice.
+  const [voiceFinder, setVoiceFinder] = useState(null); // { category, focus, loading, data }
+  const finderCooldownRef = useRef({}); // `${cat}|${focus}` -> last fetch ms
+  // Thin shim — the cache/cooldown/fetch logic lives in the lazy ./modules/voices/finder module,
+  // so it costs the initial bundle nothing and loads on the first tap.
+  const findVoices = useCallback(async (opts = {}) => {
+    const { runFinder } = await import('./modules/voices/finder');
+    return runFinder({ ...opts, defaultCat: tab, voices, tombstones: voiceTombstones,
+      ld, sv, fetchWithTimeout, cooldownRef: finderCooldownRef, setState: setVoiceFinder });
+  }, [voices, voiceTombstones, tab]);
+  // Add a finder candidate: close the sheet and open the E2 confirm flow on a NEW seed voice.
+  const addFinderCandidate = useCallback((c) => {
+    if (!c || !c.name) return;
+    setVoiceFinder(null);
+    resolveVoiceFlow({ name: c.name, type: c.type || 'person', category: c.category || tab, status: 'seed' });
+  }, [resolveVoiceFlow, tab]);
   // E3: per-category Voices signals (tiles). Loads ONCE per category open (cached), and
   // only reloads when the page refresh runs (loadCat clears the cache entry). No polling.
   const [voiceSignals, setVoiceSignals] = useState({}); // { [cat]: {tiles,failures,loading,loaded} }
@@ -10824,13 +10852,14 @@ export default function App() {
           briefingSources={briefingSources}
           initialTab={panelInitial.tab} initialCat={panelInitial.cat}
           voices={voices} onAddVoice={addOrUpdateVoice} removeVoiceById={removeVoiceById} reorderVoice={reorderVoice}
-          onResolveVoice={resolveVoiceFlow} seedQueue={seedQueue} onAcceptSeed={resolveVoiceFlow} onSkipSeed={skipSeed}
+          onResolveVoice={resolveVoiceFlow} seedQueue={seedQueue} onAcceptSeed={resolveVoiceFlow} onSkipSeed={skipSeed} onFindVoices={findVoices}
           onTestVoices={testVoices} voicesTest={voicesTest} searchKeyPresent={false}
           CATS={CATS} INDICES={INDICES} DEFAULT_WEATHER_CITIES={DEFAULT_WEATHER_CITIES} DEFAULT_SOCIAL={DEFAULT_SOCIAL}
           BRIEFING_PRIORITY_SOURCES={BRIEFING_PRIORITY_SOURCES} SOCIAL_META={SOCIAL_META}
           onClose={()=>setShowPanel(false)} onSave={handleCustomizeSave}/></Suspense>}
         {/* E2: Voices add+confirm discovery modal (lazy). */}
         {voiceResolve && <Suspense fallback={null}><ResolveModal voice={voiceResolve.voice} state={voiceResolve} onAccept={acceptCandidate} onClose={()=>setVoiceResolve(null)}/></Suspense>}
+        {voiceFinder && <Suspense fallback={null}><VoiceFinderModal state={voiceFinder} onAdd={addFinderCandidate} onClose={()=>setVoiceFinder(null)} onRetry={()=>findVoices({category:voiceFinder.category,focus:voiceFinder.focus})}/></Suspense>}
       </div>
       {/* Floating AI chatbot — available on all pages (lazy; prefetched on idle). */}
       <Suspense fallback={null}>

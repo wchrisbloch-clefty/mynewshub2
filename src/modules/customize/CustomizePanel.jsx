@@ -15,7 +15,7 @@ const PLAT_LABELS = { twitter: '𝕏', linkedin: 'in', instagram: 'IG', youtube:
 
 export function CustomizePanel({feeds, kw, alerts, urgent, social, watchlist, teams, health, arts, weatherCities, hiddenIndices, briefingExclude, briefingSources, initialTab, initialCat, onClose, onSave,
   voices, onAddVoice, removeVoiceById, reorderVoice, onResolveVoice, onTestVoices, voicesTest, searchKeyPresent,
-  seedQueue, onAcceptSeed, onSkipSeed,
+  seedQueue, onAcceptSeed, onSkipSeed, onFindVoices,
   CATS, INDICES, DEFAULT_WEATHER_CITIES, DEFAULT_SOCIAL, BRIEFING_PRIORITY_SOURCES, SOCIAL_META}) {
   const [lf, setLf] = useState(JSON.parse(JSON.stringify(feeds)));
   const [lk, setLk] = useState(JSON.parse(JSON.stringify(kw)));
@@ -223,6 +223,14 @@ export function CustomizePanel({feeds, kw, alerts, urgent, social, watchlist, te
                 </select>
                 <button className="cp-btn" onClick={()=>{ if(vName.trim()){ (onResolveVoice||onAddVoice)({name:vName.trim(),type:vType,category:voiceCat}); setVName(''); } }}>Add</button>
               </div>
+              {onFindVoices && (
+                <div className="cp-find-wrap">
+                  <button className="cp-btn-sec" onClick={()=>onFindVoices({category:voiceCat})}>
+                    Find voices for {(CATS[voiceCat]||{}).label||voiceCat}
+                  </button>
+                  <div className="cp-desc">Suggestions from a web search, labelled <strong>unverified</strong> — you confirm handles yourself. Needs a Firecrawl key.</div>
+                </div>
+              )}
               {onTestVoices && (
                 <div style={{margin:'4px 0 10px'}}>
                   <div style={{display:'flex',gap:'8px',alignItems:'center'}}>
