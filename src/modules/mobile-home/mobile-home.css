@@ -120,11 +120,13 @@
 /* Z1: the Top-stories block is a FIXED 5-row reserve (header + 5 COMPACT rows + the Show-all button)
    so it never changes height between the skeleton and the committed list — nothing below it shifts.
    Measured committed height ~430px; the floor matches so the swap-in is zero-shift. */
-/* AC3: rows 1–2 become STANDARD (72px thumb) when they have a usable image, which makes the
-   committed block taller than 5 COMPACT rows. Reserve the common 1-image-row height (~500px) so
-   the skeleton→committed swap is shift-free; the list is always full (5 rows), so there is no
-   empty-floor whitespace — only a small bounded delta in the rare all-/no-image cases. */
-.mh-topstories{min-height:500px;}
+/* AD3: reserve the Top-stories height ONLY WHILE LOADING (the Batch Y lesson — a permanent floor
+   left ~70px of dead space when rows 1–2 had no image). The loading skeleton mirrors the committed
+   anatomy (2 thumbnail rows + 3 compact + the Show-all footer) and the reserve is sized to the
+   MEDIAN committed height, so the skeleton→committed swap is shift-free in the common (1-image)
+   case and bounded in the 0-/2-image cases. Once committed, the block SIZES TO CONTENT — no floor,
+   so there is no blank gap whatever the image count. */
+.mh-topstories-loading{min-height:500px;}
 /* Breaking is conditional; reserve its slot only while General is still loading so it does not
    shove content when it arrives, then it collapses if there is nothing breaking. T1: sized to the
    one-line strip (~2 rows) — the old 300px reserve was for the retired breaking CARD and collapsing

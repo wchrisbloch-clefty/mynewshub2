@@ -409,7 +409,7 @@ export function MobileHome({ ctx }) {
           replaces BOTH the old category round-robin AND the State-of-Play card (the double dip). It
           shows 5 rows + "Show all N" which opens the full State-of-Play page ("All top stories"). The
           block is a FIXED 5-row reserve, so nothing below it shifts as it commits (CLS). */}
-      <section className="mh-section mh-topstories">
+      <section className={`mh-section mh-topstories${committed && model.top.length > 0 ? '' : ' mh-topstories-loading'}`}>
         <div className="mh-sec-head"><span className="eyebrow mh-sec-label">Top stories</span></div>
         {committed && model.top.length > 0
           ? <>
@@ -421,7 +421,7 @@ export function MobileHome({ ctx }) {
                 <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><polyline points="9 18 15 12 9 6"/></svg>
               </button>
             </>
-          : <SectionSkeleton rows={TOP_SHOWN} label="Top stories"/>}
+          : <SectionSkeleton rows={TOP_SHOWN} thumbRows={2} footer label="Top stories"/>}
       </section>
 
       {/* O2: Live Scores moved to the TOP of the scrolling header stack (match iPad order:
