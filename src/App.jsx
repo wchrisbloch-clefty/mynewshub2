@@ -81,7 +81,7 @@ const XPulseLazy = lazy(() => import('./modules/x-pulse').then(m => ({ default: 
 function XPulse(props) { return <Suspense fallback={null}><XPulseLazy {...props} /></Suspense>; }
 import { selectStateOfPlay } from './modules/state-of-play/select.js';
 import { rankHomeTop } from './modules/top-stories/select';
-import { scoreStory, rankMode } from './modules/ranking';
+import { scoreStory, rankMode, coverageOf } from './modules/ranking';
 import { anyWholeWord } from './modules/text-match';
 import { TopicTag } from './modules/topic-tag';
 import { CatIcon, SHOW_CHIP_ICONS } from './modules/cat-icon';
@@ -9005,6 +9005,15 @@ function FeedPage({ cat, ctx }) {
       // lone fan/local post — instead of pure recency. The kill switch keeps recency order.
       () => {
         const base = onePerCluster(feedItems.filter(a => !topStoryKeys.has(storyKey(a)) && !catBreakingKeys.has(storyKey(a)) && !sopShownKeys.has(storyKey(a)) && !houstonKeys.has(storyKey(a))));
+        // AF3 proof: the items scoreStory sees carry _clusterMembers, so multi-outlet coverage is
+        // actually counted (not always 1). ?debug=1 tallies how many feed items are multi-outlet.
+        if (DEBUG && typeof window !== 'undefined') {
+          window.__dbg = window.__dbg || {};
+          window.__dbg.feedMultiOutlet = base.filter(a => Array.isArray(a._clusterMembers) && a._clusterMembers.length > 1).length;
+          window.__dbg.feedTotal = base.length;
+          // Rank spread proves the score is NOT inert even when single-outlet: core>specialist>fan.
+          window.__dbg.feedRankSpread = base.reduce((m, a) => { const r = coverageOf(a); const k = r.core ? 'core' : r.specialist ? 'specialist' : r.hasFan ? 'fan' : r.hasAlt ? 'alt' : r.hasLocal ? 'local' : 'other'; m[k] = (m[k] || 0) + 1; return m; }, {});
+        }
         if (!rankV2) return base;
         const now = Date.now();
         return [...base].map((a, i) => ({ a, i, s: scoreStory(a, { cat, now }) }))
@@ -9012,6 +9021,34 @@ function FeedPage({ cat, ctx }) {
           .map(o => o.a);
       },
       [feedItems, topStoryKeys, catBreakingKeys, sopShownKeys, houstonKeys, rankV2, cat]);
+
+    // AF3: split the (score-ordered) feed into "Top now" and "Latest". Top now = the leading
+    // eligible stories within 24h, max 2 per publisher, cap 6 — a multi-outlet story, never a lone
+    // fan/alt/local post (coverage>=1). Latest = the rest, kept in order. News adds the AF4 rule
+    // (a single non-core source can't enter Top now). Pure recency (legacy) shows no split.
+    const topNowSet = useMemo(() => {
+      const set = new Set();
+      if (!rankV2) return set;
+      const now = Date.now(); const perPub = {};
+      for (const a of dedupedFeed) {
+        const ageH = (now - new Date(a.pubDate)) / 3_600_000;
+        if (ageH > 24) continue;
+        const cov = coverageOf(a);
+        if ((cov.core + cov.specialist) < 1) continue;           // never a lone fan/alt/local
+        if (isHome && cov.core < 1 && (cov.core + cov.specialist) < 2) continue; // AF4 NEWS gate
+        const pub = a.source || '?'; const c = perPub[pub] || 0;
+        if (c >= 2) continue;
+        perPub[pub] = c + 1; set.add(a.link || a);
+        if (set.size >= 6) break;
+      }
+      return set;
+    }, [dedupedFeed, rankV2, isHome]);
+    const orderedFeed = useMemo(() => {
+      if (!rankV2 || !topNowSet.size) return dedupedFeed;
+      const inTop = a => topNowSet.has(a.link || a);
+      return [...dedupedFeed.filter(inTop), ...dedupedFeed.filter(a => !inTop(a))];
+    }, [dedupedFeed, topNowSet, rankV2]);
+    const topNowN = rankV2 ? topNowSet.size : 0;
 
     // ── COVERAGE GAP (folded into State of Play) — widely-covered stories none of the
     //    reader's own sources carried. Home keys off this category; the merged
@@ -9314,12 +9351,17 @@ function FeedPage({ cat, ctx }) {
                         collapsed={sopCollapsed} onToggleCollapse={toggleSop}/>
                     </div>
                   )}
-                  {(activeKw||activeSrc||search ? feedItems.slice(0,20) : dedupedFeed.slice(0,20)).map((a,i)=>(
+                  {(activeKw||activeSrc||search ? feedItems.slice(0,20) : orderedFeed.slice(0,20)).map((a,i)=>{
+                    const showSplit = !activeKw && !activeSrc && !search && rankV2 && topNowN > 0;
+                    return (
                     <Fragment key={a.link||i}>
+                      {showSplit && i===0 && <span className="eyebrow feed-rank-eyebrow">Top now</span>}
+                      {showSplit && i===topNowN && <span className="eyebrow feed-rank-eyebrow">Latest</span>}
                       <SnapshotCard a={a} meta={CATS[cat]||CATS.general} isSaved={isSavedFn(a)} onSave={onSave} onRead={onRead} onPerspectives={setPerspArticle} onAsk={setChatContext} formatDate={fmtDate} opinionLabel={opinionLabel(a)} hideImage={i>=3} lead={false}/>
                       {i===2 && <XPulse topic={cc?.label||cat} variant="feed"/>}
                     </Fragment>
-                  ))}
+                    );
+                  })}
                  </div>
             }
 

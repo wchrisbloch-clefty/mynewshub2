@@ -197,6 +197,9 @@ html{font-optical-sizing:auto;}
   text-transform:uppercase;letter-spacing:0.08em;color:var(--text3);line-height:1.2;
 }
 .eyebrow.active,.eyebrow[data-active="true"]{color:var(--accent);}
+/* AF3: "Top now" / "Latest" section dividers in the feed. A quiet full-width label, not a row. */
+.feed-rank-eyebrow{display:block;margin:4px 0 8px;padding-top:4px;border-top:1px solid var(--border2);}
+.feed-rank-eyebrow:first-child{border-top:none;padding-top:0;}
 
 /* One shared image treatment — consistent aspect ratio, radius, and a branded
    placeholder (never a bare grey box) for every thumbnail/hero. */
