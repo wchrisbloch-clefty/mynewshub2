@@ -2,6 +2,13 @@
 import { capByPublisher, rankClusters, sameStory } from '../clustering/index.js';
 import { isSatire } from '../satire/index.js';
 import { isPromoItem } from '../breaking/index.js';
+import { rankOf } from '../ranking/rank.js';
+
+// AF3.1: ONE ranking. Top Stories now scores like scoreStory (AE2) — distinct-outlet coverage
+// (clusterSize) PLUS source rank (core > specialist > fan), so a widely-covered wire story leads
+// and a fan blog cannot, instead of pure clusterSize. Keeps the recency tiebreak.
+const rankScore = a => { const r = rankOf(a && a.source); return r === 'core' ? 3 : r === 'fan' ? -2 : (r === 'alt' || r === 'local') ? 0 : 1; };
+const topScore = a => (a && a.clusterSize || 1) * 2 + rankScore(a);
 
 // S7: Home "Top Stories" selection. The old selection was a category round-robin (the first
 // image item of sports, then business, then …), so a niche trade interview or a weekly-award
@@ -12,12 +19,14 @@ import { isPromoItem } from '../breaking/index.js';
 //
 // items: [{ key, cat, clusterSize, pubDate, breaking }]  (already image-eligible where required)
 // nonGeneralUsed: how many non-general slots the lead/hero already consumed (0 or 1).
-export function rankHomeTop(items, { max = 5, nonGeneralUsed = 0, seedSources = [] } = {}) {
+export function rankHomeTop(items, { max = 5, nonGeneralUsed = 0, seedSources = [], rankV2 = true } = {}) {
   const seen = new Set();
   const dedup = [];
   for (const a of items || []) { if (!a || seen.has(a.key)) continue; seen.add(a.key); dedup.push(a); }
+  // AF3.1: rank-aware in v2 (core>specialist>fan + coverage), pure clusterSize under ?rank=legacy.
+  const score = rankV2 ? topScore : (a => (a && a.clusterSize) || 1);
   dedup.sort((a, b) => {
-    const c = (b.clusterSize || 1) - (a.clusterSize || 1);
+    const c = score(b) - score(a);
     if (c) return c;
     return new Date(b.pubDate || 0) - new Date(a.pubDate || 0);
   });

@@ -8918,7 +8918,7 @@ function FeedPage({ cat, ctx }) {
         const leadNonGen = catLead && (catLead.cat || 'general') !== 'general' ? 1 : 0;
         // AA4.5: seed the ≤2/publisher cap with the hero's publisher so lead + rows ≤ 2 per source.
         const seedSources = catLead && catLead.source ? [catLead.source] : [];
-        for (const k of rankHomeTop(pool, { max: 6 - picks.length, nonGeneralUsed: leadNonGen, seedSources })) {
+        for (const k of rankHomeTop(pool, { max: 6 - picks.length, nonGeneralUsed: leadNonGen, seedSources, rankV2 })) {
           const it = byKey.get(k);
           if (it && !used.has(k)) { picks.push({ ...it, cat: it.cat || 'general' }); used.add(k); }
         }
