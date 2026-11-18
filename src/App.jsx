@@ -8779,6 +8779,8 @@ function FeedPage({ cat, ctx }) {
     const setPcSubTab = (key) => navigate('popculture', key === 'all' ? null : key);
     const enSubTab = cat === 'bloom' ? (subcat || 'all') : 'all';
     const setEnSubTab = (key) => navigate('bloom', key === 'all' ? null : key);
+    const tcSubTab = cat === 'tech' ? (subcat || 'all') : 'all';
+    const setTcSubTab = (key) => navigate('tech', key === 'all' ? null : key);
     const [pcWebResults, setPcWebResults] = useState([]);
     const [pcWebLoading, setPcWebLoading] = useState(false);
     const [enWebResults, setEnWebResults] = useState([]);
@@ -8827,6 +8829,23 @@ function FeedPage({ cat, ctx }) {
       markets: ['commodity','commodities','futures','spot price','energy prices','gas prices','oil prices','supply','demand','export','import','petrochemical','inflation energy'],
       policy:  ['policy','regulation','epa','federal','congress','legislation','tariff','subsidy','permit','department of energy','doe','ferc','administration','executive order','climate bill'],
     };
+    // AF2.1: Tech chips. "Stay current" gathers the AF5 daily-digest feeds by source name (they carry
+    // sub:'stay-current'); the rest match whole-word on the headline (AE6). Icons reuse imports.
+    const TECH_SUBTABS = [
+      { key:'all',         label:'All',           icon:LayoutGrid },
+      { key:'aimodels',    label:'AI & Models',   icon:Zap },
+      { key:'staycurrent', label:'Stay current',  icon:TrendingUp },
+      { key:'bigtech',     label:'Big Tech',      icon:Scale },
+      { key:'chips',       label:'Chips & Infra', icon:Droplet },
+      { key:'startups',    label:'Startups',      icon:Leaf },
+    ];
+    const TECH_KWS = {
+      aimodels:['ai model','llm','gpt','gemini','claude','llama','mistral','fine-tune','benchmark','open weights','frontier model','multimodal','inference','anthropic','openai'],
+      bigtech: ['apple','google','microsoft','amazon','meta','nvidia','antitrust','big tech','alphabet'],
+      chips:   ['chip','semiconductor','gpu','tsmc','foundry','wafer','data center','hbm','asml','fab','node','lithography'],
+      startups:['startup','seed round','series a','series b','venture','funding round','valuation','founder','raise','vc','y combinator'],
+    };
+    const TECH_STAYCURRENT_SRC = new Set(['TLDR AI','Hugging Face','Import AI','Latent Space']);
 
     // Filter items by pop culture sub-tab
     // AE6: WHOLE-WORD sub-category filtering (was substring .includes, which lit up 'ev' inside
@@ -8837,6 +8856,13 @@ function FeedPage({ cat, ctx }) {
       const kws = PC_KWS[pcSubTab] || [];
       return items.filter(a => anyWholeWord((a.title + ' ' + (a.desc||'')), kws));
     }, [items, cat, pcSubTab]);
+
+    const tcFilteredItems = useMemo(() => {
+      if (cat !== 'tech' || tcSubTab === 'all') return items;
+      if (tcSubTab === 'staycurrent') return items.filter(a => TECH_STAYCURRENT_SRC.has(a.source));
+      const kws = TECH_KWS[tcSubTab] || [];
+      return items.filter(a => anyWholeWord((a.title + ' ' + (a.desc||'')), kws));
+    }, [items, cat, tcSubTab]);
 
     const enFilteredItems = useMemo(() => {
       if (cat !== 'bloom' || enSubTab === 'all') return items;
@@ -8893,7 +8919,7 @@ function FeedPage({ cat, ctx }) {
       fetchWebSearch(q).then(r => { setEnWebResults(r); setEnWebLoading(false); });
     }, [cat, enSubTab]);
 
-    const baseFilteredItems = cat === 'bloom' ? enFilteredItems : pcFilteredItems;
+    const baseFilteredItems = cat === 'bloom' ? enFilteredItems : cat === 'tech' ? tcFilteredItems : pcFilteredItems;
     // Fold the wide-discovery rows into the active feed (deduped by storyKey, then
     // re-sorted by recency), so every category shows headlines from ANY outlet — not
     // just the reader's toggled-on feeds (Pass L item 2).
@@ -9234,16 +9260,22 @@ function FeedPage({ cat, ctx }) {
 
         {/* ── ENERGY sub-category pills — at the top of the page, matching the Sports
             league/team pill position + format (Pass J item 8). ── */}
-        {cat === 'bloom' && !activeKw && !activeSrc && !search && (
+        {(cat === 'bloom' || cat === 'tech') && !activeKw && !activeSrc && !search && (() => {
+          // AF2.1: one chip row for Energy AND Tech sub-categories (same position/format as Sports).
+          const SUBTABS = cat === 'tech' ? TECH_SUBTABS : EN_SUBTABS;
+          const curSub = cat === 'tech' ? tcSubTab : enSubTab;
+          const setSub = cat === 'tech' ? setTcSubTab : setEnSubTab;
+          return (
           <div className="pc-subtabs en-subtabs" data-no-swipe style={{marginBottom:'12px'}}>
-            {EN_SUBTABS.map(t => (
-              <button key={t.key} className={`pc-subtab ${enSubTab===t.key?'active':''}`}
-                onClick={()=>{setEnSubTab(t.key);window.scrollTo({top:0,behavior:'instant'});}}>
+            {SUBTABS.map(t => (
+              <button key={t.key} className={`pc-subtab ${curSub===t.key?'active':''}`}
+                onClick={()=>{setSub(t.key);window.scrollTo({top:0,behavior:'instant'});}}>
                 {SHOW_CHIP_ICONS && <CatIcon icon={t.icon}/>}{t.label}
               </button>
             ))}
           </div>
-        )}
+          );
+        })()}
 
         {/* ── HOME: Top Stories (image cards) — sits first; the text-only State of Play
             module below it provides a breathing-room break before the next image block
