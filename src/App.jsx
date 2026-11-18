@@ -8876,7 +8876,11 @@ function FeedPage({ cat, ctx }) {
       if (!extra.length) return baseFilteredItems;
       return [...baseFilteredItems, ...extra].sort((a, b) => new Date(b.pubDate || 0) - new Date(a.pubDate || 0));
     }, [baseFilteredItems, catWideItems]);
-    const heroItems=activeFilteredItems.filter(a=>a.img);
+    // AF2.3: an `alt` source NEVER leads (AE1 governance: alt never leads/breaks/raises a tier,
+    // never counts toward coverage). It is kept out of the hero/lead pool here and out of the Top
+    // Stories pool below, so it surfaces only in the feed's "Latest" with its "Alternative
+    // perspective" chip (SnapshotCard) — where the Show-alternative-perspective switch can hide it.
+    const heroItems=activeFilteredItems.filter(a=>a.img && !isAltSource(a.source));
     const catLead=heroItems[0]||null;
     const feedItems=catLead?activeFilteredItems.filter(a=>a.link!==catLead.link):activeFilteredItems;
 
@@ -8911,7 +8915,9 @@ function FeedPage({ cat, ctx }) {
         const pool = [];
         for (const a of flat) {
           const k = storyKey(a);
-          if (used.has(k) || isPromoItem(a)) continue;
+          // AF2.3: alt sources never enter Top Stories (they never count toward coverage); they
+          // flow to the feed's Latest with the "Alternative perspective" chip instead.
+          if (used.has(k) || isPromoItem(a) || isAltSource(a.source)) continue;
           if (!byKey.has(k)) byKey.set(k, a);
           pool.push({ key: k, cat: a.cat, source: a.source, clusterSize: outletCount[k] || 1, pubDate: a.pubDate, breaking: !!(a.isAlert || a._breaking) });
         }
@@ -8974,8 +8980,11 @@ function FeedPage({ cat, ctx }) {
     // NB: breaking is NOT subtracted here — selectStateOfPlay already drops any ranked row that
     // matches a breaking row (notSameAsAny), so subtracting the HELD catBreaking keys up here only
     // coupled breaking's (later) commit into the feed/rail dedup and made them re-flow late (CLS).
+    // AF2.3: alt sources never enter State of Play either (it is a promoted lead-like module; alt
+    // never leads/counts coverage). Excluded here so an alt item falls through to the feed's Latest,
+    // where SnapshotCard carries the "Alternative perspective" chip and the Show-alt switch hides it.
     const sopSourceItems = useMemo(
-      () => activeFilteredItems.filter(a => !topStoryKeys.has(storyKey(a)) && !isPromoItem(a)),
+      () => activeFilteredItems.filter(a => !topStoryKeys.has(storyKey(a)) && !isPromoItem(a) && !isAltSource(a.source)),
       [activeFilteredItems, topStoryKeys]);
     // The numbered State-of-Play rows — ranked by the SAME pure selector the component uses, so
     // what we claim for dedup is exactly what SoP shows. (Breaking is held/claimed above via
