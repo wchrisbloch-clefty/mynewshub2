@@ -15,7 +15,7 @@ const PLAT_LABELS = { twitter: '𝕏', linkedin: 'in', instagram: 'IG', youtube:
 
 export function CustomizePanel({feeds, kw, alerts, urgent, social, watchlist, teams, health, arts, weatherCities, hiddenIndices, briefingExclude, briefingSources, initialTab, initialCat, onClose, onSave,
   voices, onAddVoice, removeVoiceById, reorderVoice, onResolveVoice, onTestVoices, voicesTest, searchKeyPresent,
-  seedQueue, onAcceptSeed, onSkipSeed, onFindVoices,
+  seedQueue, onAcceptSeed, onSkipSeed, onFindVoices, aeAdded = 0, showAlt = true, onToggleAlt,
   CATS, INDICES, DEFAULT_WEATHER_CITIES, DEFAULT_SOCIAL, BRIEFING_PRIORITY_SOURCES, SOCIAL_META}) {
   const [lf, setLf] = useState(JSON.parse(JSON.stringify(feeds)));
   const [lk, setLk] = useState(JSON.parse(JSON.stringify(kw)));
@@ -144,6 +144,12 @@ export function CustomizePanel({feeds, kw, alerts, urgent, social, watchlist, te
           {secTab==='sources' && (
             <div className="cp-sec">
               <div className="cp-lbl">Sources</div>
+              {aeAdded > 0 && <div className="cp-desc"><strong>{aeAdded} source{aeAdded===1?'':'s'} added this update</strong> — test them below.</div>}
+              {onToggleAlt && (
+                <button className="cp-btn-sec cp-alt-toggle" onClick={onToggleAlt} role="switch" aria-checked={showAlt}>
+                  {showAlt ? '☑' : '☐'} Show alternative perspective
+                </button>
+              )}
               <div className="cp-cat-tabs">{Object.keys(CAT_LABELS).map(c=><button key={c} className={`cp-cat-tab ${srcTab===c?'active':''}`} onClick={()=>setSrcTab(c)}>{CAT_LABELS[c]}</button>)}</div>
               <div className="cp-legend">
                 <span className="cp-legend-item"><span className="cp-health cp-h-green"/>Loaded</span>

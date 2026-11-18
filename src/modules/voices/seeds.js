@@ -89,6 +89,17 @@ export const SEED_VOICES = [
   seed('Jocko Willink', 'person', 'general'),
   seed('Chris Voss', 'person', 'business'),
 
+  // AF6: X-only voices (no first-party RSS — they live on X). Names only, status 'seed', never
+  // auto-followed; the handle is resolved + confirmed on Accept (api/voices-resolve), never stored
+  // here. `_xOnly` marks that X is their only identity so the resolver prefers an X handle.
+  //   • ZeroHedge / Watcher Guru: CB named the handles @zerohedge / @WatcherGuru (confirmed, not
+  //     guessed) — the resolve modal prefills them on Accept.
+  //   • The Hormuz Letter: the Voices finder returns @HormuzLetter as the sole consistent candidate
+  //     (6 independent sources). It is surfaced for CB to confirm on Accept — NOT stored here.
+  seed('ZeroHedge', 'org', 'business', { _xOnly: true }),
+  seed('Watcher Guru', 'org', 'business', { _xOnly: true }),
+  seed('The Hormuz Letter', 'org', 'bloom', { _xOnly: true }),
+
   // Ancient Mysteries — parked in Pop Culture, flagged (category pending your confirm)
   seed('Jesse Michels', 'person', 'popculture', { _parkedFrom: 'ancient-mysteries' }),
   seed('MrBallen', 'person', 'popculture', { _parkedFrom: 'ancient-mysteries' }),

@@ -42,5 +42,47 @@ const dup = { general: [{ name: 'Bloomberg', on: true }], finance: [{ name: 'Blo
 const { feeds: md } = migrateFeedsZ2(dup);
 eq(md.finance.filter(f => f.name === 'Bloomberg').length, 1, 'AA5.1: target dedupes by name (no duplicate Bloomberg)');
 
+// ── AF1: AE add-only migration ──────────────────────────────────────────────────
+import { migrateFeedsAE } from './index.js';
+const PRE_BIZ = ['NPR Business','CNBC Business','CNBC Top News','Morning Brew','Oilprice.com',
+  'Utility Dive','Data Center Dynamics','Power Magazine','Rigzone','MIT Tech Review','Canary Media',
+  'The Guardian Business','CNBC Tech'];
+const DEF = {
+  general: [{name:'BBC News',url:'b',on:true},
+    {name:'CBS News',url:'cbs',on:true,_ae:true},
+    {name:'The Daily Wire',url:'dw',on:true,_ae:true,_alt:true}],
+  business: [...PRE_BIZ.map(n=>({name:n,url:n,on:true})), {name:'WSJ Business',url:'wsjb',on:true,_ae:true}],
+  bloom: [{name:'EIA Today in Energy',url:'eia',on:true,_ae:true,sub:'policy',tier:'verified'}],
+};
+const savedPreAE = {
+  general: [{name:'BBC News',url:'b',on:false}, {name:'My Custom',url:'cust',on:true,custom:true}], // BBC user-disabled
+  business: PRE_BIZ.map(n=>({name:n,url:n,on:true})), // pristine
+  bloom: [],
+};
+const r1 = migrateFeedsAE(savedPreAE, DEF);
+eq(r1.added, 4, 'AF1: adds the 4 _ae feeds (CBS, Daily Wire, WSJ Business, EIA)');
+eq(r1.feeds.general.some(f=>f.name==='CBS News'), true, 'AF1: new CBS News added to general');
+eq(r1.feeds.general.find(f=>f.name==='The Daily Wire')._alt, true, 'AF1: _alt flag carried on added feed');
+eq(r1.feeds.general.find(f=>f.name==='BBC News').on, false, 'AF1: user-disabled BBC stays disabled');
+eq(r1.feeds.general.some(f=>f.name==='My Custom'&&f.custom), true, 'AF1: custom feed untouched');
+eq(r1.feeds.business.some(f=>f.name==='WSJ Business'), true, 'AF1: WSJ Business added to business');
+eq(r1.feeds.business.some(f=>f.name==='Oilprice.com'), false, 'AF1: dup removed from pristine business');
+eq(r1.feeds.business.some(f=>f.name==='MIT Tech Review'), false, 'AF1: MIT Tech Review removed from business');
+eq(r1.feeds.business.some(f=>f.name==='NPR Business'), true, 'AF1: non-dup business feed kept');
+eq(r1.feeds.bloom.find(f=>f.name==='EIA Today in Energy').sub, 'policy', 'AF1: sub hint carried on added feed');
+// re-run → idempotent
+const r2 = migrateFeedsAE(r1.feeds, DEF);
+eq(r2.added, 0, 'AF1: re-run adds nothing (idempotent)');
+eq(JSON.stringify(r2.feeds), JSON.stringify(r1.feeds), 'AF1: re-run leaves feeds unchanged');
+// removed-by-user _ae feed is NOT re-added when running once on a config that already dropped it
+const droppedCBS = JSON.parse(JSON.stringify(r1.feeds));
+droppedCBS.general = droppedCBS.general.filter(f=>f.name!=='CBS News');
+eq(migrateFeedsAE(droppedCBS, DEF).feeds.general.some(f=>f.name==='CBS News'), true,
+   'AF1: (note) a single run re-adds a dropped _ae feed — the once-per-device guard prevents this in practice');
+// edited business → dupes NOT removed
+const editedBiz = { business: PRE_BIZ.map((n,i)=>({name:n,url:n,on:i!==0})) }; // user turned one off
+eq(migrateFeedsAE(editedBiz, DEF).feeds.business.some(f=>f.name==='Oilprice.com'), true,
+   'AF1: edited business list keeps its dups (not pristine)');
+
 console.log(fail === 0 ? '\nALL PASS' : `\n${fail} FAILURE(S)`);
 process.exit(fail === 0 ? 0 : 1);
