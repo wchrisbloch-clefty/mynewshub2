@@ -59,6 +59,12 @@ import { SEED_VOICES } from './modules/voices/seeds';
 // chunk; findConnections (logic) stays eager. A self-wrapping lazy keeps the call site unchanged.
 const ConnectionsStripLazy = lazy(() => import('./modules/connections/ConnectionsStrip.jsx').then(m => ({ default: m.ConnectionsStrip })));
 function ConnectionsStrip(props) { return <Suspense fallback={null}><ConnectionsStripLazy {...props} /></Suspense>; }
+// AF1 bundle offset: StateOfPlay (~10.8KB) renders in the rail (isolated from the feed via
+// .sop-hoist, and below the fold on phone) and loads its own data async, so it is split off the
+// initial chunk; selectStateOfPlay (logic) stays eager. Self-wrapping lazy, null fallback (no
+// empty box — the component owns its own skeleton/empty states once loaded).
+const StateOfPlayLazy = lazy(() => import('./modules/state-of-play/StateOfPlay.jsx').then(m => ({ default: m.StateOfPlay })));
+function StateOfPlay(props) { return <Suspense fallback={null}><StateOfPlayLazy {...props} /></Suspense>; }
 const ResolveModal = lazy(() => import('./modules/voices/ResolveModal').then(m => ({ default: m.ResolveModal })));
 const VoiceFinderModal = lazy(() => import('./modules/voices/VoiceFinderModal').then(m => ({ default: m.VoiceFinderModal })));
 import { VoicesStrip } from './modules/voices/VoicesStrip';
@@ -73,7 +79,7 @@ import { VoicesStrip } from './modules/voices/VoicesStrip';
 // (the collapsed trigger is below the first screen and non-blocking).
 const XPulseLazy = lazy(() => import('./modules/x-pulse').then(m => ({ default: m.XPulse })));
 function XPulse(props) { return <Suspense fallback={null}><XPulseLazy {...props} /></Suspense>; }
-import { StateOfPlay, selectStateOfPlay } from './modules/state-of-play';
+import { selectStateOfPlay } from './modules/state-of-play/select.js';
 import { rankHomeTop } from './modules/top-stories/select';
 import { scoreStory, rankMode } from './modules/ranking';
 import { anyWholeWord } from './modules/text-match';
@@ -91,7 +97,7 @@ import { useMarkets } from './modules/markets-surface/useMarkets.js';
 const MarketsSurfaceLazy = lazy(() => import('./modules/markets-surface/MarketsSurface.jsx').then(m => ({ default: m.MarketsSurface })));
 function MarketsSurface(props) { return <Suspense fallback={null}><MarketsSurfaceLazy {...props} /></Suspense>; }
 import { parseRoute, buildPath } from './modules/routing';
-import { migrateFeedsZ2, FEEDS_MIG_V } from './modules/feeds-migrate';
+import { migrateFeedsZ2, migrateFeedsAE, FEEDS_MIG_V } from './modules/feeds-migrate';
 import { PROMPT_VERSION } from '../lib/ai-models.js';
 import { TIER_LABEL, tagProvenance, TierBadge } from './modules/provenance';
 const ChatBot = lazy(() => import('./modules/concierge').then(m => ({ default: m.ChatBot })));
@@ -9506,10 +9512,12 @@ export default function App() {
     const saved = ld('feeds', null);
     if (saved == null) return DEFAULT_FEEDS;              // fresh browser — already Z2-tagged
     if (ld('feedsMigV', 0) >= FEEDS_MIG_V) return saved;  // migrated already; respect later user edits
-    const { feeds: migrated, changed } = migrateFeedsZ2(saved);
-    try { sv('feeds', migrated); sv('feedsMigV', FEEDS_MIG_V); } catch {}
-    if (DEBUG && typeof console !== 'undefined') console.log('[feedsMigrationZ2] applied; moved feeds:', changed);
-    return migrated;
+    // AF1: Z2 (category moves) then AE (add-only new defaults + de-dup) — chained, both idempotent.
+    const z2 = migrateFeedsZ2(saved);
+    const ae = migrateFeedsAE(z2.feeds, DEFAULT_FEEDS);
+    try { sv('feeds', ae.feeds); sv('feedsMigV', FEEDS_MIG_V); sv('feedsAEAdded', ae.added); } catch {}
+    if (DEBUG && typeof console !== 'undefined') console.log('[feedsMigrationAE] applied; added:', ae.added, 'z2 moved:', z2.changed);
+    return ae.feeds;
   });
   // ── FOLLOW-A-SOURCE-FROM-FEED (Pass G item 7) ───────────────────────────────
   // "Followed" = present and enabled in any category's feed list (the same list
@@ -10920,6 +10928,7 @@ export default function App() {
         />
 
         {showPanel&&<Suspense fallback={null}><CustomizePanel feeds={feeds} kw={kw} alerts={alerts} urgent={urgent}
+          aeAdded={Number(ld('feedsAEAdded',0))||0}
           social={social} watchlist={watchlist} teams={teams} health={health} arts={arts}
           weatherCities={weatherCities} hiddenIndices={hiddenIndices}
           briefingExclude={briefingExclude}
