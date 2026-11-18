@@ -154,6 +154,15 @@ export function SportsPage({ ctx }) {
           const t = (a.title + ' ' + (a.desc||'')).toLowerCase();
           return teamsInSport.some(m => m && t.includes(m)) || sportKws.some(k => t.includes(k));
         });
+      } else {
+        // AF2.1: main Sports ("All") EXCLUDES racing & golf — they have their own chips, so a
+        // horse-racing or golf item no longer clutters the main league feed. (Only when nothing is
+        // filtered to a team.) Niche single-interest coverage stays one tap away under its chip.
+        const nicheKws = [...(SPORT_KWS.racing || []), ...(SPORT_KWS.golf || [])];
+        items = items.filter(a => {
+          const t = (a.title + ' ' + (a.desc||'')).toLowerCase();
+          return !nicheKws.some(k => t.includes(k));
+        });
       }
       // Favorite-team prioritization: bubble articles mentioning user's teams to top
       const favMatches = teams.map(t => (t.match||'').toLowerCase()).filter(Boolean);

@@ -8801,15 +8801,26 @@ function FeedPage({ cat, ctx }) {
       comedy: ['comedy','comedian','stand-up','funny','humor','joke','sketch','snl','sitcom','comic','parody','satire'],
     };
 
+    // AF2.1: Energy chips — Oil & Gas now splits into Upstream/Midstream/Downstream, Power becomes
+    // Power & Utilities, and a Data-center power chip is added. `sub` hints on feeds (AF5) plus the
+    // whole-word keyword match (AE6) drive each.
     const EN_SUBTABS = [
-      { key:'all',     label:'All',           icon:LayoutGrid },
-      { key:'power',   label:'Power',         icon:Zap },
-      { key:'oilgas',  label:'Oil & Gas',     icon:Droplet },
-      { key:'clean',   label:'Clean Energy',  icon:Leaf },
-      { key:'markets', label:'Markets',       icon:TrendingUp },
-      { key:'policy',  label:'Policy',        icon:Scale },
+      { key:'all',        label:'All',             icon:LayoutGrid },
+      { key:'oilgas',     label:'Oil & Gas',       icon:Droplet },
+      { key:'upstream',   label:'Upstream',        icon:Droplet },
+      { key:'midstream',  label:'Midstream',       icon:Droplet },
+      { key:'downstream', label:'Downstream',      icon:Droplet },
+      { key:'power',      label:'Power & Utilities', icon:Zap },
+      { key:'datacenter', label:'Data-center',     icon:Zap },
+      { key:'clean',      label:'Clean Energy',    icon:Leaf },
+      { key:'markets',    label:'Markets',         icon:TrendingUp },
+      { key:'policy',     label:'Policy',          icon:Scale },
     ];
     const EN_KWS = {
+      upstream:   ['upstream','drilling','rig','exploration','wellhead','shale','fracking','permian','e&p','crude production','offshore drilling','wildcat'],
+      midstream:  ['midstream','pipeline','terminal','ngl','gathering','lng export','compressor','storage hub','takeaway'],
+      downstream: ['downstream','refinery','refining','petrochemical','gasoline','diesel','crack spread','fuel retail','refined products'],
+      datacenter: ['data center','datacenter','data-center','hyperscale','ai power','powering ai','load growth','grid demand','server farm','ppa'],
       power:   ['power','electric','grid','utility','electricity','megawatt','kilowatt','nuclear','coal','natural gas','transmission','substation','generation','powerplant','baseload'],
       oilgas:  ['oil','gas','petroleum','crude','refinery','pipeline','opec','brent','wti','shale','drilling','rig','barrel','lng','upstream','downstream','midstream','gasoline'],
       clean:   ['solar','wind','renewable','clean energy','green','battery','storage','ev','electric vehicle','hydrogen','carbon','emissions','climate','sustainability','net zero','offshore wind'],
