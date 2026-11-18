@@ -90,3 +90,11 @@ shipped without the verified tier, so the Copy report confirms or swaps them):
 - Hard Fork — no first-party RSS URL could be resolved.
 Resolve these on CB's device (or a later finder pass) before adding — a guessed 404 URL only
 pollutes the Source test.
+
+## AF6 — X-only voices (names only; handles resolved on Accept, never stored)
+Added to SEED_VOICES as `status:'seed'`, `_xOnly:true`, never auto-followed:
+- **ZeroHedge** (business) — CB-named handle **@zerohedge** (prefilled by the resolve modal on Accept).
+- **Watcher Guru** (business) — CB-named handle **@WatcherGuru** (prefilled on Accept).
+- **The Hormuz Letter** (bloom) — Voices finder returns **@HormuzLetter** as the sole consistent
+  candidate across 6 independent sources (njtmulder, RapsonEnergy, Reuters repost, r/oil, etc.).
+  Surfaced for CB to confirm on Accept; the handle is NOT stored in seeds.js (never guessed).
