@@ -81,7 +81,7 @@ const XPulseLazy = lazy(() => import('./modules/x-pulse').then(m => ({ default: 
 function XPulse(props) { return <Suspense fallback={null}><XPulseLazy {...props} /></Suspense>; }
 import { selectStateOfPlay } from './modules/state-of-play/select.js';
 import { rankHomeTop } from './modules/top-stories/select';
-import { scoreStory, rankMode, coverageOf } from './modules/ranking';
+import { scoreStory, rankMode, coverageOf, isAlt as isAltSource } from './modules/ranking';
 import { anyWholeWord } from './modules/text-match';
 import { TopicTag } from './modules/topic-tag';
 import { CatIcon, SHOW_CHIP_ICONS } from './modules/cat-icon';
@@ -3103,6 +3103,7 @@ body:not(.dark) .pill-bar{
 .cp-btn-red{background:var(--red);}
 .cp-btn-sec{background:none;border:1px solid var(--border);color:var(--text2);border-radius:var(--radius-md);padding:6px 12px;font-size:var(--fs-meta);font-weight:700;cursor:pointer;font-family:inherit;white-space:nowrap;}
 .cp-btn-sec:hover{border-color:var(--accent);color:var(--accent);}
+.cp-alt-toggle{min-height:44px;margin:6px 0 10px;display:inline-flex;align-items:center;gap:6px;}
 .cp-find-wrap{margin:2px 0 10px;}
 .cp-find-wrap .cp-btn-sec{min-height:44px;}
 .cp-find-wrap .cp-desc{margin:4px 0 0;}
@@ -8713,7 +8714,7 @@ function AuthModal({ onClose, onSend, status, email, setEmail, userId, onSignOut
 function FeedPage({ cat, ctx }) {
   // J3: hoisted to module scope (stable identity) so App re-renders re-render this
   // page instead of remounting it. App-internal values arrive via one ctx object.
-  const { activeKw, activeSrc, applyPending, arts, breakingItems, briefingExclude, feedHealth, feeds, followTeam, followedTeams, handleTabChange, health, isSavedFn, isTeamFollowed, isTopicFollowed, kw, kwMatch, lastUpdated, loadCat, loading, myTeams, myTopics, navigate, onRead, onSave, openCustomize, pendingNew, recommended, refreshAll, refreshVoiceSignals, search, setActiveKw, setActiveSrc, setChatContext, setFeeds, setPerspArticle, setSearch, social, sorted, sourceRecs, srcWebLoading, srcWebResults, subcat, tab, teams, toggleTopic, unfollowTeam, urgent, voicesStripFor, webLoading, webResults } = ctx;
+  const { showAlt = true, activeKw, activeSrc, applyPending, arts, breakingItems, briefingExclude, feedHealth, feeds, followTeam, followedTeams, handleTabChange, health, isSavedFn, isTeamFollowed, isTopicFollowed, kw, kwMatch, lastUpdated, loadCat, loading, myTeams, myTopics, navigate, onRead, onSave, openCustomize, pendingNew, recommended, refreshAll, refreshVoiceSignals, search, setActiveKw, setActiveSrc, setChatContext, setFeeds, setPerspArticle, setSearch, social, sorted, sourceRecs, srcWebLoading, srcWebResults, subcat, tab, teams, toggleTopic, unfollowTeam, urgent, voicesStripFor, webLoading, webResults } = ctx;
     dbgRender('FeedPage'); // J1: render counter
     useEffect(() => dbgMount('FeedPage'), []); // J1: remount counter
     const cc=CATS[cat];
@@ -8738,7 +8739,8 @@ function FeedPage({ cat, ctx }) {
       ? (bizFilter === 'business' ? sorted('business')
          : [...sorted('business'), ...sorted('finance')].sort((a,b)=>new Date(b.pubDate)-new Date(a.pubDate)))
       : sorted(cat);
-    const items=useMemo(()=>clusterStories(rawItems),[rawItems]);
+    // AF2.2: hide `alt` sources entirely when the "Show alternative perspective" switch is off.
+    const items=useMemo(()=>clusterStories(showAlt ? rawItems : rawItems.filter(a => !isAltSource(a.source))),[rawItems, showAlt]);
     const isLoading = isMergedBiz ? (loading.business || loading.finance) : loading[cat];
     // AE2: importance-ranking kill switch. v2 (default) orders the feed by scoreStory so a
     // multi-outlet wire story outranks a 3-minute-old fan blog; `?rank=legacy` (or the stored
@@ -9561,6 +9563,10 @@ export default function App() {
     if (DEBUG && typeof console !== 'undefined') console.log('[feedsMigrationAE] applied; added:', ae.added, 'z2 moved:', z2.changed);
     return ae.feeds;
   });
+  // AF2.2: "Show alternative perspective" — default ON. When off, items from `alt` sources
+  // (Daily Wire / ZeroHedge / Watcher Guru) are hidden on every page/band. Stored with prefs.
+  const [showAlt, setShowAlt] = useState(() => ld('showAlt', true));
+  const toggleShowAlt = useCallback(() => setShowAlt(v => { const n = !v; try { sv('showAlt', n); } catch {} return n; }), []);
   // ── FOLLOW-A-SOURCE-FROM-FEED (Pass G item 7) ───────────────────────────────
   // "Followed" = present and enabled in any category's feed list (the same list
   // Customize manages). followSource enables an existing entry or, if the source
@@ -10893,6 +10899,7 @@ export default function App() {
                     isPhone: isMobile,
                   }}/></Suspense>
                 : NEWS_CATS.filter(c=>c!=='sports').includes(tab)&&<FeedPage cat={tab} ctx={{
+                showAlt,
                 activeKw, activeSrc, applyPending, arts, breakingItems, briefingExclude, feedHealth,
                 feeds, followTeam, followedTeams, handleTabChange, health, isSavedFn, isTeamFollowed,
                 isTopicFollowed, kw, kwMatch, lastUpdated, loadCat, loading, myTeams, myTopics, navigate, onRead,
@@ -10970,7 +10977,7 @@ export default function App() {
         />
 
         {showPanel&&<Suspense fallback={null}><CustomizePanel feeds={feeds} kw={kw} alerts={alerts} urgent={urgent}
-          aeAdded={Number(ld('feedsAEAdded',0))||0}
+          aeAdded={Number(ld('feedsAEAdded',0))||0} showAlt={showAlt} onToggleAlt={toggleShowAlt}
           social={social} watchlist={watchlist} teams={teams} health={health} arts={arts}
           weatherCities={weatherCities} hiddenIndices={hiddenIndices}
           briefingExclude={briefingExclude}

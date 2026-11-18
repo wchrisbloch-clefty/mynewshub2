@@ -57,6 +57,9 @@
 /* F8: Opinion/Analysis label — rules-only metadata, styled as a neutral OUTLINE tag so it
    never reads as a trust tier/category (no fill, no accent). */
 .snap-opinion{font-family:var(--font-sans);font-size:var(--fs-label);font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:var(--text3);border:1px solid var(--border);border-radius:4px;padding:1px 6px;white-space:nowrap;}
+/* AF2.2: ALT lane chip — neutral (never red; red is reserved for Breaking). Not uppercase, so it
+   reads as a plain note rather than a status. */
+.snap-alt{font-family:var(--font-sans);font-size:var(--fs-label);font-weight:600;color:var(--text3);background:var(--surface2);border:1px solid var(--border2);border-radius:4px;padding:1px 6px;white-space:nowrap;}
 .snap-hero-overlay .snap-opinion{color:var(--on-media);border-color:rgba(255,255,255,0.55);}
 .snap-time{font-family:var(--font-sans);font-size:var(--fs-meta);color:var(--text3);}
 /* F3: single meta row — time (+ sources) left, actions right. */

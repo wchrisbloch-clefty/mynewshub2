@@ -19,6 +19,7 @@ import { useState } from 'react';
 import { hasUsableImage, imgReferrerPolicy, imageVerdict } from '../source-image';
 import { FollowSourceChip } from '../follow-source';
 import { TierBadge } from '../provenance';
+import { isAlt as isAltSource } from '../ranking';
 import './SnapshotCard.css';
 
 const defaultFormatDate = d => { try { return new Date(d).toLocaleString(); } catch { return ''; } };
@@ -28,6 +29,9 @@ export function SnapshotCard({ a, meta = {}, isSaved, onSave, onRead, onPerspect
   const [imgErr, setImgErr] = useState(false);
   const topKw = a.matchedKw?.[0] || null;
   const multi = a._clusterSize > 1;
+  // AF2.2: an item from an `alt` source (Daily Wire / ZeroHedge / Watcher Guru) carries a neutral
+  // "Alternative perspective" chip — never red, never implying coverage. Source-name based (rankOf).
+  const alt = isAltSource(a.source);
   // F2: a lead WITH an image renders as a hero — 16:9 cover image, a bottom-up dark
   // gradient, and the source + headline overlaid in white (meta in one fixed position).
   // The no-image lead keeps the D5 typographic treatment. Regular cards are unchanged.
@@ -52,6 +56,7 @@ export function SnapshotCard({ a, meta = {}, isSaved, onSave, onRead, onPerspect
           <div className="snap-hero-overlay">
             <div className="snap-meta snap-hero-meta">
               <span className="snap-hero-source">{a.source}</span>
+              {alt && <span className="snap-alt">Alternative perspective</span>}
               {opinionLabel && <span className="snap-opinion">{opinionLabel}</span>}
               {a.isAlert && <span className="snap-live">● LIVE</span>}
               <span className="snap-hero-time">{formatDate(a.pubDate)}</span>
@@ -68,6 +73,7 @@ export function SnapshotCard({ a, meta = {}, isSaved, onSave, onRead, onPerspect
           {a.author && <span className="snap-byline">{a.author}</span>}
           {a.isAlert && <span className="snap-live">● LIVE</span>}
           <TierBadge item={a}/>
+          {alt && <span className="snap-alt">Alternative perspective</span>}
           {opinionLabel && <span className="snap-opinion">{opinionLabel}</span>}
           {topKw && <span className="snap-tag">{topKw}</span>}
         </div>

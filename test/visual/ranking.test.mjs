@@ -61,6 +61,15 @@ ok(r2.topNow.filter(c => c.source === 'AP (Google News)').length <= 2, 'max 2 pe
 const leg = legacyOrder([olderWire, freshFan]);
 ok(leg[0] === freshFan, 'legacy order = pure recency (fresh fan first)');
 
+// ── AF2.2: ALT governance — alt never counts coverage, never leads Top now ──────
+const altOnly = mk('ZeroHedge take on the market', ['ZeroHedge'], 0.2, 'alt1');
+ok(coverageOf(altOnly).core === 0 && coverageOf(altOnly).specialist === 0, 'alt-only cluster coverage 0');
+ok(coverageOf(altOnly).hasAlt === true, 'alt cluster flagged hasAlt');
+const altMix = [altOnly, politics, nflTrade];
+const altSplit = splitTopNowLatest(altMix, { cat: 'business', now: NOW });
+ok(!altSplit.topNow.some(c => c.title === 'ZeroHedge take on the market'), 'alt item never in Top now');
+ok(rankOf('The Daily Wire') === 'alt' && rankOf('Watcher Guru') === 'alt', 'Daily Wire + Watcher Guru are alt');
+
 console.log(`\nRANKING — ${fail} failures, ${pass} passed`);
 console.log(fail === 0 ? 'ALL PASS' : 'FAILURES ABOVE');
 process.exit(fail ? 1 : 0);
