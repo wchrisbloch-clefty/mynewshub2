@@ -433,6 +433,14 @@ const DEFAULT_FEEDS = {
     { name:'Hydrocarbon Processing', url:'https://www.hydrocarbonprocessing.com/rss',                           on:true, _ae:true, sub:'downstream' },
     { name:'EIA Today in Energy',   url:'https://www.eia.gov/rss/todayinenergy.xml',                             on:true, _ae:true, tier:'verified', sub:'policy' },
     { name:'American Petroleum Institute (Google News)', url:'https://news.google.com/rss/search?q=when:3d%20site:api.org&hl=en-US&gl=US&ceid=US:en', on:true, _ae:true, sub:'policy' },
+    // ── AF5: energy trade depth. World Oil + OGJ serve application/rss+xml 200 (publisher-listed
+    //   feed URLs), item-level pending CB's device Source test → UNVERIFIED (no tier). The app
+    //   encodeURIComponent()s the URL once, so the raw OGJ `input={...}` is stored literally.
+    //   Offshore Magazine, Pipeline & Gas Journal and Hart Energy are UNVERIFIED-pending in the
+    //   sources doc — their public RSS URL 404s / is unresolved, so no guessed URL is shipped. ──
+    { name:'World Oil',                     url:'https://www.worldoil.com/rss?feed=news',                                                        on:true, _ae:true, sub:'upstream' },
+    { name:'Oil & Gas Journal',             url:'https://www.ogj.com/__rss/website-scheduled-content.xml?input={"sectionAlias":"general-interest"}',       on:true, _ae:true, sub:'upstream' },
+    { name:'Oil & Gas Journal — Pipelines', url:'https://www.ogj.com/__rss/website-scheduled-content.xml?input={"sectionAlias":"pipelines-transportation"}', on:true, _ae:true, sub:'midstream' },
   ],
   popculture: [
     { name:'Variety',           url:'https://variety.com/feed/',                                  on:true },
@@ -460,6 +468,15 @@ const DEFAULT_FEEDS = {
     { name:'IEEE Spectrum',     url:'https://spectrum.ieee.org/feeds/feed.rss',                   on:true },
     { name:'9to5Google',        url:'https://9to5google.com/feed/',                               on:false },
     { name:'9to5Mac',           url:'https://9to5mac.com/feed/',                                  on:false },
+    // ── AF5: AI "stay-current" daily digests. sub:'stay-current' routes them to the Tech
+    //   "Stay current" chip (AF2.1). TLDR AI / Hugging Face / Import AI VERIFIED (returned <item>s
+    //   over the agent proxy); Latent Space serves application/rss+xml 200 but item-level is pending
+    //   CB's device Source test, so it ships UNVERIFIED (no tier). Hard Fork omitted — no first-party
+    //   RSS URL could be resolved (never guessed). ──
+    { name:'TLDR AI',           url:'https://tldr.tech/api/rss/ai',                               on:true, _ae:true, tier:'verified', sub:'stay-current' },
+    { name:'Hugging Face',      url:'https://huggingface.co/blog/feed.xml',                       on:true, _ae:true, tier:'verified', sub:'stay-current' },
+    { name:'Import AI',         url:'https://importai.substack.com/feed',                         on:true, _ae:true, tier:'verified', sub:'stay-current' },
+    { name:'Latent Space',      url:'https://www.latent.space/feed',                              on:true, _ae:true, sub:'stay-current' },
     // Analysis (reported) — opt-in; surfaced via the Source Directory (Pass L item 4).
     // (Semafor Tech dropped: no RSS endpoint could be verified — their old
     //  /rss/technology.xml 404s and egress is blocked here, so rather than ship another

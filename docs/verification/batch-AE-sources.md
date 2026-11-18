@@ -67,3 +67,26 @@ These are in the target list but were held back so the branch stays within the i
 - **Houston local (AE3):** Houston Public Media, ABC13/KTRK, KPRC, Fox 26, Houston Business Journal.
 - **The Hormuz Letter (X):** CB gave no handle and it could not be verified — resolve via the Voices
   ResolveModal / finder and confirm in the AE5 import sheet; **never guessed**.
+
+## AF5 — remaining feeds resolved (every URL verified or UNVERIFIED)
+Shipped into DEFAULT_FEEDS (`_ae:true`, carried to devices by migrateFeedsAE at FEEDS_MIG_V=4):
+
+**VERIFIED** (returned `<item>`s over the agent proxy):
+- TLDR AI — `https://tldr.tech/api/rss/ai` (tech, sub:stay-current) — tier:verified
+- Hugging Face — `https://huggingface.co/blog/feed.xml` (tech, sub:stay-current) — tier:verified
+- Import AI — `https://importai.substack.com/feed` (tech, sub:stay-current) — tier:verified
+
+**UNVERIFIED** (URL serves `application/rss+xml` 200 but item-level pending CB's device Source test;
+shipped without the verified tier, so the Copy report confirms or swaps them):
+- Latent Space — `https://www.latent.space/feed` (tech, sub:stay-current)
+- World Oil — `https://www.worldoil.com/rss?feed=news` (bloom, sub:upstream) — URL from worldoil.com/rss-list
+- Oil & Gas Journal — `…/__rss/website-scheduled-content.xml?input={"sectionAlias":"general-interest"}` (bloom, sub:upstream)
+- Oil & Gas Journal — Pipelines — `…?input={"sectionAlias":"pipelines-transportation"}` (bloom, sub:midstream)
+
+**NOT SHIPPED — no working URL found (never guessed):**
+- Offshore Magazine — offshore-mag.com/rss 404s; Endeavor section alias unknown.
+- Pipeline & Gas Journal — pgjonline.com/feed 404s; no public RSS endpoint located.
+- Hart Energy — hartenergy.com/feed 404s; no public RSS endpoint located.
+- Hard Fork — no first-party RSS URL could be resolved.
+Resolve these on CB's device (or a later finder pass) before adding — a guessed 404 URL only
+pollutes the Source test.

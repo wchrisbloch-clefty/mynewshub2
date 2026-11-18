@@ -2,7 +2,9 @@
 // fresh browsers. This versioned migration moves ONLY the four Z2 feeds in a SAVED config, preserving
 // each feed's `on` flag, its position, custom feeds and every other user edit. Runs once per device
 // (the host guards on FEEDS_MIG_V), is idempotent, and never touches a feed the user moved back.
-export const FEEDS_MIG_V = 3; // AF1: bumped so devices at v2 (post-Z2) pick up the AE additions.
+export const FEEDS_MIG_V = 4; // AF5: bumped so devices at v3 pick up the AF5 feed additions (AI
+// stay-current + energy trade depth). migrateFeedsAE is add-only/idempotent, so re-running it only
+// appends the new `_ae` feeds; the v3 additions are already present and skipped by url/name.
 
 // AF1: the seven energy/data-center duplicates removed from `business` (they stay in `bloom`; MIT
 // Tech Review moves to tech-only). Removed ONLY when the saved `business` list is still pristine —
