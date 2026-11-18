@@ -201,6 +201,16 @@ html{font-optical-sizing:auto;}
 .feed-rank-eyebrow{display:block;margin:4px 0 8px;padding-top:4px;border-top:1px solid var(--border2);}
 .feed-rank-eyebrow:first-child{border-top:none;padding-top:0;}
 
+/* AF4.2: "Breaking in sports" strip — calm/neutral (heavy coverage, not a red alert). */
+.sports-breaking{margin:0 0 16px;border:1px solid var(--border);border-radius:10px;background:var(--surface);overflow:hidden;}
+.sports-breaking-head{padding:10px 14px 6px;}
+.sports-breaking-label{font-family:var(--font-sans);font-size:var(--fs-label);font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:var(--text3);}
+.sports-breaking-row{display:block;width:100%;text-align:left;background:none;border:none;border-top:1px solid var(--border2);padding:10px 14px;cursor:pointer;}
+.sports-breaking-row:first-of-type{border-top:none;}
+.sports-breaking-row:hover{background:var(--surface2);}
+.sports-breaking-title{display:block;font-family:var(--font-serif);font-size:var(--fs-body);font-weight:600;color:var(--text);line-height:1.25;}
+.sports-breaking-meta{display:block;margin-top:3px;font-family:var(--font-sans);font-size:var(--fs-meta);color:var(--text3);}
+
 /* One shared image treatment — consistent aspect ratio, radius, and a branded
    placeholder (never a bare grey box) for every thumbnail/hero. */
 .media-img{width:100%;aspect-ratio:16/9;object-fit:cover;background:var(--surface2);border-radius:var(--img-radius);display:block;}
