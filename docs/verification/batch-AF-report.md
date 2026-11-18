@@ -18,9 +18,35 @@ per item. **DO NOT MERGE.** `social-command-center` untouched. No secrets commit
 | **AF3.1** | Home Top Stories ranked by the same weighting as scoreStory (one ranking) | ✅ **PASS** (top-stories/select PASS) |
 | **AF4.1** | Houston local gate — a local story leaves the strip only when it matters | ✅ **PASS** (wholeword 22/22) |
 | **AF2.3** | ALT governance across **every** promoted module (the real find from check #3) | ✅ **PASS** (alt-governance 6/6) |
-| **AF2.1** | sub-chips (Energy Upstream/Midstream/Downstream, Tech Stay-current) | ⛔ **CAP-BLOCKED** — new chip UI; 58 B headroom (see Bundle) |
-| **AF4.2** | "Breaking in sports" strip | ⛔ **CAP-BLOCKED** — new strip UI; 58 B headroom |
-| **AF5** | finish the source list (~10 feeds) + Copy-report fields | ⛔ **CAP-BLOCKED** — ~12 feed literals ≈ +360 B > 58 B |
+| **AF5** | remaining feeds — every URL verified or UNVERIFIED | ✅ **PASS** (migrate PASS; see AF5 note) |
+| **AF6** | X-only voices + Hormuz Letter via finder (never guessed) | ✅ **PASS** (voicefind 32/32) |
+| **AF2.1** | Energy sub-chips + Sports excludes racing/golf | ✅ **PASS** (Energy+Sports); **Tech chips CAP-BLOCKED** (+120 B over +1.0%) |
+| **AF4.2** | "Breaking in sports" strip (lazy chunk) | ✅ **PASS** (sports-breaking 6/6) |
+
+*(CB raised the hard bundle cap to +1.0% vs main (181,615 B) for the rest of Batch AF. Final initial
+JS gzip **181,258 B** = +1,441 B / +0.80%, 357 B headroom.)*
+
+## AF5 — remaining feeds (verified / UNVERIFIED)
+VERIFIED (returned `<item>`s): **TLDR AI, Hugging Face, Import AI** (tech, sub:stay-current).
+UNVERIFIED (serve `application/rss+xml` 200, item-level pending CB's device Source test; shipped
+without the verified tier so Copy-report confirms them): **Latent Space** (tech), **World Oil**,
+**Oil & Gas Journal** (general-interest + pipelines → midstream). NOT shipped — no working public RSS
+URL found, so no guessed 404 is added (never guess): **Offshore Magazine, Pipeline & Gas Journal,
+Hart Energy, Hard Fork** (all recorded UNVERIFIED-pending in batch-AE-sources.md). `FEEDS_MIG_V` 3→4
+so v3 devices pick them up.
+
+## AF6 — X-only voices (names only; handle resolved on Accept, never stored)
+**ZeroHedge / Watcher Guru** (CB-named @zerohedge / @WatcherGuru) and **The Hormuz Letter** added as
+`status:'seed'`, `_xOnly:true`, never auto-followed. The finder returns **@HormuzLetter** as the sole
+consistent candidate across 6 independent sources — surfaced for CB to confirm on Accept, NOT
+hardcoded in seeds.js.
+
+## AF2.1 — Tech chips held at the cap (CB decision)
+Energy chips (All · Oil & Gas · Upstream · Midstream · Downstream · Power & Utilities · Data-center ·
+Clean · Markets · Policy) and the Sports racing/golf exclusion shipped. **Tech chips** (All · AI &
+Models · Stay current · Big Tech · Chips & Infra · Startups) were built + measured but push first-paint
+FeedPage **+120 B over the +1.0% cap** (181,735 vs 181,615). Per CB's rule they are reverted, not
+split. Options for CB: a ~0.1% nudge to +1.1%, or trim the Tech keyword sets to fit.
 | **AF6** | Hormuz Letter + X-only voices | ⏳ **REMAINING** — resolve via Voices finder; **never guessed** |
 
 ## AF2.3 — what CB's check #3 actually caught (the real find)
