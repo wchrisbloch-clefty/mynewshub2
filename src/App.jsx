@@ -76,6 +76,7 @@ function XPulse(props) { return <Suspense fallback={null}><XPulseLazy {...props}
 import { StateOfPlay, selectStateOfPlay } from './modules/state-of-play';
 import { rankHomeTop } from './modules/top-stories/select';
 import { scoreStory, rankMode } from './modules/ranking';
+import { anyWholeWord } from './modules/text-match';
 import { TopicTag } from './modules/topic-tag';
 import { CatIcon, SHOW_CHIP_ICONS } from './modules/cat-icon';
 import { cleanSourceName } from './modules/source-name';
@@ -8785,22 +8786,19 @@ function FeedPage({ cat, ctx }) {
     };
 
     // Filter items by pop culture sub-tab
+    // AE6: WHOLE-WORD sub-category filtering (was substring .includes, which lit up 'ev' inside
+    // every/event, 'rig' inside right, 'oil' inside boil). A `sub` hint on a feed (AE1) also
+    // routes its stories into the matching chip even when the headline is terse.
     const pcFilteredItems = useMemo(() => {
       if (cat !== 'popculture' || pcSubTab === 'all') return items;
       const kws = PC_KWS[pcSubTab] || [];
-      return items.filter(a => {
-        const t = (a.title + ' ' + (a.desc||'')).toLowerCase();
-        return kws.some(k => t.includes(k));
-      });
+      return items.filter(a => anyWholeWord((a.title + ' ' + (a.desc||'')), kws));
     }, [items, cat, pcSubTab]);
 
     const enFilteredItems = useMemo(() => {
       if (cat !== 'bloom' || enSubTab === 'all') return items;
       const kws = EN_KWS[enSubTab] || [];
-      return items.filter(a => {
-        const t = (a.title + ' ' + (a.desc||'')).toLowerCase();
-        return kws.some(k => t.includes(k));
-      });
+      return items.filter(a => anyWholeWord((a.title + ' ' + (a.desc||'')), kws));
     }, [items, cat, enSubTab]);
 
     // ── WIDE DISCOVERY (Pass L item 2) ──────────────────────────────────────────
