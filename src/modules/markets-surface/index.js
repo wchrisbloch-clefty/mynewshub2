@@ -1,1 +1,2 @@
-export { MarketsSurface, useMarkets } from './MarketsSurface.jsx';
+export { MarketsSurface } from './MarketsSurface.jsx';
+export { useMarkets } from './useMarkets.js';

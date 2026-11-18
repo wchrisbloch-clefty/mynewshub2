@@ -42,7 +42,7 @@ import { clusterStories, hotClusterTopics, rankClusters, TREND_STOP, decodeEntit
 import { opinionLabel } from './modules/opinion';
 import { SourceImage, hasUsableImage } from './modules/source-image';
 import { ShareControl, buildBriefingExcerpt } from './modules/share';
-import { ConnectionsStrip, findConnections } from './modules/connections';
+import { findConnections } from './modules/connections/connections.js';
 import { qualifyBreaking, isPromoItem } from './modules/breaking';
 import { claimConnections, claimAcrossSections } from './modules/dedup/railDedup';
 import { reconcileHeld } from './modules/stable-list/heldList';
@@ -55,11 +55,18 @@ import { makeVoice, upsertVoice, removeVoice as removeVoiceModel, mergeVoices, c
 import { SEED_VOICES } from './modules/voices/seeds';
 // G4: code-split heavy, not-needed-at-first-paint surfaces. Home is never lazy.
 // ChatBot is always mounted but not first-paint; ResolveModal is rare.
+// AE2 bundle offset: the rail ConnectionsStrip (one use, below the fold) is split off the initial
+// chunk; findConnections (logic) stays eager. A self-wrapping lazy keeps the call site unchanged.
+const ConnectionsStripLazy = lazy(() => import('./modules/connections/ConnectionsStrip.jsx').then(m => ({ default: m.ConnectionsStrip })));
+function ConnectionsStrip(props) { return <Suspense fallback={null}><ConnectionsStripLazy {...props} /></Suspense>; }
 const ResolveModal = lazy(() => import('./modules/voices/ResolveModal').then(m => ({ default: m.ResolveModal })));
 const VoiceFinderModal = lazy(() => import('./modules/voices/VoiceFinderModal').then(m => ({ default: m.VoiceFinderModal })));
 import { VoicesStrip } from './modules/voices/VoicesStrip';
-import { extractContent, extractionFallbackMessage } from './modules/extractor';
-import { retrieveFeedContext, buildFeedContextBlock } from './modules/retrieval';
+// AE2 bundle offset: the extractor is imported on demand at its reader/analyze call site (below),
+// not here, so it leaves the initial chunk.
+// AE2 bundle offset: retrieval (retrieveFeedContext / buildFeedContextBlock) is used ONLY by the
+// lazy ChatBot (src/modules/concierge), never in App.jsx — importing it here forced ~2KB of it
+// into the initial chunk for nothing. Removed so the ranking module fits under the gzip cap.
 // XPulse is click-to-load (nothing fetches until tapped) and renders only at feed position 2 /
 // in the reader — never on the phone-Home first screen — so it is split off the initial chunk.
 // A self-wrapping lazy component keeps every <XPulse/> call site unchanged; fallback={null}
@@ -68,6 +75,7 @@ const XPulseLazy = lazy(() => import('./modules/x-pulse').then(m => ({ default: 
 function XPulse(props) { return <Suspense fallback={null}><XPulseLazy {...props} /></Suspense>; }
 import { StateOfPlay, selectStateOfPlay } from './modules/state-of-play';
 import { rankHomeTop } from './modules/top-stories/select';
+import { scoreStory, rankMode } from './modules/ranking';
 import { TopicTag } from './modules/topic-tag';
 import { CatIcon, SHOW_CHIP_ICONS } from './modules/cat-icon';
 import { cleanSourceName } from './modules/source-name';
@@ -76,7 +84,11 @@ import { SnapshotCard, CoverageList } from './modules/snapshot-card';
 // desktop). The Suspense fallback reserves full height so the chunk swap causes no layout shift.
 const MobileHome = lazy(() => import('./modules/mobile-home').then(m => ({ default: m.MobileHome })));
 import { FollowSourceContext, FollowSourceChip } from './modules/follow-source';
-import { MarketsSurface, useMarkets } from './modules/markets-surface';
+import { useMarkets } from './modules/markets-surface/useMarkets.js';
+// AE2 bundle offset: the ~6KB MarketsSurface component renders only on the Markets tab, so it is
+// split off the initial chunk; the tiny useMarkets hook stays eager. Self-wrapping lazy.
+const MarketsSurfaceLazy = lazy(() => import('./modules/markets-surface/MarketsSurface.jsx').then(m => ({ default: m.MarketsSurface })));
+function MarketsSurface(props) { return <Suspense fallback={null}><MarketsSurfaceLazy {...props} /></Suspense>; }
 import { parseRoute, buildPath } from './modules/routing';
 import { migrateFeedsZ2, FEEDS_MIG_V } from './modules/feeds-migrate';
 import { PROMPT_VERSION } from '../lib/ai-models.js';
@@ -309,9 +321,25 @@ const DEFAULT_FEEDS = {
     { name:'The Guardian US',   url:'https://www.theguardian.com/us/rss',                                       on:true },
     { name:'Axios',             url:'https://api.axios.com/feed/',                                              on:true },
     { name:'Breitbart',         url:'https://feeds.feedburner.com/breitbart',                                   on:true },
+    // KHOU + Chron stay FETCHED (they power the Houston Local strip) but are ranked `local`
+    // (RANK_BY_NAME), so AE2/AE3 keep them out of News Top now / lead / Breaking unless the
+    // Houston gate opens (>=2 outlets or a major-event term). AE7 tags them `local` on devices.
     { name:'KHOU Houston',      url:'https://www.khou.com/feeds/syndication/rss/news',                          on:true },
     { name:'Chron.com',         url:'https://www.chron.com/rss/feed/News-270.php',                              on:true },
     { name:'Morning Wire',      url:'https://feeds.megaphone.fm/BVDWV8747925072',                               on:true },
+    // ── AE1 core NEWS additions (UNVERIFIED until CB's device runs the Source test, AE9) ──
+    { name:'AP (Google News)',  url:'https://news.google.com/rss/search?q=when:1d%20site:apnews.com&hl=en-US&gl=US&ceid=US:en', on:true, _ae:true, tier:'inferred' },
+    { name:'Reuters (Google News)', url:'https://news.google.com/rss/search?q=when:1d%20site:reuters.com&hl=en-US&gl=US&ceid=US:en', on:true, _ae:true, tier:'inferred' },
+    { name:'CBS News',          url:'https://www.cbsnews.com/latest/rss/main',                                  on:true, _ae:true },
+    { name:'ABC News',          url:'https://feeds.abcnews.com/abcnews/topstories',                             on:true, _ae:true },
+    { name:'NBC News',          url:'https://feeds.nbcnews.com/nbcnews/public/news',                            on:true, _ae:true },
+    { name:'CNN',               url:'http://rss.cnn.com/rss/cnn_topstories.rss',                                on:true, _ae:true },
+    { name:'The New York Times',url:'https://rss.nytimes.com/services/xml/rss/nyt/HomePage.xml',                on:true, _ae:true },
+    { name:'Wall Street Journal', url:'https://feeds.content.dowjones.io/public/rss/RSSWorldNews',              on:true, _ae:true },
+    { name:'Politico',          url:'https://www.politico.com/rss/politicopicks.xml',                           on:true, _ae:true },
+    { name:'Google News — Top stories', url:'https://news.google.com/rss?hl=en-US&gl=US&ceid=US:en',            on:true, _ae:true, tier:'inferred' },
+    // ALT lane (AE1.3b) — "alternative perspective", never leads/breaks/raises a tier.
+    { name:'The Daily Wire',    url:'https://www.dailywire.com/feeds/rss.xml',                                  on:true, _ae:true, _alt:true },
   ],
   sports: [
     // ESPN via its supported JSON news API (site.api.espn.com) — the old
@@ -343,21 +371,34 @@ const DEFAULT_FEEDS = {
     { name:'Golf.com',             url:'https://golf.com/feed/',                                                on:true },
     { name:'ESPN Golf',            url:'https://site.api.espn.com/apis/site/v2/sports/golf/pga/news',           on:true },
     { name:'Golf Monthly',         url:'https://www.golfmonthly.com/feed',                                      on:true },
+    // ── AE1 core SPORTS additions (UNVERIFIED until CB's device runs the Source test, AE9).
+    //   The Spun / OutKick / 247Sports / On3 are ranked `fan` (RANK_BY_NAME) so they never lead
+    //   Top now or trigger Breaking; racing/golf appear only under their own chips (AE6). ──
+    { name:'The Athletic',         url:'https://news.google.com/rss/search?q=when:1d%20site:nytimes.com/athletic&hl=en-US&gl=US&ceid=US:en', on:true, _ae:true },
+    { name:'Fox Sports',           url:'https://www.foxsports.com/feedout/syndicatedContent?categoryId=0',      on:true, _ae:true },
+    { name:'Sports Illustrated',   url:'https://www.si.com/rss/si_topstories.rss',                              on:true, _ae:true },
+    { name:'Bleacher Report',      url:'https://bleacherreport.com/articles/feed',                              on:true, _ae:true },
+    { name:'Google News — Sports', url:'https://news.google.com/rss/headlines/section/topic/SPORTS?hl=en-US&gl=US&ceid=US:en', on:true, _ae:true, tier:'inferred' },
   ],
   business: [
+    // AE1.2: the seven energy/data-center feeds that also live in `bloom` were removed from
+    // `business` so every feed has ONE home category (Oilprice, Utility Dive, Data Center
+    // Dynamics, Power Magazine, Rigzone, Canary Media → bloom; MIT Tech Review → tech only).
+    // Cross-category visibility stays via clustering / Top stories. AE1 core adds: Reuters
+    // Business + WSJ Business (Google News / publisher feeds), Axios Markets. (new = UNVERIFIED)
     { name:'NPR Business',           url:'https://feeds.npr.org/1006/rss.xml',                                  on:true },
     { name:'CNBC Business',          url:'https://www.cnbc.com/id/10001147/device/rss/rss.html',                on:true },
     { name:'CNBC Top News',          url:'https://www.cnbc.com/id/100003114/device/rss/rss.html',               on:true }, // Z2: moved from general
     { name:'Morning Brew',           url:'https://www.morningbrew.com/feed',                                    on:true }, // Z2: moved from general
-    { name:'Oilprice.com',           url:'https://oilprice.com/rss/main',                                       on:true },
-    { name:'Utility Dive',           url:'https://www.utilitydive.com/feeds/news/',                             on:true },
-    { name:'Data Center Dynamics',   url:'https://www.datacenterdynamics.com/en/rss/',                          on:true },
-    { name:'Power Magazine',         url:'https://www.powermag.com/feed/',                                      on:true },
-    { name:'Rigzone',                url:'https://www.rigzone.com/news/rss/rigzone_latest.aspx',                on:true },
-    { name:'MIT Tech Review',        url:'https://www.technologyreview.com/feed/',                              on:true },
-    { name:'Canary Media',           url:'https://www.canarymedia.com/rss',                                     on:true },
     { name:'The Guardian Business',  url:'https://www.theguardian.com/business/rss',                            on:true },
     { name:'CNBC Tech',              url:'https://www.cnbc.com/id/19854910/device/rss/rss.html',                on:true },
+    // ── AE1 additions (UNVERIFIED until the Source test runs on CB's device, AE9) ──
+    { name:'Reuters Business (Google News)', url:'https://news.google.com/rss/search?q=when:1d%20site:reuters.com%20business&hl=en-US&gl=US&ceid=US:en', on:true, _ae:true },
+    { name:'WSJ Business',           url:'https://feeds.content.dowjones.io/public/rss/WSJcomUSBusiness',       on:true, _ae:true },
+    { name:'Axios Markets',          url:'https://api.axios.com/feed/business',                                 on:true, _ae:true },
+    // ALT lane (AE1.3b) — shown, labelled "alternative perspective", never leads/breaks.
+    { name:'ZeroHedge',              url:'https://feeds.feedburner.com/zerohedge/feed',                         on:true, _ae:true, _alt:true },
+    { name:'Watcher Guru',           url:'https://watcher.guru/news/feed',                                      on:true, _ae:true, _alt:true },
   ],
   finance: [
     { name:'MarketWatch',   url:'https://feeds.marketwatch.com/marketwatch/topstories/',                        on:true },
@@ -368,15 +409,23 @@ const DEFAULT_FEEDS = {
     { name:'CNBC Finance',  url:'https://www.cnbc.com/id/10000664/device/rss/rss.html',                         on:true },
   ],
   bloom: [
-    { name:'Oilprice.com',          url:'https://oilprice.com/rss/main',                                        on:true },
-    { name:'Utility Dive',          url:'https://www.utilitydive.com/feeds/news/',                               on:true },
-    { name:'Data Center Dynamics',  url:'https://www.datacenterdynamics.com/en/rss/',                            on:true },
-    { name:'Power Magazine',        url:'https://www.powermag.com/feed/',                                        on:true },
+    // AE1.2: MIT Tech Review removed here (tech only). AE6: `sub` hints route a feed into the
+    // Oil & Gas 3rd-level chips (upstream/midstream/downstream) and Policy. (new = UNVERIFIED)
+    { name:'Oilprice.com',          url:'https://oilprice.com/rss/main',                                        on:true, sub:'upstream' },
+    { name:'Utility Dive',          url:'https://www.utilitydive.com/feeds/news/',                               on:true, sub:'power' },
+    { name:'Data Center Dynamics',  url:'https://www.datacenterdynamics.com/en/rss/',                            on:true, sub:'datacenter' },
+    { name:'Power Magazine',        url:'https://www.powermag.com/feed/',                                        on:true, sub:'power' },
     { name:'CNBC Energy',           url:'https://www.cnbc.com/id/19836768/device/rss/rss.html',                  on:true },
-    { name:'MIT Tech Review',       url:'https://www.technologyreview.com/feed/',                                on:true },
-    { name:'Canary Media',          url:'https://www.canarymedia.com/rss',                                       on:true },
-    { name:'Rigzone',               url:'https://www.rigzone.com/news/rss/rigzone_latest.aspx',                   on:true },
-    { name:'Data Center Frontier',  url:'https://www.datacenterfrontier.com/feed/',                                on:true,  tier:'reported' },
+    { name:'Canary Media',          url:'https://www.canarymedia.com/rss',                                       on:true, sub:'clean' },
+    { name:'Rigzone',               url:'https://www.rigzone.com/news/rss/rigzone_latest.aspx',                   on:true, sub:'upstream' },
+    { name:'Data Center Frontier',  url:'https://www.datacenterfrontier.com/feed/',                                on:true,  tier:'reported', sub:'datacenter' },
+    // ── AE1 additions (UNVERIFIED until CB's device runs the Source test, AE9). More energy
+    //   depth (World Oil, Oil & Gas Journal, Offshore, Pipeline & Gas Journal, Hart) is listed
+    //   verified-URL-pending in the sources doc — added under the +0.5% bundle cap in a follow-up. ──
+    { name:'Natural Gas Intelligence', url:'https://www.naturalgasintel.com/feed/',                             on:true, _ae:true, sub:'midstream' },
+    { name:'Hydrocarbon Processing', url:'https://www.hydrocarbonprocessing.com/rss',                           on:true, _ae:true, sub:'downstream' },
+    { name:'EIA Today in Energy',   url:'https://www.eia.gov/rss/todayinenergy.xml',                             on:true, _ae:true, tier:'verified', sub:'policy' },
+    { name:'American Petroleum Institute (Google News)', url:'https://news.google.com/rss/search?q=when:3d%20site:api.org&hl=en-US&gl=US&ceid=US:en', on:true, _ae:true, sub:'policy' },
   ],
   popculture: [
     { name:'Variety',           url:'https://variety.com/feed/',                                  on:true },
@@ -414,6 +463,14 @@ const DEFAULT_FEEDS = {
     // (Anthropic dropped: it publishes no first-party RSS feed.)
     { name:'OpenAI',            url:'https://openai.com/news/rss.xml',                            on:true,  tier:'verified' },
     { name:'Google DeepMind',   url:'https://deepmind.google/blog/rss.xml',                       on:true,  tier:'verified' },
+    // ── AE1 AI&TECH additions (UNVERIFIED until CB's device runs the Source test, AE9).
+    //   "Stay current" voices carry sub:'staycurrent' so AE6's new sub-chip can gather them.
+    //   More stay-current voices (TLDR AI, Hugging Face, Import AI, Latent Space, Hard Fork) are
+    //   listed verified-URL-pending in docs/verification/batch-AE-sources.md — added under the
+    //   +0.5% bundle cap in a follow-up. ──
+    { name:'Techmeme',          url:'https://www.techmeme.com/feed.xml',                          on:true,  _ae:true },
+    { name:'Simon Willison',    url:'https://simonwillison.net/atom/everything/',                 on:true,  _ae:true, sub:'staycurrent' },
+    { name:'One Useful Thing',  url:'https://www.oneusefulthing.org/feed',                        on:true,  _ae:true, sub:'staycurrent' },
   ],
   comedy: [
     { name:'The Babylon Bee', url:'https://babylonbee.com/feed',  on:true },
@@ -1172,6 +1229,9 @@ async function fetchAISummary({type, title, content, mode='summary', url}) {
   let body = content;
   let fromPreview = false;
   if (url && EXTRACT_MODES.has(mode)) {
+    // AE2 bundle offset: the extractor only runs when a reader/analyze action fires, so load it
+    // on demand instead of in the initial chunk.
+    const { extractContent, extractionFallbackMessage } = await import('./modules/extractor');
     const ex = await extractContent(url);
     if (ex && ex.text) {
       body = ex.text;                                   // tier (a)
@@ -8673,6 +8733,13 @@ function FeedPage({ cat, ctx }) {
       : sorted(cat);
     const items=useMemo(()=>clusterStories(rawItems),[rawItems]);
     const isLoading = isMergedBiz ? (loading.business || loading.finance) : loading[cat];
+    // AE2: importance-ranking kill switch. v2 (default) orders the feed by scoreStory so a
+    // multi-outlet wire story outranks a 3-minute-old fan blog; `?rank=legacy` (or the stored
+    // flag) restores pure recency so CB can compare. Read once per mount.
+    const rankV2 = useMemo(() => {
+      let stored = null; try { stored = localStorage.getItem('mnh_rank'); } catch { /* private mode */ }
+      return rankMode(typeof window !== 'undefined' ? window.location.search : '', stored) !== 'legacy';
+    }, []);
 
     // Phase 2: subcategory is URL-driven (never local state). Chips navigate.
     const pcSubTab = cat === 'popculture' ? (subcat || 'all') : 'all';
@@ -8930,8 +8997,17 @@ function FeedPage({ cat, ctx }) {
     const dedupedFeed = useMemo(
       // X2a: one story once — cluster-dedupe this category feed (not only Home/Sports) so near-
       // duplicates (identical + bigram-near titles) collapse to one row.
-      () => onePerCluster(feedItems.filter(a => !topStoryKeys.has(storyKey(a)) && !catBreakingKeys.has(storyKey(a)) && !sopShownKeys.has(storyKey(a)) && !houstonKeys.has(storyKey(a)))),
-      [feedItems, topStoryKeys, catBreakingKeys, sopShownKeys, houstonKeys]);
+      // AE2: then order by IMPORTANCE (scoreStory) in v2 — multi-outlet coverage + recency beat a
+      // lone fan/local post — instead of pure recency. The kill switch keeps recency order.
+      () => {
+        const base = onePerCluster(feedItems.filter(a => !topStoryKeys.has(storyKey(a)) && !catBreakingKeys.has(storyKey(a)) && !sopShownKeys.has(storyKey(a)) && !houstonKeys.has(storyKey(a))));
+        if (!rankV2) return base;
+        const now = Date.now();
+        return [...base].map((a, i) => ({ a, i, s: scoreStory(a, { cat, now }) }))
+          .sort((x, y) => y.s - x.s || x.i - y.i) // score desc, stable by original recency order
+          .map(o => o.a);
+      },
+      [feedItems, topStoryKeys, catBreakingKeys, sopShownKeys, houstonKeys, rankV2, cat]);
 
     // ── COVERAGE GAP (folded into State of Play) — widely-covered stories none of the
     //    reader's own sources carried. Home keys off this category; the merged
