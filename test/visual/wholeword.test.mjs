@@ -28,6 +28,15 @@ ok(!anyWholeWord('every meeting ran long', ['ev', 'tv']), "anyWholeWord no false
 ok(!anyWholeWord('', ['oil']), 'empty text no match');
 ok(!anyWholeWord('text', []), 'empty keyword list no match');
 
+// ── AF4.1: Houston major-event gate (same whole-word helper over the CB-editable term list) ──────
+const MAJOR = ['hurricane','tropical storm','flood','flooding','tornado','explosion','refinery fire',
+  'evacuation','state of emergency','mass shooting','power outage','grid emergency'];
+ok(anyWholeWord('Hurricane barrels toward the Texas coast', MAJOR), 'hurricane opens the Houston gate');
+ok(anyWholeWord('Refinery fire forces evacuation in Pasadena', MAJOR), 'refinery fire + evacuation open the gate');
+ok(anyWholeWord('Grid emergency declared as demand spikes', MAJOR), 'grid emergency opens the gate');
+ok(!anyWholeWord('Houston Auto Show opens at NRG Center this weekend', MAJOR), 'auto show stays local-only (gate shut)');
+ok(!anyWholeWord('City approves new floodlight budget', MAJOR), "'floodlight' does not fire 'flood'");
+
 console.log(`\nWHOLEWORD — ${fail} failures, ${pass} passed`);
 console.log(fail === 0 ? 'ALL PASS' : 'FAILURES ABOVE');
 process.exit(fail ? 1 : 0);

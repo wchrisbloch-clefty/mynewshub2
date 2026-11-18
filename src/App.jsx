@@ -8422,6 +8422,13 @@ function RightNowWeather({ cities, data }) {
 // ─── HOUSTON (Home-only local news row) ───────────────────────────────────────
 // Filters the already-loaded feed to local Houston sources.
 const HOUSTON_SOURCES = ['KHOU Houston', 'Chron.com', 'Click2Houston', 'Houston Public Media', 'Houston Chronicle'];
+// AF4.1: a Houston/Harris-County LOCAL story stays in the Houston Local strip unless the Houston
+// gate opens — it is covered by >=2 distinct outlets, OR its headline names a major event. ONE
+// CB-editable list (whole-word / phrase matched, so "flood" doesn't fire on "floodlight").
+const HOUSTON_MAJOR_EVENT = ['hurricane','tropical storm','flood','flooding','tornado','explosion',
+  'refinery fire','evacuation','state of emergency','mass shooting','power outage','grid emergency'];
+const isMajorLocalEvent = a => anyWholeWord(((a && a.title) || ''), HOUSTON_MAJOR_EVENT);
+const houstonGateOpen = a => isMajorLocalEvent(a) || ((a && a._clusterSize) || 1) >= 2;
 // Cross-module dedup identity: a normalized title key (same convention as dedupe()),
 // so the same story is caught across modules even when different sources give it
 // different URLs (e.g. a clustered State-of-Play item vs the raw Houston-source item).
@@ -8992,6 +8999,9 @@ function FeedPage({ cat, ctx }) {
       const seen = new Set();
       return Object.values(arts || {}).flat()
         .filter(a => HOUSTON_SOURCES.includes(a.source))
+        // AF4.1: a local story that passes the Houston gate (>=2 outlets or a major-event term)
+        // leaves the strip and flows into the main feed / Top now; the rest stay local-only.
+        .filter(a => !houstonGateOpen(a))
         .filter(a => !topStoryKeys.has(storyKey(a)) && !catBreakingKeys.has(storyKey(a)) && !sopShownKeys.has(storyKey(a)))
         .filter(a => { const k = storyKey(a); if (seen.has(k)) return false; seen.add(k); return true; })
         .sort((a, b) => new Date(b.pubDate) - new Date(a.pubDate))
@@ -9036,8 +9046,13 @@ function FeedPage({ cat, ctx }) {
         const ageH = (now - new Date(a.pubDate)) / 3_600_000;
         if (ageH > 24) continue;
         const cov = coverageOf(a);
-        if ((cov.core + cov.specialist) < 1) continue;           // never a lone fan/alt/local
-        if (isHome && cov.core < 1 && (cov.core + cov.specialist) < 2) continue; // AF4 NEWS gate
+        const realCoverage = cov.core + cov.specialist;
+        // AF4.1: a local story is eligible only when the Houston gate is open (>=2 outlets or a
+        // major event); otherwise a lone fan/alt/local never enters Top now.
+        const localGateOpen = cov.hasLocal && houstonGateOpen(a);
+        if (realCoverage < 1 && !localGateOpen) continue;
+        // AF4.3 NEWS gate: a single non-core source can't enter News Top now (the Houston gate overrides).
+        if (isHome && !localGateOpen && cov.core < 1 && realCoverage < 2) continue;
         const pub = a.source || '?'; const c = perPub[pub] || 0;
         if (c >= 2) continue;
         perPub[pub] = c + 1; set.add(a.link || a);
