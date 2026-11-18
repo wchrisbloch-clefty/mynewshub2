@@ -20,11 +20,11 @@ per item. **DO NOT MERGE.** `social-command-center` untouched. No secrets commit
 | **AF2.3** | ALT governance across **every** promoted module (the real find from check #3) | ✅ **PASS** (alt-governance 6/6) |
 | **AF5** | remaining feeds — every URL verified or UNVERIFIED | ✅ **PASS** (migrate PASS; see AF5 note) |
 | **AF6** | X-only voices + Hormuz Letter via finder (never guessed) | ✅ **PASS** (voicefind 32/32) |
-| **AF2.1** | Energy sub-chips + Sports excludes racing/golf | ✅ **PASS** (Energy+Sports); **Tech chips CAP-BLOCKED** (+120 B over +1.0%) |
+| **AF2.1** | Energy + **Tech** sub-chips + Sports excludes racing/golf | ✅ **PASS** (chips render, conformance 0) |
 | **AF4.2** | "Breaking in sports" strip (lazy chunk) | ✅ **PASS** (sports-breaking 6/6) |
 
-*(CB raised the hard bundle cap to +1.0% vs main (181,615 B) for the rest of Batch AF. Final initial
-JS gzip **181,258 B** = +1,441 B / +0.80%, 357 B headroom.)*
+*(CB raised the hard bundle cap to **+1.1%** vs main (181,795 B) for the rest of Batch AF. Final
+initial JS gzip **181,775 B** = +1,958 B / +1.09%, 20 B headroom. No further cap changes.)*
 
 ## AF5 — remaining feeds (verified / UNVERIFIED)
 VERIFIED (returned `<item>`s): **TLDR AI, Hugging Face, Import AI** (tech, sub:stay-current).
@@ -41,12 +41,15 @@ so v3 devices pick them up.
 consistent candidate across 6 independent sources — surfaced for CB to confirm on Accept, NOT
 hardcoded in seeds.js.
 
-## AF2.1 — Tech chips held at the cap (CB decision)
-Energy chips (All · Oil & Gas · Upstream · Midstream · Downstream · Power & Utilities · Data-center ·
-Clean · Markets · Policy) and the Sports racing/golf exclusion shipped. **Tech chips** (All · AI &
-Models · Stay current · Big Tech · Chips & Infra · Startups) were built + measured but push first-paint
-FeedPage **+120 B over the +1.0% cap** (181,735 vs 181,615). Per CB's rule they are reverted, not
-split. Options for CB: a ~0.1% nudge to +1.1%, or trim the Tech keyword sets to fit.
+## AF2.1 — all three categories shipped
+- **Energy** chips: All · Oil & Gas · Upstream · Midstream · Downstream · Power & Utilities ·
+  Data-center · Clean · Markets · Policy.
+- **Tech** chips: All · AI & Models · Stay current · Big Tech · Chips & Infra · Startups. "Stay
+  current" gathers the AF5 digest feeds by source name; the rest match whole-word on the headline.
+  Re-landed after CB raised the cap to +1.1% (keyword sets trimmed of a few exec names/dupes to seat
+  under it). Chips verified rendering in a fixture smoke.
+- **Sports**: main "All" excludes racing & golf (own chips).
+All three use the one chip row + whole-word match; conformance 0 violations (1116 elems).
 | **AF6** | Hormuz Letter + X-only voices | ⏳ **REMAINING** — resolve via Voices finder; **never guessed** |
 
 ## AF2.3 — what CB's check #3 actually caught (the real find)
