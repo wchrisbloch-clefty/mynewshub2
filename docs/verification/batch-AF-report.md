@@ -15,10 +15,36 @@ per item. **DO NOT MERGE.** `social-command-center` untouched. No secrets commit
 | **AF2.2** | ALT lane: "Alternative perspective" chip + Show/Hide toggle | ✅ **PASS** (4 governance tests) |
 | **AF3** | Top now / Latest split in the feed + the clustering proof | ✅ **PASS** (eyebrows render, conformance 0) |
 | **AF4.3** | News: a single non-core source can't enter Top now | ✅ **PASS** (wired in AF3's Top-now gate) |
-| **AF2.1** | sub-chips (Energy Upstream/Midstream/Downstream, Tech Stay-current) | ⏳ **REMAINING** — `sub` hints + whole-word in place; needs the chip UI |
-| **AF4.1/4.2** | Houston local gate + "Breaking in sports" strip | ⏳ **REMAINING** — the `splitTopNowLatest` eligibility hook + `local`/`fan` ranks are in |
-| **AF5** | finish the source list (~10 feeds) + Copy-report fields | ⏳ **REMAINING** — deferred list in batch-AE-sources.md |
+| **AF3.1** | Home Top Stories ranked by the same weighting as scoreStory (one ranking) | ✅ **PASS** (top-stories/select PASS) |
+| **AF4.1** | Houston local gate — a local story leaves the strip only when it matters | ✅ **PASS** (wholeword 22/22) |
+| **AF2.3** | ALT governance across **every** promoted module (the real find from check #3) | ✅ **PASS** (alt-governance 6/6) |
+| **AF2.1** | sub-chips (Energy Upstream/Midstream/Downstream, Tech Stay-current) | ⛔ **CAP-BLOCKED** — new chip UI; 58 B headroom (see Bundle) |
+| **AF4.2** | "Breaking in sports" strip | ⛔ **CAP-BLOCKED** — new strip UI; 58 B headroom |
+| **AF5** | finish the source list (~10 feeds) + Copy-report fields | ⛔ **CAP-BLOCKED** — ~12 feed literals ≈ +360 B > 58 B |
 | **AF6** | Hormuz Letter + X-only voices | ⏳ **REMAINING** — resolve via Voices finder; **never guessed** |
+
+## AF2.3 — what CB's check #3 actually caught (the real find)
+Check #3 ("the alternative-perspective label shows on the Daily Wire, and the toggle hides it")
+failed on first proof — not because the chip was broken, but because **AF2.2 only governed the main
+feed list**. An `alt` source could still **lead Top Stories** (the hero took the first image item,
+alt or not), sit in the **Top Stories pool**, and fill a **State of Play** row — and in all three it
+rendered with **no chip** (those are separate renderers, not SnapshotCard) and the Show-alt switch
+**could not hide it** (it only filtered the feed). That violates AE1 ("alt never leads/breaks/raises
+a tier, never counts toward coverage; can appear in Latest"). Fixed: `heroItems`, the Home Top
+Stories pool, and `sopSourceItems` all exclude `isAltSource`, so alt surfaces **only** in the feed's
+Latest with the chip, hidden by the switch. Proven end-to-end on the **real Daily Wire feed** (source
+is stamped from the feed NAME, which is what `isAlt()` keys on): Show-alt ON → one feed card + chip,
+never in SoP/Top; Show-alt OFF → hidden everywhere. Locked by `test/visual/alt-governance.test.mjs`.
+
+## Checks CB asked for
+- **#1 Test sources → Copy report:** **NEEDS-DEVICE.** The sandbox has no live feed egress, so I
+  cannot learn which of the new `_ae:true` URLs actually return items — that is exactly what the
+  on-device Copy report is for. All new feed URLs remain **UNVERIFIED** until CB pastes that report.
+- **#2 default vs `?rank=legacy`:** on representative fixtures the **top** of each category coincides
+  (the most-covered recent story leads under both) — `rank=legacy` only reorders lower, fresher,
+  single-outlet items (the divergence proven in AF3 via `feedRankSpread`: core→specialist→fan). Which
+  headlines "feel wrong" is a device judgment — **NEEDS-DEVICE** for the subjective half.
+- **#3 Daily Wire chip + toggle:** ✅ **PASS** — see AF2.3 above.
 
 ## AF1 — migration (the #1 gap, fixed)
 New feeds lived only in `DEFAULT_FEEDS`; CB's devices load saved feeds from localStorage, so he saw
