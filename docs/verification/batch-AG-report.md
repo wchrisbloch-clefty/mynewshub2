@@ -96,11 +96,16 @@ either a cap change (CB's call) or a lazy-split of an existing initial module (e
 behind the lazy Voices path, ~the lever for AG5.2/5.3). The AG5.1 roster + mergeAether are ready to
 wire in the moment there is room.
 
-## Gates
+## Gates — ALL GREEN
 Unit: ranking · wholeword · migrate · voicefind · sports-breaking · across-outlets 8/8 · also-moving
 7/7 · aether-import 11/11 · top-stories/select · state-of-play/select — **ALL PASS**. check:tokens
-**PASS**. Visual suite (390 / 820 / 1194 / 1440, light + dark): _see the commit that finalizes this
-report._
+**PASS**.
+Visual (fixtures, light + dark, widths 390 / 430 / 820 / 1024 / 1100 / 1101 / 1180 / 1194 / 1280 /
+1440): conformance **ALL CONFORMANT** · empty-box **ALL PASS** · text-overlap **PASS (0 overlaps
+across 120 cells)** · contrast **ALL PASS** · dedupe-label **ALL PASS** · sports-dedup **ALL PASS** ·
+p5-sports-index **ALL PASS** · o7-hero-contrast **ALL PASS** · touch-mode **ALL PASS** · image-slots
+**ALL PASS** · layout-polish **ALL PASS** · fixed-overlap **PASS** · alt-governance **ALL PASS** ·
+font-network **ALL PASS**. Initial JS gzip **181,788 B** (+1.1% cap 181,795; 7 B headroom).
 
 ## What CB does
 - Preview → **Customize → Sources → Test all sources → Copy report → paste to Booth** (this is how we
