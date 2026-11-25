@@ -38,6 +38,11 @@ const trend = art('NPR News', 'A single-outlet story that happens to be trending
 rows = selectAlsoMoving([trend], { storyKey: sk, trendingHas: (a) => /trending/i.test(a.title) });
 ok(rows.length === 1 && rows[0].why === 'Trending', 'trendingHas → "Trending" chip (AG4 hook)');
 
+// (d) AG5.3 voice flag: a single-outlet story a confirmed voice flagged → "Yergin · 2h ↗" chip
+const vf = art('Oilprice.com', 'A single-outlet energy story a voice just posted about');
+rows = selectAlsoMoving([vf], { storyKey: sk, voiceFlag: () => ({ name: 'Yergin', ago: '2h' }) });
+ok(rows.length === 1 && rows[0].why === 'Yergin · 2h ↗', 'voiceFlag → "Yergin · 2h ↗" chip (AG5.3 hook)');
+
 // fan/alt/local with >=2 DISTINCT ranks qualifies (e.g. a local + a core outlet)
 const mixed = art('KHOU Houston', 'Grid story carried by a core outlet too', { _clusterSize: 2, _clusterSources: ['KHOU Houston', 'Reuters (Google News)'] });
 ok(selectAlsoMoving([mixed], { storyKey: sk }).length === 1, 'local+core (2 distinct ranks) qualifies');

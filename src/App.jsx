@@ -8756,7 +8756,7 @@ function AuthModal({ onClose, onSend, status, email, setEmail, userId, onSignOut
 function FeedPage({ cat, ctx }) {
   // J3: hoisted to module scope (stable identity) so App re-renders re-render this
   // page instead of remounting it. App-internal values arrive via one ctx object.
-  const { showAlt = true, activeKw, activeSrc, applyPending, arts, breakingItems, briefingExclude, feedHealth, feeds, followTeam, followedTeams, handleTabChange, health, isSavedFn, isTeamFollowed, isTopicFollowed, kw, kwMatch, lastUpdated, loadCat, loading, myTeams, myTopics, navigate, onRead, onSave, openCustomize, pendingNew, recommended, refreshAll, refreshVoiceSignals, search, setActiveKw, setActiveSrc, setChatContext, setFeeds, setPerspArticle, setSearch, social, sorted, sourceRecs, srcWebLoading, srcWebResults, subcat, tab, teams, toggleTopic, unfollowTeam, urgent, voicesStripFor, webLoading, webResults, trendingHas } = ctx;
+  const { showAlt = true, activeKw, activeSrc, applyPending, arts, breakingItems, briefingExclude, feedHealth, feeds, followTeam, followedTeams, handleTabChange, health, isSavedFn, isTeamFollowed, isTopicFollowed, kw, kwMatch, lastUpdated, loadCat, loading, myTeams, myTopics, navigate, onRead, onSave, openCustomize, pendingNew, recommended, refreshAll, refreshVoiceSignals, search, setActiveKw, setActiveSrc, setChatContext, setFeeds, setPerspArticle, setSearch, social, sorted, sourceRecs, srcWebLoading, srcWebResults, subcat, tab, teams, toggleTopic, unfollowTeam, urgent, voicesStripFor, webLoading, webResults, trendingHas, voiceFlagFn, voiceTiles } = ctx;
     dbgRender('FeedPage'); // J1: render counter
     useEffect(() => dbgMount('FeedPage'), []); // J1: remount counter
     const cc=CATS[cat];
@@ -9157,8 +9157,10 @@ function FeedPage({ cat, ctx }) {
       // Pool = the score-ordered feed minus the Top-now rows (dedupedFeed already excludes Top Stories
       // / Breaking / State of Play / Houston); Also-moving's own keys are excluded from Latest below.
       const pool = dedupedFeed.filter(a => !topNowSet.has(a.link || a));
-      return selectAlsoMoving(pool, { storyKey, kwMatch, cat, followedTeams, trendingHas });
-    }, [dedupedFeed, topNowSet, cat, activeKw, activeSrc, search, rankV2, followedTeams, kwMatch, trendingHas]);
+      // AG5.3: bind the lazy voice-flag matcher to this category's voice-signal tiles.
+      const voiceFlag = (voiceFlagFn && voiceTiles && voiceTiles.length) ? (a => voiceFlagFn(a, voiceTiles)) : null;
+      return selectAlsoMoving(pool, { storyKey, kwMatch, cat, followedTeams, trendingHas, voiceFlag });
+    }, [dedupedFeed, topNowSet, cat, activeKw, activeSrc, search, rankV2, followedTeams, kwMatch, trendingHas, voiceFlagFn, voiceTiles]);
     const alsoMovingKeys = useMemo(() => new Set(alsoMovingRows.map(r => storyKey(r.item))), [alsoMovingRows]);
 
     // ── COVERAGE GAP (folded into State of Play) — widely-covered stories none of the
@@ -9997,6 +9999,14 @@ export default function App() {
     }).catch(() => {});
     const idle = typeof requestIdleCallback === 'function' ? requestIdleCallback(run) : setTimeout(run, 1500);
     return () => { alive = false; if (typeof cancelIdleCallback === 'function') cancelIdleCallback(idle); };
+  }, []);
+  // AG5.3: load the voice-flag matcher lazily (kept out of the initial chunk). Stored as the fn so
+  // FeedPage can bind it to each category's voice-signal tiles for "Also moving".
+  const [voiceFlagFn, setVoiceFlagFn] = useState(null);
+  useEffect(() => {
+    let alive = true;
+    import('./modules/voice-flag').then(m => { if (alive) setVoiceFlagFn(() => m.voiceFlagFor); }).catch(() => {});
+    return () => { alive = false; };
   }, []);
   const [panelInitial, setPanelInitial] = useState({tab:'keywords',cat:'general'});
   const [activeKw, setActiveKw]     = useState(null);
@@ -11067,6 +11077,7 @@ export default function App() {
                 setActiveKw, setActiveSrc, setChatContext, setFeeds, setPerspArticle, setSearch, social,
                 sorted, sourceRecs, srcWebLoading, srcWebResults, subcat, tab, teams, toggleTopic,
                 unfollowTeam, urgent, voicesStripFor, webLoading, webResults, trendingHas,
+                voiceFlagFn, voiceTiles: (voiceSignals[tab] || {}).tiles || [],
               }}/>}
               {tab==='finance'&&<FinancePage/>}
               {tab==='podcasts'&&(
