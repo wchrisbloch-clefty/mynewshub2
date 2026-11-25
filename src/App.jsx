@@ -8756,7 +8756,7 @@ function AuthModal({ onClose, onSend, status, email, setEmail, userId, onSignOut
 function FeedPage({ cat, ctx }) {
   // J3: hoisted to module scope (stable identity) so App re-renders re-render this
   // page instead of remounting it. App-internal values arrive via one ctx object.
-  const { showAlt = true, activeKw, activeSrc, applyPending, arts, breakingItems, briefingExclude, feedHealth, feeds, followTeam, followedTeams, handleTabChange, health, isSavedFn, isTeamFollowed, isTopicFollowed, kw, kwMatch, lastUpdated, loadCat, loading, myTeams, myTopics, navigate, onRead, onSave, openCustomize, pendingNew, recommended, refreshAll, refreshVoiceSignals, search, setActiveKw, setActiveSrc, setChatContext, setFeeds, setPerspArticle, setSearch, social, sorted, sourceRecs, srcWebLoading, srcWebResults, subcat, tab, teams, toggleTopic, unfollowTeam, urgent, voicesStripFor, webLoading, webResults } = ctx;
+  const { showAlt = true, activeKw, activeSrc, applyPending, arts, breakingItems, briefingExclude, feedHealth, feeds, followTeam, followedTeams, handleTabChange, health, isSavedFn, isTeamFollowed, isTopicFollowed, kw, kwMatch, lastUpdated, loadCat, loading, myTeams, myTopics, navigate, onRead, onSave, openCustomize, pendingNew, recommended, refreshAll, refreshVoiceSignals, search, setActiveKw, setActiveSrc, setChatContext, setFeeds, setPerspArticle, setSearch, social, sorted, sourceRecs, srcWebLoading, srcWebResults, subcat, tab, teams, toggleTopic, unfollowTeam, urgent, voicesStripFor, webLoading, webResults, trendingHas } = ctx;
     dbgRender('FeedPage'); // J1: render counter
     useEffect(() => dbgMount('FeedPage'), []); // J1: remount counter
     const cc=CATS[cat];
@@ -9157,8 +9157,8 @@ function FeedPage({ cat, ctx }) {
       // Pool = the score-ordered feed minus the Top-now rows (dedupedFeed already excludes Top Stories
       // / Breaking / State of Play / Houston); Also-moving's own keys are excluded from Latest below.
       const pool = dedupedFeed.filter(a => !topNowSet.has(a.link || a));
-      return selectAlsoMoving(pool, { storyKey, kwMatch, cat, followedTeams });
-    }, [dedupedFeed, topNowSet, cat, activeKw, activeSrc, search, rankV2, followedTeams, kwMatch]);
+      return selectAlsoMoving(pool, { storyKey, kwMatch, cat, followedTeams, trendingHas });
+    }, [dedupedFeed, topNowSet, cat, activeKw, activeSrc, search, rankV2, followedTeams, kwMatch, trendingHas]);
     const alsoMovingKeys = useMemo(() => new Set(alsoMovingRows.map(r => storyKey(r.item))), [alsoMovingRows]);
 
     // ── COVERAGE GAP (folded into State of Play) — widely-covered stories none of the
@@ -9986,6 +9986,18 @@ export default function App() {
     import('./modules/voices/seeds').then(m => { if (alive) setSeedBase(m.SEED_VOICES || []); }).catch(() => {});
     return () => { alive = false; };
   }, [showPanel, seedBase.length]);
+  // AG4: load trending tokens ONCE, AFTER first paint (idle), via the existing /api/feed proxy. Stored
+  // as a bound predicate so the (lazy) trending module stays out of the initial chunk. Fail-soft.
+  const [trendingHas, setTrendingHas] = useState(null);
+  useEffect(() => {
+    let alive = true;
+    const run = () => import('./modules/trending').then(async m => {
+      const toks = m.trendTokens(await m.fetchTrending(fetchRSS));
+      if (alive && toks.size) setTrendingHas(() => (a) => m.isTrending(a, toks));
+    }).catch(() => {});
+    const idle = typeof requestIdleCallback === 'function' ? requestIdleCallback(run) : setTimeout(run, 1500);
+    return () => { alive = false; if (typeof cancelIdleCallback === 'function') cancelIdleCallback(idle); };
+  }, []);
   const [panelInitial, setPanelInitial] = useState({tab:'keywords',cat:'general'});
   const [activeKw, setActiveKw]     = useState(null);
   const [activeSrc, setActiveSrc]   = useState(null);
@@ -11054,7 +11066,7 @@ export default function App() {
                 onSave, openCustomize, pendingNew, recommended, refreshAll, refreshVoiceSignals, search,
                 setActiveKw, setActiveSrc, setChatContext, setFeeds, setPerspArticle, setSearch, social,
                 sorted, sourceRecs, srcWebLoading, srcWebResults, subcat, tab, teams, toggleTopic,
-                unfollowTeam, urgent, voicesStripFor, webLoading, webResults,
+                unfollowTeam, urgent, voicesStripFor, webLoading, webResults, trendingHas,
               }}/>}
               {tab==='finance'&&<FinancePage/>}
               {tab==='podcasts'&&(

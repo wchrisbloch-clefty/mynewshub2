@@ -33,6 +33,11 @@ const p = (t) => art('CNBC Top News', t, { _clusterSize: 2, _clusterSources: ['C
 rows = selectAlsoMoving([p('Alpha story moves widely today'), p('Beta story moves widely today'), p('Gamma story moves widely today')], { storyKey: sk });
 ok(rows.length === 2, 'at most 2 per publisher');
 
+// (b) AG4 trending: a single-outlet story flagged by trendingHas → "Trending" chip
+const trend = art('NPR News', 'A single-outlet story that happens to be trending now');
+rows = selectAlsoMoving([trend], { storyKey: sk, trendingHas: (a) => /trending/i.test(a.title) });
+ok(rows.length === 1 && rows[0].why === 'Trending', 'trendingHas → "Trending" chip (AG4 hook)');
+
 // fan/alt/local with >=2 DISTINCT ranks qualifies (e.g. a local + a core outlet)
 const mixed = art('KHOU Houston', 'Grid story carried by a core outlet too', { _clusterSize: 2, _clusterSources: ['KHOU Houston', 'Reuters (Google News)'] });
 ok(selectAlsoMoving([mixed], { storyKey: sk }).length === 1, 'local+core (2 distinct ranks) qualifies');
