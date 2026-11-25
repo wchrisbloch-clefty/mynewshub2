@@ -82,6 +82,7 @@ function XPulse(props) { return <Suspense fallback={null}><XPulseLazy {...props}
 import { selectStateOfPlay } from './modules/state-of-play/select.js';
 import { rankHomeTop } from './modules/top-stories/select';
 import { scoreStory, rankMode, coverageOf, isAlt as isAltSource } from './modules/ranking';
+import { selectAlsoMoving } from './modules/also-moving/select'; // AG3
 import { anyWholeWord } from './modules/text-match';
 import { TopicTag } from './modules/topic-tag';
 import { CatIcon, SHOW_CHIP_ICONS } from './modules/cat-icon';
@@ -117,6 +118,8 @@ export const prefetchPage = (name) => { const f = PAGE_IMPORTERS[name]; if (f) f
 const prefetchCustomize = () => import('./modules/customize/CustomizePanel');
 // AG2: "Right now across outlets" glance — lazy (not first paint).
 const AcrossOutlets = lazy(() => import('./modules/across-outlets/AcrossOutlets').then(m => ({ default: m.AcrossOutlets })));
+// AG3: "Also moving" strip — lazy (not first paint).
+const AlsoMoving = lazy(() => import('./modules/also-moving/AlsoMoving').then(m => ({ default: m.AlsoMoving })));
 const prefetchLazy = () => { import('./modules/concierge'); import('./modules/voices/ResolveModal'); import('./modules/x-pulse'); import('./modules/analyze/AnalyzePanel'); import('./modules/reader/ArticleReader'); prefetchCustomize(); Object.values(PAGE_IMPORTERS).forEach(f => f()); };
 // Icons: single set (lucide-react), fixed size per context — item 7.
 import { Settings, RefreshCw, Moon, Sun, User,
@@ -8838,9 +8841,9 @@ function FeedPage({ cat, ctx }) {
       downstream: ['downstream','refinery','refining','petrochemical','gasoline','diesel','crack spread','fuel retail','refined products'],
       datacenter: ['data center','datacenter','data-center','hyperscale','ai power','powering ai','load growth','grid demand','server farm','ppa'],
       power:   ['power','electric','grid','utility','electricity','megawatt','kilowatt','nuclear','coal','natural gas','transmission','substation','generation','powerplant','baseload'],
-      oilgas:  ['oil','gas','petroleum','crude','refinery','pipeline','opec','brent','wti','shale','drilling','rig','barrel','lng','upstream','downstream','midstream','gasoline'],
-      clean:   ['solar','wind','renewable','clean energy','green','battery','storage','ev','electric vehicle','hydrogen','carbon','emissions','climate','sustainability','net zero','offshore wind'],
-      markets: ['commodity','commodities','futures','spot price','energy prices','gas prices','oil prices','supply','demand','export','import','petrochemical','inflation energy'],
+      oilgas:  ['oil','gas','petroleum','crude','refinery','pipeline','opec','brent','wti','shale','drilling','rig','barrel','lng','gasoline'],
+      clean:   ['solar','wind','renewable','clean energy','green','battery','storage','ev','hydrogen','carbon','emissions','climate','sustainability','net zero','offshore wind'],
+      markets: ['commodity','commodities','futures','spot price','energy prices','gas prices','oil prices','supply','demand','export','import'],
       policy:  ['policy','regulation','epa','federal','congress','legislation','tariff','subsidy','permit','department of energy','doe','ferc','administration','executive order','climate bill'],
     };
     // AF2.1: Tech chips. "Stay current" gathers the AF5 daily-digest feeds by source name (they carry
@@ -8854,10 +8857,10 @@ function FeedPage({ cat, ctx }) {
       { key:'startups',    label:'Startups',      icon:Leaf },
     ];
     const TECH_KWS = {
-      aimodels:['ai model','llm','gpt','gemini','claude','llama','mistral','fine-tune','benchmark','open weights','frontier model','multimodal','inference','anthropic','openai'],
-      bigtech: ['apple','google','microsoft','amazon','meta','nvidia','antitrust','big tech','alphabet'],
-      chips:   ['chip','semiconductor','gpu','tsmc','foundry','wafer','data center','hbm','asml','fab','node','lithography'],
-      startups:['startup','seed round','series a','series b','venture','funding round','valuation','founder','raise','vc','y combinator'],
+      aimodels:['ai model','llm','gpt','gemini','claude','llama','mistral','benchmark','frontier model','multimodal','anthropic','openai'],
+      bigtech: ['apple','google','microsoft','amazon','meta','nvidia','antitrust','alphabet'],
+      chips:   ['chip','semiconductor','gpu','tsmc','foundry','wafer','data center','hbm','asml'],
+      startups:['startup','seed round','series a','series b','venture','funding round','valuation','founder','raise'],
     };
     const TECH_STAYCURRENT_SRC = new Set(['TLDR AI','Hugging Face','Import AI','Latent Space']);
 
@@ -9143,6 +9146,19 @@ function FeedPage({ cat, ctx }) {
       return [...dedupedFeed.filter(inTop), ...dedupedFeed.filter(a => !inTop(a))];
     }, [dedupedFeed, topNowSet, rankV2]);
     const topNowN = rankV2 ? topNowSet.size : 0;
+    // AG3: "Also moving" — behind-the-scenes stories that aren't in Top now or any outlet's glance
+    // lead. Computed here (not in the component) so its keys can be excluded from Latest. Pool is the
+    // score-ordered feed (already minus Top Stories / Breaking / SoP / Houston); we further exclude
+    // the Top-now rows and the glance's pinned leads. Keyword/team qualify now; trending (AG4) and
+    // voice flags (AG5) feed in later via trendingHas/voiceFlag.
+    const alsoMovingRows = useMemo(() => {
+      if (activeKw || activeSrc || search || !rankV2) return [];
+      // Pool = the score-ordered feed minus the Top-now rows (dedupedFeed already excludes Top Stories
+      // / Breaking / State of Play / Houston); Also-moving's own keys are excluded from Latest below.
+      const pool = dedupedFeed.filter(a => !topNowSet.has(a.link || a));
+      return selectAlsoMoving(pool, { storyKey, kwMatch, cat, followedTeams });
+    }, [dedupedFeed, topNowSet, cat, activeKw, activeSrc, search, rankV2, followedTeams, kwMatch]);
+    const alsoMovingKeys = useMemo(() => new Set(alsoMovingRows.map(r => storyKey(r.item))), [alsoMovingRows]);
 
     // ── COVERAGE GAP (folded into State of Play) — widely-covered stories none of the
     //    reader's own sources carried. Home keys off this category; the merged
@@ -9456,11 +9472,13 @@ function FeedPage({ cat, ctx }) {
                   {!activeKw && !activeSrc && !search && (
                     <Suspense fallback={null}><AcrossOutlets items={rawItems} cat={cat} showAlt={showAlt} onRead={onRead} formatDate={fmtDate}/></Suspense>
                   )}
-                  {(activeKw||activeSrc||search ? feedItems.slice(0,20) : orderedFeed.slice(0,20)).map((a,i)=>{
+                  {(activeKw||activeSrc||search ? feedItems.slice(0,20) : orderedFeed.filter(a=>!alsoMovingKeys.has(storyKey(a))).slice(0,20)).map((a,i)=>{
                     const showSplit = !activeKw && !activeSrc && !search && rankV2 && topNowN > 0;
                     return (
                     <Fragment key={a.link||i}>
                       {showSplit && i===0 && <span className="eyebrow feed-rank-eyebrow">Top now</span>}
+                      {/* AG3: "Also moving" sits under Top now, before Latest (lazy). */}
+                      {showSplit && i===topNowN && <Suspense fallback={null}><AlsoMoving rows={alsoMovingRows} onRead={onRead} formatDate={fmtDate}/></Suspense>}
                       {showSplit && i===topNowN && <span className="eyebrow feed-rank-eyebrow">Latest</span>}
                       <SnapshotCard a={a} meta={CATS[cat]||CATS.general} isSaved={isSavedFn(a)} onSave={onSave} onRead={onRead} onPerspectives={setPerspArticle} onAsk={setChatContext} formatDate={fmtDate} opinionLabel={opinionLabel(a)} hideImage={i>=3} lead={false}/>
                       {i===2 && <XPulse topic={cc?.label||cat} variant="feed"/>}
