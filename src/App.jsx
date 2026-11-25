@@ -343,7 +343,7 @@ const DEFAULT_FEEDS = {
     { name:'CNN',               url:'http://rss.cnn.com/rss/cnn_topstories.rss',                                on:true, _ae:true },
     { name:'The New York Times',url:'https://rss.nytimes.com/services/xml/rss/nyt/HomePage.xml',                on:true, _ae:true },
     { name:'Wall Street Journal', url:'https://feeds.content.dowjones.io/public/rss/RSSWorldNews',              on:true, _ae:true },
-    { name:'Politico',          url:'https://www.politico.com/rss/politicopicks.xml',                           on:true, _ae:true },
+    { name:'Politico',          url:'https://rss.politico.com/politics-news.xml',                               on:true, _ae:true },
     { name:'Google News — Top stories', url:'https://news.google.com/rss?hl=en-US&gl=US&ceid=US:en',            on:true, _ae:true, tier:'inferred' },
     // ALT lane (AE1.3b) — "alternative perspective", never leads/breaks/raises a tier.
     { name:'The Daily Wire',    url:'https://www.dailywire.com/feeds/rss.xml',                                  on:true, _ae:true, _alt:true },
@@ -432,7 +432,7 @@ const DEFAULT_FEEDS = {
     { name:'Natural Gas Intelligence', url:'https://www.naturalgasintel.com/feed/',                             on:true, _ae:true, sub:'midstream' },
     { name:'Hydrocarbon Processing', url:'https://www.hydrocarbonprocessing.com/rss',                           on:true, _ae:true, sub:'downstream' },
     { name:'EIA Today in Energy',   url:'https://www.eia.gov/rss/todayinenergy.xml',                             on:true, _ae:true, tier:'verified', sub:'policy' },
-    { name:'American Petroleum Institute (Google News)', url:'https://news.google.com/rss/search?q=when:3d%20site:api.org&hl=en-US&gl=US&ceid=US:en', on:true, _ae:true, sub:'policy' },
+    { name:'American Petroleum Institute (Google News)', url:'https://news.google.com/rss/search?q=%22American%20Petroleum%20Institute%22%20when:7d&hl=en-US&gl=US&ceid=US:en', on:true, _ae:true, sub:'policy' }, // AG1: name search (site:api.org returned nothing)
     // ── AF5: energy trade depth. World Oil + OGJ serve application/rss+xml 200 (publisher-listed
     //   feed URLs), item-level pending CB's device Source test → UNVERIFIED (no tier). The app
     //   encodeURIComponent()s the URL once, so the raw OGJ `input={...}` is stored literally.
@@ -464,7 +464,7 @@ const DEFAULT_FEEDS = {
     { name:'Ars Technica',      url:'https://feeds.arstechnica.com/arstechnica/index',            on:true },
     { name:'VentureBeat',       url:'https://venturebeat.com/feed/',                              on:true },
     { name:'MIT Tech Review',   url:'https://www.technologyreview.com/feed/',                     on:true },
-    { name:'Hacker News',       url:'https://news.ycombinator.com/rss',                           on:true,  tier:'inferred' },
+    { name:'Hacker News',       url:'https://hnrss.org/frontpage',                                on:true,  tier:'inferred' }, // AG1: hnrss (news.ycombinator.com/rss blocked on device)
     { name:'IEEE Spectrum',     url:'https://spectrum.ieee.org/feeds/feed.rss',                   on:true },
     { name:'9to5Google',        url:'https://9to5google.com/feed/',                               on:false },
     { name:'9to5Mac',           url:'https://9to5mac.com/feed/',                                  on:false },
@@ -871,26 +871,35 @@ async function fetchWithTimeout(url, ms=8000, opts={}) {
   const timer = setTimeout(() => ctrl.abort(), ms);
   try { return await fetch(url, {...opts, signal:ctrl.signal}); } finally { clearTimeout(timer); }
 }
-async function fetchRSS(url) {
+// AG1: Google News `site:` search is the reliable fallback for a publisher whose own RSS blocks or
+// 404s — every GNews site:/topic feed we added LOADED on CB's device. Derived from the primary host.
+function gnewsFallback(url) {
+  try {
+    const h = new URL(url).hostname.replace(/^www\./, '');
+    if (!h || h.includes('news.google.com')) return ''; // never fall back GNews → GNews
+    return `https://news.google.com/rss/search?q=when:2d%20site:${h}&hl=en-US&gl=US&ceid=US:en`;
+  } catch { return ''; }
+}
+async function fetchRSS(url, fallbackUrl) {
   // ONE first-party fetch path: /api/feed (browser UA + retry, robust server-side
   // parse for RSS / Atom / JSON / link-in-guid). It always returns 200 with
   // { items, error?, status } so we can surface the real upstream status.
-  //
-  // The old /api/rss stage was removed: it re-fetched the SAME host with the SAME
-  // UA whenever /api/feed parsed empty, doubling function invocations and rate-limit
-  // exposure for zero benefit now that the server parser matches the client one.
   let lastStatus = 0;
   try {
     const r = await fetchWithTimeout(`/api/feed?url=${encodeURIComponent(url)}`, 12000);
-    if (r.ok) { const d = await r.json(); if (d.items?.length) return {items:d.items, reason:'', status:200}; if (d.status) lastStatus = d.status; }
+    if (r.ok) { const d = await r.json(); if (d.items?.length) return {items:d.items, reason:'', status:200, usedFallback:false}; if (d.status) lastStatus = d.status; }
   } catch {}
-  // Last resort only: a public CORS proxy — a genuinely different host/network path,
-  // so it can succeed where our own egress is blocked. Not a same-host refetch.
-  try {
-    const r = await fetchWithTimeout(`https://api.allorigins.win/get?url=${encodeURIComponent(url)}`);
-    if (r.ok) { const d = await r.json(); if (d.contents) { const items = parseXML(d.contents); if (items.length) return {items, reason:'', status:200}; } }
-  } catch {}
-  return {items:[], reason:`unavailable${lastStatus?` (${lastStatus})`:''}`, status:lastStatus};
+  // AG1: ONE fallback attempt through the SAME proxy — an explicit per-feed fallbackUrl, else the
+  // Google News site: search. Items keep the feed's original `name`, so rank/sub/alt still apply; the
+  // source is flagged `via Google News` for the Test report.
+  const fb = fallbackUrl || gnewsFallback(url);
+  if (fb && fb !== url) {
+    try {
+      const r = await fetchWithTimeout(`/api/feed?url=${encodeURIComponent(fb)}`, 8000);
+      if (r.ok) { const d = await r.json(); if (d.items?.length) return {items:d.items, reason:'', status:200, usedFallback:true, via:'Google News'}; }
+    } catch {}
+  }
+  return {items:[], reason:`unavailable${lastStatus?` (${lastStatus})`:''}`, status:lastStatus, usedFallback:false};
 }
 
 // ─── FORMATTERS ───────────────────────────────────────────────────────────────
@@ -10068,10 +10077,10 @@ export default function App() {
     setLoading(l=>({...l,[cat]:true}));
     const results=[],hUpdates={},fhUpdates={};
     await Promise.allSettled((feeds[cat]||[]).filter(f=>f.on).map(async f=>{
-      const t0=Date.now();const{items,status,reason}=await fetchRSS(f.url);const ms=Date.now()-t0;
+      const t0=Date.now();const{items,status,reason,usedFallback}=await fetchRSS(f.url,f.fallbackUrl);const ms=Date.now()-t0;
       const ok=items.length>0;
       hUpdates[f.name]=ok?(ms<4000?'green':'yellow'):'red';
-      fhUpdates[f.name]={code:status||0, ok, reason:reason||''};
+      fhUpdates[f.name]={code:status||0, ok, reason:reason||'', usedFallback:!!usedFallback};
       items.forEach(i=>{if(i.title&&i.link)results.push({...i,source:f.name,cat,_tier:f.tier||'reported'});});
     }));
     setHealth(h=>({...h,...hUpdates}));
@@ -10092,7 +10101,7 @@ export default function App() {
   const fetchCatArticles = useCallback(async (cat)=>{
     const results=[];
     await Promise.allSettled((feeds[cat]||[]).filter(f=>f.on).map(async f=>{
-      const {items}=await fetchRSS(f.url);
+      const {items}=await fetchRSS(f.url,f.fallbackUrl);
       items.forEach(i=>{if(i.title&&i.link)results.push({...i,source:f.name,cat,_tier:f.tier||'reported'});});
     }));
     results.sort((a,b)=>new Date(b.pubDate)-new Date(a.pubDate));
@@ -11061,7 +11070,7 @@ export default function App() {
         />
 
         {showPanel&&<Suspense fallback={null}><CustomizePanel feeds={feeds} kw={kw} alerts={alerts} urgent={urgent}
-          aeAdded={Number(ld('feedsAEAdded',0))||0} showAlt={showAlt} onToggleAlt={toggleShowAlt}
+          aeAdded={Number(ld('feedsAEAdded',0))||0} showAlt={showAlt} onToggleAlt={toggleShowAlt} fetchRSS={fetchRSS}
           social={social} watchlist={watchlist} teams={teams} health={health} arts={arts}
           weatherCities={weatherCities} hiddenIndices={hiddenIndices}
           briefingExclude={briefingExclude}

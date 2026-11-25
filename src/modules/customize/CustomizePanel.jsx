@@ -6,8 +6,10 @@
 // the global .cp-* rules. Lazy-loaded + idle/hover-prefetched by App (fallback null — a
 // prefetched overlay, same convention as the other lazy modals).
 import { useState } from 'react';
-import { ChevronDown, X as XIcon } from 'lucide-react';
+import { ChevronDown, X as XIcon, CheckSquare, Square } from 'lucide-react';
 import { VOICE_PLATFORMS } from '../voices/model';
+import { rankOf } from '../ranking'; // AG1.3: source rank for the Test-all report
+import './CustomizePanel.css'; // AG1.3/AG6.1: lazy-chunk styles (kept out of initial GLOBAL_CSS)
 
 // Moved from App with the panel (its only consumer).
 const CAT_LABELS = { general: 'News', sports: 'Sports', business: 'Business', finance: 'Markets', bloom: 'Energy', tech: 'AI & Tech', popculture: 'Pop Culture', comedy: 'Comedy' };
@@ -15,7 +17,7 @@ const PLAT_LABELS = { twitter: '𝕏', linkedin: 'in', instagram: 'IG', youtube:
 
 export function CustomizePanel({feeds, kw, alerts, urgent, social, watchlist, teams, health, arts, weatherCities, hiddenIndices, briefingExclude, briefingSources, initialTab, initialCat, onClose, onSave,
   voices, onAddVoice, removeVoiceById, reorderVoice, onResolveVoice, onTestVoices, voicesTest, searchKeyPresent,
-  seedQueue, onAcceptSeed, onSkipSeed, onFindVoices, aeAdded = 0, showAlt = true, onToggleAlt,
+  seedQueue, onAcceptSeed, onSkipSeed, onFindVoices, aeAdded = 0, showAlt = true, onToggleAlt, fetchRSS,
   CATS, INDICES, DEFAULT_WEATHER_CITIES, DEFAULT_SOCIAL, BRIEFING_PRIORITY_SOURCES, SOCIAL_META}) {
   const [lf, setLf] = useState(JSON.parse(JSON.stringify(feeds)));
   const [lk, setLk] = useState(JSON.parse(JSON.stringify(kw)));
@@ -58,6 +60,40 @@ export function CustomizePanel({feeds, kw, alerts, urgent, social, watchlist, te
     setTestState(s=>({...s,[key]:'loading'}));
     const {items,reason} = await fetchRSS(url);
     setTestState(s=>({...s,[key]:items.length>0?`ok:${items.length} articles`:`fail:${reason||'empty'}`}));
+  };
+
+  // AG1.3: Test EVERY enabled feed across ALL categories (concurrency <=6). Runs ONLY on tap — no
+  // network on panel open. Uses the existing /api/feed proxy via fetchRSS (incl. the AG1 fallback),
+  // so a feed that only works "via Google News" is reported as such. No secrets in the report.
+  const [testAll, setTestAll] = useState({ running:false, done:0, total:0, rows:[] });
+  const [copied, setCopied] = useState(false);
+  const runTestAll = async () => {
+    const jobs = [];
+    for (const cat of Object.keys(lf)) for (const f of (lf[cat]||[])) if (f && f.on && f.url) jobs.push({ cat, f });
+    setTestAll({ running:true, done:0, total:jobs.length, rows:[] });
+    let done = 0, i = 0;
+    const worker = async () => {
+      while (i < jobs.length) {
+        const { cat, f } = jobs[i++];
+        const t0 = Date.now();
+        let r; try { r = await fetchRSS(f.url, f.fallbackUrl); } catch { r = { items:[], reason:'error', status:0 }; }
+        const row = { cat, name:f.name, items:(r.items||[]).length, code:r.status||0, reason:r.reason||'',
+          usedFallback:!!r.usedFallback, via:r.via||'', rank:rankOf(f.name), sub:f.sub||'', alt:!!f._alt, ms:Date.now()-t0 };
+        done++;
+        setTestAll(s => ({ ...s, done, rows:[...s.rows, row] }));
+      }
+    };
+    await Promise.all(Array.from({ length: Math.min(6, jobs.length) }, worker));
+    setTestAll(s => ({ ...s, running:false }));
+  };
+  const copyTestReport = () => {
+    const rows = testAll.rows.slice().sort((a,b)=> a.cat.localeCompare(b.cat) || a.name.localeCompare(b.name));
+    const report = {
+      generatedAt: new Date().toISOString(),
+      summary: { total: rows.length, ok: rows.filter(r=>r.items>0).length, failed: rows.filter(r=>r.items===0).length, viaFallback: rows.filter(r=>r.usedFallback).length },
+      feeds: rows.map(r => ({ feed:r.name, category:CAT_LABELS[r.cat]||r.cat, status:r.items>0?'ok':'fail', items:r.items, code:r.code, reason:r.reason, usedFallback:r.usedFallback, via:r.via, rank:r.rank, sub:r.sub, alt:r.alt })),
+    };
+    try { navigator.clipboard.writeText(JSON.stringify(report, null, 2)); setCopied(true); setTimeout(()=>setCopied(false), 1500); } catch {}
   };
   const addSource = () => {
     if (!newName.trim()||!newUrl.trim()) return;
@@ -147,8 +183,38 @@ export function CustomizePanel({feeds, kw, alerts, urgent, social, watchlist, te
               {aeAdded > 0 && <div className="cp-desc"><strong>{aeAdded} source{aeAdded===1?'':'s'} added this update</strong> — test them below.</div>}
               {onToggleAlt && (
                 <button className="cp-btn-sec cp-alt-toggle" onClick={onToggleAlt} role="switch" aria-checked={showAlt}>
-                  {showAlt ? '☑' : '☐'} Show alternative perspective
+                  {/* AG6.1: real SVG checkbox — the old ☑/☐ unicode glyphs rendered as an empty
+                      square on CB's device (font lacked them). Default ON. */}
+                  {showAlt ? <CheckSquare size={15} aria-hidden="true"/> : <Square size={15} aria-hidden="true"/>}
+                  <span>Show alternative perspective</span>
                 </button>
+              )}
+              {/* AG1.3: Test ALL sources across every category — one tap, concurrency <=6, no network
+                  on open. Live grouped pass/fail + Copy report (plain JSON, no secrets). */}
+              <div className="cp-testall">
+                <button className="cp-btn-sec" onClick={runTestAll} disabled={testAll.running}>
+                  {testAll.running ? `Testing ${testAll.done}/${testAll.total}…` : 'Test all sources'}
+                </button>
+                {testAll.rows.length>0 && !testAll.running && (
+                  <button className="cp-btn-sec" onClick={copyTestReport}>{copied ? 'Copied ✓' : 'Copy report'}</button>
+                )}
+              </div>
+              {testAll.rows.length>0 && (
+                <div className="cp-testall-results">
+                  <div className="cp-desc"><strong>{testAll.rows.filter(r=>r.items>0).length}</strong> loaded · <strong>{testAll.rows.filter(r=>r.items===0).length}</strong> failed · <strong>{testAll.rows.filter(r=>r.usedFallback).length}</strong> via Google News</div>
+                  {Object.keys(CAT_LABELS).filter(c=>testAll.rows.some(r=>r.cat===c)).map(c=>(
+                    <div key={c} className="cp-testall-cat">
+                      <div className="cp-testall-cathead">{CAT_LABELS[c]}</div>
+                      {testAll.rows.filter(r=>r.cat===c).map((r,j)=>(
+                        <div key={j} className="cp-testall-row">
+                          <span className={`cp-health ${r.items>0?(r.usedFallback?'cp-h-yellow':'cp-h-green'):'cp-h-red'}`}/>
+                          <span className="cp-testall-name">{r.name}</span>
+                          <span className="cp-testall-stat">{r.items>0 ? `${r.items} items${r.usedFallback?' · via Google News':''}` : (r.reason||`fail${r.code?` (${r.code})`:''}`)}</span>
+                        </div>
+                      ))}
+                    </div>
+                  ))}
+                </div>
               )}
               <div className="cp-cat-tabs">{Object.keys(CAT_LABELS).map(c=><button key={c} className={`cp-cat-tab ${srcTab===c?'active':''}`} onClick={()=>setSrcTab(c)}>{CAT_LABELS[c]}</button>)}</div>
               <div className="cp-legend">
