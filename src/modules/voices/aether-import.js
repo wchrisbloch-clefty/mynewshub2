@@ -42,6 +42,16 @@ export const AETHER_PEOPLE = [
   { name: 'Michael Button',  type: 'person', category: 'popculture', platform: 'youtube', handle: 'MichaelButton1', parkedFrom: 'ancient-mysteries' },
 ];
 
+// AG5.2: X-only voices surfaced in the import sheet for CB to confirm alongside the AetherHub people.
+// ZeroHedge / Watcher Guru carry CB-named handles; The Hormuz Letter is the Voices FINDER candidate
+// (@HormuzLetter, the one consistent match across 6 sources) — flagged `candidate` so the sheet asks
+// CB to confirm it, never auto-stored.
+export const AETHER_X_VOICES = [
+  { name: 'ZeroHedge',         type: 'org', category: 'business', platform: 'x', handle: '@zerohedge' },
+  { name: 'Watcher Guru',      type: 'org', category: 'business', platform: 'x', handle: '@WatcherGuru' },
+  { name: 'The Hormuz Letter', type: 'org', category: 'bloom',    platform: 'x', handle: '@HormuzLetter', candidate: true },
+];
+
 // Topic watches from AetherHub (CB's category keyword watches, e.g. ERCOT) — AG5.3 surfaces a
 // "Watching: ERCOT" row on Energy. Kept minimal here; extend from CATEGORIES when AG5.3 lands.
 export const AETHER_TOPIC_WATCHES = [

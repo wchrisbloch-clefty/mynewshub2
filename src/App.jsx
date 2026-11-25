@@ -52,7 +52,8 @@ import { DEBUG, dbgRender, dbgPoll, dbgMount, dbgSwipe, DebugOverlay } from './m
 import { evaluateSwipe } from './modules/swipe-gesture';
 import { useScores, configureScores, loadScores as loadScoresStore, anyLiveGame } from './state';
 import { makeVoice, upsertVoice, removeVoice as removeVoiceModel, mergeVoices, clearTombstone, voiceId, VOICE_PLATFORMS } from './modules/voices/model';
-import { SEED_VOICES } from './modules/voices/seeds';
+// AG5: SEED_VOICES + the AetherHub roster are loaded lazily (see seedBase) so they stay OUT of the
+// initial chunk — freeing room under the +1.1% cap for AG5.2/AG5.3/AG4.
 // G4: code-split heavy, not-needed-at-first-paint surfaces. Home is never lazy.
 // ChatBot is always mounted but not first-paint; ResolveModal is rare.
 // AE2 bundle offset: the rail ConnectionsStrip (one use, below the fold) is split off the initial
@@ -9769,6 +9770,22 @@ export default function App() {
     setVoiceTombstones(prev => { const n = clearTombstone(prev, v.id); sv('voiceTombstones', n); return n; });
     setVoices(prev => { const n = upsertVoice(prev, v); sv('voices', n); return n; });
   }, []);
+  // AG5.2: Import from AetherHub — create CONFIRMED voices (handles set, confirmedBy:'aetherhub-import')
+  // from the roster rows CB confirms. Batched so "Confirm all" is one update. Clears any tombstone.
+  const importAetherVoices = useCallback((people) => {
+    if (!people || !people.length) return;
+    setVoices(prev => {
+      let out = prev;
+      for (const p of people) {
+        const handles = p.platform === 'youtube' ? { youtube: p.handle } : { x: p.handle };
+        const v = makeVoice({ type: p.type, name: p.name, category: p.category, handles, status: 'confirmed', confirmedAt: Date.now() });
+        v.confirmedBy = 'aetherhub-import';
+        out = upsertVoice(out, v);
+      }
+      sv('voices', out); return out;
+    });
+    setVoiceTombstones(prev => { let n = prev; for (const p of people) n = clearTombstone(n, voiceId(p.name, p.type)); sv('voiceTombstones', n); return n; });
+  }, []);
   const removeVoiceById = useCallback((id) => {
     setVoices(prev => { const n = prev.filter(v => v.id !== id); sv('voices', n); return n; });
     setVoiceTombstones(prev => prev.includes(id) ? prev : (() => { const n = [...prev, id]; sv('voiceTombstones', n); return n; })());
@@ -9905,14 +9922,16 @@ export default function App() {
   }, []);
   // The review queue: name-only suggestions (E4 list) + migrated social, minus anything
   // already added or tombstoned (Skip tombstones so it won't re-suggest).
+  // AG5: SEED_VOICES is lazy-loaded into seedBase (below) so it is not in the initial chunk.
+  const [seedBase, setSeedBase] = useState([]);
   const seedQueue = useMemo(() => {
     const added = new Set((voices || []).map(v => v.id));
     const tomb = new Set(voiceTombstones || []);
-    const all = [...SEED_VOICES.map(s => ({ ...makeVoice(s), _parkedFrom: s._parkedFrom })), ...migratedSocialSeeds];
+    const all = [...seedBase.map(s => ({ ...makeVoice(s), _parkedFrom: s._parkedFrom })), ...migratedSocialSeeds];
     const seen = new Set(), out = [];
     for (const v of all) { if (seen.has(v.id) || added.has(v.id) || tomb.has(v.id)) continue; seen.add(v.id); out.push(v); }
     return out;
-  }, [voices, voiceTombstones, migratedSocialSeeds]);
+  }, [voices, voiceTombstones, migratedSocialSeeds, seedBase]);
   const skipSeed = useCallback((id) => {
     setVoiceTombstones(prev => prev.includes(id) ? prev : (() => { const n = [...prev, id]; sv('voiceTombstones', n); return n; })());
   }, []);
@@ -9959,6 +9978,14 @@ export default function App() {
   const [activePod, setActivePod]   = useState(null);
   const [podLimit, setPodLimit]     = useState(20); // episodes shown; "Load more" adds 20. App-level so it survives PodcastsPage remounts.
   const [showPanel, setShowPanel]   = useState(false);
+  // AG5: load the seed roster lazily (SEED_VOICES + AetherHub) the first time the Customize panel is
+  // opened — keeps both out of the initial chunk. Idempotent; the seed queue fills in once loaded.
+  useEffect(() => {
+    if (!showPanel || seedBase.length) return;
+    let alive = true;
+    import('./modules/voices/seeds').then(m => { if (alive) setSeedBase(m.SEED_VOICES || []); }).catch(() => {});
+    return () => { alive = false; };
+  }, [showPanel, seedBase.length]);
   const [panelInitial, setPanelInitial] = useState({tab:'keywords',cat:'general'});
   const [activeKw, setActiveKw]     = useState(null);
   const [activeSrc, setActiveSrc]   = useState(null);
@@ -11105,7 +11132,7 @@ export default function App() {
           briefingSources={briefingSources}
           initialTab={panelInitial.tab} initialCat={panelInitial.cat}
           voices={voices} onAddVoice={addOrUpdateVoice} removeVoiceById={removeVoiceById} reorderVoice={reorderVoice}
-          onResolveVoice={resolveVoiceFlow} seedQueue={seedQueue} onAcceptSeed={resolveVoiceFlow} onSkipSeed={skipSeed} onFindVoices={findVoices}
+          onResolveVoice={resolveVoiceFlow} seedQueue={seedQueue} onAcceptSeed={resolveVoiceFlow} onSkipSeed={skipSeed} onFindVoices={findVoices} onImportAether={importAetherVoices}
           onTestVoices={testVoices} voicesTest={voicesTest} searchKeyPresent={false}
           CATS={CATS} INDICES={INDICES} DEFAULT_WEATHER_CITIES={DEFAULT_WEATHER_CITIES} DEFAULT_SOCIAL={DEFAULT_SOCIAL}
           BRIEFING_PRIORITY_SOURCES={BRIEFING_PRIORITY_SOURCES} SOCIAL_META={SOCIAL_META}

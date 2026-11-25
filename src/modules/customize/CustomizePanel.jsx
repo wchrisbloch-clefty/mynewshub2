@@ -9,6 +9,7 @@ import { useState } from 'react';
 import { ChevronDown, X as XIcon, CheckSquare, Square } from 'lucide-react';
 import { VOICE_PLATFORMS } from '../voices/model';
 import { rankOf } from '../ranking'; // AG1.3: source rank for the Test-all report
+import { AETHER_PEOPLE, AETHER_X_VOICES } from '../voices/aether-import'; // AG5.2: import roster (lazy)
 import './CustomizePanel.css'; // AG1.3/AG6.1: lazy-chunk styles (kept out of initial GLOBAL_CSS)
 
 // Moved from App with the panel (its only consumer).
@@ -17,7 +18,7 @@ const PLAT_LABELS = { twitter: '𝕏', linkedin: 'in', instagram: 'IG', youtube:
 
 export function CustomizePanel({feeds, kw, alerts, urgent, social, watchlist, teams, health, arts, weatherCities, hiddenIndices, briefingExclude, briefingSources, initialTab, initialCat, onClose, onSave,
   voices, onAddVoice, removeVoiceById, reorderVoice, onResolveVoice, onTestVoices, voicesTest, searchKeyPresent,
-  seedQueue, onAcceptSeed, onSkipSeed, onFindVoices, aeAdded = 0, showAlt = true, onToggleAlt, fetchRSS,
+  seedQueue, onAcceptSeed, onSkipSeed, onFindVoices, onImportAether, aeAdded = 0, showAlt = true, onToggleAlt, fetchRSS,
   CATS, INDICES, DEFAULT_WEATHER_CITIES, DEFAULT_SOCIAL, BRIEFING_PRIORITY_SOURCES, SOCIAL_META}) {
   const [lf, setLf] = useState(JSON.parse(JSON.stringify(feeds)));
   const [lk, setLk] = useState(JSON.parse(JSON.stringify(kw)));
@@ -54,6 +55,11 @@ export function CustomizePanel({feeds, kw, alerts, urgent, social, watchlist, te
   const [vType, setVType] = useState('person');
   const [editVoiceId, setEditVoiceId] = useState(null);
   const [showSeeds, setShowSeeds] = useState(false);
+  // AG5.2: "Import from AetherHub" sheet state
+  const [showImport, setShowImport] = useState(false);
+  const [imported, setImported] = useState(() => new Set());
+  const AETHER_ROSTER = [...AETHER_PEOPLE, ...AETHER_X_VOICES];
+  const doImport = (rows) => { if (onImportAether) onImportAether(rows); setImported(prev => { const n = new Set(prev); rows.forEach(r => n.add(r.name)); return n; }); };
   const VOICE_CATS = ['general','business','bloom','tech','sports','health','popculture'];
 
   const testFeed = async (url, key) => {
@@ -303,6 +309,34 @@ export function CustomizePanel({feeds, kw, alerts, urgent, social, watchlist, te
                   <div className="cp-desc">Suggestions from a web search, labelled <strong>unverified</strong> — you confirm handles yourself. Needs a Firecrawl key.</div>
                 </div>
               )}
+              {/* AG5.2: one-time "Import from AetherHub" sheet — confirm all / each. Names already
+                  confirmed are hidden; handles are stored only on confirm (the Hormuz candidate is
+                  flagged so CB confirms the finder's @HormuzLetter, never auto-stored). */}
+              {onImportAether && (() => {
+                const pending = AETHER_ROSTER.filter(r => !imported.has(r.name));
+                return (
+                  <div className="cp-aether">
+                    <button className="cp-seeds-toggle" onClick={()=>setShowImport(s=>!s)}>
+                      <ChevronDown size={12} aria-hidden="true" className={`cp-chev${showImport?'':' cp-chev-closed'}`}/> Import from AetherHub ({pending.length})
+                    </button>
+                    {showImport && (
+                      <div className="cp-aether-list">
+                        {pending.length>0
+                          ? <button className="cp-btn cp-aether-all" onClick={()=>doImport(pending)}>Confirm all ({pending.length})</button>
+                          : <div className="cp-desc">All imported ✓</div>}
+                        {pending.map(r => (
+                          <div key={r.name} className="cp-aether-row">
+                            <span className="cp-aether-name">{r.name}</span>
+                            <span className="cp-aether-handle">{r.handle}{r.candidate?' · finder candidate':''}</span>
+                            <span className="cp-aether-cat">{(CATS[r.category]||{}).label||r.category}</span>
+                            <button className="cp-test-btn" onClick={()=>doImport([r])}>Confirm</button>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                );
+              })()}
               {onTestVoices && (
                 <div style={{margin:'4px 0 10px'}}>
                   <div style={{display:'flex',gap:'8px',alignItems:'center'}}>

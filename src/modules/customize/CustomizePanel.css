@@ -8,3 +8,15 @@
 .cp-testall-row{display:flex;align-items:center;gap:7px;padding:2px 0;}
 .cp-testall-name{font-size:var(--fs-meta);color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:48%;}
 .cp-testall-stat{font-size:var(--fs-meta);color:var(--text3);margin-left:auto;white-space:nowrap;}
+
+/* AG5.2: Import from AetherHub sheet */
+.cp-aether{margin:6px 0 10px;}
+.cp-aether-list{border:1px solid var(--border);border-radius:var(--radius-md);padding:8px 10px;margin-top:4px;}
+.cp-aether-row{display:flex;align-items:center;gap:8px;padding:3px 0;border-top:1px solid var(--border2);}
+.cp-aether-row:first-child{border-top:none;}
+.cp-aether-name{font-size:var(--fs-meta);font-weight:700;color:var(--text);white-space:nowrap;}
+.cp-aether-handle{font-size:var(--fs-meta);color:var(--text3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;flex:1 1 auto;}
+.cp-aether-cat{font-size:var(--fs-label);color:var(--text3);white-space:nowrap;}
+.cp-chev{vertical-align:-2px;}
+.cp-chev-closed{transform:rotate(-90deg);}
+.cp-aether-all{margin-bottom:8px;}
