@@ -2,7 +2,8 @@
 // fresh browsers. This versioned migration moves ONLY the four Z2 feeds in a SAVED config, preserving
 // each feed's `on` flag, its position, custom feeds and every other user edit. Runs once per device
 // (the host guards on FEEDS_MIG_V), is idempotent, and never touches a feed the user moved back.
-export const FEEDS_MIG_V = 4; // AF5: bumped so devices at v3 pick up the AF5 feed additions (AI
+export const FEEDS_MIG_V = 5; // AG2.2: bumped so devices pick up ESPN + NBC Sports feeds.
+// (prev) AF5: bumped so devices at v3 pick up the AF5 feed additions (AI
 // stay-current + energy trade depth). migrateFeedsAE is add-only/idempotent, so re-running it only
 // appends the new `_ae` feeds; the v3 additions are already present and skipped by url/name.
 

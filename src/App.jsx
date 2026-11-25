@@ -115,6 +115,8 @@ const DesignPage = lazy(() => import('./modules/design-page/DesignPage').then(m 
 const PAGE_IMPORTERS = { podcasts: () => import('./modules/podcasts/PodcastsPage'), sources: () => import('./modules/sources/SourcesPage'), briefing: () => import('./modules/briefing/BriefingPage'), sports: () => import('./modules/sports/SportsPage') };
 export const prefetchPage = (name) => { const f = PAGE_IMPORTERS[name]; if (f) f(); };
 const prefetchCustomize = () => import('./modules/customize/CustomizePanel');
+// AG2: "Right now across outlets" glance — lazy (not first paint).
+const AcrossOutlets = lazy(() => import('./modules/across-outlets/AcrossOutlets').then(m => ({ default: m.AcrossOutlets })));
 const prefetchLazy = () => { import('./modules/concierge'); import('./modules/voices/ResolveModal'); import('./modules/x-pulse'); import('./modules/analyze/AnalyzePanel'); import('./modules/reader/ArticleReader'); prefetchCustomize(); Object.values(PAGE_IMPORTERS).forEach(f => f()); };
 // Icons: single set (lucide-react), fixed size per context — item 7.
 import { Settings, RefreshCw, Moon, Sun, User,
@@ -386,6 +388,9 @@ const DEFAULT_FEEDS = {
     { name:'Sports Illustrated',   url:'https://www.si.com/rss/si_topstories.rss',                              on:true, _ae:true },
     { name:'Bleacher Report',      url:'https://bleacherreport.com/articles/feed',                              on:true, _ae:true },
     { name:'Google News — Sports', url:'https://news.google.com/rss/headlines/section/topic/SPORTS?hl=en-US&gl=US&ceid=US:en', on:true, _ae:true, tier:'inferred' },
+    // AG2.2: general top-headline sports outlets for the "Across outlets" glance.
+    { name:'ESPN',                 url:'https://www.espn.com/espn/rss/news',                                   on:true, _ae:true },
+    { name:'NBC Sports',           url:'https://news.google.com/rss/search?q=when:2d%20site:nbcsports.com&hl=en-US&gl=US&ceid=US:en', on:true, _ae:true, tier:'inferred' },
   ],
   business: [
     // AE1.2: the seven energy/data-center feeds that also live in `bloom` were removed from
@@ -9445,6 +9450,11 @@ function FeedPage({ cat, ctx }) {
                         meta={CATS[cat]||CATS.general} onRead={onRead} onAsk={setChatContext} formatDate={fmtDate}
                         collapsed={sopCollapsed} onToggleCollapse={toggleSop}/>
                     </div>
+                  )}
+                  {/* AG2: "Right now across outlets" glance — at a glance, what each top outlet leads
+                      with. Lazy; only on the main category view (not keyword/source/search). */}
+                  {!activeKw && !activeSrc && !search && (
+                    <Suspense fallback={null}><AcrossOutlets items={rawItems} cat={cat} showAlt={showAlt} onRead={onRead} formatDate={fmtDate}/></Suspense>
                   )}
                   {(activeKw||activeSrc||search ? feedItems.slice(0,20) : orderedFeed.slice(0,20)).map((a,i)=>{
                     const showSplit = !activeKw && !activeSrc && !search && rankV2 && topNowN > 0;
