@@ -5238,6 +5238,10 @@ kbd{display:inline-block;padding:1px 5px;border:1px solid var(--border);border-r
   -webkit-overflow-scrolling:touch;
 }
 .pc-subtabs::-webkit-scrollbar{display:none;}
+/* AG6: at desktop widths (sidebar present) the Energy chip row (AF2.1: 10 chips) must WRAP inside the
+   feed column instead of scrolling — a nowrap scroll row's off-screen chips otherwise extend under the
+   sticky .sidebar (fixed-overlap). Tech/pop-culture rows fit one row, so wrapping is a no-op there. */
+@media(min-width:1024px){ .en-subtabs,.pc-subtabs{flex-wrap:wrap;overflow-x:visible;} }
 /* U4: ONE chip language — 1px --border, transparent fill, pill radius, body/medium, 32px visual
    height. Selected = the single accent fill + on-accent text (set on .active below). */
 .pc-subtab{
