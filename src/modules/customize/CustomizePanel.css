@@ -1,0 +1,28 @@
+/* AG1.3 / AG6.1: styles for the lazy Customize panel's Test-all block + alt toggle. Lives in the
+   lazy CustomizePanel chunk (not the initial GLOBAL_CSS) — tokens only, no new hex. */
+.cp-alt-toggle{display:inline-flex;align-items:center;gap:7px;}
+.cp-testall{display:flex;gap:8px;margin:10px 0 6px;}
+.cp-testall-results{margin:4px 0 10px;border:1px solid var(--border);border-radius:var(--radius-md);padding:8px 10px;}
+.cp-testall-cat{margin-top:6px;}
+.cp-testall-cathead{font-family:var(--font-sans);font-size:var(--fs-label);font-weight:700;letter-spacing:.03em;text-transform:uppercase;color:var(--text3);margin:4px 0 2px;}
+.cp-testall-row{display:flex;align-items:center;gap:7px;padding:2px 0;}
+.cp-testall-name{font-size:var(--fs-meta);color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:48%;}
+.cp-testall-stat{font-size:var(--fs-meta);color:var(--text3);margin-left:auto;white-space:nowrap;}
+
+/* AG5.2: Import from AetherHub sheet */
+.cp-aether{margin:6px 0 10px;}
+.cp-aether-list{border:1px solid var(--border);border-radius:var(--radius-md);padding:8px 10px;margin-top:4px;}
+.cp-aether-row{display:flex;align-items:center;gap:8px;padding:3px 0;border-top:1px solid var(--border2);}
+.cp-aether-row:first-child{border-top:none;}
+.cp-aether-name{font-size:var(--fs-meta);font-weight:700;color:var(--text);white-space:nowrap;}
+.cp-aether-handle{font-size:var(--fs-meta);color:var(--text3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;flex:1 1 auto;}
+.cp-aether-cat{font-size:var(--fs-label);color:var(--text3);white-space:nowrap;}
+.cp-chev{vertical-align:-2px;}
+.cp-chev-closed{transform:rotate(-90deg);}
+.cp-aether-all{margin-bottom:8px;}
+
+/* AH1: Accept-all voices controls */
+.cp-accept-all{display:flex;flex-wrap:wrap;gap:6px;margin:6px 0 8px;}
+.cp-accept-confirm{border:1px solid var(--border);border-radius:var(--radius-md);padding:10px 12px;margin:6px 0 8px;}
+.cp-accept-btns{display:flex;gap:8px;margin-top:8px;}
+.cp-accept-done{display:flex;align-items:center;gap:10px;margin:6px 0 8px;}

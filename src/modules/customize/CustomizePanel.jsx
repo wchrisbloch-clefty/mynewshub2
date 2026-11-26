@@ -6,8 +6,12 @@
 // the global .cp-* rules. Lazy-loaded + idle/hover-prefetched by App (fallback null — a
 // prefetched overlay, same convention as the other lazy modals).
 import { useState } from 'react';
-import { ChevronDown, X as XIcon } from 'lucide-react';
+import { ChevronDown, X as XIcon, CheckSquare, Square } from 'lucide-react';
 import { VOICE_PLATFORMS } from '../voices/model';
+import { rankOf } from '../ranking'; // AG1.3: source rank for the Test-all report
+import { AETHER_PEOPLE, AETHER_X_VOICES } from '../voices/aether-import'; // AG5.2: import roster (lazy)
+import { bulkAccept } from '../voices/bulk-accept'; // AH1: bulk accept-all (lazy chunk)
+import './CustomizePanel.css'; // AG1.3/AG6.1: lazy-chunk styles (kept out of initial GLOBAL_CSS)
 
 // Moved from App with the panel (its only consumer).
 const CAT_LABELS = { general: 'News', sports: 'Sports', business: 'Business', finance: 'Markets', bloom: 'Energy', tech: 'AI & Tech', popculture: 'Pop Culture', comedy: 'Comedy' };
@@ -15,7 +19,7 @@ const PLAT_LABELS = { twitter: '𝕏', linkedin: 'in', instagram: 'IG', youtube:
 
 export function CustomizePanel({feeds, kw, alerts, urgent, social, watchlist, teams, health, arts, weatherCities, hiddenIndices, briefingExclude, briefingSources, initialTab, initialCat, onClose, onSave,
   voices, onAddVoice, removeVoiceById, reorderVoice, onResolveVoice, onTestVoices, voicesTest, searchKeyPresent,
-  seedQueue, onAcceptSeed, onSkipSeed, onFindVoices,
+  seedQueue, onAcceptSeed, onSkipSeed, onFindVoices, onImportAether, onSetVoices, aeAdded = 0, showAlt = true, onToggleAlt, fetchRSS,
   CATS, INDICES, DEFAULT_WEATHER_CITIES, DEFAULT_SOCIAL, BRIEFING_PRIORITY_SOURCES, SOCIAL_META}) {
   const [lf, setLf] = useState(JSON.parse(JSON.stringify(feeds)));
   const [lk, setLk] = useState(JSON.parse(JSON.stringify(kw)));
@@ -52,12 +56,69 @@ export function CustomizePanel({feeds, kw, alerts, urgent, social, watchlist, te
   const [vType, setVType] = useState('person');
   const [editVoiceId, setEditVoiceId] = useState(null);
   const [showSeeds, setShowSeeds] = useState(false);
+  // AG5.2: "Import from AetherHub" sheet state
+  const [showImport, setShowImport] = useState(false);
+  const [imported, setImported] = useState(() => new Set());
+  const AETHER_ROSTER = [...AETHER_PEOPLE, ...AETHER_X_VOICES];
+  const doImport = (rows) => { if (onImportAether) onImportAether(rows); setImported(prev => { const n = new Set(prev); rows.forEach(r => n.add(r.name)); return n; }); };
+  // AH1: "Accept all" bulk-accept of suggested voices (unconfirmed; handles resolved lazily later).
+  const [acceptPending, setAcceptPending] = useState(null); // { label, seeds }
+  const [acceptDone, setAcceptDone] = useState(null);        // { added, skipped, prevVoices }
+  // org seeds that duplicate an existing SOURCE feed (AH1.4) — included in "orgs" but marked.
+  const sourceNames = new Set(); for (const c of Object.keys(lf || {})) for (const f of (lf[c] || [])) if (f && f.name) sourceNames.add(f.name);
+  // seedQueue is already pre-filtered of tombstoned/duplicate ids, so bulkAccept here never re-adds.
+  const confirmAccept = () => {
+    if (!onSetVoices || !acceptPending) return;
+    const prev = voices || [];
+    const r = bulkAccept(prev, [], acceptPending.seeds);
+    setAcceptPending(null); onSetVoices(r.voices);
+    const done = { added: r.added, skipped: r.skipped, prev };
+    setAcceptDone(done);
+    setTimeout(() => setAcceptDone(d => d === done ? null : d), 10000);
+  };
+  const undoAccept = () => { if (onSetVoices && acceptDone) onSetVoices(acceptDone.prev); setAcceptDone(null); };
   const VOICE_CATS = ['general','business','bloom','tech','sports','health','popculture'];
 
   const testFeed = async (url, key) => {
     setTestState(s=>({...s,[key]:'loading'}));
     const {items,reason} = await fetchRSS(url);
     setTestState(s=>({...s,[key]:items.length>0?`ok:${items.length} articles`:`fail:${reason||'empty'}`}));
+  };
+
+  // AG1.3: Test EVERY enabled feed across ALL categories (concurrency <=6). Runs ONLY on tap — no
+  // network on panel open. Uses the existing /api/feed proxy via fetchRSS (incl. the AG1 fallback),
+  // so a feed that only works "via Google News" is reported as such. No secrets in the report.
+  const [testAll, setTestAll] = useState({ running:false, done:0, total:0, rows:[] });
+  const [copied, setCopied] = useState(false);
+  const runTestAll = async () => {
+    const jobs = [];
+    for (const cat of Object.keys(lf)) for (const f of (lf[cat]||[])) if (f && f.on && f.url) jobs.push({ cat, f });
+    setTestAll({ running:true, done:0, total:jobs.length, rows:[] });
+    let done = 0, i = 0;
+    const worker = async () => {
+      while (i < jobs.length) {
+        const { cat, f } = jobs[i++];
+        const t0 = Date.now();
+        let r; try { r = await fetchRSS(f.url, f.fallbackUrl, f.mergeFallbackUrl); } catch { r = { items:[], reason:'error', status:0 }; }
+        const row = { cat, name:f.name, items:(r.items||[]).length, code:r.status||0, reason:r.reason||'',
+          usedFallback:!!r.usedFallback, via:r.via||'', rank:rankOf(f.name), sub:f.sub||'', alt:!!f._alt, ms:Date.now()-t0 };
+        done++;
+        setTestAll(s => ({ ...s, done, rows:[...s.rows, row] }));
+      }
+    };
+    await Promise.all(Array.from({ length: Math.min(6, jobs.length) }, worker));
+    setTestAll(s => ({ ...s, running:false }));
+  };
+  const copyTestReport = () => {
+    const rows = testAll.rows.slice().sort((a,b)=> a.cat.localeCompare(b.cat) || a.name.localeCompare(b.name));
+    const report = {
+      generatedAt: new Date().toISOString(),
+      // AH2: a feed whose fallback was tried but still returned 0 items is "no-items" (neutral), not a
+      // hard failure — so the red count is only genuinely broken feeds with no fallback.
+      summary: { total: rows.length, ok: rows.filter(r=>r.items>0).length, noItems: rows.filter(r=>r.items===0&&r.usedFallback).length, failed: rows.filter(r=>r.items===0&&!r.usedFallback).length, viaFallback: rows.filter(r=>r.usedFallback&&r.items>0).length },
+      feeds: rows.map(r => ({ feed:r.name, category:CAT_LABELS[r.cat]||r.cat, status:r.items>0?'ok':(r.usedFallback?'no-items':'fail'), items:r.items, code:r.code, reason:r.reason, usedFallback:r.usedFallback, via:r.via, rank:r.rank, sub:r.sub, alt:r.alt })),
+    };
+    try { navigator.clipboard.writeText(JSON.stringify(report, null, 2)); setCopied(true); setTimeout(()=>setCopied(false), 1500); } catch {}
   };
   const addSource = () => {
     if (!newName.trim()||!newUrl.trim()) return;
@@ -144,6 +205,42 @@ export function CustomizePanel({feeds, kw, alerts, urgent, social, watchlist, te
           {secTab==='sources' && (
             <div className="cp-sec">
               <div className="cp-lbl">Sources</div>
+              {aeAdded > 0 && <div className="cp-desc"><strong>{aeAdded} source{aeAdded===1?'':'s'} added this update</strong> — test them below.</div>}
+              {onToggleAlt && (
+                <button className="cp-btn-sec cp-alt-toggle" onClick={onToggleAlt} role="switch" aria-checked={showAlt}>
+                  {/* AG6.1: real SVG checkbox — the old ☑/☐ unicode glyphs rendered as an empty
+                      square on CB's device (font lacked them). Default ON. */}
+                  {showAlt ? <CheckSquare size={15} aria-hidden="true"/> : <Square size={15} aria-hidden="true"/>}
+                  <span>Show alternative perspective</span>
+                </button>
+              )}
+              {/* AG1.3: Test ALL sources across every category — one tap, concurrency <=6, no network
+                  on open. Live grouped pass/fail + Copy report (plain JSON, no secrets). */}
+              <div className="cp-testall">
+                <button className="cp-btn-sec" onClick={runTestAll} disabled={testAll.running}>
+                  {testAll.running ? `Testing ${testAll.done}/${testAll.total}…` : 'Test all sources'}
+                </button>
+                {testAll.rows.length>0 && !testAll.running && (
+                  <button className="cp-btn-sec" onClick={copyTestReport}>{copied ? 'Copied ✓' : 'Copy report'}</button>
+                )}
+              </div>
+              {testAll.rows.length>0 && (
+                <div className="cp-testall-results">
+                  <div className="cp-desc"><strong>{testAll.rows.filter(r=>r.items>0).length}</strong> loaded · <strong>{testAll.rows.filter(r=>r.items===0&&!r.usedFallback).length}</strong> failed · <strong>{testAll.rows.filter(r=>r.usedFallback&&r.items>0).length}</strong> via Google News</div>
+                  {Object.keys(CAT_LABELS).filter(c=>testAll.rows.some(r=>r.cat===c)).map(c=>(
+                    <div key={c} className="cp-testall-cat">
+                      <div className="cp-testall-cathead">{CAT_LABELS[c]}</div>
+                      {testAll.rows.filter(r=>r.cat===c).map((r,j)=>(
+                        <div key={j} className="cp-testall-row">
+                          <span className={`cp-health ${r.items>0?(r.usedFallback?'cp-h-yellow':'cp-h-green'):(r.usedFallback?'cp-h-yellow':'cp-h-red')}`}/>
+                          <span className="cp-testall-name">{r.name}</span>
+                          <span className="cp-testall-stat">{r.items>0 ? `${r.items} items${r.usedFallback?' · via Google News':''}` : (r.usedFallback ? 'no items' : (r.reason||`fail${r.code?` (${r.code})`:''}`))}</span>
+                        </div>
+                      ))}
+                    </div>
+                  ))}
+                </div>
+              )}
               <div className="cp-cat-tabs">{Object.keys(CAT_LABELS).map(c=><button key={c} className={`cp-cat-tab ${srcTab===c?'active':''}`} onClick={()=>setSrcTab(c)}>{CAT_LABELS[c]}</button>)}</div>
               <div className="cp-legend">
                 <span className="cp-legend-item"><span className="cp-health cp-h-green"/>Loaded</span>
@@ -231,6 +328,34 @@ export function CustomizePanel({feeds, kw, alerts, urgent, social, watchlist, te
                   <div className="cp-desc">Suggestions from a web search, labelled <strong>unverified</strong> — you confirm handles yourself. Needs a Firecrawl key.</div>
                 </div>
               )}
+              {/* AG5.2: one-time "Import from AetherHub" sheet — confirm all / each. Names already
+                  confirmed are hidden; handles are stored only on confirm (the Hormuz candidate is
+                  flagged so CB confirms the finder's @HormuzLetter, never auto-stored). */}
+              {onImportAether && (() => {
+                const pending = AETHER_ROSTER.filter(r => !imported.has(r.name));
+                return (
+                  <div className="cp-aether">
+                    <button className="cp-seeds-toggle" onClick={()=>setShowImport(s=>!s)}>
+                      <ChevronDown size={12} aria-hidden="true" className={`cp-chev${showImport?'':' cp-chev-closed'}`}/> Import from AetherHub ({pending.length})
+                    </button>
+                    {showImport && (
+                      <div className="cp-aether-list">
+                        {pending.length>0
+                          ? <button className="cp-btn cp-aether-all" onClick={()=>doImport(pending)}>Confirm all ({pending.length})</button>
+                          : <div className="cp-desc">All imported ✓</div>}
+                        {pending.map(r => (
+                          <div key={r.name} className="cp-aether-row">
+                            <span className="cp-aether-name">{r.name}</span>
+                            <span className="cp-aether-handle">{r.handle}{r.candidate?' · finder candidate':''}</span>
+                            <span className="cp-aether-cat">{(CATS[r.category]||{}).label||r.category}</span>
+                            <button className="cp-test-btn" onClick={()=>doImport([r])}>Confirm</button>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                );
+              })()}
               {onTestVoices && (
                 <div style={{margin:'4px 0 10px'}}>
                   <div style={{display:'flex',gap:'8px',alignItems:'center'}}>
@@ -260,23 +385,49 @@ export function CustomizePanel({feeds, kw, alerts, urgent, social, watchlist, te
                     <ChevronDown size={12} aria-hidden="true" style={{transform:showSeeds?"none":"rotate(-90deg)",verticalAlign:"-2px"}}/> Suggested voices ({seedQueue.length})
                   </button>
                   {showSeeds && (
-                    <div className="cp-seed-list">
-                      {seedQueue.map(s => (
-                        <div key={s.id} className="cp-seed-row">
-                          <span className="cp-seed-name">{s.name}</span>
-                          <span className="cp-voice-type">{s.type}</span>
-                          <span className="cp-seed-cat">{(CATS[s.category]||{}).label||s.category}</span>
-                          {s._parkedFrom && <span className="cp-voice-flag" title="Parked here pending your category decision">parked: {s._parkedFrom}</span>}
-                          {s.handles && Object.keys(s.handles).length>0 && <span className="cp-voice-handles">{VOICE_PLATFORMS.filter(p=>s.handles[p]).join(' · ')}</span>}
-                          <span className="cp-seed-actions">
-                            <button className="cp-btn" onClick={()=>onAcceptSeed&&onAcceptSeed(s)}>Accept</button>
-                            <button className="cp-btn-sec" onClick={()=>onSkipSeed&&onSkipSeed(s.id)}>Skip</button>
-                          </span>
+                    <>
+                      {/* AH1: Accept all + scopes. Adds voices by NAME (status unconfirmed); handles
+                          are resolved lazily later — no per-person prompt, no network on accept. */}
+                      {onSetVoices && !acceptPending && !acceptDone && (
+                        <div className="cp-accept-all">
+                          <button className="cp-btn" onClick={()=>setAcceptPending({label:'all suggested', seeds:seedQueue})}>Accept all ({seedQueue.length})</button>
+                          {seedQueue.some(s=>s.type==='person') && <button className="cp-btn-sec" onClick={()=>setAcceptPending({label:'people', seeds:seedQueue.filter(s=>s.type==='person')})}>People ({seedQueue.filter(s=>s.type==='person').length})</button>}
+                          {seedQueue.some(s=>s.type==='org') && <button className="cp-btn-sec" onClick={()=>setAcceptPending({label:'orgs', seeds:seedQueue.filter(s=>s.type==='org')})}>Orgs ({seedQueue.filter(s=>s.type==='org').length})</button>}
+                          {[...new Set(seedQueue.map(s=>s.category))].map(cat=>(
+                            <button key={cat} className="cp-btn-sec" onClick={()=>setAcceptPending({label:(CATS[cat]||{}).label||cat, seeds:seedQueue.filter(s=>s.category===cat)})}>{(CATS[cat]||{}).label||cat} ({seedQueue.filter(s=>s.category===cat).length})</button>
+                          ))}
                         </div>
-                      ))}
-                    </div>
+                      )}
+                      {acceptPending && (
+                        <div className="cp-accept-confirm">
+                          <div className="cp-desc">Add <strong>{acceptPending.seeds.length}</strong> voice{acceptPending.seeds.length===1?'':'s'} ({acceptPending.label}) to your Voices. Nothing posts or loads from X until you tap a voice. Handles are checked later.</div>
+                          <div className="cp-accept-btns"><button className="cp-btn" onClick={confirmAccept}>Add them</button><button className="cp-btn-sec" onClick={()=>setAcceptPending(null)}>Cancel</button></div>
+                        </div>
+                      )}
+                      <div className="cp-seed-list">
+                        {seedQueue.map(s => (
+                          <div key={s.id} className="cp-seed-row">
+                            <span className="cp-seed-name">{s.name}</span>
+                            <span className="cp-voice-type">{s.type}</span>
+                            <span className="cp-seed-cat">{(CATS[s.category]||{}).label||s.category}</span>
+                            {s._parkedFrom && <span className="cp-voice-flag" title="Parked here pending your category decision">parked: {s._parkedFrom}</span>}
+                            {s.type==='org' && sourceNames.has(s.name) && <span className="cp-voice-flag" title="You already follow this as a news source">already a source</span>}
+                            {s.handles && Object.keys(s.handles).length>0 && <span className="cp-voice-handles">{VOICE_PLATFORMS.filter(p=>s.handles[p]).join(' · ')}</span>}
+                            <span className="cp-seed-actions">
+                              <button className="cp-btn" onClick={()=>onAcceptSeed&&onAcceptSeed(s)}>Accept</button>
+                              <button className="cp-btn-sec" onClick={()=>onSkipSeed&&onSkipSeed(s.id)}>Skip</button>
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    </>
                   )}
                 </div>
+              )}
+              {/* AH1: "N added / Undo" persists even after Accept-all empties the suggestion queue
+                  (10s window; Undo restores the previous Voices list). */}
+              {acceptDone && (
+                <div className="cp-accept-done"><span className="cp-desc"><strong>{acceptDone.added} added</strong>{acceptDone.skipped?` · ${acceptDone.skipped} already there`:''}</span><button className="cp-btn-sec" onClick={undoAccept}>Undo</button></div>
               )}
               {/* Grouped by category */}
               {VOICE_CATS.map(cat => {

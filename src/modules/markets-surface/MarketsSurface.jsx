@@ -17,28 +17,7 @@ import './MarketsSurface.css';
 
 const fmtPrice = n => n == null ? '—' : n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
-export function useMarkets({ endpoint = '/api/markets' } = {}) {
-  const [data, setData] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(false);
-  const refresh = useCallback(async () => {
-    try {
-      const r = await fetch(endpoint, { signal: AbortSignal.timeout(12000) });
-      if (!r.ok) throw new Error('http');
-      const d = await r.json();
-      setData(d); setError(!!d.error && !(d.indices || []).length);
-    } catch { setError(true); }
-    finally { setLoading(false); }
-  }, [endpoint]);
-  useEffect(() => {
-    refresh();
-    const iv = setInterval(() => { if (!document.hidden) refresh(); }, 60000);
-    const onVis = () => { if (!document.hidden) refresh(); };
-    document.addEventListener('visibilitychange', onVis);
-    return () => { clearInterval(iv); document.removeEventListener('visibilitychange', onVis); };
-  }, [refresh]);
-  return { data, loading, error, refresh };
-}
+// useMarkets moved to ./useMarkets.js (AE2 bundle offset) so this component can lazy-split.
 
 export function MarketsSurface({ mkt, loading, error }) {
   const [moverTab, setMoverTab] = useState('gainers');

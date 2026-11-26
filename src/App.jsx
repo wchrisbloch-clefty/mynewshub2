@@ -42,7 +42,7 @@ import { clusterStories, hotClusterTopics, rankClusters, TREND_STOP, decodeEntit
 import { opinionLabel } from './modules/opinion';
 import { SourceImage, hasUsableImage } from './modules/source-image';
 import { ShareControl, buildBriefingExcerpt } from './modules/share';
-import { ConnectionsStrip, findConnections } from './modules/connections';
+import { findConnections } from './modules/connections/connections.js';
 import { qualifyBreaking, isPromoItem } from './modules/breaking';
 import { claimConnections, claimAcrossSections } from './modules/dedup/railDedup';
 import { reconcileHeld } from './modules/stable-list/heldList';
@@ -52,22 +52,40 @@ import { DEBUG, dbgRender, dbgPoll, dbgMount, dbgSwipe, DebugOverlay } from './m
 import { evaluateSwipe } from './modules/swipe-gesture';
 import { useScores, configureScores, loadScores as loadScoresStore, anyLiveGame } from './state';
 import { makeVoice, upsertVoice, removeVoice as removeVoiceModel, mergeVoices, clearTombstone, voiceId, VOICE_PLATFORMS } from './modules/voices/model';
-import { SEED_VOICES } from './modules/voices/seeds';
+// AG5: SEED_VOICES + the AetherHub roster are loaded lazily (see seedBase) so they stay OUT of the
+// initial chunk — freeing room under the +1.1% cap for AG5.2/AG5.3/AG4.
 // G4: code-split heavy, not-needed-at-first-paint surfaces. Home is never lazy.
 // ChatBot is always mounted but not first-paint; ResolveModal is rare.
+// AE2 bundle offset: the rail ConnectionsStrip (one use, below the fold) is split off the initial
+// chunk; findConnections (logic) stays eager. A self-wrapping lazy keeps the call site unchanged.
+const ConnectionsStripLazy = lazy(() => import('./modules/connections/ConnectionsStrip.jsx').then(m => ({ default: m.ConnectionsStrip })));
+function ConnectionsStrip(props) { return <Suspense fallback={null}><ConnectionsStripLazy {...props} /></Suspense>; }
+// AF1 bundle offset: StateOfPlay (~10.8KB) renders in the rail (isolated from the feed via
+// .sop-hoist, and below the fold on phone) and loads its own data async, so it is split off the
+// initial chunk; selectStateOfPlay (logic) stays eager. Self-wrapping lazy, null fallback (no
+// empty box — the component owns its own skeleton/empty states once loaded).
+const StateOfPlayLazy = lazy(() => import('./modules/state-of-play/StateOfPlay.jsx').then(m => ({ default: m.StateOfPlay })));
+function StateOfPlay(props) { return <Suspense fallback={null}><StateOfPlayLazy {...props} /></Suspense>; }
 const ResolveModal = lazy(() => import('./modules/voices/ResolveModal').then(m => ({ default: m.ResolveModal })));
 const VoiceFinderModal = lazy(() => import('./modules/voices/VoiceFinderModal').then(m => ({ default: m.VoiceFinderModal })));
 import { VoicesStrip } from './modules/voices/VoicesStrip';
-import { extractContent, extractionFallbackMessage } from './modules/extractor';
-import { retrieveFeedContext, buildFeedContextBlock } from './modules/retrieval';
+// AE2 bundle offset: the extractor is imported on demand at its reader/analyze call site (below),
+// not here, so it leaves the initial chunk.
+// AE2 bundle offset: retrieval (retrieveFeedContext / buildFeedContextBlock) is used ONLY by the
+// lazy ChatBot (src/modules/concierge), never in App.jsx — importing it here forced ~2KB of it
+// into the initial chunk for nothing. Removed so the ranking module fits under the gzip cap.
 // XPulse is click-to-load (nothing fetches until tapped) and renders only at feed position 2 /
 // in the reader — never on the phone-Home first screen — so it is split off the initial chunk.
 // A self-wrapping lazy component keeps every <XPulse/> call site unchanged; fallback={null}
 // (the collapsed trigger is below the first screen and non-blocking).
 const XPulseLazy = lazy(() => import('./modules/x-pulse').then(m => ({ default: m.XPulse })));
 function XPulse(props) { return <Suspense fallback={null}><XPulseLazy {...props} /></Suspense>; }
-import { StateOfPlay, selectStateOfPlay } from './modules/state-of-play';
+import { selectStateOfPlay } from './modules/state-of-play/select.js';
 import { rankHomeTop } from './modules/top-stories/select';
+import { scoreStory, rankMode, coverageOf, isAlt as isAltSource } from './modules/ranking';
+import { selectAlsoMoving } from './modules/also-moving/select'; // AG3
+import { sourcesForSub } from './modules/feeds-sub'; // AH3.1: canonical sub keys
+import { anyWholeWord } from './modules/text-match';
 import { TopicTag } from './modules/topic-tag';
 import { CatIcon, SHOW_CHIP_ICONS } from './modules/cat-icon';
 import { cleanSourceName } from './modules/source-name';
@@ -76,9 +94,13 @@ import { SnapshotCard, CoverageList } from './modules/snapshot-card';
 // desktop). The Suspense fallback reserves full height so the chunk swap causes no layout shift.
 const MobileHome = lazy(() => import('./modules/mobile-home').then(m => ({ default: m.MobileHome })));
 import { FollowSourceContext, FollowSourceChip } from './modules/follow-source';
-import { MarketsSurface, useMarkets } from './modules/markets-surface';
+import { useMarkets } from './modules/markets-surface/useMarkets.js';
+// AE2 bundle offset: the ~6KB MarketsSurface component renders only on the Markets tab, so it is
+// split off the initial chunk; the tiny useMarkets hook stays eager. Self-wrapping lazy.
+const MarketsSurfaceLazy = lazy(() => import('./modules/markets-surface/MarketsSurface.jsx').then(m => ({ default: m.MarketsSurface })));
+function MarketsSurface(props) { return <Suspense fallback={null}><MarketsSurfaceLazy {...props} /></Suspense>; }
 import { parseRoute, buildPath } from './modules/routing';
-import { migrateFeedsZ2, FEEDS_MIG_V } from './modules/feeds-migrate';
+import { migrateFeedsZ2, migrateFeedsAE, FEEDS_MIG_V } from './modules/feeds-migrate';
 import { PROMPT_VERSION } from '../lib/ai-models.js';
 import { TIER_LABEL, tagProvenance, TierBadge } from './modules/provenance';
 const ChatBot = lazy(() => import('./modules/concierge').then(m => ({ default: m.ChatBot })));
@@ -96,6 +118,10 @@ const DesignPage = lazy(() => import('./modules/design-page/DesignPage').then(m 
 const PAGE_IMPORTERS = { podcasts: () => import('./modules/podcasts/PodcastsPage'), sources: () => import('./modules/sources/SourcesPage'), briefing: () => import('./modules/briefing/BriefingPage'), sports: () => import('./modules/sports/SportsPage') };
 export const prefetchPage = (name) => { const f = PAGE_IMPORTERS[name]; if (f) f(); };
 const prefetchCustomize = () => import('./modules/customize/CustomizePanel');
+// AG2: "Right now across outlets" glance — lazy (not first paint).
+const AcrossOutlets = lazy(() => import('./modules/across-outlets/AcrossOutlets').then(m => ({ default: m.AcrossOutlets })));
+// AG3: "Also moving" strip — lazy (not first paint).
+const AlsoMoving = lazy(() => import('./modules/also-moving/AlsoMoving').then(m => ({ default: m.AlsoMoving })));
 const prefetchLazy = () => { import('./modules/concierge'); import('./modules/voices/ResolveModal'); import('./modules/x-pulse'); import('./modules/analyze/AnalyzePanel'); import('./modules/reader/ArticleReader'); prefetchCustomize(); Object.values(PAGE_IMPORTERS).forEach(f => f()); };
 // Icons: single set (lucide-react), fixed size per context — item 7.
 import { Settings, RefreshCw, Moon, Sun, User,
@@ -309,9 +335,25 @@ const DEFAULT_FEEDS = {
     { name:'The Guardian US',   url:'https://www.theguardian.com/us/rss',                                       on:true },
     { name:'Axios',             url:'https://api.axios.com/feed/',                                              on:true },
     { name:'Breitbart',         url:'https://feeds.feedburner.com/breitbart',                                   on:true },
+    // KHOU + Chron stay FETCHED (they power the Houston Local strip) but are ranked `local`
+    // (RANK_BY_NAME), so AE2/AE3 keep them out of News Top now / lead / Breaking unless the
+    // Houston gate opens (>=2 outlets or a major-event term). AE7 tags them `local` on devices.
     { name:'KHOU Houston',      url:'https://www.khou.com/feeds/syndication/rss/news',                          on:true },
     { name:'Chron.com',         url:'https://www.chron.com/rss/feed/News-270.php',                              on:true },
     { name:'Morning Wire',      url:'https://feeds.megaphone.fm/BVDWV8747925072',                               on:true },
+    // ── AE1 core NEWS additions (UNVERIFIED until CB's device runs the Source test, AE9) ──
+    { name:'AP (Google News)',  url:'https://news.google.com/rss/search?q=when:1d%20site:apnews.com&hl=en-US&gl=US&ceid=US:en', on:true, _ae:true, tier:'inferred' },
+    { name:'Reuters (Google News)', url:'https://news.google.com/rss/search?q=when:1d%20site:reuters.com&hl=en-US&gl=US&ceid=US:en', on:true, _ae:true, tier:'inferred' },
+    { name:'CBS News',          url:'https://www.cbsnews.com/latest/rss/main',                                  on:true, _ae:true },
+    { name:'ABC News',          url:'https://feeds.abcnews.com/abcnews/topstories',                             on:true, _ae:true },
+    { name:'NBC News',          url:'https://feeds.nbcnews.com/nbcnews/public/news',                            on:true, _ae:true },
+    { name:'CNN',               url:'http://rss.cnn.com/rss/cnn_topstories.rss',                                on:true, _ae:true },
+    { name:'The New York Times',url:'https://rss.nytimes.com/services/xml/rss/nyt/HomePage.xml',                on:true, _ae:true },
+    { name:'Wall Street Journal', url:'https://feeds.content.dowjones.io/public/rss/RSSWorldNews',              on:true, _ae:true },
+    { name:'Politico',          url:'https://rss.politico.com/politics-news.xml',                               on:true, _ae:true },
+    { name:'Google News — Top stories', url:'https://news.google.com/rss?hl=en-US&gl=US&ceid=US:en',            on:true, _ae:true, tier:'inferred' },
+    // ALT lane (AE1.3b) — "alternative perspective", never leads/breaks/raises a tier.
+    { name:'The Daily Wire',    url:'https://www.dailywire.com/feeds/rss.xml',                                  on:true, _ae:true, _alt:true },
   ],
   sports: [
     // ESPN via its supported JSON news API (site.api.espn.com) — the old
@@ -336,28 +378,44 @@ const DEFAULT_FEEDS = {
     // Horse racing
     { name:'BloodHorse',           url:'https://www.bloodhorse.com/horse-racing/feed/',                          on:true },
     { name:'Thoroughbred Daily News', url:'https://www.thoroughbreddailynews.com/feed/',                         on:true },
-    { name:'Horse Race Nation',    url:'https://horseracenation.com/feed/',                                      on:true },
+    { name:'Horse Race Nation',    url:'https://horseracenation.com/feed/',                                      on:true, fallbackUrl:'https://news.google.com/rss/search?q=when:2d%20site:horseracingnation.com&hl=en-US&gl=US&ceid=US:en' }, // AH2: code 0; GNews on the real domain
     { name:"America's Best Racing", url:'https://www.americasbestracing.net/rss.xml',                            on:true },
     { name:'Daily Racing Form',    url:'https://www.drf.com/news/rss/news',                                      on:false },
     // Golf — GolfWeek / Golf Digest / Golf Channel / No Laying Up all went dead (404/403).
     { name:'Golf.com',             url:'https://golf.com/feed/',                                                on:true },
     { name:'ESPN Golf',            url:'https://site.api.espn.com/apis/site/v2/sports/golf/pga/news',           on:true },
     { name:'Golf Monthly',         url:'https://www.golfmonthly.com/feed',                                      on:true },
+    // ── AE1 core SPORTS additions (UNVERIFIED until CB's device runs the Source test, AE9).
+    //   The Spun / OutKick / 247Sports / On3 are ranked `fan` (RANK_BY_NAME) so they never lead
+    //   Top now or trigger Breaking; racing/golf appear only under their own chips (AE6). ──
+    { name:'The Athletic',         url:'https://news.google.com/rss/search?q=when:1d%20site:nytimes.com/athletic&hl=en-US&gl=US&ceid=US:en', on:true, _ae:true },
+    { name:'Fox Sports',           url:'https://www.foxsports.com/feedout/syndicatedContent?categoryId=0',      on:true, _ae:true },
+    { name:'Sports Illustrated',   url:'https://www.si.com/rss/si_topstories.rss',                              on:true, _ae:true },
+    { name:'Bleacher Report',      url:'https://bleacherreport.com/articles/feed',                              on:true, _ae:true },
+    { name:'Google News — Sports', url:'https://news.google.com/rss/headlines/section/topic/SPORTS?hl=en-US&gl=US&ceid=US:en', on:true, _ae:true, tier:'inferred' },
+    // AG2.2: general top-headline sports outlets for the "Across outlets" glance.
+    { name:'ESPN',                 url:'https://www.espn.com/espn/rss/news',                                   on:true, _ae:true },
+    { name:'NBC Sports',           url:'https://news.google.com/rss/search?q=when:2d%20site:nbcsports.com&hl=en-US&gl=US&ceid=US:en', on:true, _ae:true, tier:'inferred' },
   ],
   business: [
+    // AE1.2: the seven energy/data-center feeds that also live in `bloom` were removed from
+    // `business` so every feed has ONE home category (Oilprice, Utility Dive, Data Center
+    // Dynamics, Power Magazine, Rigzone, Canary Media → bloom; MIT Tech Review → tech only).
+    // Cross-category visibility stays via clustering / Top stories. AE1 core adds: Reuters
+    // Business + WSJ Business (Google News / publisher feeds), Axios Markets. (new = UNVERIFIED)
     { name:'NPR Business',           url:'https://feeds.npr.org/1006/rss.xml',                                  on:true },
     { name:'CNBC Business',          url:'https://www.cnbc.com/id/10001147/device/rss/rss.html',                on:true },
     { name:'CNBC Top News',          url:'https://www.cnbc.com/id/100003114/device/rss/rss.html',               on:true }, // Z2: moved from general
     { name:'Morning Brew',           url:'https://www.morningbrew.com/feed',                                    on:true }, // Z2: moved from general
-    { name:'Oilprice.com',           url:'https://oilprice.com/rss/main',                                       on:true },
-    { name:'Utility Dive',           url:'https://www.utilitydive.com/feeds/news/',                             on:true },
-    { name:'Data Center Dynamics',   url:'https://www.datacenterdynamics.com/en/rss/',                          on:true },
-    { name:'Power Magazine',         url:'https://www.powermag.com/feed/',                                      on:true },
-    { name:'Rigzone',                url:'https://www.rigzone.com/news/rss/rigzone_latest.aspx',                on:true },
-    { name:'MIT Tech Review',        url:'https://www.technologyreview.com/feed/',                              on:true },
-    { name:'Canary Media',           url:'https://www.canarymedia.com/rss',                                     on:true },
     { name:'The Guardian Business',  url:'https://www.theguardian.com/business/rss',                            on:true },
     { name:'CNBC Tech',              url:'https://www.cnbc.com/id/19854910/device/rss/rss.html',                on:true },
+    // ── AE1 additions (UNVERIFIED until the Source test runs on CB's device, AE9) ──
+    { name:'Reuters Business (Google News)', url:'https://news.google.com/rss/search?q=when:1d%20site:reuters.com%20business&hl=en-US&gl=US&ceid=US:en', on:true, _ae:true },
+    { name:'WSJ Business',           url:'https://feeds.content.dowjones.io/public/rss/WSJcomUSBusiness',       on:true, _ae:true },
+    { name:'Axios Markets',          url:'https://api.axios.com/feed/business',                                 on:true, _ae:true, fallbackUrl:'https://news.google.com/rss/search?q=when:2d%20site:axios.com%20markets&hl=en-US&gl=US&ceid=US:en' }, // AH2: api.axios.com 404s; GNews on axios.com markets
+    // ALT lane (AE1.3b) — shown, labelled "alternative perspective", never leads/breaks.
+    { name:'ZeroHedge',              url:'https://feeds.feedburner.com/zerohedge/feed',                         on:true, _ae:true, _alt:true },
+    { name:'Watcher Guru',           url:'https://news.google.com/rss/search?q=when:2d%20site:watcherguru.com&hl=en-US&gl=US&ceid=US:en', on:true, _ae:true, _alt:true }, // AH2: own feed (watcher.guru/news/feed) now redirects to HTML, 0 items — GNews is the primary (name keeps alt rank)
   ],
   finance: [
     { name:'MarketWatch',   url:'https://feeds.marketwatch.com/marketwatch/topstories/',                        on:true },
@@ -368,15 +426,31 @@ const DEFAULT_FEEDS = {
     { name:'CNBC Finance',  url:'https://www.cnbc.com/id/10000664/device/rss/rss.html',                         on:true },
   ],
   bloom: [
-    { name:'Oilprice.com',          url:'https://oilprice.com/rss/main',                                        on:true },
-    { name:'Utility Dive',          url:'https://www.utilitydive.com/feeds/news/',                               on:true },
-    { name:'Data Center Dynamics',  url:'https://www.datacenterdynamics.com/en/rss/',                            on:true },
-    { name:'Power Magazine',        url:'https://www.powermag.com/feed/',                                        on:true },
+    // AE1.2: MIT Tech Review removed here (tech only). AE6: `sub` hints route a feed into the
+    // Oil & Gas 3rd-level chips (upstream/midstream/downstream) and Policy. (new = UNVERIFIED)
+    { name:'Oilprice.com',          url:'https://oilprice.com/rss/main',                                        on:true, sub:'upstream' },
+    { name:'Utility Dive',          url:'https://www.utilitydive.com/feeds/news/',                               on:true, sub:'power' },
+    { name:'Data Center Dynamics',  url:'https://www.datacenterdynamics.com/en/rss/',                            on:true, sub:'datacenter' },
+    { name:'Power Magazine',        url:'https://www.powermag.com/feed/',                                        on:true, sub:'power' },
     { name:'CNBC Energy',           url:'https://www.cnbc.com/id/19836768/device/rss/rss.html',                  on:true },
-    { name:'MIT Tech Review',       url:'https://www.technologyreview.com/feed/',                                on:true },
-    { name:'Canary Media',          url:'https://www.canarymedia.com/rss',                                       on:true },
-    { name:'Rigzone',               url:'https://www.rigzone.com/news/rss/rigzone_latest.aspx',                   on:true },
-    { name:'Data Center Frontier',  url:'https://www.datacenterfrontier.com/feed/',                                on:true,  tier:'reported' },
+    { name:'Canary Media',          url:'https://www.canarymedia.com/rss',                                       on:true, sub:'clean' },
+    { name:'Rigzone',               url:'https://www.rigzone.com/news/rss/rigzone_latest.aspx',                   on:true, sub:'upstream' },
+    { name:'Data Center Frontier',  url:'https://www.datacenterfrontier.com/feed/',                                on:true,  tier:'reported', sub:'datacenter', mergeFallbackUrl:'https://news.google.com/rss/search?q=when:3d%20%22data%20center%20frontier%22&hl=en-US&gl=US&ceid=US:en' }, // AH2: thin (2 items) — merge GNews on the publisher name
+    // ── AE1 additions (UNVERIFIED until CB's device runs the Source test, AE9). More energy
+    //   depth (World Oil, Oil & Gas Journal, Offshore, Pipeline & Gas Journal, Hart) is listed
+    //   verified-URL-pending in the sources doc — added under the +0.5% bundle cap in a follow-up. ──
+    { name:'Natural Gas Intelligence', url:'https://www.naturalgasintel.com/feed/',                             on:true, _ae:true, sub:'midstream' },
+    { name:'Hydrocarbon Processing', url:'https://www.hydrocarbonprocessing.com/rss',                           on:true, _ae:true, sub:'downstream' },
+    { name:'EIA Today in Energy',   url:'https://www.eia.gov/rss/todayinenergy.xml',                             on:true, _ae:true, tier:'verified', sub:'policy' },
+    { name:'American Petroleum Institute (Google News)', url:'https://news.google.com/rss/search?q=%22American%20Petroleum%20Institute%22%20when:7d&hl=en-US&gl=US&ceid=US:en', on:true, _ae:true, sub:'policy' }, // AG1: name search (site:api.org returned nothing)
+    // ── AF5: energy trade depth. World Oil + OGJ serve application/rss+xml 200 (publisher-listed
+    //   feed URLs), item-level pending CB's device Source test → UNVERIFIED (no tier). The app
+    //   encodeURIComponent()s the URL once, so the raw OGJ `input={...}` is stored literally.
+    //   Offshore Magazine, Pipeline & Gas Journal and Hart Energy are UNVERIFIED-pending in the
+    //   sources doc — their public RSS URL 404s / is unresolved, so no guessed URL is shipped. ──
+    { name:'World Oil',                     url:'https://www.worldoil.com/rss?feed=news',                                                        on:true, _ae:true, sub:'upstream' },
+    { name:'Oil & Gas Journal',             url:'https://www.ogj.com/__rss/website-scheduled-content.xml?input={"sectionAlias":"general-interest"}',       on:true, _ae:true, sub:'upstream' },
+    { name:'Oil & Gas Journal — Pipelines', url:'https://www.ogj.com/__rss/website-scheduled-content.xml?input={"sectionAlias":"pipelines-transportation"}', on:true, _ae:true, sub:'midstream' },
   ],
   popculture: [
     { name:'Variety',           url:'https://variety.com/feed/',                                  on:true },
@@ -398,12 +472,21 @@ const DEFAULT_FEEDS = {
     { name:'The Verge',         url:'https://www.theverge.com/rss/index.xml',                     on:true },
     { name:'Wired',             url:'https://www.wired.com/feed/rss',                             on:true },
     { name:'Ars Technica',      url:'https://feeds.arstechnica.com/arstechnica/index',            on:true },
-    { name:'VentureBeat',       url:'https://venturebeat.com/feed/',                              on:true },
+    { name:'VentureBeat',       url:'https://venturebeat.com/feed/',                              on:true, mergeFallbackUrl:'https://news.google.com/rss/search?q=when:2d%20%22venturebeat%22&hl=en-US&gl=US&ceid=US:en' }, // AH2: thin (8 items) — merge GNews on the publisher name
     { name:'MIT Tech Review',   url:'https://www.technologyreview.com/feed/',                     on:true },
-    { name:'Hacker News',       url:'https://news.ycombinator.com/rss',                           on:true,  tier:'inferred' },
+    { name:'Hacker News',       url:'https://hnrss.org/frontpage',                                on:true,  tier:'inferred' }, // AG1: hnrss (news.ycombinator.com/rss blocked on device)
     { name:'IEEE Spectrum',     url:'https://spectrum.ieee.org/feeds/feed.rss',                   on:true },
     { name:'9to5Google',        url:'https://9to5google.com/feed/',                               on:false },
     { name:'9to5Mac',           url:'https://9to5mac.com/feed/',                                  on:false },
+    // ── AF5: AI "stay-current" daily digests. sub:'staycurrent' routes them to the Tech
+    //   "Stay current" chip (AF2.1). TLDR AI / Hugging Face / Import AI VERIFIED (returned <item>s
+    //   over the agent proxy); Latent Space serves application/rss+xml 200 but item-level is pending
+    //   CB's device Source test, so it ships UNVERIFIED (no tier). Hard Fork omitted — no first-party
+    //   RSS URL could be resolved (never guessed). ──
+    { name:'TLDR AI',           url:'https://tldr.tech/api/rss/ai',                               on:true, _ae:true, tier:'verified', sub:'staycurrent' },
+    { name:'Hugging Face',      url:'https://huggingface.co/blog/feed.xml',                       on:true, _ae:true, tier:'verified', sub:'staycurrent' },
+    { name:'Import AI',         url:'https://importai.substack.com/feed',                         on:true, _ae:true, tier:'verified', sub:'staycurrent' },
+    { name:'Latent Space',      url:'https://www.latent.space/feed',                              on:true, _ae:true, sub:'staycurrent' },
     // Analysis (reported) — opt-in; surfaced via the Source Directory (Pass L item 4).
     // (Semafor Tech dropped: no RSS endpoint could be verified — their old
     //  /rss/technology.xml 404s and egress is blocked here, so rather than ship another
@@ -414,6 +497,14 @@ const DEFAULT_FEEDS = {
     // (Anthropic dropped: it publishes no first-party RSS feed.)
     { name:'OpenAI',            url:'https://openai.com/news/rss.xml',                            on:true,  tier:'verified' },
     { name:'Google DeepMind',   url:'https://deepmind.google/blog/rss.xml',                       on:true,  tier:'verified' },
+    // ── AE1 AI&TECH additions (UNVERIFIED until CB's device runs the Source test, AE9).
+    //   "Stay current" voices carry sub:'staycurrent' so AE6's new sub-chip can gather them.
+    //   More stay-current voices (TLDR AI, Hugging Face, Import AI, Latent Space, Hard Fork) are
+    //   listed verified-URL-pending in docs/verification/batch-AE-sources.md — added under the
+    //   +0.5% bundle cap in a follow-up. ──
+    { name:'Techmeme',          url:'https://www.techmeme.com/feed.xml',                          on:true,  _ae:true },
+    { name:'Simon Willison',    url:'https://simonwillison.net/atom/everything/',                 on:true,  _ae:true, sub:'staycurrent' },
+    { name:'One Useful Thing',  url:'https://www.oneusefulthing.org/feed',                        on:true,  _ae:true, sub:'staycurrent' },
   ],
   comedy: [
     { name:'The Babylon Bee', url:'https://babylonbee.com/feed',  on:true },
@@ -790,26 +881,12 @@ async function fetchWithTimeout(url, ms=8000, opts={}) {
   const timer = setTimeout(() => ctrl.abort(), ms);
   try { return await fetch(url, {...opts, signal:ctrl.signal}); } finally { clearTimeout(timer); }
 }
-async function fetchRSS(url) {
-  // ONE first-party fetch path: /api/feed (browser UA + retry, robust server-side
-  // parse for RSS / Atom / JSON / link-in-guid). It always returns 200 with
-  // { items, error?, status } so we can surface the real upstream status.
-  //
-  // The old /api/rss stage was removed: it re-fetched the SAME host with the SAME
-  // UA whenever /api/feed parsed empty, doubling function invocations and rate-limit
-  // exposure for zero benefit now that the server parser matches the client one.
-  let lastStatus = 0;
-  try {
-    const r = await fetchWithTimeout(`/api/feed?url=${encodeURIComponent(url)}`, 12000);
-    if (r.ok) { const d = await r.json(); if (d.items?.length) return {items:d.items, reason:'', status:200}; if (d.status) lastStatus = d.status; }
-  } catch {}
-  // Last resort only: a public CORS proxy — a genuinely different host/network path,
-  // so it can succeed where our own egress is blocked. Not a same-host refetch.
-  try {
-    const r = await fetchWithTimeout(`https://api.allorigins.win/get?url=${encodeURIComponent(url)}`);
-    if (r.ok) { const d = await r.json(); if (d.contents) { const items = parseXML(d.contents); if (items.length) return {items, reason:'', status:200}; } }
-  } catch {}
-  return {items:[], reason:`unavailable${lastStatus?` (${lastStatus})`:''}`, status:lastStatus};
+// AH2: the fallback rule, GNews helper AND the /api/feed proxy fetch all live in a lazy chunk (the
+// first fetch is after first paint; the import is cached), so they stay out of the initial bundle.
+let _ff = null, _doFetch = null;
+async function fetchRSS(url, fallbackUrl, mergeFallbackUrl) {
+  if (!_ff) { try { _ff = await import('./modules/feed-fetch'); _doFetch = _ff.makeProxyFetch(fetchWithTimeout); } catch { return { items: [], usedFallback: false, reason: 'unavailable', status: 0 }; } }
+  return _ff.fetchWithFallback(url, { fallbackUrl, mergeFallbackUrl, gnews: _ff.gnewsFallback, doFetch: _doFetch });
 }
 
 // ─── FORMATTERS ───────────────────────────────────────────────────────────────
@@ -1172,6 +1249,9 @@ async function fetchAISummary({type, title, content, mode='summary', url}) {
   let body = content;
   let fromPreview = false;
   if (url && EXTRACT_MODES.has(mode)) {
+    // AE2 bundle offset: the extractor only runs when a reader/analyze action fires, so load it
+    // on demand instead of in the initial chunk.
+    const { extractContent, extractionFallbackMessage } = await import('./modules/extractor');
     const ex = await extractContent(url);
     if (ex && ex.text) {
       body = ex.text;                                   // tier (a)
@@ -3036,6 +3116,7 @@ body:not(.dark) .pill-bar{
 .cp-btn-red{background:var(--red);}
 .cp-btn-sec{background:none;border:1px solid var(--border);color:var(--text2);border-radius:var(--radius-md);padding:6px 12px;font-size:var(--fs-meta);font-weight:700;cursor:pointer;font-family:inherit;white-space:nowrap;}
 .cp-btn-sec:hover{border-color:var(--accent);color:var(--accent);}
+.cp-alt-toggle{min-height:44px;margin:6px 0 10px;display:inline-flex;align-items:center;gap:6px;}
 .cp-find-wrap{margin:2px 0 10px;}
 .cp-find-wrap .cp-btn-sec{min-height:44px;}
 .cp-find-wrap .cp-desc{margin:4px 0 0;}
@@ -5135,6 +5216,10 @@ kbd{display:inline-block;padding:1px 5px;border:1px solid var(--border);border-r
   -webkit-overflow-scrolling:touch;
 }
 .pc-subtabs::-webkit-scrollbar{display:none;}
+/* AG6: at desktop widths (sidebar present) the Energy chip row (AF2.1: 10 chips) must WRAP inside the
+   feed column instead of scrolling — a nowrap scroll row's off-screen chips otherwise extend under the
+   sticky .sidebar (fixed-overlap). Tech/pop-culture rows fit one row, so wrapping is a no-op there. */
+@media(min-width:1024px){ .en-subtabs,.pc-subtabs{flex-wrap:wrap;overflow-x:visible;} }
 /* U4: ONE chip language — 1px --border, transparent fill, pill radius, body/medium, 32px visual
    height. Selected = the single accent fill + on-accent text (set on .active below). */
 .pc-subtab{
@@ -8354,6 +8439,13 @@ function RightNowWeather({ cities, data }) {
 // ─── HOUSTON (Home-only local news row) ───────────────────────────────────────
 // Filters the already-loaded feed to local Houston sources.
 const HOUSTON_SOURCES = ['KHOU Houston', 'Chron.com', 'Click2Houston', 'Houston Public Media', 'Houston Chronicle'];
+// AF4.1: a Houston/Harris-County LOCAL story stays in the Houston Local strip unless the Houston
+// gate opens — it is covered by >=2 distinct outlets, OR its headline names a major event. ONE
+// CB-editable list (whole-word / phrase matched, so "flood" doesn't fire on "floodlight").
+const HOUSTON_MAJOR_EVENT = ['hurricane','tropical storm','flood','flooding','tornado','explosion',
+  'refinery fire','evacuation','state of emergency','mass shooting','power outage','grid emergency'];
+const isMajorLocalEvent = a => anyWholeWord(((a && a.title) || ''), HOUSTON_MAJOR_EVENT);
+const houstonGateOpen = a => isMajorLocalEvent(a) || ((a && a._clusterSize) || 1) >= 2;
 // Cross-module dedup identity: a normalized title key (same convention as dedupe()),
 // so the same story is caught across modules even when different sources give it
 // different URLs (e.g. a clustered State-of-Play item vs the raw Houston-source item).
@@ -8646,7 +8738,7 @@ function AuthModal({ onClose, onSend, status, email, setEmail, userId, onSignOut
 function FeedPage({ cat, ctx }) {
   // J3: hoisted to module scope (stable identity) so App re-renders re-render this
   // page instead of remounting it. App-internal values arrive via one ctx object.
-  const { activeKw, activeSrc, applyPending, arts, breakingItems, briefingExclude, feedHealth, feeds, followTeam, followedTeams, handleTabChange, health, isSavedFn, isTeamFollowed, isTopicFollowed, kw, kwMatch, lastUpdated, loadCat, loading, myTeams, myTopics, navigate, onRead, onSave, openCustomize, pendingNew, recommended, refreshAll, refreshVoiceSignals, search, setActiveKw, setActiveSrc, setChatContext, setFeeds, setPerspArticle, setSearch, social, sorted, sourceRecs, srcWebLoading, srcWebResults, subcat, tab, teams, toggleTopic, unfollowTeam, urgent, voicesStripFor, webLoading, webResults } = ctx;
+  const { showAlt = true, activeKw, activeSrc, applyPending, arts, breakingItems, briefingExclude, feedHealth, feeds, followTeam, followedTeams, handleTabChange, health, isSavedFn, isTeamFollowed, isTopicFollowed, kw, kwMatch, lastUpdated, loadCat, loading, myTeams, myTopics, navigate, onRead, onSave, openCustomize, pendingNew, recommended, refreshAll, refreshVoiceSignals, search, setActiveKw, setActiveSrc, setChatContext, setFeeds, setPerspArticle, setSearch, social, sorted, sourceRecs, srcWebLoading, srcWebResults, subcat, tab, teams, toggleTopic, unfollowTeam, urgent, voicesStripFor, webLoading, webResults, trendingHas, voiceFlagFn, voiceTiles } = ctx;
     dbgRender('FeedPage'); // J1: render counter
     useEffect(() => dbgMount('FeedPage'), []); // J1: remount counter
     const cc=CATS[cat];
@@ -8671,14 +8763,24 @@ function FeedPage({ cat, ctx }) {
       ? (bizFilter === 'business' ? sorted('business')
          : [...sorted('business'), ...sorted('finance')].sort((a,b)=>new Date(b.pubDate)-new Date(a.pubDate)))
       : sorted(cat);
-    const items=useMemo(()=>clusterStories(rawItems),[rawItems]);
+    // AF2.2: hide `alt` sources entirely when the "Show alternative perspective" switch is off.
+    const items=useMemo(()=>clusterStories(showAlt ? rawItems : rawItems.filter(a => !isAltSource(a.source))),[rawItems, showAlt]);
     const isLoading = isMergedBiz ? (loading.business || loading.finance) : loading[cat];
+    // AE2: importance-ranking kill switch. v2 (default) orders the feed by scoreStory so a
+    // multi-outlet wire story outranks a 3-minute-old fan blog; `?rank=legacy` (or the stored
+    // flag) restores pure recency so CB can compare. Read once per mount.
+    const rankV2 = useMemo(() => {
+      let stored = null; try { stored = localStorage.getItem('mnh_rank'); } catch { /* private mode */ }
+      return rankMode(typeof window !== 'undefined' ? window.location.search : '', stored) !== 'legacy';
+    }, []);
 
     // Phase 2: subcategory is URL-driven (never local state). Chips navigate.
     const pcSubTab = cat === 'popculture' ? (subcat || 'all') : 'all';
     const setPcSubTab = (key) => navigate('popculture', key === 'all' ? null : key);
     const enSubTab = cat === 'bloom' ? (subcat || 'all') : 'all';
     const setEnSubTab = (key) => navigate('bloom', key === 'all' ? null : key);
+    const tcSubTab = cat === 'tech' ? (subcat || 'all') : 'all';
+    const setTcSubTab = (key) => navigate('tech', key === 'all' ? null : key);
     const [pcWebResults, setPcWebResults] = useState([]);
     const [pcWebLoading, setPcWebLoading] = useState(false);
     const [enWebResults, setEnWebResults] = useState([]);
@@ -8701,39 +8803,73 @@ function FeedPage({ cat, ctx }) {
       comedy: ['comedy','comedian','stand-up','funny','humor','joke','sketch','snl','sitcom','comic','parody','satire'],
     };
 
+    // AF2.1: Energy chips — Oil & Gas now splits into Upstream/Midstream/Downstream, Power becomes
+    // Power & Utilities, and a Data-center power chip is added. `sub` hints on feeds (AF5) plus the
+    // whole-word keyword match (AE6) drive each.
     const EN_SUBTABS = [
-      { key:'all',     label:'All',           icon:LayoutGrid },
-      { key:'power',   label:'Power',         icon:Zap },
-      { key:'oilgas',  label:'Oil & Gas',     icon:Droplet },
-      { key:'clean',   label:'Clean Energy',  icon:Leaf },
-      { key:'markets', label:'Markets',       icon:TrendingUp },
-      { key:'policy',  label:'Policy',        icon:Scale },
+      { key:'all',        label:'All',             icon:LayoutGrid },
+      { key:'oilgas',     label:'Oil & Gas',       icon:Droplet },
+      { key:'upstream',   label:'Upstream',        icon:Droplet },
+      { key:'midstream',  label:'Midstream',       icon:Droplet },
+      { key:'downstream', label:'Downstream',      icon:Droplet },
+      { key:'power',      label:'Power & Utilities', icon:Zap },
+      { key:'datacenter', label:'Data-center',     icon:Zap },
+      { key:'clean',      label:'Clean Energy',    icon:Leaf },
+      { key:'markets',    label:'Markets',         icon:TrendingUp },
+      { key:'policy',     label:'Policy',          icon:Scale },
     ];
     const EN_KWS = {
+      upstream:   ['upstream','drilling','rig','exploration','wellhead','shale','fracking','permian','e&p','crude production','offshore drilling','wildcat'],
+      midstream:  ['midstream','pipeline','terminal','ngl','gathering','lng export','compressor','storage hub','takeaway'],
+      downstream: ['downstream','refinery','refining','petrochemical','gasoline','diesel','crack spread','fuel retail','refined products'],
+      datacenter: ['data center','datacenter','hyperscale','ai power','load growth','grid demand'],
       power:   ['power','electric','grid','utility','electricity','megawatt','kilowatt','nuclear','coal','natural gas','transmission','substation','generation','powerplant','baseload'],
-      oilgas:  ['oil','gas','petroleum','crude','refinery','pipeline','opec','brent','wti','shale','drilling','rig','barrel','lng','upstream','downstream','midstream','gasoline'],
-      clean:   ['solar','wind','renewable','clean energy','green','battery','storage','ev','electric vehicle','hydrogen','carbon','emissions','climate','sustainability','net zero','offshore wind'],
-      markets: ['commodity','commodities','futures','spot price','energy prices','gas prices','oil prices','supply','demand','export','import','petrochemical','inflation energy'],
+      oilgas:  ['oil','gas','petroleum','crude','refinery','pipeline','opec','brent','wti','shale','drilling','rig','barrel','lng','gasoline'],
+      clean:   ['solar','wind','renewable','clean energy','battery','storage','ev','hydrogen','carbon','emissions','climate','sustainability','net zero','offshore wind'],
+      markets: ['commodity','commodities','futures','spot price','energy prices','gas prices','oil prices','supply','demand','export','import'],
       policy:  ['policy','regulation','epa','federal','congress','legislation','tariff','subsidy','permit','department of energy','doe','ferc','administration','executive order','climate bill'],
     };
+    // AF2.1: Tech chips. "Stay current" gathers the AF5 daily-digest feeds by source name (they carry
+    // sub:'staycurrent'); the rest match whole-word on the headline (AE6). Icons reuse imports.
+    const TECH_SUBTABS = [
+      { key:'all',         label:'All',           icon:LayoutGrid },
+      { key:'aimodels',    label:'AI & Models',   icon:Zap },
+      { key:'staycurrent', label:'Stay current',  icon:TrendingUp },
+      { key:'bigtech',     label:'Big Tech',      icon:Scale },
+      { key:'chips',       label:'Chips & Infra', icon:Droplet },
+      { key:'startups',    label:'Startups',      icon:Leaf },
+    ];
+    const TECH_KWS = {
+      aimodels:['ai model','llm','gpt','gemini','claude','llama','mistral','benchmark','frontier model','multimodal','anthropic','openai'],
+      bigtech: ['apple','google','microsoft','amazon','meta','nvidia','antitrust','alphabet'],
+      chips:   ['chip','semiconductor','gpu','tsmc','foundry','wafer','data center','hbm','asml'],
+      startups:['startup','seed round','series a','series b','venture','funding round','valuation','founder','raise'],
+    };
+    // AH3.1: the Stay-current source set is derived from the feeds' (normalized) `sub` — so every feed
+    // tagged staycurrent (incl. ones that drifted to the `stay-current` spelling) lands in the chip.
+    const techStaycurrentSrc = useMemo(() => sourcesForSub(feeds.tech, 'staycurrent'), [feeds]);
 
     // Filter items by pop culture sub-tab
+    // AE6: WHOLE-WORD sub-category filtering (was substring .includes, which lit up 'ev' inside
+    // every/event, 'rig' inside right, 'oil' inside boil). A `sub` hint on a feed (AE1) also
+    // routes its stories into the matching chip even when the headline is terse.
     const pcFilteredItems = useMemo(() => {
       if (cat !== 'popculture' || pcSubTab === 'all') return items;
       const kws = PC_KWS[pcSubTab] || [];
-      return items.filter(a => {
-        const t = (a.title + ' ' + (a.desc||'')).toLowerCase();
-        return kws.some(k => t.includes(k));
-      });
+      return items.filter(a => anyWholeWord((a.title + ' ' + (a.desc||'')), kws));
     }, [items, cat, pcSubTab]);
+
+    const tcFilteredItems = useMemo(() => {
+      if (cat !== 'tech' || tcSubTab === 'all') return items;
+      if (tcSubTab === 'staycurrent') return items.filter(a => techStaycurrentSrc.has(a.source));
+      const kws = TECH_KWS[tcSubTab] || [];
+      return items.filter(a => anyWholeWord((a.title + ' ' + (a.desc||'')), kws));
+    }, [items, cat, tcSubTab, techStaycurrentSrc]);
 
     const enFilteredItems = useMemo(() => {
       if (cat !== 'bloom' || enSubTab === 'all') return items;
       const kws = EN_KWS[enSubTab] || [];
-      return items.filter(a => {
-        const t = (a.title + ' ' + (a.desc||'')).toLowerCase();
-        return kws.some(k => t.includes(k));
-      });
+      return items.filter(a => anyWholeWord((a.title + ' ' + (a.desc||'')), kws));
     }, [items, cat, enSubTab]);
 
     // ── WIDE DISCOVERY (Pass L item 2) ──────────────────────────────────────────
@@ -8785,7 +8921,7 @@ function FeedPage({ cat, ctx }) {
       fetchWebSearch(q).then(r => { setEnWebResults(r); setEnWebLoading(false); });
     }, [cat, enSubTab]);
 
-    const baseFilteredItems = cat === 'bloom' ? enFilteredItems : pcFilteredItems;
+    const baseFilteredItems = cat === 'bloom' ? enFilteredItems : cat === 'tech' ? tcFilteredItems : pcFilteredItems;
     // Fold the wide-discovery rows into the active feed (deduped by storyKey, then
     // re-sorted by recency), so every category shows headlines from ANY outlet — not
     // just the reader's toggled-on feeds (Pass L item 2).
@@ -8796,7 +8932,11 @@ function FeedPage({ cat, ctx }) {
       if (!extra.length) return baseFilteredItems;
       return [...baseFilteredItems, ...extra].sort((a, b) => new Date(b.pubDate || 0) - new Date(a.pubDate || 0));
     }, [baseFilteredItems, catWideItems]);
-    const heroItems=activeFilteredItems.filter(a=>a.img);
+    // AF2.3: an `alt` source NEVER leads (AE1 governance: alt never leads/breaks/raises a tier,
+    // never counts toward coverage). It is kept out of the hero/lead pool here and out of the Top
+    // Stories pool below, so it surfaces only in the feed's "Latest" with its "Alternative
+    // perspective" chip (SnapshotCard) — where the Show-alternative-perspective switch can hide it.
+    const heroItems=activeFilteredItems.filter(a=>a.img && !isAltSource(a.source));
     const catLead=heroItems[0]||null;
     const feedItems=catLead?activeFilteredItems.filter(a=>a.link!==catLead.link):activeFilteredItems;
 
@@ -8831,14 +8971,16 @@ function FeedPage({ cat, ctx }) {
         const pool = [];
         for (const a of flat) {
           const k = storyKey(a);
-          if (used.has(k) || isPromoItem(a)) continue;
+          // AF2.3: alt sources never enter Top Stories (they never count toward coverage); they
+          // flow to the feed's Latest with the "Alternative perspective" chip instead.
+          if (used.has(k) || isPromoItem(a) || isAltSource(a.source)) continue;
           if (!byKey.has(k)) byKey.set(k, a);
           pool.push({ key: k, cat: a.cat, source: a.source, clusterSize: outletCount[k] || 1, pubDate: a.pubDate, breaking: !!(a.isAlert || a._breaking) });
         }
         const leadNonGen = catLead && (catLead.cat || 'general') !== 'general' ? 1 : 0;
         // AA4.5: seed the ≤2/publisher cap with the hero's publisher so lead + rows ≤ 2 per source.
         const seedSources = catLead && catLead.source ? [catLead.source] : [];
-        for (const k of rankHomeTop(pool, { max: 6 - picks.length, nonGeneralUsed: leadNonGen, seedSources })) {
+        for (const k of rankHomeTop(pool, { max: 6 - picks.length, nonGeneralUsed: leadNonGen, seedSources, rankV2 })) {
           const it = byKey.get(k);
           if (it && !used.has(k)) { picks.push({ ...it, cat: it.cat || 'general' }); used.add(k); }
         }
@@ -8894,8 +9036,11 @@ function FeedPage({ cat, ctx }) {
     // NB: breaking is NOT subtracted here — selectStateOfPlay already drops any ranked row that
     // matches a breaking row (notSameAsAny), so subtracting the HELD catBreaking keys up here only
     // coupled breaking's (later) commit into the feed/rail dedup and made them re-flow late (CLS).
+    // AF2.3: alt sources never enter State of Play either (it is a promoted lead-like module; alt
+    // never leads/counts coverage). Excluded here so an alt item falls through to the feed's Latest,
+    // where SnapshotCard carries the "Alternative perspective" chip and the Show-alt switch hides it.
     const sopSourceItems = useMemo(
-      () => activeFilteredItems.filter(a => !topStoryKeys.has(storyKey(a)) && !isPromoItem(a)),
+      () => activeFilteredItems.filter(a => !topStoryKeys.has(storyKey(a)) && !isPromoItem(a) && !isAltSource(a.source)),
       [activeFilteredItems, topStoryKeys]);
     // The numbered State-of-Play rows — ranked by the SAME pure selector the component uses, so
     // what we claim for dedup is exactly what SoP shows. (Breaking is held/claimed above via
@@ -8919,6 +9064,9 @@ function FeedPage({ cat, ctx }) {
       const seen = new Set();
       return Object.values(arts || {}).flat()
         .filter(a => HOUSTON_SOURCES.includes(a.source))
+        // AF4.1: a local story that passes the Houston gate (>=2 outlets or a major-event term)
+        // leaves the strip and flows into the main feed / Top now; the rest stay local-only.
+        .filter(a => !houstonGateOpen(a))
         .filter(a => !topStoryKeys.has(storyKey(a)) && !catBreakingKeys.has(storyKey(a)) && !sopShownKeys.has(storyKey(a)))
         .filter(a => { const k = storyKey(a); if (seen.has(k)) return false; seen.add(k); return true; })
         .sort((a, b) => new Date(b.pubDate) - new Date(a.pubDate))
@@ -8930,8 +9078,74 @@ function FeedPage({ cat, ctx }) {
     const dedupedFeed = useMemo(
       // X2a: one story once — cluster-dedupe this category feed (not only Home/Sports) so near-
       // duplicates (identical + bigram-near titles) collapse to one row.
-      () => onePerCluster(feedItems.filter(a => !topStoryKeys.has(storyKey(a)) && !catBreakingKeys.has(storyKey(a)) && !sopShownKeys.has(storyKey(a)) && !houstonKeys.has(storyKey(a)))),
-      [feedItems, topStoryKeys, catBreakingKeys, sopShownKeys, houstonKeys]);
+      // AE2: then order by IMPORTANCE (scoreStory) in v2 — multi-outlet coverage + recency beat a
+      // lone fan/local post — instead of pure recency. The kill switch keeps recency order.
+      () => {
+        const base = onePerCluster(feedItems.filter(a => !topStoryKeys.has(storyKey(a)) && !catBreakingKeys.has(storyKey(a)) && !sopShownKeys.has(storyKey(a)) && !houstonKeys.has(storyKey(a))));
+        // AF3 proof: the items scoreStory sees carry _clusterMembers, so multi-outlet coverage is
+        // actually counted (not always 1). ?debug=1 tallies how many feed items are multi-outlet.
+        if (DEBUG && typeof window !== 'undefined') {
+          window.__dbg = window.__dbg || {};
+          window.__dbg.feedMultiOutlet = base.filter(a => Array.isArray(a._clusterMembers) && a._clusterMembers.length > 1).length;
+          window.__dbg.feedTotal = base.length;
+          // Rank spread proves the score is NOT inert even when single-outlet: core>specialist>fan.
+          window.__dbg.feedRankSpread = base.reduce((m, a) => { const r = coverageOf(a); const k = r.core ? 'core' : r.specialist ? 'specialist' : r.hasFan ? 'fan' : r.hasAlt ? 'alt' : r.hasLocal ? 'local' : 'other'; m[k] = (m[k] || 0) + 1; return m; }, {});
+        }
+        if (!rankV2) return base;
+        const now = Date.now();
+        return [...base].map((a, i) => ({ a, i, s: scoreStory(a, { cat, now }) }))
+          .sort((x, y) => y.s - x.s || x.i - y.i) // score desc, stable by original recency order
+          .map(o => o.a);
+      },
+      [feedItems, topStoryKeys, catBreakingKeys, sopShownKeys, houstonKeys, rankV2, cat]);
+
+    // AF3: split the (score-ordered) feed into "Top now" and "Latest". Top now = the leading
+    // eligible stories within 24h, max 2 per publisher, cap 6 — a multi-outlet story, never a lone
+    // fan/alt/local post (coverage>=1). Latest = the rest, kept in order. News adds the AF4 rule
+    // (a single non-core source can't enter Top now). Pure recency (legacy) shows no split.
+    const topNowSet = useMemo(() => {
+      const set = new Set();
+      if (!rankV2) return set;
+      const now = Date.now(); const perPub = {};
+      for (const a of dedupedFeed) {
+        const ageH = (now - new Date(a.pubDate)) / 3_600_000;
+        if (ageH > 24) continue;
+        const cov = coverageOf(a);
+        const realCoverage = cov.core + cov.specialist;
+        // AF4.1: a local story is eligible only when the Houston gate is open (>=2 outlets or a
+        // major event); otherwise a lone fan/alt/local never enters Top now.
+        const localGateOpen = cov.hasLocal && houstonGateOpen(a);
+        if (realCoverage < 1 && !localGateOpen) continue;
+        // AF4.3 NEWS gate: a single non-core source can't enter News Top now (the Houston gate overrides).
+        if (isHome && !localGateOpen && cov.core < 1 && realCoverage < 2) continue;
+        const pub = a.source || '?'; const c = perPub[pub] || 0;
+        if (c >= 2) continue;
+        perPub[pub] = c + 1; set.add(a.link || a);
+        if (set.size >= 6) break;
+      }
+      return set;
+    }, [dedupedFeed, rankV2, isHome]);
+    const orderedFeed = useMemo(() => {
+      if (!rankV2 || !topNowSet.size) return dedupedFeed;
+      const inTop = a => topNowSet.has(a.link || a);
+      return [...dedupedFeed.filter(inTop), ...dedupedFeed.filter(a => !inTop(a))];
+    }, [dedupedFeed, topNowSet, rankV2]);
+    const topNowN = rankV2 ? topNowSet.size : 0;
+    // AG3: "Also moving" — behind-the-scenes stories that aren't in Top now or any outlet's glance
+    // lead. Computed here (not in the component) so its keys can be excluded from Latest. Pool is the
+    // score-ordered feed (already minus Top Stories / Breaking / SoP / Houston); we further exclude
+    // the Top-now rows and the glance's pinned leads. Keyword/team qualify now; trending (AG4) and
+    // voice flags (AG5) feed in later via trendingHas/voiceFlag.
+    const alsoMovingRows = useMemo(() => {
+      if (activeKw || activeSrc || search || !rankV2) return [];
+      // Pool = the score-ordered feed minus the Top-now rows (dedupedFeed already excludes Top Stories
+      // / Breaking / State of Play / Houston); Also-moving's own keys are excluded from Latest below.
+      const pool = dedupedFeed.filter(a => !topNowSet.has(a.link || a));
+      // AG5.3: bind the lazy voice-flag matcher to this category's voice-signal tiles.
+      const voiceFlag = (voiceFlagFn && voiceTiles && voiceTiles.length) ? (a => voiceFlagFn(a, voiceTiles)) : null;
+      return selectAlsoMoving(pool, { storyKey, kwMatch, cat, followedTeams, trendingHas, voiceFlag });
+    }, [dedupedFeed, topNowSet, cat, activeKw, activeSrc, search, rankV2, followedTeams, kwMatch, trendingHas, voiceFlagFn, voiceTiles]);
+    const alsoMovingKeys = useMemo(() => new Set(alsoMovingRows.map(r => storyKey(r.item))), [alsoMovingRows]);
 
     // ── COVERAGE GAP (folded into State of Play) — widely-covered stories none of the
     //    reader's own sources carried. Home keys off this category; the merged
@@ -9063,16 +9277,22 @@ function FeedPage({ cat, ctx }) {
 
         {/* ── ENERGY sub-category pills — at the top of the page, matching the Sports
             league/team pill position + format (Pass J item 8). ── */}
-        {cat === 'bloom' && !activeKw && !activeSrc && !search && (
+        {(cat === 'bloom' || cat === 'tech') && !activeKw && !activeSrc && !search && (() => {
+          // AF2.1: one chip row for Energy AND Tech sub-categories (same position/format as Sports).
+          const SUBTABS = cat === 'tech' ? TECH_SUBTABS : EN_SUBTABS;
+          const curSub = cat === 'tech' ? tcSubTab : enSubTab;
+          const setSub = cat === 'tech' ? setTcSubTab : setEnSubTab;
+          return (
           <div className="pc-subtabs en-subtabs" data-no-swipe style={{marginBottom:'12px'}}>
-            {EN_SUBTABS.map(t => (
-              <button key={t.key} className={`pc-subtab ${enSubTab===t.key?'active':''}`}
-                onClick={()=>{setEnSubTab(t.key);window.scrollTo({top:0,behavior:'instant'});}}>
+            {SUBTABS.map(t => (
+              <button key={t.key} className={`pc-subtab ${curSub===t.key?'active':''}`}
+                onClick={()=>{setSub(t.key);window.scrollTo({top:0,behavior:'instant'});}}>
                 {SHOW_CHIP_ICONS && <CatIcon icon={t.icon}/>}{t.label}
               </button>
             ))}
           </div>
-        )}
+          );
+        })()}
 
         {/* ── HOME: Top Stories (image cards) — sits first; the text-only State of Play
             module below it provides a breathing-room break before the next image block
@@ -9234,12 +9454,24 @@ function FeedPage({ cat, ctx }) {
                         collapsed={sopCollapsed} onToggleCollapse={toggleSop}/>
                     </div>
                   )}
-                  {(activeKw||activeSrc||search ? feedItems.slice(0,20) : dedupedFeed.slice(0,20)).map((a,i)=>(
+                  {/* AG2: "Right now across outlets" glance — at a glance, what each top outlet leads
+                      with. Lazy; only on the main category view (not keyword/source/search). */}
+                  {!activeKw && !activeSrc && !search && (
+                    <Suspense fallback={null}><AcrossOutlets items={rawItems} cat={cat} showAlt={showAlt} onRead={onRead} formatDate={fmtDate}/></Suspense>
+                  )}
+                  {(activeKw||activeSrc||search ? feedItems.slice(0,20) : orderedFeed.filter(a=>!alsoMovingKeys.has(storyKey(a))).slice(0,20)).map((a,i)=>{
+                    const showSplit = !activeKw && !activeSrc && !search && rankV2 && topNowN > 0;
+                    return (
                     <Fragment key={a.link||i}>
+                      {showSplit && i===0 && <span className="eyebrow feed-rank-eyebrow">Top now</span>}
+                      {/* AG3: "Also moving" sits under Top now, before Latest (lazy). */}
+                      {showSplit && i===topNowN && <Suspense fallback={null}><AlsoMoving rows={alsoMovingRows} onRead={onRead} formatDate={fmtDate}/></Suspense>}
+                      {showSplit && i===topNowN && <span className="eyebrow feed-rank-eyebrow">Latest</span>}
                       <SnapshotCard a={a} meta={CATS[cat]||CATS.general} isSaved={isSavedFn(a)} onSave={onSave} onRead={onRead} onPerspectives={setPerspArticle} onAsk={setChatContext} formatDate={fmtDate} opinionLabel={opinionLabel(a)} hideImage={i>=3} lead={false}/>
                       {i===2 && <XPulse topic={cc?.label||cat} variant="feed"/>}
                     </Fragment>
-                  ))}
+                    );
+                  })}
                  </div>
             }
 
@@ -9432,11 +9664,26 @@ export default function App() {
     const saved = ld('feeds', null);
     if (saved == null) return DEFAULT_FEEDS;              // fresh browser — already Z2-tagged
     if (ld('feedsMigV', 0) >= FEEDS_MIG_V) return saved;  // migrated already; respect later user edits
-    const { feeds: migrated, changed } = migrateFeedsZ2(saved);
-    try { sv('feeds', migrated); sv('feedsMigV', FEEDS_MIG_V); } catch {}
-    if (DEBUG && typeof console !== 'undefined') console.log('[feedsMigrationZ2] applied; moved feeds:', changed);
-    return migrated;
+    // AF1: Z2 (category moves) then AE (add-only new defaults + de-dup) — chained, both idempotent.
+    const z2 = migrateFeedsZ2(saved);
+    const ae = migrateFeedsAE(z2.feeds, DEFAULT_FEEDS);
+    try { sv('feeds', ae.feeds); sv('feedsMigV', FEEDS_MIG_V); sv('feedsAEAdded', ae.added); } catch {}
+    if (DEBUG && typeof console !== 'undefined') console.log('[feedsMigrationAE] applied; added:', ae.added, 'z2 moved:', z2.changed);
+    return ae.feeds;
   });
+  // AH2: after first paint, lazily patch saved feeds with the dead-feed fallbacks (idempotent; the
+  // patch module is in its own lazy chunk, out of the initial bundle). Applies the next refresh.
+  useEffect(() => {
+    import('./modules/feeds-migrate/ah').then(m => setFeeds(prev => {
+      const r = m.migrateFeedsAH(prev, DEFAULT_FEEDS);
+      if (r.changed) { try { sv('feeds', r.feeds); } catch {} return r.feeds; }
+      return prev;
+    })).catch(() => {});
+  }, []);
+  // AF2.2: "Show alternative perspective" — default ON. When off, items from `alt` sources
+  // (Daily Wire / ZeroHedge / Watcher Guru) are hidden on every page/band. Stored with prefs.
+  const [showAlt, setShowAlt] = useState(() => ld('showAlt', true));
+  const toggleShowAlt = useCallback(() => setShowAlt(v => { const n = !v; try { sv('showAlt', n); } catch {} return n; }), []);
   // ── FOLLOW-A-SOURCE-FROM-FEED (Pass G item 7) ───────────────────────────────
   // "Followed" = present and enabled in any category's feed list (the same list
   // Customize manages). followSource enables an existing entry or, if the source
@@ -9517,6 +9764,22 @@ export default function App() {
     const v = partial.id && partial.handles !== undefined && partial.name ? partial : makeVoice(partial);
     setVoiceTombstones(prev => { const n = clearTombstone(prev, v.id); sv('voiceTombstones', n); return n; });
     setVoices(prev => { const n = upsertVoice(prev, v); sv('voices', n); return n; });
+  }, []);
+  // AG5.2: Import from AetherHub — create CONFIRMED voices (handles set, confirmedBy:'aetherhub-import')
+  // from the roster rows CB confirms. Batched so "Confirm all" is one update. Clears any tombstone.
+  const importAetherVoices = useCallback((people) => {
+    if (!people || !people.length) return;
+    setVoices(prev => {
+      let out = prev;
+      for (const p of people) {
+        const handles = p.platform === 'youtube' ? { youtube: p.handle } : { x: p.handle };
+        const v = makeVoice({ type: p.type, name: p.name, category: p.category, handles, status: 'confirmed', confirmedAt: Date.now() });
+        v.confirmedBy = 'aetherhub-import';
+        out = upsertVoice(out, v);
+      }
+      sv('voices', out); return out;
+    });
+    setVoiceTombstones(prev => { let n = prev; for (const p of people) n = clearTombstone(n, voiceId(p.name, p.type)); sv('voiceTombstones', n); return n; });
   }, []);
   const removeVoiceById = useCallback((id) => {
     setVoices(prev => { const n = prev.filter(v => v.id !== id); sv('voices', n); return n; });
@@ -9654,17 +9917,23 @@ export default function App() {
   }, []);
   // The review queue: name-only suggestions (E4 list) + migrated social, minus anything
   // already added or tombstoned (Skip tombstones so it won't re-suggest).
+  // AG5: SEED_VOICES is lazy-loaded into seedBase (below) so it is not in the initial chunk.
+  const [seedBase, setSeedBase] = useState([]);
   const seedQueue = useMemo(() => {
     const added = new Set((voices || []).map(v => v.id));
     const tomb = new Set(voiceTombstones || []);
-    const all = [...SEED_VOICES.map(s => ({ ...makeVoice(s), _parkedFrom: s._parkedFrom })), ...migratedSocialSeeds];
+    const all = [...seedBase.map(s => ({ ...makeVoice(s), _parkedFrom: s._parkedFrom })), ...migratedSocialSeeds];
     const seen = new Set(), out = [];
     for (const v of all) { if (seen.has(v.id) || added.has(v.id) || tomb.has(v.id)) continue; seen.add(v.id); out.push(v); }
     return out;
-  }, [voices, voiceTombstones, migratedSocialSeeds]);
+  }, [voices, voiceTombstones, migratedSocialSeeds, seedBase]);
   const skipSeed = useCallback((id) => {
     setVoiceTombstones(prev => prev.includes(id) ? prev : (() => { const n = [...prev, id]; sv('voiceTombstones', n); return n; })());
   }, []);
+  // AH1: bulk "Accept all" — add many seeds at once as status:'unconfirmed', confirmedBy:'accept-all'.
+  // NO per-person handle prompt (handles resolve lazily later via Lane 1). Tombstoned ids are never
+  // re-added; existing ids are skipped and counted. Returns { added, skipped, prevVoices, addedIds }
+  // so the panel can offer Undo (restore) / "Remove added". Only persists prefs — no network.
   // E5: "Test voices" — per voice/platform reachability (makes NO search-API calls).
   const [voicesTest, setVoicesTest] = useState(null); // { loading, summary, results }
   const testVoices = useCallback(async () => {
@@ -9708,6 +9977,34 @@ export default function App() {
   const [activePod, setActivePod]   = useState(null);
   const [podLimit, setPodLimit]     = useState(20); // episodes shown; "Load more" adds 20. App-level so it survives PodcastsPage remounts.
   const [showPanel, setShowPanel]   = useState(false);
+  // AG5: load the seed roster lazily (SEED_VOICES + AetherHub) the first time the Customize panel is
+  // opened — keeps both out of the initial chunk. Idempotent; the seed queue fills in once loaded.
+  useEffect(() => {
+    if (!showPanel || seedBase.length) return;
+    let alive = true;
+    import('./modules/voices/seeds').then(m => { if (alive) setSeedBase(m.SEED_VOICES || []); }).catch(() => {});
+    return () => { alive = false; };
+  }, [showPanel, seedBase.length]);
+  // AG4: load trending tokens ONCE, AFTER first paint (idle), via the existing /api/feed proxy. Stored
+  // as a bound predicate so the (lazy) trending module stays out of the initial chunk. Fail-soft.
+  const [trendingHas, setTrendingHas] = useState(null);
+  useEffect(() => {
+    let alive = true;
+    const run = () => import('./modules/trending').then(async m => {
+      const toks = m.trendTokens(await m.fetchTrending(fetchRSS));
+      if (alive && toks.size) setTrendingHas(() => (a) => m.isTrending(a, toks));
+    }).catch(() => {});
+    const idle = typeof requestIdleCallback === 'function' ? requestIdleCallback(run) : setTimeout(run, 1500);
+    return () => { alive = false; if (typeof cancelIdleCallback === 'function') cancelIdleCallback(idle); };
+  }, []);
+  // AG5.3: load the voice-flag matcher lazily (kept out of the initial chunk). Stored as the fn so
+  // FeedPage can bind it to each category's voice-signal tiles for "Also moving".
+  const [voiceFlagFn, setVoiceFlagFn] = useState(null);
+  useEffect(() => {
+    let alive = true;
+    import('./modules/voice-flag').then(m => { if (alive) setVoiceFlagFn(() => m.voiceFlagFor); }).catch(() => {});
+    return () => { alive = false; };
+  }, []);
   const [panelInitial, setPanelInitial] = useState({tab:'keywords',cat:'general'});
   const [activeKw, setActiveKw]     = useState(null);
   const [activeSrc, setActiveSrc]   = useState(null);
@@ -9854,10 +10151,10 @@ export default function App() {
     setLoading(l=>({...l,[cat]:true}));
     const results=[],hUpdates={},fhUpdates={};
     await Promise.allSettled((feeds[cat]||[]).filter(f=>f.on).map(async f=>{
-      const t0=Date.now();const{items,status,reason}=await fetchRSS(f.url);const ms=Date.now()-t0;
+      const t0=Date.now();const{items,status,reason,usedFallback}=await fetchRSS(f.url,f.fallbackUrl,f.mergeFallbackUrl);const ms=Date.now()-t0;
       const ok=items.length>0;
       hUpdates[f.name]=ok?(ms<4000?'green':'yellow'):'red';
-      fhUpdates[f.name]={code:status||0, ok, reason:reason||''};
+      fhUpdates[f.name]={code:status||0, ok, reason:reason||'', usedFallback:!!usedFallback};
       items.forEach(i=>{if(i.title&&i.link)results.push({...i,source:f.name,cat,_tier:f.tier||'reported'});});
     }));
     setHealth(h=>({...h,...hUpdates}));
@@ -9878,7 +10175,7 @@ export default function App() {
   const fetchCatArticles = useCallback(async (cat)=>{
     const results=[];
     await Promise.allSettled((feeds[cat]||[]).filter(f=>f.on).map(async f=>{
-      const {items}=await fetchRSS(f.url);
+      const {items}=await fetchRSS(f.url,f.fallbackUrl,f.mergeFallbackUrl);
       items.forEach(i=>{if(i.title&&i.link)results.push({...i,source:f.name,cat,_tier:f.tier||'reported'});});
     }));
     results.sort((a,b)=>new Date(b.pubDate)-new Date(a.pubDate));
@@ -10769,13 +11066,15 @@ export default function App() {
                     isPhone: isMobile,
                   }}/></Suspense>
                 : NEWS_CATS.filter(c=>c!=='sports').includes(tab)&&<FeedPage cat={tab} ctx={{
+                showAlt,
                 activeKw, activeSrc, applyPending, arts, breakingItems, briefingExclude, feedHealth,
                 feeds, followTeam, followedTeams, handleTabChange, health, isSavedFn, isTeamFollowed,
                 isTopicFollowed, kw, kwMatch, lastUpdated, loadCat, loading, myTeams, myTopics, navigate, onRead,
                 onSave, openCustomize, pendingNew, recommended, refreshAll, refreshVoiceSignals, search,
                 setActiveKw, setActiveSrc, setChatContext, setFeeds, setPerspArticle, setSearch, social,
                 sorted, sourceRecs, srcWebLoading, srcWebResults, subcat, tab, teams, toggleTopic,
-                unfollowTeam, urgent, voicesStripFor, webLoading, webResults,
+                unfollowTeam, urgent, voicesStripFor, webLoading, webResults, trendingHas,
+                voiceFlagFn, voiceTiles: (voiceSignals[tab] || {}).tiles || [],
               }}/>}
               {tab==='finance'&&<FinancePage/>}
               {tab==='podcasts'&&(
@@ -10846,13 +11145,14 @@ export default function App() {
         />
 
         {showPanel&&<Suspense fallback={null}><CustomizePanel feeds={feeds} kw={kw} alerts={alerts} urgent={urgent}
+          aeAdded={Number(ld('feedsAEAdded',0))||0} showAlt={showAlt} onToggleAlt={toggleShowAlt} fetchRSS={fetchRSS}
           social={social} watchlist={watchlist} teams={teams} health={health} arts={arts}
           weatherCities={weatherCities} hiddenIndices={hiddenIndices}
           briefingExclude={briefingExclude}
           briefingSources={briefingSources}
           initialTab={panelInitial.tab} initialCat={panelInitial.cat}
           voices={voices} onAddVoice={addOrUpdateVoice} removeVoiceById={removeVoiceById} reorderVoice={reorderVoice}
-          onResolveVoice={resolveVoiceFlow} seedQueue={seedQueue} onAcceptSeed={resolveVoiceFlow} onSkipSeed={skipSeed} onFindVoices={findVoices}
+          onResolveVoice={resolveVoiceFlow} seedQueue={seedQueue} onAcceptSeed={resolveVoiceFlow} onSkipSeed={skipSeed} onFindVoices={findVoices} onImportAether={importAetherVoices} onSetVoices={(list)=>{setVoices(list||[]);try{sv('voices',list||[]);}catch{}}}
           onTestVoices={testVoices} voicesTest={voicesTest} searchKeyPresent={false}
           CATS={CATS} INDICES={INDICES} DEFAULT_WEATHER_CITIES={DEFAULT_WEATHER_CITIES} DEFAULT_SOCIAL={DEFAULT_SOCIAL}
           BRIEFING_PRIORITY_SOURCES={BRIEFING_PRIORITY_SOURCES} SOCIAL_META={SOCIAL_META}

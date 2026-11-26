@@ -12,6 +12,7 @@ import { XPulse } from '../x-pulse';
 import { dbgRender, dbgMount } from '../debug';
 import { isPromoItem } from '../breaking'; // K3: promo filter for the team wide/gap scans
 import { CatIcon, SHOW_CHIP_ICONS } from '../cat-icon'; // U3: one quiet chip-icon treatment (off in Batch U)
+import { selectSportsBreaking } from './breaking-select'; // AF4.2: Breaking-in-sports gate (pure)
 
 // Per-league keyword sets (lifted to module scope, P5) so the feed filter AND the index-tile
 // counts share ONE source of truth — a tile's number is exactly what selecting it would show.
@@ -118,6 +119,11 @@ export function SportsPage({ ctx }) {
     // and never cache. `sorted` is a stable useCallback, so this recomputes only when
     // its inputs actually change.
     const allItems = useMemo(() => sorted('sports'), [sorted]);
+    // AF4.2: Breaking-in-sports — heavily-covered (>=3 real outlets, >=1 core) stories in the last 2h,
+    // with a +1 boost for the reader's followed teams. Only on the "All" overview.
+    const sportsBreaking = useMemo(() => selectSportsBreaking(allItems, {
+      favMatches: teams.map(t => (t.match || '').toLowerCase()).filter(Boolean), storyKey,
+    }), [allItems, teams, storyKey]);
     const isLoading = loading.sports;
 
     // Filter teams by sport tab — pill rail respects tab
@@ -153,6 +159,15 @@ export function SportsPage({ ctx }) {
         items = items.filter(a => {
           const t = (a.title + ' ' + (a.desc||'')).toLowerCase();
           return teamsInSport.some(m => m && t.includes(m)) || sportKws.some(k => t.includes(k));
+        });
+      } else {
+        // AF2.1: main Sports ("All") EXCLUDES racing & golf — they have their own chips, so a
+        // horse-racing or golf item no longer clutters the main league feed. (Only when nothing is
+        // filtered to a team.) Niche single-interest coverage stays one tap away under its chip.
+        const nicheKws = [...(SPORT_KWS.racing || []), ...(SPORT_KWS.golf || [])];
+        items = items.filter(a => {
+          const t = (a.title + ' ' + (a.desc||'')).toLowerCase();
+          return !nicheKws.some(k => t.includes(k));
         });
       }
       // Favorite-team prioritization: bubble articles mentioning user's teams to top
@@ -286,6 +301,20 @@ export function SportsPage({ ctx }) {
 
         {/* ── SCORES — live scoreboard, anchored at the very top of the ribbon ── */}
         {!teamName && <SportsScoreStrip sportTab={sportTab} teams={[...teams, ...myTeams.map(t=>({match:t.name, league:t.league}))]}/>}
+
+        {/* ── AF4.2: BREAKING IN SPORTS — only on the "All" overview, only when a story clears the
+            >=3-real-outlet + >=1-core gate (fan/alt never trigger). ── */}
+        {sportTab === 'all' && !teamName && !activeTeam && !activeSrc && !search && sportsBreaking.length > 0 && (
+          <div className="sports-breaking" data-no-swipe>
+            <div className="sports-breaking-head"><span className="sports-breaking-label">Breaking in sports</span></div>
+            {sportsBreaking.map((a, i) => (
+              <button key={a.link || i} className="sports-breaking-row" onClick={() => onRead(a)}>
+                <span className="sports-breaking-title">{a.title}</span>
+                <span className="sports-breaking-meta">{a.source} · {a._outlets} outlets{a._fav ? ' · your team' : ''}</span>
+              </button>
+            ))}
+          </div>
+        )}
 
         {/* ── LEAGUES — phone: scrollable pill chips (unchanged). >=641 (P5): a wrapping grid of
             equal outlined INDEX TILES carrying live counts ("NFL 12"); 0-count leagues are hidden
