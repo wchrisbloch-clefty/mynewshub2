@@ -1,5 +1,6 @@
 // AA5.1 unit tests for the one-time Z2 feed reconcile.
 import { migrateFeedsZ2 } from './index.js';
+import { migrateFeedsAH } from './ah.js';
 let fail = 0;
 const eq = (got, want, msg) => { const ok = JSON.stringify(got) === JSON.stringify(want); if (!ok) fail++; console.log(`${ok ? 'PASS' : 'FAIL'}  ${msg}${ok ? '' : `  got ${JSON.stringify(got)} want ${JSON.stringify(want)}`}`); };
 
@@ -83,6 +84,29 @@ eq(migrateFeedsAE(droppedCBS, DEF).feeds.general.some(f=>f.name==='CBS News'), t
 const editedBiz = { business: PRE_BIZ.map((n,i)=>({name:n,url:n,on:i!==0})) }; // user turned one off
 eq(migrateFeedsAE(editedBiz, DEF).feeds.business.some(f=>f.name==='Oilprice.com'), true,
    'AF1: edited business list keeps its dups (not pristine)');
+
+// ── AH2: dead-feed fallback patch ────────────────────────────────────────────
+const AH_DEF = {
+  business: [{ name: 'Axios Markets', url: 'https://api.axios.com/feed/business', fallbackUrl: 'GN-axios' }],
+  bloom: [{ name: 'Watcher Guru', url: 'https://news.google.com/rss/search?q=watcherguru', fallbackUrl: 'GN-wg' }],
+  tech: [{ name: 'VentureBeat', url: 'https://venturebeat.com/feed/', mergeFallbackUrl: 'GN-vb' }],
+};
+// saved feeds lack the fallback fields + still have Watcher Guru's old dead URL
+const savedAH = {
+  business: [{ name: 'Axios Markets', url: 'https://api.axios.com/feed/business', on: true }],
+  bloom: [{ name: 'Watcher Guru', url: 'https://watcher.guru/news/feed', on: true }],
+  tech: [{ name: 'VentureBeat', url: 'https://venturebeat.com/feed/', on: true }],
+};
+const ah = migrateFeedsAH(savedAH, AH_DEF);
+eq(ah.feeds.business[0].fallbackUrl, 'GN-axios', 'AH2: Axios Markets gets the fallbackUrl');
+eq(ah.feeds.tech[0].mergeFallbackUrl, 'GN-vb', 'AH2: VentureBeat gets the mergeFallbackUrl');
+eq(ah.feeds.bloom[0].url, 'https://news.google.com/rss/search?q=watcherguru', 'AH2: Watcher Guru adopts the GNews primary (old dead URL)');
+eq(ah.feeds.business[0].on, true, 'AH2: the user on/off flag is preserved');
+// idempotent: re-run changes nothing
+eq(migrateFeedsAH(ah.feeds, AH_DEF).changed, false, 'AH2: re-run is idempotent (no change)');
+// a user who kept a custom Watcher Guru URL is left alone
+const custom = { bloom: [{ name: 'Watcher Guru', url: 'https://my.custom/rss', on: true }] };
+eq(migrateFeedsAH(custom, AH_DEF).feeds.bloom[0].url, 'https://my.custom/rss', 'AH2: a user-edited URL is not overwritten');
 
 console.log(fail === 0 ? '\nALL PASS' : `\n${fail} FAILURE(S)`);
 process.exit(fail === 0 ? 0 : 1);

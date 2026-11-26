@@ -378,7 +378,7 @@ const DEFAULT_FEEDS = {
     // Horse racing
     { name:'BloodHorse',           url:'https://www.bloodhorse.com/horse-racing/feed/',                          on:true },
     { name:'Thoroughbred Daily News', url:'https://www.thoroughbreddailynews.com/feed/',                         on:true },
-    { name:'Horse Race Nation',    url:'https://horseracenation.com/feed/',                                      on:true },
+    { name:'Horse Race Nation',    url:'https://horseracenation.com/feed/',                                      on:true, fallbackUrl:'https://news.google.com/rss/search?q=when:2d%20site:horseracingnation.com&hl=en-US&gl=US&ceid=US:en' }, // AH2: code 0; GNews on the real domain
     { name:"America's Best Racing", url:'https://www.americasbestracing.net/rss.xml',                            on:true },
     { name:'Daily Racing Form',    url:'https://www.drf.com/news/rss/news',                                      on:false },
     // Golf — GolfWeek / Golf Digest / Golf Channel / No Laying Up all went dead (404/403).
@@ -412,10 +412,10 @@ const DEFAULT_FEEDS = {
     // ── AE1 additions (UNVERIFIED until the Source test runs on CB's device, AE9) ──
     { name:'Reuters Business (Google News)', url:'https://news.google.com/rss/search?q=when:1d%20site:reuters.com%20business&hl=en-US&gl=US&ceid=US:en', on:true, _ae:true },
     { name:'WSJ Business',           url:'https://feeds.content.dowjones.io/public/rss/WSJcomUSBusiness',       on:true, _ae:true },
-    { name:'Axios Markets',          url:'https://api.axios.com/feed/business',                                 on:true, _ae:true },
+    { name:'Axios Markets',          url:'https://api.axios.com/feed/business',                                 on:true, _ae:true, fallbackUrl:'https://news.google.com/rss/search?q=when:2d%20site:axios.com%20markets&hl=en-US&gl=US&ceid=US:en' }, // AH2: api.axios.com 404s; GNews on axios.com markets
     // ALT lane (AE1.3b) — shown, labelled "alternative perspective", never leads/breaks.
     { name:'ZeroHedge',              url:'https://feeds.feedburner.com/zerohedge/feed',                         on:true, _ae:true, _alt:true },
-    { name:'Watcher Guru',           url:'https://watcher.guru/news/feed',                                      on:true, _ae:true, _alt:true },
+    { name:'Watcher Guru',           url:'https://news.google.com/rss/search?q=when:2d%20site:watcherguru.com&hl=en-US&gl=US&ceid=US:en', on:true, _ae:true, _alt:true }, // AH2: own feed (watcher.guru/news/feed) now redirects to HTML, 0 items — GNews is the primary (name keeps alt rank)
   ],
   finance: [
     { name:'MarketWatch',   url:'https://feeds.marketwatch.com/marketwatch/topstories/',                        on:true },
@@ -435,7 +435,7 @@ const DEFAULT_FEEDS = {
     { name:'CNBC Energy',           url:'https://www.cnbc.com/id/19836768/device/rss/rss.html',                  on:true },
     { name:'Canary Media',          url:'https://www.canarymedia.com/rss',                                       on:true, sub:'clean' },
     { name:'Rigzone',               url:'https://www.rigzone.com/news/rss/rigzone_latest.aspx',                   on:true, sub:'upstream' },
-    { name:'Data Center Frontier',  url:'https://www.datacenterfrontier.com/feed/',                                on:true,  tier:'reported', sub:'datacenter' },
+    { name:'Data Center Frontier',  url:'https://www.datacenterfrontier.com/feed/',                                on:true,  tier:'reported', sub:'datacenter', mergeFallbackUrl:'https://news.google.com/rss/search?q=when:3d%20%22data%20center%20frontier%22&hl=en-US&gl=US&ceid=US:en' }, // AH2: thin (2 items) — merge GNews on the publisher name
     // ── AE1 additions (UNVERIFIED until CB's device runs the Source test, AE9). More energy
     //   depth (World Oil, Oil & Gas Journal, Offshore, Pipeline & Gas Journal, Hart) is listed
     //   verified-URL-pending in the sources doc — added under the +0.5% bundle cap in a follow-up. ──
@@ -472,7 +472,7 @@ const DEFAULT_FEEDS = {
     { name:'The Verge',         url:'https://www.theverge.com/rss/index.xml',                     on:true },
     { name:'Wired',             url:'https://www.wired.com/feed/rss',                             on:true },
     { name:'Ars Technica',      url:'https://feeds.arstechnica.com/arstechnica/index',            on:true },
-    { name:'VentureBeat',       url:'https://venturebeat.com/feed/',                              on:true },
+    { name:'VentureBeat',       url:'https://venturebeat.com/feed/',                              on:true, mergeFallbackUrl:'https://news.google.com/rss/search?q=when:2d%20%22venturebeat%22&hl=en-US&gl=US&ceid=US:en' }, // AH2: thin (8 items) — merge GNews on the publisher name
     { name:'MIT Tech Review',   url:'https://www.technologyreview.com/feed/',                     on:true },
     { name:'Hacker News',       url:'https://hnrss.org/frontpage',                                on:true,  tier:'inferred' }, // AG1: hnrss (news.ycombinator.com/rss blocked on device)
     { name:'IEEE Spectrum',     url:'https://spectrum.ieee.org/feeds/feed.rss',                   on:true },
@@ -881,35 +881,12 @@ async function fetchWithTimeout(url, ms=8000, opts={}) {
   const timer = setTimeout(() => ctrl.abort(), ms);
   try { return await fetch(url, {...opts, signal:ctrl.signal}); } finally { clearTimeout(timer); }
 }
-// AG1: Google News `site:` search is the reliable fallback for a publisher whose own RSS blocks or
-// 404s — every GNews site:/topic feed we added LOADED on CB's device. Derived from the primary host.
-function gnewsFallback(url) {
-  try {
-    const h = new URL(url).hostname.replace(/^www\./, '');
-    if (!h || h.includes('news.google.com')) return ''; // never fall back GNews → GNews
-    return `https://news.google.com/rss/search?q=when:2d%20site:${h}&hl=en-US&gl=US&ceid=US:en`;
-  } catch { return ''; }
-}
-async function fetchRSS(url, fallbackUrl) {
-  // ONE first-party fetch path: /api/feed (browser UA + retry, robust server-side
-  // parse for RSS / Atom / JSON / link-in-guid). It always returns 200 with
-  // { items, error?, status } so we can surface the real upstream status.
-  let lastStatus = 0;
-  try {
-    const r = await fetchWithTimeout(`/api/feed?url=${encodeURIComponent(url)}`, 12000);
-    if (r.ok) { const d = await r.json(); if (d.items?.length) return {items:d.items, reason:'', status:200, usedFallback:false}; if (d.status) lastStatus = d.status; }
-  } catch {}
-  // AG1: ONE fallback attempt through the SAME proxy — an explicit per-feed fallbackUrl, else the
-  // Google News site: search. Items keep the feed's original `name`, so rank/sub/alt still apply; the
-  // source is flagged `via Google News` for the Test report.
-  const fb = fallbackUrl || gnewsFallback(url);
-  if (fb && fb !== url) {
-    try {
-      const r = await fetchWithTimeout(`/api/feed?url=${encodeURIComponent(fb)}`, 8000);
-      if (r.ok) { const d = await r.json(); if (d.items?.length) return {items:d.items, reason:'', status:200, usedFallback:true, via:'Google News'}; }
-    } catch {}
-  }
-  return {items:[], reason:`unavailable${lastStatus?` (${lastStatus})`:''}`, status:lastStatus, usedFallback:false};
+// AH2: the fallback rule, GNews helper AND the /api/feed proxy fetch all live in a lazy chunk (the
+// first fetch is after first paint; the import is cached), so they stay out of the initial bundle.
+let _ff = null, _doFetch = null;
+async function fetchRSS(url, fallbackUrl, mergeFallbackUrl) {
+  if (!_ff) { try { _ff = await import('./modules/feed-fetch'); _doFetch = _ff.makeProxyFetch(fetchWithTimeout); } catch { return { items: [], usedFallback: false, reason: 'unavailable', status: 0 }; } }
+  return _ff.fetchWithFallback(url, { fallbackUrl, mergeFallbackUrl, gnews: _ff.gnewsFallback, doFetch: _doFetch });
 }
 
 // ─── FORMATTERS ───────────────────────────────────────────────────────────────
@@ -9694,6 +9671,15 @@ export default function App() {
     if (DEBUG && typeof console !== 'undefined') console.log('[feedsMigrationAE] applied; added:', ae.added, 'z2 moved:', z2.changed);
     return ae.feeds;
   });
+  // AH2: after first paint, lazily patch saved feeds with the dead-feed fallbacks (idempotent; the
+  // patch module is in its own lazy chunk, out of the initial bundle). Applies the next refresh.
+  useEffect(() => {
+    import('./modules/feeds-migrate/ah').then(m => setFeeds(prev => {
+      const r = m.migrateFeedsAH(prev, DEFAULT_FEEDS);
+      if (r.changed) { try { sv('feeds', r.feeds); } catch {} return r.feeds; }
+      return prev;
+    })).catch(() => {});
+  }, []);
   // AF2.2: "Show alternative perspective" — default ON. When off, items from `alt` sources
   // (Daily Wire / ZeroHedge / Watcher Guru) are hidden on every page/band. Stored with prefs.
   const [showAlt, setShowAlt] = useState(() => ld('showAlt', true));
@@ -10161,7 +10147,7 @@ export default function App() {
     setLoading(l=>({...l,[cat]:true}));
     const results=[],hUpdates={},fhUpdates={};
     await Promise.allSettled((feeds[cat]||[]).filter(f=>f.on).map(async f=>{
-      const t0=Date.now();const{items,status,reason,usedFallback}=await fetchRSS(f.url,f.fallbackUrl);const ms=Date.now()-t0;
+      const t0=Date.now();const{items,status,reason,usedFallback}=await fetchRSS(f.url,f.fallbackUrl,f.mergeFallbackUrl);const ms=Date.now()-t0;
       const ok=items.length>0;
       hUpdates[f.name]=ok?(ms<4000?'green':'yellow'):'red';
       fhUpdates[f.name]={code:status||0, ok, reason:reason||'', usedFallback:!!usedFallback};
@@ -10185,7 +10171,7 @@ export default function App() {
   const fetchCatArticles = useCallback(async (cat)=>{
     const results=[];
     await Promise.allSettled((feeds[cat]||[]).filter(f=>f.on).map(async f=>{
-      const {items}=await fetchRSS(f.url,f.fallbackUrl);
+      const {items}=await fetchRSS(f.url,f.fallbackUrl,f.mergeFallbackUrl);
       items.forEach(i=>{if(i.title&&i.link)results.push({...i,source:f.name,cat,_tier:f.tier||'reported'});});
     }));
     results.sort((a,b)=>new Date(b.pubDate)-new Date(a.pubDate));

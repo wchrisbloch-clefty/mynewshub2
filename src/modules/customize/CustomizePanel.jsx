@@ -82,7 +82,7 @@ export function CustomizePanel({feeds, kw, alerts, urgent, social, watchlist, te
       while (i < jobs.length) {
         const { cat, f } = jobs[i++];
         const t0 = Date.now();
-        let r; try { r = await fetchRSS(f.url, f.fallbackUrl); } catch { r = { items:[], reason:'error', status:0 }; }
+        let r; try { r = await fetchRSS(f.url, f.fallbackUrl, f.mergeFallbackUrl); } catch { r = { items:[], reason:'error', status:0 }; }
         const row = { cat, name:f.name, items:(r.items||[]).length, code:r.status||0, reason:r.reason||'',
           usedFallback:!!r.usedFallback, via:r.via||'', rank:rankOf(f.name), sub:f.sub||'', alt:!!f._alt, ms:Date.now()-t0 };
         done++;
@@ -96,8 +96,10 @@ export function CustomizePanel({feeds, kw, alerts, urgent, social, watchlist, te
     const rows = testAll.rows.slice().sort((a,b)=> a.cat.localeCompare(b.cat) || a.name.localeCompare(b.name));
     const report = {
       generatedAt: new Date().toISOString(),
-      summary: { total: rows.length, ok: rows.filter(r=>r.items>0).length, failed: rows.filter(r=>r.items===0).length, viaFallback: rows.filter(r=>r.usedFallback).length },
-      feeds: rows.map(r => ({ feed:r.name, category:CAT_LABELS[r.cat]||r.cat, status:r.items>0?'ok':'fail', items:r.items, code:r.code, reason:r.reason, usedFallback:r.usedFallback, via:r.via, rank:r.rank, sub:r.sub, alt:r.alt })),
+      // AH2: a feed whose fallback was tried but still returned 0 items is "no-items" (neutral), not a
+      // hard failure — so the red count is only genuinely broken feeds with no fallback.
+      summary: { total: rows.length, ok: rows.filter(r=>r.items>0).length, noItems: rows.filter(r=>r.items===0&&r.usedFallback).length, failed: rows.filter(r=>r.items===0&&!r.usedFallback).length, viaFallback: rows.filter(r=>r.usedFallback&&r.items>0).length },
+      feeds: rows.map(r => ({ feed:r.name, category:CAT_LABELS[r.cat]||r.cat, status:r.items>0?'ok':(r.usedFallback?'no-items':'fail'), items:r.items, code:r.code, reason:r.reason, usedFallback:r.usedFallback, via:r.via, rank:r.rank, sub:r.sub, alt:r.alt })),
     };
     try { navigator.clipboard.writeText(JSON.stringify(report, null, 2)); setCopied(true); setTimeout(()=>setCopied(false), 1500); } catch {}
   };
@@ -207,15 +209,15 @@ export function CustomizePanel({feeds, kw, alerts, urgent, social, watchlist, te
               </div>
               {testAll.rows.length>0 && (
                 <div className="cp-testall-results">
-                  <div className="cp-desc"><strong>{testAll.rows.filter(r=>r.items>0).length}</strong> loaded · <strong>{testAll.rows.filter(r=>r.items===0).length}</strong> failed · <strong>{testAll.rows.filter(r=>r.usedFallback).length}</strong> via Google News</div>
+                  <div className="cp-desc"><strong>{testAll.rows.filter(r=>r.items>0).length}</strong> loaded · <strong>{testAll.rows.filter(r=>r.items===0&&!r.usedFallback).length}</strong> failed · <strong>{testAll.rows.filter(r=>r.usedFallback&&r.items>0).length}</strong> via Google News</div>
                   {Object.keys(CAT_LABELS).filter(c=>testAll.rows.some(r=>r.cat===c)).map(c=>(
                     <div key={c} className="cp-testall-cat">
                       <div className="cp-testall-cathead">{CAT_LABELS[c]}</div>
                       {testAll.rows.filter(r=>r.cat===c).map((r,j)=>(
                         <div key={j} className="cp-testall-row">
-                          <span className={`cp-health ${r.items>0?(r.usedFallback?'cp-h-yellow':'cp-h-green'):'cp-h-red'}`}/>
+                          <span className={`cp-health ${r.items>0?(r.usedFallback?'cp-h-yellow':'cp-h-green'):(r.usedFallback?'cp-h-yellow':'cp-h-red')}`}/>
                           <span className="cp-testall-name">{r.name}</span>
-                          <span className="cp-testall-stat">{r.items>0 ? `${r.items} items${r.usedFallback?' · via Google News':''}` : (r.reason||`fail${r.code?` (${r.code})`:''}`)}</span>
+                          <span className="cp-testall-stat">{r.items>0 ? `${r.items} items${r.usedFallback?' · via Google News':''}` : (r.usedFallback ? 'no items' : (r.reason||`fail${r.code?` (${r.code})`:''}`))}</span>
                         </div>
                       ))}
                     </div>
