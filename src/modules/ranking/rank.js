@@ -19,12 +19,17 @@ export const RANKS = ['core', 'specialist', 'fan', 'alt', 'local'];
 const CORE = new Set([
   'AP (Google News)', 'Reuters (Google News)', 'CBS News', 'ABC News', 'NBC News', 'CNN',
   'The New York Times', 'Wall Street Journal', 'Politico', 'Axios', 'BBC News', 'NPR News',
+  // AH3.3: Fox News → core, for parity with CNN/ABC/CBS/NBC (largest US cable news outlet). NY Post
+  // stays specialist; Daily Wire/ZeroHedge/Watcher Guru stay alt. REVERSIBLE — remove to revert.
+  'Fox News',
   'The Guardian US', 'Reuters Business (Google News)', 'WSJ Business', 'WSJ Markets', 'CNBC Top News',
   'CNBC Business', 'MarketWatch', 'Bloomberg', 'Yahoo Finance', 'FT (Google News)', 'Axios Markets',
   'The Guardian Business', 'EIA Today in Energy', 'U.S. Department of Energy', 'FERC',
   'American Petroleum Institute (Google News)', 'CNBC Energy', 'TechCrunch', 'The Verge', 'Wired',
   'Ars Technica', 'VentureBeat', 'MIT Tech Review', 'IEEE Spectrum', 'Techmeme', 'OpenAI',
   'Google DeepMind', 'Yahoo Sports', 'The Athletic', 'Fox Sports', 'Pro Football Talk',
+  // AH3.2: ESPN top-headlines feed → core (its league feeds "ESPN NFL" etc. already match the ESPN rule).
+  'ESPN',
   'Sports Illustrated', 'Bleacher Report',
 ]);
 const FAN = new Set(['The Spun', 'OutKick', '247Sports', 'On3 Recruiting']);

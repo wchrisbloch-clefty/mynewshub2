@@ -84,6 +84,7 @@ import { selectStateOfPlay } from './modules/state-of-play/select.js';
 import { rankHomeTop } from './modules/top-stories/select';
 import { scoreStory, rankMode, coverageOf, isAlt as isAltSource } from './modules/ranking';
 import { selectAlsoMoving } from './modules/also-moving/select'; // AG3
+import { sourcesForSub } from './modules/feeds-sub'; // AH3.1: canonical sub keys
 import { anyWholeWord } from './modules/text-match';
 import { TopicTag } from './modules/topic-tag';
 import { CatIcon, SHOW_CHIP_ICONS } from './modules/cat-icon';
@@ -477,15 +478,15 @@ const DEFAULT_FEEDS = {
     { name:'IEEE Spectrum',     url:'https://spectrum.ieee.org/feeds/feed.rss',                   on:true },
     { name:'9to5Google',        url:'https://9to5google.com/feed/',                               on:false },
     { name:'9to5Mac',           url:'https://9to5mac.com/feed/',                                  on:false },
-    // ── AF5: AI "stay-current" daily digests. sub:'stay-current' routes them to the Tech
+    // ── AF5: AI "stay-current" daily digests. sub:'staycurrent' routes them to the Tech
     //   "Stay current" chip (AF2.1). TLDR AI / Hugging Face / Import AI VERIFIED (returned <item>s
     //   over the agent proxy); Latent Space serves application/rss+xml 200 but item-level is pending
     //   CB's device Source test, so it ships UNVERIFIED (no tier). Hard Fork omitted — no first-party
     //   RSS URL could be resolved (never guessed). ──
-    { name:'TLDR AI',           url:'https://tldr.tech/api/rss/ai',                               on:true, _ae:true, tier:'verified', sub:'stay-current' },
-    { name:'Hugging Face',      url:'https://huggingface.co/blog/feed.xml',                       on:true, _ae:true, tier:'verified', sub:'stay-current' },
-    { name:'Import AI',         url:'https://importai.substack.com/feed',                         on:true, _ae:true, tier:'verified', sub:'stay-current' },
-    { name:'Latent Space',      url:'https://www.latent.space/feed',                              on:true, _ae:true, sub:'stay-current' },
+    { name:'TLDR AI',           url:'https://tldr.tech/api/rss/ai',                               on:true, _ae:true, tier:'verified', sub:'staycurrent' },
+    { name:'Hugging Face',      url:'https://huggingface.co/blog/feed.xml',                       on:true, _ae:true, tier:'verified', sub:'staycurrent' },
+    { name:'Import AI',         url:'https://importai.substack.com/feed',                         on:true, _ae:true, tier:'verified', sub:'staycurrent' },
+    { name:'Latent Space',      url:'https://www.latent.space/feed',                              on:true, _ae:true, sub:'staycurrent' },
     // Analysis (reported) — opt-in; surfaced via the Source Directory (Pass L item 4).
     // (Semafor Tech dropped: no RSS endpoint could be verified — their old
     //  /rss/technology.xml 404s and egress is blocked here, so rather than ship another
@@ -8852,7 +8853,7 @@ function FeedPage({ cat, ctx }) {
       policy:  ['policy','regulation','epa','federal','congress','legislation','tariff','subsidy','permit','department of energy','doe','ferc','administration','executive order','climate bill'],
     };
     // AF2.1: Tech chips. "Stay current" gathers the AF5 daily-digest feeds by source name (they carry
-    // sub:'stay-current'); the rest match whole-word on the headline (AE6). Icons reuse imports.
+    // sub:'staycurrent'); the rest match whole-word on the headline (AE6). Icons reuse imports.
     const TECH_SUBTABS = [
       { key:'all',         label:'All',           icon:LayoutGrid },
       { key:'aimodels',    label:'AI & Models',   icon:Zap },
@@ -8867,7 +8868,9 @@ function FeedPage({ cat, ctx }) {
       chips:   ['chip','semiconductor','gpu','tsmc','foundry','wafer','data center','hbm','asml'],
       startups:['startup','seed round','series a','series b','venture','funding round','valuation','founder','raise'],
     };
-    const TECH_STAYCURRENT_SRC = new Set(['TLDR AI','Hugging Face','Import AI','Latent Space']);
+    // AH3.1: the Stay-current source set is derived from the feeds' (normalized) `sub` — so every feed
+    // tagged staycurrent (incl. ones that drifted to the `stay-current` spelling) lands in the chip.
+    const techStaycurrentSrc = useMemo(() => sourcesForSub(feeds.tech, 'staycurrent'), [feeds]);
 
     // Filter items by pop culture sub-tab
     // AE6: WHOLE-WORD sub-category filtering (was substring .includes, which lit up 'ev' inside
@@ -8881,10 +8884,10 @@ function FeedPage({ cat, ctx }) {
 
     const tcFilteredItems = useMemo(() => {
       if (cat !== 'tech' || tcSubTab === 'all') return items;
-      if (tcSubTab === 'staycurrent') return items.filter(a => TECH_STAYCURRENT_SRC.has(a.source));
+      if (tcSubTab === 'staycurrent') return items.filter(a => techStaycurrentSrc.has(a.source));
       const kws = TECH_KWS[tcSubTab] || [];
       return items.filter(a => anyWholeWord((a.title + ' ' + (a.desc||'')), kws));
-    }, [items, cat, tcSubTab]);
+    }, [items, cat, tcSubTab, techStaycurrentSrc]);
 
     const enFilteredItems = useMemo(() => {
       if (cat !== 'bloom' || enSubTab === 'all') return items;
