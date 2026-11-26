@@ -78,7 +78,11 @@ redundant / false-hitting energy keywords were dropped to seat the last few byte
 Unit (16 suites): ranking · wholeword · migrate 6/6 · voicefind · sports-breaking · across-outlets ·
 also-moving · aether-import · trending 10/10 · voice-flag 9/9 · feed-fetch 10/10 · sub-rank 23/23 ·
 bulk-accept 6/6 · top-stories/select · state-of-play/select — **ALL PASS**. check:tokens **PASS**.
-Visual suite (390 / 820 / 1194 / 1440, light + dark): _finalized in the commit that closes this report._
+Visual (fixtures, light + dark, widths 390 … 1440): conformance **ALL CONFORMANT** · empty-box **PASS** ·
+text-overlap **PASS (0 overlaps)** · contrast **PASS** · dedupe-label **PASS** · sports-dedup **PASS** ·
+p5-sports-index **PASS** · o7-hero-contrast **PASS** · touch-mode **PASS** · image-slots **PASS** ·
+layout-polish **PASS** · fixed-overlap **PASS** · alt-governance **PASS** · font-network **PASS**.
+**14/14 visual gates green.** Final initial JS gzip 181,795 B (= the +1.1% cap).
 
 ## What CB does
 - Preview → **Customize → Voices → Accept all → confirm** (expect 105+ added, Undo available).
