@@ -8822,10 +8822,10 @@ function FeedPage({ cat, ctx }) {
       upstream:   ['upstream','drilling','rig','exploration','wellhead','shale','fracking','permian','e&p','crude production','offshore drilling','wildcat'],
       midstream:  ['midstream','pipeline','terminal','ngl','gathering','lng export','compressor','storage hub','takeaway'],
       downstream: ['downstream','refinery','refining','petrochemical','gasoline','diesel','crack spread','fuel retail','refined products'],
-      datacenter: ['data center','datacenter','data-center','hyperscale','ai power','powering ai','load growth','grid demand','server farm','ppa'],
+      datacenter: ['data center','datacenter','hyperscale','ai power','load growth','grid demand'],
       power:   ['power','electric','grid','utility','electricity','megawatt','kilowatt','nuclear','coal','natural gas','transmission','substation','generation','powerplant','baseload'],
       oilgas:  ['oil','gas','petroleum','crude','refinery','pipeline','opec','brent','wti','shale','drilling','rig','barrel','lng','gasoline'],
-      clean:   ['solar','wind','renewable','clean energy','green','battery','storage','ev','hydrogen','carbon','emissions','climate','sustainability','net zero','offshore wind'],
+      clean:   ['solar','wind','renewable','clean energy','battery','storage','ev','hydrogen','carbon','emissions','climate','sustainability','net zero','offshore wind'],
       markets: ['commodity','commodities','futures','spot price','energy prices','gas prices','oil prices','supply','demand','export','import'],
       policy:  ['policy','regulation','epa','federal','congress','legislation','tariff','subsidy','permit','department of energy','doe','ferc','administration','executive order','climate bill'],
     };
@@ -9930,6 +9930,10 @@ export default function App() {
   const skipSeed = useCallback((id) => {
     setVoiceTombstones(prev => prev.includes(id) ? prev : (() => { const n = [...prev, id]; sv('voiceTombstones', n); return n; })());
   }, []);
+  // AH1: bulk "Accept all" — add many seeds at once as status:'unconfirmed', confirmedBy:'accept-all'.
+  // NO per-person handle prompt (handles resolve lazily later via Lane 1). Tombstoned ids are never
+  // re-added; existing ids are skipped and counted. Returns { added, skipped, prevVoices, addedIds }
+  // so the panel can offer Undo (restore) / "Remove added". Only persists prefs — no network.
   // E5: "Test voices" — per voice/platform reachability (makes NO search-API calls).
   const [voicesTest, setVoicesTest] = useState(null); // { loading, summary, results }
   const testVoices = useCallback(async () => {
@@ -11148,7 +11152,7 @@ export default function App() {
           briefingSources={briefingSources}
           initialTab={panelInitial.tab} initialCat={panelInitial.cat}
           voices={voices} onAddVoice={addOrUpdateVoice} removeVoiceById={removeVoiceById} reorderVoice={reorderVoice}
-          onResolveVoice={resolveVoiceFlow} seedQueue={seedQueue} onAcceptSeed={resolveVoiceFlow} onSkipSeed={skipSeed} onFindVoices={findVoices} onImportAether={importAetherVoices}
+          onResolveVoice={resolveVoiceFlow} seedQueue={seedQueue} onAcceptSeed={resolveVoiceFlow} onSkipSeed={skipSeed} onFindVoices={findVoices} onImportAether={importAetherVoices} onSetVoices={(list)=>{setVoices(list||[]);try{sv('voices',list||[]);}catch{}}}
           onTestVoices={testVoices} voicesTest={voicesTest} searchKeyPresent={false}
           CATS={CATS} INDICES={INDICES} DEFAULT_WEATHER_CITIES={DEFAULT_WEATHER_CITIES} DEFAULT_SOCIAL={DEFAULT_SOCIAL}
           BRIEFING_PRIORITY_SOURCES={BRIEFING_PRIORITY_SOURCES} SOCIAL_META={SOCIAL_META}

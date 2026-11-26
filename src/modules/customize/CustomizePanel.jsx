@@ -10,6 +10,7 @@ import { ChevronDown, X as XIcon, CheckSquare, Square } from 'lucide-react';
 import { VOICE_PLATFORMS } from '../voices/model';
 import { rankOf } from '../ranking'; // AG1.3: source rank for the Test-all report
 import { AETHER_PEOPLE, AETHER_X_VOICES } from '../voices/aether-import'; // AG5.2: import roster (lazy)
+import { bulkAccept } from '../voices/bulk-accept'; // AH1: bulk accept-all (lazy chunk)
 import './CustomizePanel.css'; // AG1.3/AG6.1: lazy-chunk styles (kept out of initial GLOBAL_CSS)
 
 // Moved from App with the panel (its only consumer).
@@ -18,7 +19,7 @@ const PLAT_LABELS = { twitter: '𝕏', linkedin: 'in', instagram: 'IG', youtube:
 
 export function CustomizePanel({feeds, kw, alerts, urgent, social, watchlist, teams, health, arts, weatherCities, hiddenIndices, briefingExclude, briefingSources, initialTab, initialCat, onClose, onSave,
   voices, onAddVoice, removeVoiceById, reorderVoice, onResolveVoice, onTestVoices, voicesTest, searchKeyPresent,
-  seedQueue, onAcceptSeed, onSkipSeed, onFindVoices, onImportAether, aeAdded = 0, showAlt = true, onToggleAlt, fetchRSS,
+  seedQueue, onAcceptSeed, onSkipSeed, onFindVoices, onImportAether, onSetVoices, aeAdded = 0, showAlt = true, onToggleAlt, fetchRSS,
   CATS, INDICES, DEFAULT_WEATHER_CITIES, DEFAULT_SOCIAL, BRIEFING_PRIORITY_SOURCES, SOCIAL_META}) {
   const [lf, setLf] = useState(JSON.parse(JSON.stringify(feeds)));
   const [lk, setLk] = useState(JSON.parse(JSON.stringify(kw)));
@@ -60,6 +61,22 @@ export function CustomizePanel({feeds, kw, alerts, urgent, social, watchlist, te
   const [imported, setImported] = useState(() => new Set());
   const AETHER_ROSTER = [...AETHER_PEOPLE, ...AETHER_X_VOICES];
   const doImport = (rows) => { if (onImportAether) onImportAether(rows); setImported(prev => { const n = new Set(prev); rows.forEach(r => n.add(r.name)); return n; }); };
+  // AH1: "Accept all" bulk-accept of suggested voices (unconfirmed; handles resolved lazily later).
+  const [acceptPending, setAcceptPending] = useState(null); // { label, seeds }
+  const [acceptDone, setAcceptDone] = useState(null);        // { added, skipped, prevVoices }
+  // org seeds that duplicate an existing SOURCE feed (AH1.4) — included in "orgs" but marked.
+  const sourceNames = new Set(); for (const c of Object.keys(lf || {})) for (const f of (lf[c] || [])) if (f && f.name) sourceNames.add(f.name);
+  // seedQueue is already pre-filtered of tombstoned/duplicate ids, so bulkAccept here never re-adds.
+  const confirmAccept = () => {
+    if (!onSetVoices || !acceptPending) return;
+    const prev = voices || [];
+    const r = bulkAccept(prev, [], acceptPending.seeds);
+    setAcceptPending(null); onSetVoices(r.voices);
+    const done = { added: r.added, skipped: r.skipped, prev };
+    setAcceptDone(done);
+    setTimeout(() => setAcceptDone(d => d === done ? null : d), 10000);
+  };
+  const undoAccept = () => { if (onSetVoices && acceptDone) onSetVoices(acceptDone.prev); setAcceptDone(null); };
   const VOICE_CATS = ['general','business','bloom','tech','sports','health','popculture'];
 
   const testFeed = async (url, key) => {
@@ -368,23 +385,49 @@ export function CustomizePanel({feeds, kw, alerts, urgent, social, watchlist, te
                     <ChevronDown size={12} aria-hidden="true" style={{transform:showSeeds?"none":"rotate(-90deg)",verticalAlign:"-2px"}}/> Suggested voices ({seedQueue.length})
                   </button>
                   {showSeeds && (
-                    <div className="cp-seed-list">
-                      {seedQueue.map(s => (
-                        <div key={s.id} className="cp-seed-row">
-                          <span className="cp-seed-name">{s.name}</span>
-                          <span className="cp-voice-type">{s.type}</span>
-                          <span className="cp-seed-cat">{(CATS[s.category]||{}).label||s.category}</span>
-                          {s._parkedFrom && <span className="cp-voice-flag" title="Parked here pending your category decision">parked: {s._parkedFrom}</span>}
-                          {s.handles && Object.keys(s.handles).length>0 && <span className="cp-voice-handles">{VOICE_PLATFORMS.filter(p=>s.handles[p]).join(' · ')}</span>}
-                          <span className="cp-seed-actions">
-                            <button className="cp-btn" onClick={()=>onAcceptSeed&&onAcceptSeed(s)}>Accept</button>
-                            <button className="cp-btn-sec" onClick={()=>onSkipSeed&&onSkipSeed(s.id)}>Skip</button>
-                          </span>
+                    <>
+                      {/* AH1: Accept all + scopes. Adds voices by NAME (status unconfirmed); handles
+                          are resolved lazily later — no per-person prompt, no network on accept. */}
+                      {onSetVoices && !acceptPending && !acceptDone && (
+                        <div className="cp-accept-all">
+                          <button className="cp-btn" onClick={()=>setAcceptPending({label:'all suggested', seeds:seedQueue})}>Accept all ({seedQueue.length})</button>
+                          {seedQueue.some(s=>s.type==='person') && <button className="cp-btn-sec" onClick={()=>setAcceptPending({label:'people', seeds:seedQueue.filter(s=>s.type==='person')})}>People ({seedQueue.filter(s=>s.type==='person').length})</button>}
+                          {seedQueue.some(s=>s.type==='org') && <button className="cp-btn-sec" onClick={()=>setAcceptPending({label:'orgs', seeds:seedQueue.filter(s=>s.type==='org')})}>Orgs ({seedQueue.filter(s=>s.type==='org').length})</button>}
+                          {[...new Set(seedQueue.map(s=>s.category))].map(cat=>(
+                            <button key={cat} className="cp-btn-sec" onClick={()=>setAcceptPending({label:(CATS[cat]||{}).label||cat, seeds:seedQueue.filter(s=>s.category===cat)})}>{(CATS[cat]||{}).label||cat} ({seedQueue.filter(s=>s.category===cat).length})</button>
+                          ))}
                         </div>
-                      ))}
-                    </div>
+                      )}
+                      {acceptPending && (
+                        <div className="cp-accept-confirm">
+                          <div className="cp-desc">Add <strong>{acceptPending.seeds.length}</strong> voice{acceptPending.seeds.length===1?'':'s'} ({acceptPending.label}) to your Voices. Nothing posts or loads from X until you tap a voice. Handles are checked later.</div>
+                          <div className="cp-accept-btns"><button className="cp-btn" onClick={confirmAccept}>Add them</button><button className="cp-btn-sec" onClick={()=>setAcceptPending(null)}>Cancel</button></div>
+                        </div>
+                      )}
+                      <div className="cp-seed-list">
+                        {seedQueue.map(s => (
+                          <div key={s.id} className="cp-seed-row">
+                            <span className="cp-seed-name">{s.name}</span>
+                            <span className="cp-voice-type">{s.type}</span>
+                            <span className="cp-seed-cat">{(CATS[s.category]||{}).label||s.category}</span>
+                            {s._parkedFrom && <span className="cp-voice-flag" title="Parked here pending your category decision">parked: {s._parkedFrom}</span>}
+                            {s.type==='org' && sourceNames.has(s.name) && <span className="cp-voice-flag" title="You already follow this as a news source">already a source</span>}
+                            {s.handles && Object.keys(s.handles).length>0 && <span className="cp-voice-handles">{VOICE_PLATFORMS.filter(p=>s.handles[p]).join(' · ')}</span>}
+                            <span className="cp-seed-actions">
+                              <button className="cp-btn" onClick={()=>onAcceptSeed&&onAcceptSeed(s)}>Accept</button>
+                              <button className="cp-btn-sec" onClick={()=>onSkipSeed&&onSkipSeed(s.id)}>Skip</button>
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    </>
                   )}
                 </div>
+              )}
+              {/* AH1: "N added / Undo" persists even after Accept-all empties the suggestion queue
+                  (10s window; Undo restores the previous Voices list). */}
+              {acceptDone && (
+                <div className="cp-accept-done"><span className="cp-desc"><strong>{acceptDone.added} added</strong>{acceptDone.skipped?` · ${acceptDone.skipped} already there`:''}</span><button className="cp-btn-sec" onClick={undoAccept}>Undo</button></div>
               )}
               {/* Grouped by category */}
               {VOICE_CATS.map(cat => {

@@ -20,3 +20,9 @@
 .cp-chev{vertical-align:-2px;}
 .cp-chev-closed{transform:rotate(-90deg);}
 .cp-aether-all{margin-bottom:8px;}
+
+/* AH1: Accept-all voices controls */
+.cp-accept-all{display:flex;flex-wrap:wrap;gap:6px;margin:6px 0 8px;}
+.cp-accept-confirm{border:1px solid var(--border);border-radius:var(--radius-md);padding:10px 12px;margin:6px 0 8px;}
+.cp-accept-btns{display:flex;gap:8px;margin-top:8px;}
+.cp-accept-done{display:flex;align-items:center;gap:10px;margin:6px 0 8px;}
